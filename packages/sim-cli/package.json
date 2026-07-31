@@ -1,0 +1,15 @@
+{
+  "name": "@paths-beyond/sim-cli",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/cli.ts",
+  "types": "./src/cli.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@paths-beyond/data",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./validate.ts",
+  "types": "./validate.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "validate:data": "tsx validate.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
