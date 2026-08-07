@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import type { Id } from '@paths-beyond/core';
-import { loadBalanceContent } from './loadContent.js';
+import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { formatReport, buildReport } from './report.js';
 import { runTournament } from './runTournament.js';
 
@@ -33,7 +33,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 
 export function runCli(argv: readonly string[]): string {
   const { runs, seed } = parseArgs(argv);
-  const content = loadBalanceContent();
+  const content = loadCatalogFromDisk();
 
   if (content.comps.length < 2) {
     throw new Error('tools/balance precisa de pelo menos 2 composições em packages/data/test-fixtures/comps/valid/ pra montar uma matriz');

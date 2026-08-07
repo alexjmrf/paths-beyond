@@ -1,0 +1,58 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { findJsonFiles } from '@paths-beyond/data/validate.js';
+import { buildCatalog } from './buildCatalog.js';
+import type { ContentCatalog } from './types.js';
+
+// Diretório-fonte por padrão: packages/data/ (conteúdo real). `import.meta.resolve`
+// seria mais robusto a mudanças de estrutura do monorepo, mas o loader SSR do Vitest
+// (vite-node) não o implementa — mesma categoria de divergência tsx-vs-vite-node já
+// documentada em packages/data/validate.ts (DECISIONS.md, M1) e reaproveitada em
+// tools/balance/src/loadContent.ts (M8). Caminho relativo à posição deste arquivo dentro
+// do monorepo funciona nos dois ambientes.
+function realContentDir(): string {
+  const hereDir = fileURLToPath(new URL('.', import.meta.url)); // packages/content/src/
+  return join(hereDir, '..', '..', 'data');
+}
+
+export type ContentLayout = 'flat' | 'valid-subdir';
+
+export interface LoadCatalogFromDiskOptions {
+  readonly rootDir?: string;
+  readonly layout?: ContentLayout;
+}
+
+function typeDir(rootDir: string, type: string, layout: ContentLayout): string {
+  return layout === 'valid-subdir' ? join(rootDir, type, 'valid') : join(rootDir, type);
+}
+
+function readJsonFiles(dir: string): unknown[] {
+  return findJsonFiles(dir).map((file) => JSON.parse(readFileSync(file, 'utf8')));
+}
+
+function readFirstJsonFile(dir: string): unknown {
+  const files = findJsonFiles(dir);
+  const first = files[0];
+  if (!first) throw new Error(`nenhum conteúdo válido encontrado em ${dir}`);
+  return JSON.parse(readFileSync(first, 'utf8'));
+}
+
+// Adapter Node de `buildCatalog` (D2, M9): só lê o disco e entrega JSON já parseado pra
+// função pura fazer a validação/indexação/fusão. Usado por `apps/server`, `sim-cli` e
+// `tools/balance` — nenhum deles roda em browser.
+export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): ContentCatalog {
+  const root = options.rootDir ?? realContentDir();
+  const layout = options.layout ?? 'flat';
+
+  return buildCatalog({
+    classes: readJsonFiles(typeDir(root, 'classes', layout)),
+    skills: readJsonFiles(typeDir(root, 'skills', layout)),
+    items: readJsonFiles(typeDir(root, 'items', layout)),
+    itemSets: readJsonFiles(typeDir(root, 'item-sets', layout)),
+    comps: readJsonFiles(typeDir(root, 'comps', layout)),
+    maps: readJsonFiles(typeDir(root, 'maps', layout)),
+    terrains: readJsonFiles(typeDir(root, 'terrains', layout)),
+    weaponDuelRanges: readFirstJsonFile(typeDir(root, 'weapon-duel-ranges', layout)),
+  });
+}

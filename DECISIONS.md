@@ -497,3 +497,62 @@ duplicado verbatim nos dois arquivos.
 
 Nenhuma mudança de código nesta sessão — só a auditoria, as entradas M9–M14 em
 `docs/spec/09-roadmap.md`, o briefing de M9 e a atualização de `PROGRESS.md`.
+
+## M9 — Integração de conteúdo
+
+### M9 — sub-sessão 1: `packages/content` (o loader)
+
+- **Reconstrução de histórico git (Parte 0) tratada como trabalho desta sessão, não como
+  decisão de design** — segue literalmente o agrupamento por milestone já prescrito no
+  briefing (`m1`..`m8` + `chore`). Único desvio: um commit extra de correção
+  (`packages/core/src/battle/aiTurn.ts` — resolveAiTurns, M7 sub-sessão 6 — tinha ficado
+  de fora do commit de M7 porque só foi notado depois; corrigido com um commit pequeno
+  rotulado M7 antes do commit de M8, em vez de misturado no lugar errado). Arquivos
+  "plumbing" que evoluem em cima de vários milestones (`package.json`/
+  `pnpm-workspace.yaml`/`vitest.workspace.ts` da raiz) ganharam versões intermediárias
+  escritas à mão por commit, pra cada estado do histórico bater com o que o projeto
+  realmente tinha naquele milestone (ex.: `pnpm balance` só vira real no commit de M8,
+  não antes). Arquivos com evolução mais entrelaçada (`packages/core/src/index.ts`,
+  `packages/core/package.json`, `pnpm-lock.yaml`) foram commitados inteiros no milestone
+  que mais claramente os fechou — não dá pra separar hunks sem `git add -p` interativo,
+  que a ferramenta de shell não-interativa não suporta; o próprio briefing autoriza essa
+  imprecisão ("se as fronteiras ficarem ruins, refaz").
+- **`baselineReactionSkillIds` é derivado como "toda skill `kind:'reaction'` do
+  catálogo"** (`packages/content/src/buildCatalog.ts`, `deriveBaselineReactionSkillIds`).
+  D2 do briefing pedia pra mover a derivação pro catálogo, mas não dava a regra — decisão
+  desta sub-sessão. Motivo: hoje só existem duas skills `kind:'reaction'` no conteúdo real
+  (`skill-contra-atacar`/`skill-defender`, M8 sub-sessão 2) e as duas já eram, por
+  convenção de autoria, pensadas como baseline (toda unidade tem as duas por padrão,
+  §6.4) — inferir por `kind` evita repetir os ids como string literal em mais um lugar
+  (antes hardcoded tanto em `apps/server` quanto em
+  `tools/balance/src/runTournament.ts`). Risco assumido conscientemente: se um talento
+  vier a conceder uma reação nova que não deva contar como baseline (ex.: uma reação
+  exclusiva de árvore), essa inferência quebra — fica registrado como o ponto exato a
+  revisitar (candidato: campo explícito em vez de inferir por `kind`), não é decisão
+  fechada para sempre.
+- **`ArenaMap`/`Composition`/`ContentCatalog` ganharam definição única em
+  `packages/content/src/types.ts`**, fechando a duplicação verbatim que a auditoria
+  (`docs/milestones/M9-integracao-de-conteudo.md`, seção 2) apontou entre
+  `tools/balance/src/loadContent.ts` e `apps/server/src/content/types.ts` — só do lado de
+  `tools/balance` nesta fatia, já que `apps/server` só migra na sub-sessão 2 (fora de
+  escopo desta sessão; `apps/server/src/content/types.ts` continua com sua própria cópia
+  de `ArenaMap` até lá).
+- **`firstArenaMap(catalog)` como conveniência temporária pra `tools/balance`** — o
+  Coliseu (§9.2) só usa 1 mapa e `content.map` (M8) virou `content.maps` (`Record<Id,
+  ArenaMap>`, D2). "Primeiro mapa na ordem de inserção" replica fielmente o
+  `loadFirstValid` de antes de M9 (que sempre pegava o primeiro arquivo encontrado no
+  disco) — seguro enquanto só existir 1 mapa "de arena" por dataset. Vira candidato a
+  escolha explícita por id quando `apps/client` portar os 3 mapas de campanha
+  (sub-sessão 3) e o dataset real de `packages/data/maps/` deixar de ter só 1 arquivo.
+- **Baseline de `pnpm balance` capturado antes de qualquer mudança de código de M9**
+  (critério de aceite 2 do milestone exige comparação "antes"/"depois"). Depois da
+  migração completa desta sub-sessão, a saída de `pnpm balance -- --runs 10000` é
+  **byte-a-byte idêntica** à linha de base (`diff` sem nenhuma linha de diferença) — a
+  migração do loader não mudou nenhum resultado de simulação.
+
+`pnpm test` (570 testes, 56 arquivos — 14 novos em `packages/content`, 4 removidos de
+`tools/balance/tests/loadContent.test.ts` [deletado, testes migraram], 3 removidos de
+`tools/balance/tests/runTournament.test.ts` [migraram junto]), `pnpm typecheck` (7
+pacotes, limpo — `packages/content` pela primeira vez), `pnpm lint` sem alteração,
+`pnpm validate:data` (17 schemas, 62 arquivos, sem mudança — fatia não mexeu em
+conteúdo).

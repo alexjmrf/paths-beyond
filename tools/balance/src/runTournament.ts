@@ -11,7 +11,7 @@ import {
   type ItemInstance,
   type RngState,
 } from '@paths-beyond/core';
-import type { BalanceContent, Composition } from './loadContent.js';
+import { firstArenaMap, type Composition, type ContentCatalog } from '@paths-beyond/content';
 
 // §9.5 — "a defesa recebe +1 AP inicial por herói e o bônus de terreno do mapa" (o
 // bônus de terreno já vem de onde as unidades pisam no mapa; o +1 AP é aplicado aqui,
@@ -23,13 +23,6 @@ const DEFENDER_AP_BONUS = 1;
 // comps de um fixture usam as mesmas coordenadas pequenas (0,0)/(0,1) porque cada
 // composição é autocontida e não sabe contra quem vai lutar.
 const DEFENDER_POSITION_OFFSET_X = 6;
-
-// §6.4 — "reações padrão que toda unidade tem: Contra-atacar, Defender". Mesmo padrão de
-// `ContentCatalog.baselineReactionSkillIds` (`apps/server/src/content/types.ts`, M7 sub-
-// sessão 4): quais ids são "baseline" é decisão de quem monta a batalha, não conteúdo
-// validado por schema — os ids reais (`skill-contra-atacar`/`skill-defender`, M8 sub-
-// sessão 2) precisam existir no catálogo de skills carregado por `loadBalanceContent()`.
-const BASELINE_REACTION_SKILL_IDS: readonly Id[] = ['skill-contra-atacar', 'skill-defender'];
 
 export interface BattleOutcomeRecord {
   readonly attackerCompId: Id;
@@ -46,10 +39,10 @@ export interface BattleOutcomeRecord {
 }
 
 // M8, sub-sessão 3/N: `hero.equipment` (6 slots, ids ou null) passa a ser resolvido de
-// verdade em `ItemInstance[]` a partir do catálogo carregado por `loadBalanceContent()` —
+// verdade em `ItemInstance[]` a partir do catálogo carregado por `loadCatalogFromDisk()` —
 // antes, `equippedItems` era sempre `[]`, então nenhum item jamais entrava na conta do
 // torneio, mesmo quando um comp referenciava um item de verdade em `hero.equipment`.
-function resolveEquippedItems(hero: Hero, content: BalanceContent, compId: Id): readonly ItemInstance[] {
+function resolveEquippedItems(hero: Hero, content: ContentCatalog, compId: Id): readonly ItemInstance[] {
   const equipped: ItemInstance[] = [];
   for (const itemId of Object.values(hero.equipment)) {
     if (itemId === null) continue;
@@ -62,7 +55,7 @@ function resolveEquippedItems(hero: Hero, content: BalanceContent, compId: Id): 
 
 function toPlacements(
   comp: Composition,
-  content: BalanceContent,
+  content: ContentCatalog,
   side: 'player' | 'enemy',
   positionOffsetX: number,
 ): HeroPlacement[] {
@@ -89,21 +82,24 @@ function applyDefenderBonus(units: readonly BattleUnit[]): readonly BattleUnit[]
 // Modo 2/Coliseu (§9.2): os dois lados são 100% IA — `simulate()` com `commands: []`
 // já resolve a batalha inteira sozinho, via `resolveAiTurns` (M7, sub-sessão 6),
 // conectado dentro de `buildInitialState`. Nenhum comando precisa ser submetido.
-function runOneBattle(attacker: Composition, defender: Composition, content: BalanceContent, seed: number): BattleOutcomeRecord {
+function runOneBattle(attacker: Composition, defender: Composition, content: ContentCatalog, seed: number): BattleOutcomeRecord {
   const attackerPlacements = toPlacements(attacker, content, 'player', 0);
   const defenderPlacements = toPlacements(defender, content, 'enemy', DEFENDER_POSITION_OFFSET_X);
+  // Coliseu (§9.2) só conhece uma arena — ver `firstArenaMap` em `@paths-beyond/content`
+  // pra saber por que "o primeiro mapa carregado" ainda é seguro nesta sub-sessão.
+  const map = firstArenaMap(content);
 
   const setup = buildBattleSetupFromHeroes({
     placements: [...attackerPlacements, ...defenderPlacements],
-    map: content.map.grid,
+    map: map.grid,
     permadeath: 'classic',
-    winCondition: content.map.winCondition,
+    winCondition: map.winCondition,
     effectDefs: {},
-    initialValor: content.map.initialValor,
+    initialValor: map.initialValor,
     itemSets: content.itemSets,
     skillsCatalog: content.skills,
     weaponDuelRanges: content.weaponDuelRanges,
-    baselineReactionSkillIds: BASELINE_REACTION_SKILL_IDS,
+    baselineReactionSkillIds: content.baselineReactionSkillIds,
   });
 
   const buffedSetup = { ...setup, units: applyDefenderBonus(setup.units) };
@@ -140,7 +136,7 @@ function nextBattleSeed(state: RngState): { seed: number; state: RngState } {
 // Roda `runsPerPairing` batalhas pra cada par ORDENADO de composições distintas
 // (A ataca B, B ataca A são pareamentos diferentes — a vantagem do atacante em
 // escolher o engajamento, §9.5, é assimétrica por natureza).
-export function runTournament(content: BalanceContent, options: RunTournamentOptions): readonly BattleOutcomeRecord[] {
+export function runTournament(content: ContentCatalog, options: RunTournamentOptions): readonly BattleOutcomeRecord[] {
   const records: BattleOutcomeRecord[] = [];
   let rngState = seedRng(options.masterSeed);
 
