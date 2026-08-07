@@ -1,0 +1,9 @@
+{
+  "id": "effect-furia",
+  "name": "Fúria",
+  "kind": "buff",
+  "dispellable": true,
+  "maxStacks": 3,
+  "statMods": [{ "stat": "atk", "flat": 50 }],
+  "damageDealtPct": 100
+}

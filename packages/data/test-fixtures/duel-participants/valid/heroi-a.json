@@ -1,0 +1,59 @@
+{
+  "id": "duel-hero-a",
+  "stats": {
+    "hp": 5000,
+    "atk": 1000,
+    "def": 300,
+    "spd": 100,
+    "chc": 50,
+    "chd": 1500,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "currentHp": 5000,
+  "ap": 3,
+  "pp": 2,
+  "unitType": "infantry",
+  "weaponType": "sword",
+  "duelRange": 1,
+  "tacticsScript": [
+    { "enabled": true, "skillId": "skill-golpe-forte", "conditions": [{ "t": "targetHpBelow", "pct": 500 }] }
+  ],
+  "reactionScript": [{ "enabled": true, "skillId": "skill-contra-ataque", "conditions": [] }],
+  "knownSkills": {
+    "skill-golpe-forte": {
+      "id": "skill-golpe-forte",
+      "name": "Golpe Forte",
+      "kind": "duel",
+      "apCost": 1,
+      "cooldown": 1,
+      "multiplier": 1500,
+      "flat": 0,
+      "scalesWith": "atk",
+      "effects": [],
+      "tags": ["physical"]
+    },
+    "skill-contra-ataque": {
+      "id": "skill-contra-ataque",
+      "name": "Contra-ataque",
+      "kind": "reaction",
+      "apCost": 0,
+      "ppCost": 1,
+      "cooldown": 0,
+      "multiplier": 800,
+      "flat": 0,
+      "scalesWith": "atk",
+      "trigger": "onAttacked",
+      "effects": [],
+      "tags": ["physical"]
+    }
+  },
+  "cooldowns": {},
+  "activeEffects": [],
+  "positionalMultiplier": 1000
+}

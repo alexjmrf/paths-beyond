@@ -1,0 +1,32 @@
+{
+  "id": "duel-hero-invalido",
+  "stats": {
+    "hp": 5000,
+    "atk": 1000,
+    "def": 300,
+    "spd": 100,
+    "chc": 50,
+    "chd": 1500,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "currentHp": 5000,
+  "ap": 3,
+  "pp": 2,
+  "unitType": "infantry",
+  "weaponType": "sword",
+  "duelRange": 1,
+  "tacticsScript": [
+    { "enabled": true, "skillId": "skill-golpe-forte", "conditions": [{ "t": "targetIsAwesome" }] }
+  ],
+  "reactionScript": [],
+  "knownSkills": {},
+  "cooldowns": {},
+  "activeEffects": [],
+  "positionalMultiplier": 1000
+}

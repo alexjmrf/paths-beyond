@@ -1,0 +1,59 @@
+{
+  "id": "duel-hero-b",
+  "stats": {
+    "hp": 4200,
+    "atk": 850,
+    "def": 260,
+    "spd": 130,
+    "chc": 80,
+    "chd": 1500,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "currentHp": 4200,
+  "ap": 3,
+  "pp": 2,
+  "unitType": "cavalry",
+  "weaponType": "axe",
+  "duelRange": 1,
+  "tacticsScript": [
+    { "enabled": true, "skillId": "skill-golpe-veloz", "conditions": [] }
+  ],
+  "reactionScript": [{ "enabled": true, "skillId": "skill-defender", "conditions": [] }],
+  "knownSkills": {
+    "skill-golpe-veloz": {
+      "id": "skill-golpe-veloz",
+      "name": "Golpe Veloz",
+      "kind": "duel",
+      "apCost": 1,
+      "cooldown": 0,
+      "multiplier": 1100,
+      "flat": 0,
+      "scalesWith": "atk",
+      "effects": [],
+      "tags": ["physical"]
+    },
+    "skill-defender": {
+      "id": "skill-defender",
+      "name": "Defender",
+      "kind": "reaction",
+      "apCost": 0,
+      "ppCost": 1,
+      "cooldown": 0,
+      "multiplier": 0,
+      "flat": 0,
+      "scalesWith": "atk",
+      "trigger": "onAttacked",
+      "effects": [],
+      "tags": []
+    }
+  },
+  "cooldowns": {},
+  "activeEffects": [],
+  "positionalMultiplier": 1000
+}

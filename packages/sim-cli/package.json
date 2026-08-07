@@ -8,6 +8,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@paths-beyond/core": "workspace:*",
+    "@paths-beyond/data": "workspace:*",
+    "zod": "^3.24.1"
+  },
   "devDependencies": {
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

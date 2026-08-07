@@ -1,0 +1,17 @@
+import { z } from 'zod';
+import { idSchema, statModifierSchema } from './shared.js';
+
+// §6.9 — payload de um efeito (o que ele FAZ; ActiveEffect é só o estado da instância,
+// vive dentro de duel-participants.schema.ts).
+const effectSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1),
+  kind: z.enum(['buff', 'debuff']),
+  dispellable: z.boolean(),
+  maxStacks: z.number().int().positive(),
+  statMods: z.array(statModifierSchema).default([]), // §4.1 passo 8
+  damageDealtPct: z.number().int().optional(), // §6.6 passo 8
+  damageTakenReductionPct: z.number().int().optional(), // §6.6 passo 8
+});
+
+export default effectSchema;

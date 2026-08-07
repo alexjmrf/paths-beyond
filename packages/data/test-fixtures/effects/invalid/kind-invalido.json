@@ -1,0 +1,8 @@
+{
+  "id": "effect-invalido",
+  "name": "Efeito Inválido",
+  "kind": "neutral",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": []
+}

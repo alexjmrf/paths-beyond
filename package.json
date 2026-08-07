@@ -13,7 +13,7 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "lint": "node scripts/check-no-random.mjs",
     "validate:data": "pnpm --filter @paths-beyond/data run validate:data",
-    "sim": "node -e \"console.error('pnpm sim: ainda não implementado (chega em M1/M2). Ver docs/spec/09-roadmap.md'); process.exit(1)\"",
+    "sim": "tsx packages/sim-cli/src/cli.ts",
     "balance": "node -e \"console.error('pnpm balance: ainda não implementado (chega em M8). Ver docs/spec/09-roadmap.md'); process.exit(1)\""
   },
   "devDependencies": {
