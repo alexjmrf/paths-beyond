@@ -1,0 +1,3 @@
+[
+  { "slot": "cape", "stat": "atk", "weight": 100, "valueRange": { "min": 100, "max": 200 } }
+]

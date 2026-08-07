@@ -1,0 +1,8 @@
+[
+  { "slot": "weapon", "stat": "atk", "weight": 100, "valueRange": { "min": 100, "max": 200 } },
+  { "slot": "helmet", "stat": "hp", "weight": 100, "valueRange": { "min": 500, "max": 1000 } },
+  { "slot": "armor", "stat": "def", "weight": 100, "valueRange": { "min": 100, "max": 200 } },
+  { "slot": "necklace", "stat": "atk", "weight": 30, "valueRange": { "min": 50, "max": 100 } },
+  { "slot": "necklace", "stat": "chc", "weight": 40, "valueRange": { "min": 30, "max": 60 } },
+  { "slot": "necklace", "stat": "chd", "weight": 30, "valueRange": { "min": 100, "max": 200 } }
+]

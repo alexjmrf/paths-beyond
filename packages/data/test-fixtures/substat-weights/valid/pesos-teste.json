@@ -1,0 +1,6 @@
+[
+  { "stat": "atk", "weight": 40, "valueRange": { "min": 10, "max": 20 }, "reforgeBonusPct": 200 },
+  { "stat": "def", "weight": 30, "valueRange": { "min": 8, "max": 16 } },
+  { "stat": "spd", "weight": 20, "valueRange": { "min": 2, "max": 6 } },
+  { "stat": "chc", "weight": 10, "valueRange": { "min": 20, "max": 40 } }
+]
