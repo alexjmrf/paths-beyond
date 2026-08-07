@@ -1,0 +1,7 @@
+{
+  "id": "terrain-floresta",
+  "moveCost": { "foot": 2, "cavalry": 3, "flying": 1, "heavy": 3, "aquatic": "impassable" },
+  "defBonus": 100,
+  "evaBonus": 50,
+  "blocksSight": true
+}

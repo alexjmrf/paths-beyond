@@ -1,0 +1,7 @@
+{
+  "id": "terrain-montanha",
+  "moveCost": { "foot": "impassable", "cavalry": "impassable", "flying": 1, "heavy": "impassable", "aquatic": "impassable" },
+  "defBonus": 150,
+  "evaBonus": 100,
+  "blocksSight": true
+}

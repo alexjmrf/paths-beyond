@@ -23,9 +23,15 @@ importers:
 
   apps/client:
     dependencies:
+      '@paths-beyond/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       '@paths-beyond/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@paths-beyond/data':
+        specifier: workspace:*
+        version: link:../../packages/data
       pixi.js:
         specifier: ^8.6.0
         version: 8.19.0

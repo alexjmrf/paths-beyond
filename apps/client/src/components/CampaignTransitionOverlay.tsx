@@ -1,4 +1,4 @@
-import { campaignMaps } from '../data/campaign/index.js';
+import { campaignMaps } from '../data/campaign.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §09-roadmap.md (M6) — "campanha de 3 mapas jogável ponta a ponta". Cobre os 3 estados
@@ -16,7 +16,7 @@ export function CampaignTransitionOverlay() {
       <div className="campaign-overlay">
         <div className="campaign-overlay-panel">
           <h2>Campanha concluída!</h2>
-          <p>Você venceu os {campaignMaps.length} mapas de demonstração.</p>
+          <p>Você venceu os {campaignMaps.length} mapas da campanha.</p>
         </div>
       </div>
     );

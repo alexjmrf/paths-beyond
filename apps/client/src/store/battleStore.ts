@@ -6,6 +6,7 @@ import {
   validateAllocation,
   type BattleState,
   type BattleUnit,
+  type ClassDef,
   type Coord,
   type DuelResult,
   type GearSlot,
@@ -17,19 +18,29 @@ import {
   type TalentTree,
 } from '@paths-beyond/core';
 import { create } from 'zustand';
-import { campaignMaps } from '../data/campaign/index.js';
-import { campaignItems } from '../data/campaign/items.js';
-import { allTalentNodes, MAX_POINTS_PER_TREE } from '../data/campaign/talents.js';
+import { campaignMaps } from '../data/campaign.js';
+import { catalog } from '../data/catalog.js';
 import { decodeBuildCode } from '../logic/buildCode.js';
+import { MAX_POINTS_PER_TREE } from '../logic/talentLayout.js';
 
 // Seed fixa pra esta fatia de M6 — o cliente ainda não tem tela de configuração de
 // batalha; a semente real por partida é trabalho de uma fatia futura (persistência/save).
 const BATTLE_SEED = 42;
 
 function buildMapState(mapIndex: number): BattleState {
-  const setup = campaignMaps[mapIndex];
-  if (!setup) throw new Error(`mapa de campanha ${mapIndex} não existe`);
-  return buildInitialState(setup, BATTLE_SEED);
+  const content = campaignMaps[mapIndex];
+  if (!content) throw new Error(`mapa de campanha ${mapIndex} não existe`);
+  return buildInitialState(content.setup, BATTLE_SEED);
+}
+
+// A árvore de talentos de um herói vem da SUA classe real (`ClassDef.talentTree`,
+// M5/M8) — diferente da árvore única de demonstração que M6 aplicava a toda unidade.
+// `heroesByUnitId` (montado em `data/campaign.ts` ao resolver `Hero[]` →
+// `buildBattleSetupFromHeroes`) é o único jeito de saber a classe de uma unidade, já
+// que `BattleUnit` (core) não carrega `classId` — só o estado de batalha resolvido.
+export function classDefForUnit(campaignMapIndex: number, unitId: string): ClassDef | undefined {
+  const heroId = campaignMaps[campaignMapIndex]?.heroesByUnitId[unitId]?.classId;
+  return heroId ? catalog.classes[heroId] : undefined;
 }
 
 // §11 — "Preview de duelo: rodar simulateDuel com a seed real ... Este é o recurso mais
@@ -109,7 +120,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   campaignMapIndex: 0,
   campaignComplete: false,
   tacticsEditorUnitId: null,
-  inventory: campaignItems,
+  inventory: Object.values(catalog.items),
   equippedByUnit: {},
   inventoryUnitId: null,
   talentAllocationByUnit: {},
@@ -288,11 +299,11 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   closeTalentEditor: () => set({ talentEditorUnitId: null }),
 
   allocateTalent: (unitId, nodeId) => {
-    const { talentAllocationByUnit } = get();
+    const { talentAllocationByUnit, campaignMapIndex } = get();
     const current = talentAllocationByUnit[unitId] ?? {};
     const nextAllocation: TalentAllocation = { ...current, [nodeId]: (current[nodeId] ?? 0) + 1 };
     const result = validateAllocation({
-      tree: allTalentNodes,
+      tree: classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? [],
       allocation: nextAllocation,
       maxPointsPerTree: MAX_POINTS_PER_TREE,
     });
@@ -307,14 +318,14 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   deallocateTalent: (unitId, nodeId) => {
-    const { talentAllocationByUnit } = get();
+    const { talentAllocationByUnit, campaignMapIndex } = get();
     const current = talentAllocationByUnit[unitId] ?? {};
     const currentRank = current[nodeId] ?? 0;
     if (currentRank <= 0) return;
 
     const nextAllocation: TalentAllocation = { ...current, [nodeId]: currentRank - 1 };
     const result = validateAllocation({
-      tree: allTalentNodes,
+      tree: classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? [],
       allocation: nextAllocation,
       maxPointsPerTree: MAX_POINTS_PER_TREE,
     });
@@ -329,20 +340,21 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   resetTalentTree: (unitId, tree) => {
-    const { talentAllocationByUnit } = get();
+    const { talentAllocationByUnit, campaignMapIndex } = get();
     const current = talentAllocationByUnit[unitId] ?? {};
-    const next = resetTree(current, tree, allTalentNodes);
+    const next = resetTree(current, tree, classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? []);
     set({ talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: next }, lastTalentReason: null });
   },
 
   loadBuildCode: (unitId, code) => {
+    const { campaignMapIndex } = get();
     const decoded = decodeBuildCode(code);
     if (!decoded) {
       set({ lastTalentReason: 'código de build inválido' });
       return;
     }
     const result = validateAllocation({
-      tree: allTalentNodes,
+      tree: classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? [],
       allocation: decoded.talents,
       maxPointsPerTree: MAX_POINTS_PER_TREE,
     });

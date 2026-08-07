@@ -7,7 +7,7 @@ import { ResourcePanel } from './components/ResourcePanel.js';
 import { TacticsEditor } from './components/TacticsEditor.js';
 import { TalentTreePanel } from './components/TalentTreePanel.js';
 import { UnitActionBar } from './components/UnitActionBar.js';
-import { campaignMaps } from './data/campaign/index.js';
+import { campaignMaps } from './data/campaign.js';
 import { useBattleStore } from './store/battleStore.js';
 
 export function App() {
@@ -18,7 +18,7 @@ export function App() {
   return (
     <div className="app-layout">
       <header>
-        <h1>Project Vanguard — campanha de demonstração (M6)</h1>
+        <h1>Project Vanguard — campanha</h1>
         <span className="campaign-progress">
           Mapa {campaignMapIndex + 1} de {campaignMaps.length}
         </span>

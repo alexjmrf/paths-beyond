@@ -1,13 +1,14 @@
 import { STAT_KEYS, type GearSlot, type ItemInstance, type StatKey } from '@paths-beyond/core';
 import { useState } from 'react';
-import { campaignItemSets } from '../data/campaign/items.js';
+import { catalog } from '../data/catalog.js';
 import { previewEquip } from '../logic/itemPreview.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 const GEAR_SLOTS: readonly GearSlot[] = ['weapon', 'helmet', 'armor', 'necklace', 'ring', 'boots'];
+const itemSets = Object.values(catalog.itemSets);
 
 function setName(setId: string): string {
-  return campaignItemSets.find((s) => s.id === setId)?.name ?? setId;
+  return catalog.itemSets[setId]?.name ?? setId;
 }
 
 function itemLabel(item: ItemInstance): string {
@@ -101,7 +102,7 @@ export function InventoryPanel() {
             Set
             <select value={setFilter} onChange={(e) => setSetFilter(e.target.value)}>
               <option value="all">todos</option>
-              {campaignItemSets.map((set) => (
+              {itemSets.map((set) => (
                 <option key={set.id} value={set.id}>
                   {set.name}
                 </option>

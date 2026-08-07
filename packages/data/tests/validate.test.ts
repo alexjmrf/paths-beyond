@@ -23,9 +23,9 @@ import { findJsonFiles, validateDataset, validateFiles } from '../validate.js';
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('validateDataset() against real packages/data content', () => {
-  it('finds the 17 schemas (5 de M1 + 2 de M2 + 3 de M3 + 3 de M4 + 1 de M5: builds + 1 de M7: weapon-duel-ranges + 1 de M8: comps + 1 de M8: arena-shop) e valida o conteúdo real de M8 (10 classes [9 base + 1 promovida] + 22 skills + 1 efeito + 1 tabela de alcance + 9 comps + 1 mapa + 1 terreno + 11 itens + 2 sets + 4 ofertas de loja = 62 arquivos)', async () => {
+  it('finds the 17 schemas (5 de M1 + 2 de M2 + 3 de M3 + 3 de M4 + 1 de M5: builds + 1 de M7: weapon-duel-ranges + 1 de M8: comps + 1 de M8: arena-shop) e valida o conteúdo real de M8+M9 (10 classes [9 base + 1 promovida] + 22 skills + 1 efeito + 1 tabela de alcance + 9 comps + 4 mapas [1 real + 3 provisórios de campanha, M9 sub-sessão 3] + 3 terrenos [1 real + 2 portados de campanha, M9] + 11 itens + 2 sets + 4 ofertas de loja = 67 arquivos)', async () => {
     const report = await validateDataset(packageRoot);
-    expect(report).toMatchObject({ ok: true, schemasFound: 17, filesChecked: 62 });
+    expect(report).toMatchObject({ ok: true, schemasFound: 17, filesChecked: 67 });
   });
 });
 

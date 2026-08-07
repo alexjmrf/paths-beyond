@@ -1,9 +1,9 @@
 import { STAT_KEYS, type StatKey, type TalentEffect, type TalentTree } from '@paths-beyond/core';
 import { useState } from 'react';
-import { DEMO_CLASS_ID, classTreeLayout, specTreeLayout, type PositionedTalentNode } from '../data/campaign/talents.js';
 import { encodeBuildCode } from '../logic/buildCode.js';
+import { layoutTalentTree, MAX_POINTS_PER_TREE, type PositionedTalentNode } from '../logic/talentLayout.js';
 import { previewTalents } from '../logic/talentPreview.js';
-import { useBattleStore } from '../store/battleStore.js';
+import { classDefForUnit, useBattleStore } from '../store/battleStore.js';
 
 const ROW_HEIGHT = 90;
 const COL_WIDTH = 150;
@@ -53,6 +53,18 @@ function describeEffect(effect: TalentEffect): string {
   }
 }
 
+// Rótulo curto do nó no grafo — remove o prefixo `talent-<slug-da-classe>-`/`t-classe-`/
+// `t-spec-` (demonstração) pra caber no retângulo do nó. `classId` vem da classe real da
+// unidade (M9); sem ele (nó de demonstração legado ou classe desconhecida), cai pro id
+// inteiro em vez de tentar adivinhar o prefixo.
+function shortNodeLabel(nodeId: string, classId: string | undefined): string {
+  const withoutDemoPrefix = nodeId.replace(/^t-(classe|spec)-/, '');
+  if (withoutDemoPrefix !== nodeId) return withoutDemoPrefix;
+  if (!classId) return nodeId;
+  const slug = classId.replace(/^class-/, '');
+  return nodeId.replace(new RegExp(`^talent-${slug}-`), '');
+}
+
 function statDeltaRow(stat: StatKey, before: number, after: number) {
   const delta = after - before;
   if (delta === 0) return null;
@@ -70,6 +82,7 @@ function statDeltaRow(stat: StatKey, before: number, after: number) {
 // layout visual) com um SVG desenhando as arestas de `requires` por baixo dos nós.
 export function TalentTreePanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const campaignMapIndex = useBattleStore((s) => s.campaignMapIndex);
   const talentEditorUnitId = useBattleStore((s) => s.talentEditorUnitId);
   const talentAllocationByUnit = useBattleStore((s) => s.talentAllocationByUnit);
   const lastTalentReason = useBattleStore((s) => s.lastTalentReason);
@@ -86,19 +99,27 @@ export function TalentTreePanel() {
   const unit = battleState.units.find((u) => u.unitId === talentEditorUnitId);
   if (!talentEditorUnitId || !unit) return null;
 
+  // Árvore real da classe do herói (M9) — não existe mais uma árvore de demonstração
+  // fixa pra toda unidade; cada classe autorada em M8 tem a sua (só `tree:'class'` ou só
+  // `tree:'spec'`, nunca as duas ao mesmo tempo — uma classe base não tem árvore de
+  // especialização até promover, ver `docs/spec/06-classes-e-talentos.md`). A aba sem
+  // conteúdo pra esta classe simplesmente mostra o grafo vazio, sem quebrar.
+  const classDef = classDefForUnit(campaignMapIndex, unit.unitId);
+  const allPositioned = layoutTalentTree(classDef?.talentTree ?? []);
+
   const allocation = talentAllocationByUnit[unit.unitId] ?? {};
-  const layout = activeTree === 'class' ? classTreeLayout : specTreeLayout;
+  const layout = allPositioned.filter((p) => p.node.tree === activeTree);
 
   const pointsSpent = layout.reduce((sum, p) => sum + (allocation[p.node.id] ?? 0), 0);
   const selectedPositioned = selectedNodeId ? layout.find((p) => p.node.id === selectedNodeId) : undefined;
   const selectedNode = selectedPositioned?.node;
 
-  const preview = previewTalents(unit.stats, [...classTreeLayout, ...specTreeLayout].map((p) => p.node), allocation);
+  const preview = previewTalents(unit.stats, classDef?.talentTree ?? [], allocation);
 
   const svgWidth = MARGIN * 2 + COLS * COL_WIDTH;
   const svgHeight = MARGIN * 2 + ROWS * ROW_HEIGHT;
 
-  const currentCode = encodeBuildCode({ classId: DEMO_CLASS_ID, talents: allocation });
+  const currentCode = encodeBuildCode({ classId: classDef?.id ?? 'classe-desconhecida', talents: allocation });
 
   return (
     <div className="talent-tree-overlay">
@@ -113,7 +134,7 @@ export function TalentTreePanel() {
             Especialização
           </button>
           <span className="talent-points">
-            {pointsSpent} / 8 pontos
+            {pointsSpent} / {MAX_POINTS_PER_TREE} pontos
           </span>
           <button type="button" onClick={() => resetTalentTree(unit.unitId, activeTree)}>
             Resetar árvore
@@ -154,7 +175,7 @@ export function TalentTreePanel() {
               >
                 <rect width={NODE_W} height={NODE_H} rx={8} />
                 <text x={NODE_W / 2} y={22} textAnchor="middle">
-                  {p.node.id.replace(/^t-(classe|spec)-/, '')}
+                  {shortNodeLabel(p.node.id, classDef?.id)}
                 </text>
                 <text x={NODE_W / 2} y={40} textAnchor="middle" className="rank">
                   {rank}/{p.node.maxRank}

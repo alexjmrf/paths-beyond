@@ -585,3 +585,69 @@ conteúdo).
 pacotes, limpo), `pnpm lint`/`pnpm validate:data` sem alteração (17 schemas, 62
 arquivos). `pnpm balance -- --runs 10000` byte-a-byte idêntico à linha de base da
 sub-sessão 1 (nenhuma mudança em `tools/balance`/`packages/content` nesta fatia).
+
+### M9 — sub-sessão 3: cliente com conteúdo real
+
+- **Import por subpath direto (`@paths-beyond/content/src/buildCatalog.js`/`types.js`)
+  no adapter de browser, nunca pelo barrel `@paths-beyond/content`.** Achado real ao
+  rodar `tsc --noEmit` pela primeira vez com a dependência nova: o barrel (`index.ts`)
+  reexporta `loadCatalogFromDisk` (usa `node:fs`/`node:path`/`node:url`), e importar
+  qualquer coisa do barrel puxa esse arquivo pro grafo de módulos do TypeScript —
+  como `apps/client/tsconfig.json` não declara `types:["node"]` de propósito (o
+  cliente roda em browser, regra já implícita desde M6), o programa inteiro falhava
+  com "Cannot find module 'node:fs'". Mesmo padrão já usado por
+  `tools/balance/src/loadContent.ts` (M8) pra importar schemas de `@paths-beyond/data`
+  por subpath em vez de um barrel — não foi preciso mudar `packages/content/package.json`
+  (sem campo `exports`, subpath resolve direto pro arquivo em disco, mesmo mecanismo
+  que já sustenta `@paths-beyond/data/schemas/*.schema.js`).
+- **D3 — os 3 mapas de campanha portados marcam o caráter provisório só por
+  `id`/`name`** (`map-campanha-{1,2,3}-provisorio`, nome com "(provisório...)"), não por
+  um campo novo no schema. `maps.schema.ts` não tem — e não ganhou — um campo
+  `provisional`: adicionar um campo de schema só pra 3 arquivos que M12 vai substituir
+  é mais acoplamento permanente do que o problema pede. Se M12 (autoria de mapa real)
+  não fizer questão de apagar esses 3 arquivos explicitamente, o candidato certo é
+  reabrir esta decisão então, não agora.
+- **`terrain-floresta`/`terrain-montanha` são conteúdo REAL, não provisório** —
+  diferente dos 3 mapas, o TIPO de terreno "floresta"/"montanha" (custos de
+  movimento/bônus de defesa/evasão) não é arbitrário de demonstração, é um tipo de
+  terreno genérico que qualquer mapa real futuro (M12) pode querer reusar. Só a
+  GEOMETRIA dos 3 layouts (onde cada terreno fica em cada mapa) é provisória; os
+  valores do terreno em si, portados de `terrains.ts` (M6) sem alteração, não são.
+- **`baselineReactionSkillIds` derivado por `kind:'reaction'` (decisão da sub-sessão 1)
+  sobreviveu ao teste real** — os únicos dois hits no catálogo real
+  (`skill-contra-atacar`/`skill-defender`) são exatamente os que a campanha real
+  precisa, confirmado pelo teste de browser (Chromium headless) sem erro.
+- **Talentos: árvore por classe real, não uma árvore global de demonstração.**
+  Descoberta ao portar: uma classe `tier:'base'` só tem nós `tree:'class'`; uma classe
+  `tier:'spec'` (promovida) só tem nós `tree:'spec'` — nunca ambas simultaneamente
+  (diferente da demo de M6, que aplicava uma árvore "classe" E uma árvore "spec" fixas
+  pra qualquer unidade). Isso é fiel à spec (§8.2: especialização vem da promoção) — a
+  correção não foi tratada como bug a esconder; `TalentTreePanel.tsx` mostra a aba sem
+  conteúdo (nenhum nó) quando a classe da unidade não tem aquela árvore, em vez de
+  fingir dados que não existem. Nenhuma mecânica de promoção foi implementada nesta
+  sub-sessão (fora de escopo de M9) — a classe promovida (`class-mestre-espadachim`)
+  entra como um inimigo já promovido de fábrica, não como resultado de uma promoção
+  em jogo.
+- **`layoutTalentTree()` deriva a coluna visual (0/1/2) da estrutura da árvore**, não
+  mais hand-authored por nó (impossível pra conteúdo real — `ClassDef.talentTree` não
+  tem campo de layout, propositalmente, já que é decisão só do cliente). Regra: nó
+  sozinho numa linha fica centralizado; um par `exclusiveWith` na mesma linha (o
+  padrão real de bifurcação usado por toda classe de M8) fica um de cada lado,
+  ordenado por id pra determinismo.
+- **Enemigos de campanha continuam sem `aiArchetype`** (preserva o comportamento de
+  M6 — nenhuma unidade de campanha é controlada por IA nesta fatia). Ligar IA de mapa
+  real na campanha do cliente seria mecânica nova, fora do escopo "zero mecânica nova"
+  de M9.
+- **Verificação além de typecheck/testes**: como a UI não é coberta por `pnpm test`,
+  rodei o servidor Vite real e verifiquei com Playwright/Chromium headless (mesma
+  instalação de M8 sub-sessão 7) — página carrega, zero erros de console, campanha
+  renderiza com stats/AP/PP reais. Screenshot descartável salvo fora do repo (mesmo
+  padrão de diagnóstico descartável já usado em M8 sub-sessão 4/7).
+
+`pnpm test` (571 testes, 57 arquivos — só `validate.test.ts` mudou de expectativa,
+62→67 arquivos, pelos 5 arquivos reais novos), `pnpm typecheck` (7 pacotes, limpo),
+`pnpm lint` sem alteração, `pnpm validate:data` (17 schemas, 67 arquivos). `pnpm
+balance -- --runs 10000` continua byte-a-byte idêntico à linha de base (confirmado que
+`firstArenaMap()` de `tools/balance` ainda escolhe `map-arena-coliseu` com 4 mapas no
+catálogo — ordem alfabética de `readdirSync` coloca "map-arena" antes de
+"map-campanha").
