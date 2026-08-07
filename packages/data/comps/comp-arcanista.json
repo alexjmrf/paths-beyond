@@ -1,0 +1,44 @@
+{
+  "id": "comp-arcanista",
+  "name": "Arcanista",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-arcanista",
+        "classId": "class-arcanista",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arcanista",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "arcane",
+        "duelSkills": [
+          "skill-ataque-arcanista",
+          "skill-especial-arcanista"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arcanista",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

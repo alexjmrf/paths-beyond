@@ -1,0 +1,13 @@
+{
+  "id": "skill-contra-atacar",
+  "name": "Contra-atacar",
+  "kind": "reaction",
+  "apCost": 0,
+  "ppCost": 1,
+  "cooldown": 0,
+  "multiplier": 800,
+  "flat": 0,
+  "scalesWith": "atk",
+  "trigger": "onAttacked",
+  "tags": []
+}

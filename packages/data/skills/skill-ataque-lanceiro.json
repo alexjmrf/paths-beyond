@@ -1,0 +1,13 @@
+{
+  "id": "skill-ataque-lanceiro",
+  "name": "Ataque Básico (Lanceiro)",
+  "kind": "duel",
+  "apCost": 0,
+  "cooldown": 0,
+  "multiplier": 1000,
+  "flat": 0,
+  "scalesWith": "atk",
+  "tags": [
+    "physical"
+  ]
+}

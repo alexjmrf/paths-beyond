@@ -1,0 +1,13 @@
+{
+  "id": "skill-defender",
+  "name": "Defender",
+  "kind": "reaction",
+  "apCost": 0,
+  "ppCost": 1,
+  "cooldown": 0,
+  "multiplier": 0,
+  "flat": 0,
+  "scalesWith": "atk",
+  "trigger": "onAttacked",
+  "tags": []
+}

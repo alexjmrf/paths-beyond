@@ -1,0 +1,25 @@
+{
+  "id": "item-colar-forca",
+  "setId": "set-forca",
+  "slot": "necklace",
+  "rarity": "common",
+  "ilvl": 58,
+  "mainstat": {
+    "stat": "hp",
+    "value": 40
+  },
+  "substats": [
+    {
+      "stat": "atk",
+      "value": 5,
+      "rolls": 1
+    },
+    {
+      "stat": "spd",
+      "value": 4,
+      "rolls": 1
+    }
+  ],
+  "enhance": 0,
+  "reforged": false
+}

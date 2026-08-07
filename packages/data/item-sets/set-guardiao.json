@@ -1,0 +1,12 @@
+{
+  "id": "set-guardiao",
+  "name": "Guardião",
+  "effects": [
+    {
+      "t": "stat",
+      "pieces": 2,
+      "stat": "def",
+      "pct": 150
+    }
+  ]
+}

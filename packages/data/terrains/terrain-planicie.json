@@ -1,0 +1,7 @@
+{
+  "id": "terrain-planicie",
+  "moveCost": { "foot": 1, "cavalry": 1, "flying": 1, "heavy": 1, "aquatic": 2 },
+  "defBonus": 0,
+  "evaBonus": 0,
+  "blocksSight": false
+}

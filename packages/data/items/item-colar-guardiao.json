@@ -1,0 +1,25 @@
+{
+  "id": "item-colar-guardiao",
+  "setId": "set-guardiao",
+  "slot": "necklace",
+  "rarity": "common",
+  "ilvl": 58,
+  "mainstat": {
+    "stat": "def",
+    "value": 15
+  },
+  "substats": [
+    {
+      "stat": "hp",
+      "value": 30,
+      "rolls": 1
+    },
+    {
+      "stat": "spd",
+      "value": 4,
+      "rolls": 1
+    }
+  ],
+  "enhance": 0,
+  "reforged": false
+}

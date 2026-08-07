@@ -1,0 +1,12 @@
+{
+  "id": "set-forca",
+  "name": "Força",
+  "effects": [
+    {
+      "t": "stat",
+      "pieces": 2,
+      "stat": "atk",
+      "pct": 100
+    }
+  ]
+}

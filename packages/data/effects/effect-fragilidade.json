@@ -1,0 +1,8 @@
+{
+  "id": "effect-fragilidade",
+  "name": "Fragilidade",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 2,
+  "statMods": [{ "stat": "def", "pct": -150 }]
+}

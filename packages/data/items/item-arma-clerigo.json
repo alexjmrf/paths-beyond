@@ -1,0 +1,25 @@
+{
+  "id": "item-arma-clerigo",
+  "setId": "set-guardiao",
+  "slot": "weapon",
+  "rarity": "common",
+  "ilvl": 58,
+  "mainstat": {
+    "stat": "atk",
+    "value": 18
+  },
+  "substats": [
+    {
+      "stat": "spd",
+      "value": 6,
+      "rolls": 1
+    },
+    {
+      "stat": "def",
+      "value": 8,
+      "rolls": 1
+    }
+  ],
+  "enhance": 0,
+  "reforged": false
+}

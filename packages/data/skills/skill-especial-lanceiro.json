@@ -1,0 +1,13 @@
+{
+  "id": "skill-especial-lanceiro",
+  "name": "Golpe Especial (Lanceiro)",
+  "kind": "duel",
+  "apCost": 1,
+  "cooldown": 2,
+  "multiplier": 1350,
+  "flat": 0,
+  "scalesWith": "atk",
+  "tags": [
+    "physical"
+  ]
+}

@@ -6,9 +6,12 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:browser": "vitest run --workspace vitest.browser.workspace.ts"
   },
   "devDependencies": {
+    "@vitest/browser": "^2.1.9",
+    "playwright": "^1.62.1",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

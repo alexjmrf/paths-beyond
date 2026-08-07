@@ -1,0 +1,44 @@
+{
+  "id": "comp-cavalaria",
+  "name": "Cavalaria",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-cav-1",
+        "classId": "class-cavaleiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": { "weapon": null, "helmet": null, "armor": null, "necklace": null, "ring": null, "boots": null },
+        "weaponType": "sword",
+        "duelSkills": ["skill-golpe-basico"],
+        "mapSkills": [],
+        "tacticsScript": [{ "enabled": true, "skillId": "skill-golpe-basico", "conditions": [] }]
+      },
+      "pos": { "x": 0, "y": 0 },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-cav-2",
+        "classId": "class-cavaleiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": { "weapon": null, "helmet": null, "armor": null, "necklace": null, "ring": null, "boots": null },
+        "weaponType": "spear",
+        "duelSkills": ["skill-golpe-basico"],
+        "mapSkills": [],
+        "tacticsScript": [{ "enabled": true, "skillId": "skill-golpe-basico", "conditions": [] }]
+      },
+      "pos": { "x": 0, "y": 1 },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

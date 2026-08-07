@@ -1,0 +1,611 @@
+{
+  "id": "class-grifeiro",
+  "name": "Grifeiro",
+  "tier": "base",
+  "unitType": "flying",
+  "moveType": "flying",
+  "moveRange": 5,
+  "allowedWeapons": [
+    "spear"
+  ],
+  "basePools": {
+    "ap": 3,
+    "pp": 2
+  },
+  "statCurve": [
+    {
+      "hp": 420,
+      "atk": 63,
+      "def": 56,
+      "spd": 84
+    },
+    {
+      "hp": 440,
+      "atk": 66,
+      "def": 59,
+      "spd": 84
+    },
+    {
+      "hp": 460,
+      "atk": 69,
+      "def": 62,
+      "spd": 84
+    },
+    {
+      "hp": 480,
+      "atk": 72,
+      "def": 65,
+      "spd": 84
+    },
+    {
+      "hp": 500,
+      "atk": 75,
+      "def": 68,
+      "spd": 85
+    },
+    {
+      "hp": 520,
+      "atk": 78,
+      "def": 71,
+      "spd": 85
+    },
+    {
+      "hp": 540,
+      "atk": 81,
+      "def": 74,
+      "spd": 85
+    },
+    {
+      "hp": 560,
+      "atk": 84,
+      "def": 77,
+      "spd": 85
+    },
+    {
+      "hp": 580,
+      "atk": 87,
+      "def": 80,
+      "spd": 85
+    },
+    {
+      "hp": 600,
+      "atk": 90,
+      "def": 83,
+      "spd": 86
+    },
+    {
+      "hp": 620,
+      "atk": 93,
+      "def": 86,
+      "spd": 86
+    },
+    {
+      "hp": 640,
+      "atk": 96,
+      "def": 89,
+      "spd": 86
+    },
+    {
+      "hp": 660,
+      "atk": 99,
+      "def": 92,
+      "spd": 86
+    },
+    {
+      "hp": 680,
+      "atk": 102,
+      "def": 95,
+      "spd": 86
+    },
+    {
+      "hp": 700,
+      "atk": 105,
+      "def": 98,
+      "spd": 87
+    },
+    {
+      "hp": 720,
+      "atk": 108,
+      "def": 101,
+      "spd": 87
+    },
+    {
+      "hp": 740,
+      "atk": 111,
+      "def": 104,
+      "spd": 87
+    },
+    {
+      "hp": 760,
+      "atk": 114,
+      "def": 107,
+      "spd": 87
+    },
+    {
+      "hp": 780,
+      "atk": 117,
+      "def": 110,
+      "spd": 87
+    },
+    {
+      "hp": 800,
+      "atk": 120,
+      "def": 113,
+      "spd": 88
+    },
+    {
+      "hp": 820,
+      "atk": 123,
+      "def": 116,
+      "spd": 88
+    },
+    {
+      "hp": 840,
+      "atk": 126,
+      "def": 119,
+      "spd": 88
+    },
+    {
+      "hp": 860,
+      "atk": 129,
+      "def": 122,
+      "spd": 88
+    },
+    {
+      "hp": 880,
+      "atk": 132,
+      "def": 125,
+      "spd": 88
+    },
+    {
+      "hp": 900,
+      "atk": 135,
+      "def": 128,
+      "spd": 89
+    },
+    {
+      "hp": 920,
+      "atk": 138,
+      "def": 131,
+      "spd": 89
+    },
+    {
+      "hp": 940,
+      "atk": 141,
+      "def": 134,
+      "spd": 89
+    },
+    {
+      "hp": 960,
+      "atk": 144,
+      "def": 137,
+      "spd": 89
+    },
+    {
+      "hp": 980,
+      "atk": 147,
+      "def": 140,
+      "spd": 89
+    },
+    {
+      "hp": 1000,
+      "atk": 150,
+      "def": 143,
+      "spd": 90
+    },
+    {
+      "hp": 1020,
+      "atk": 153,
+      "def": 146,
+      "spd": 90
+    },
+    {
+      "hp": 1040,
+      "atk": 156,
+      "def": 149,
+      "spd": 90
+    },
+    {
+      "hp": 1060,
+      "atk": 159,
+      "def": 152,
+      "spd": 90
+    },
+    {
+      "hp": 1080,
+      "atk": 162,
+      "def": 155,
+      "spd": 90
+    },
+    {
+      "hp": 1100,
+      "atk": 165,
+      "def": 158,
+      "spd": 91
+    },
+    {
+      "hp": 1120,
+      "atk": 168,
+      "def": 161,
+      "spd": 91
+    },
+    {
+      "hp": 1140,
+      "atk": 171,
+      "def": 164,
+      "spd": 91
+    },
+    {
+      "hp": 1160,
+      "atk": 174,
+      "def": 167,
+      "spd": 91
+    },
+    {
+      "hp": 1180,
+      "atk": 177,
+      "def": 170,
+      "spd": 91
+    },
+    {
+      "hp": 1200,
+      "atk": 180,
+      "def": 173,
+      "spd": 92
+    },
+    {
+      "hp": 1220,
+      "atk": 183,
+      "def": 176,
+      "spd": 92
+    },
+    {
+      "hp": 1240,
+      "atk": 186,
+      "def": 179,
+      "spd": 92
+    },
+    {
+      "hp": 1260,
+      "atk": 189,
+      "def": 182,
+      "spd": 92
+    },
+    {
+      "hp": 1280,
+      "atk": 192,
+      "def": 185,
+      "spd": 92
+    },
+    {
+      "hp": 1300,
+      "atk": 195,
+      "def": 188,
+      "spd": 93
+    },
+    {
+      "hp": 1320,
+      "atk": 198,
+      "def": 191,
+      "spd": 93
+    },
+    {
+      "hp": 1340,
+      "atk": 201,
+      "def": 194,
+      "spd": 93
+    },
+    {
+      "hp": 1360,
+      "atk": 204,
+      "def": 197,
+      "spd": 93
+    },
+    {
+      "hp": 1380,
+      "atk": 207,
+      "def": 200,
+      "spd": 93
+    },
+    {
+      "hp": 1400,
+      "atk": 210,
+      "def": 203,
+      "spd": 94
+    },
+    {
+      "hp": 1420,
+      "atk": 213,
+      "def": 206,
+      "spd": 94
+    },
+    {
+      "hp": 1440,
+      "atk": 216,
+      "def": 209,
+      "spd": 94
+    },
+    {
+      "hp": 1460,
+      "atk": 219,
+      "def": 212,
+      "spd": 94
+    },
+    {
+      "hp": 1480,
+      "atk": 222,
+      "def": 215,
+      "spd": 94
+    },
+    {
+      "hp": 1500,
+      "atk": 225,
+      "def": 218,
+      "spd": 95
+    },
+    {
+      "hp": 1520,
+      "atk": 228,
+      "def": 221,
+      "spd": 95
+    },
+    {
+      "hp": 1540,
+      "atk": 231,
+      "def": 224,
+      "spd": 95
+    },
+    {
+      "hp": 1560,
+      "atk": 234,
+      "def": 227,
+      "spd": 95
+    },
+    {
+      "hp": 1580,
+      "atk": 237,
+      "def": 230,
+      "spd": 95
+    },
+    {
+      "hp": 1600,
+      "atk": 240,
+      "def": 233,
+      "spd": 96
+    }
+  ],
+  "awakeningMultipliers": [
+    1000,
+    1050,
+    1100,
+    1150,
+    1200,
+    1250,
+    1300
+  ],
+  "promotionFlat": [],
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 80
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 100
+      }
+    ]
+  ],
+  "talentTree": [
+    {
+      "id": "talent-grifeiro-agressivo",
+      "tree": "class",
+      "row": 1,
+      "maxRank": 1,
+      "exclusiveWith": [
+        "talent-grifeiro-defensivo"
+      ],
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-defensivo",
+      "tree": "class",
+      "row": 1,
+      "maxRank": 1,
+      "exclusiveWith": [
+        "talent-grifeiro-agressivo"
+      ],
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-vigor-extra",
+      "tree": "class",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-robustez",
+      "tree": "class",
+      "row": 3,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-contra-simples",
+      "tree": "class",
+      "row": 4,
+      "maxRank": 1,
+      "exclusiveWith": [
+        "talent-grifeiro-golpe-fragilizante"
+      ],
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-contra-atacar",
+          "patch": {
+            "ppCost": 0
+          }
+        },
+        {
+          "t": "maxAp",
+          "n": -1
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-golpe-fragilizante",
+      "tree": "class",
+      "row": 4,
+      "maxRank": 1,
+      "exclusiveWith": [
+        "talent-grifeiro-contra-simples"
+      ],
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-grifeiro",
+          "patch": {
+            "effects": [
+              {
+                "effectId": "effect-fragilidade",
+                "target": "target",
+                "chance": 500
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-recuperacao-de-vitoria",
+      "tree": "class",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-fortalecimento",
+      "tree": "class",
+      "row": 6,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-foco-em-equipe",
+      "tree": "class",
+      "row": 7,
+      "maxRank": 1,
+      "exclusiveWith": [
+        "talent-grifeiro-foco-solo"
+      ],
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-foco-solo",
+      "tree": "class",
+      "row": 7,
+      "maxRank": 1,
+      "exclusiveWith": [
+        "talent-grifeiro-foco-em-equipe"
+      ],
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 40
+        },
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-grifeiro-maestria",
+      "tree": "class",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-grifeiro-maestria"
+        }
+      ]
+    }
+  ]
+}

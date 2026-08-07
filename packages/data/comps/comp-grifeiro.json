@@ -1,0 +1,44 @@
+{
+  "id": "comp-grifeiro",
+  "name": "Grifeiro",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-grifeiro",
+        "classId": "class-grifeiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-grifeiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-grifeiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

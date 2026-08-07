@@ -1,0 +1,13 @@
+{
+  "id": "skill-ataque-guerreiro",
+  "name": "Ataque Básico (Guerreiro)",
+  "kind": "duel",
+  "apCost": 0,
+  "cooldown": 0,
+  "multiplier": 1000,
+  "flat": 0,
+  "scalesWith": "atk",
+  "tags": [
+    "physical"
+  ]
+}

@@ -14,7 +14,9 @@
     "lint": "node scripts/check-no-random.mjs",
     "validate:data": "pnpm --filter @paths-beyond/data run validate:data",
     "sim": "tsx packages/sim-cli/src/cli.ts",
-    "balance": "node -e \"console.error('pnpm balance: ainda não implementado (chega em M8). Ver docs/spec/09-roadmap.md'); process.exit(1)\""
+    "balance": "tsx tools/balance/src/cli.ts",
+    "test:browser": "pnpm --filter @paths-beyond/core run test:browser",
+    "browsers:install": "pnpm --filter @paths-beyond/core exec playwright install --with-deps"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
