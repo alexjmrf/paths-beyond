@@ -32,3 +32,23 @@ jobs:
 
       - name: Validate data
         run: pnpm validate:data
+
+  determinismo-navegadores:
+    # O job acima roda a suíte em Node (V8). Este roda os testes de determinismo em
+    # Chromium, Firefox e WebKit reais. É o único job que prova que o hash do replay é o
+    # mesmo na máquina do jogador — sem ele, uma divergência entre engines só apareceria
+    # como resultado de arena que não bate, com partidas já disputadas.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Habilitar corepack
+        run: corepack enable
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+      - name: Instalar navegadores
+        run: pnpm browsers:install
+      - name: Determinismo entre engines
+        run: pnpm test:browser

@@ -42,6 +42,8 @@ A spec é normativa e está dividida por assunto. **Leia apenas o arquivo releva
 | `docs/spec/08-progressao-e-ui.md` | Economia PvE e requisitos duros de UI |
 | `docs/spec/09-roadmap.md` | Milestones e critérios de aceite |
 
+`docs/milestones/` contém o **briefing de implementação** do milestone atual, quando existe — detalhamento normativo do que a entrada terse do roadmap só resume, com as decisões de design já tomadas. **Se existir um briefing para o milestone em que você está, leia-o inteiro antes de codar e não reabra as decisões dele.**
+
 `PROGRESS.md` diz em que milestone o projeto está. **Leia antes de começar qualquer coisa.**
 `DECISIONS.md` registra decisões tomadas fora da spec.
 

@@ -39,6 +39,68 @@ Fastify, Postgres, times de defesa com IA declarativa, matchmaking por CP/ELO, r
 
 ---
 
+> **M9 em diante foram definidos pela auditoria de 2026-08-07**, depois que M0–M8 (o roadmap
+> original) foram concluídos. Motivação registrada em `DECISIONS.md`, seção "Auditoria
+> 2026-08-07". Cada milestone tem um briefing de implementação detalhado em
+> `docs/milestones/` escrito **no momento em que ele vira o próximo** — não antes, porque o
+> escopo dos posteriores depende do resultado dos anteriores.
+
+### M9 — Integração de conteúdo
+Loader único `packages/data` → `ContentCatalog`, consumido por cliente, servidor, `sim-cli` e
+`tools/balance`. Aposentadoria do conteúdo hardcoded de `apps/client/src/data/campaign/`
+(regra 4 do `CLAUDE.md`). Servidor bootando com catálogo real em vez de `EMPTY_CATALOG`.
+Nenhuma mecânica nova.
+**Aceite:** existe exatamente um loader no repositório e `apps/client/src/data/campaign/` não
+existe mais; `pnpm balance` produz matriz **idêntica** à de antes da migração; o mesmo `Hero`
+produz o mesmo hash de `StatSheet` no cliente, no servidor e no `sim-cli`.
+
+### M10 — Profundidade do duelo
+Ligar o que M2 deixou desligado: `skill.effects` aplicados dentro do duelo (buff/debuff/DoT),
+dano e cura de assistência aplicados a HP de verdade, gatilhos de reação além de `onAttacked`
+(`onDamaged`, `onLethal`), efeitos `special` de set (§7.4), tick de DoT/regeneração (§6.9).
+Exige campo normativo de dano/cura periódico em `EffectDef` e de duração em
+`EffectApplication` — hoje nenhum dos dois existe. Exige também `tools/balance` suportando
+comps **multi-unidade** com assistência real: sem isso as mudanças desta milestone não são
+mensuráveis.
+**Aceite:** um duelo com skill que aplica debuff produz stat sheet alterado na troca seguinte,
+provado por teste; assistência muda o HP final do duelo; `pnpm balance` roda com comps de
+múltiplas unidades e os dois critérios de M8 continuam batendo com o motor novo.
+
+### M11 — Objetivos de mapa e Valor
+Condições de vitória além de `rout` (`seize`, `surviveRounds`, `escort`, `defend` — já têm
+schema desde M3, nenhuma tem resolução), `mapSkill` com alvo em área (§5.4: cura em área,
+artilharia), catálogo real de `valor-skills` resolvido de verdade por `useValor` (hoje só
+gasta saldo). Sem estes, todo mapa da campanha é obrigatoriamente "mate todo mundo".
+**Aceite:** uma batalha por milestone-condição termina por cada uma das 4 condições novas em
+teste; `useValor` produz efeito observável no estado; `mapSkill` em área atinge mais de uma
+unidade; `pnpm balance` reexecutado sem regressão nos dois critérios de M8.
+
+### M12 — Conteúdo e campanha real
+Autoria de conteúdo em cima do motor completo: campanha em capítulos (6–10 mapas, §10) com
+objetivos variados, mais classes e skills, e — o ponto principal — **skills que usam os
+efeitos de M10 e os objetivos de M11**. Rebalanceamento completo.
+**Aceite:** campanha de 6+ mapas jogável ponta a ponta com pelo menos 3 condições de vitória
+distintas; nenhuma skill do catálogo é só um número de dano; os dois critérios de M8 batendo.
+
+### M13 — Superfície jogável completa (§11)
+Fechar os requisitos duros de §11 que nenhum milestone cobriu: tela de **replay** (reprodução
+passo a passo com controle de velocidade), tela de **PvP** ligando cliente ao servidor de M7
+(hoje o cliente nunca chama o servidor), **persistência/save** entre mapas, e a acessibilidade
+faltante (modo daltônico nos overlays, fonte escalável).
+**Aceite:** um `Replay` gravado é reproduzido passo a passo na UI e bate com o resultado do
+core; uma partida de PvP é iniciada, resolvida e revista pelo cliente contra o servidor real;
+progresso sobrevive a recarregar a página.
+
+### M14 — Economia PvE (§10)
+Masmorras de farm com foco definido (equipamento/experiência/ouro/chefe), energia de conta,
+progressão de awakening (0–6) e imprint, e as três moedas (`ouro`, `pedras`,
+`marcas de arena`). A loja de PvP (M8) já existe e continua valendo a regra: vende gear de set
+e cosmético, **nunca poder bruto**.
+**Aceite:** um ciclo completo de farm → drop → enhance → equipar → subir de poder é jogável;
+energia limita o farm diário; nenhuma moeda compra poder bruto.
+
+---
+
 ---
 
 ## 15. Decisões em aberto (registrar em `DECISIONS.md` ao resolver)
