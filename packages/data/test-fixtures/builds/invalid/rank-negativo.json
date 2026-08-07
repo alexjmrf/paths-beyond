@@ -1,0 +1,8 @@
+{
+  "id": "build-invalida",
+  "name": "Build Inválida",
+  "classId": "class-cavaleiro",
+  "talents": {
+    "talent-carga": -1
+  }
+}
