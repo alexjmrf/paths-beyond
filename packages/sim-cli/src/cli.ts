@@ -1,4 +1,6 @@
 import { pathToFileURL } from 'node:url';
+import { runBattleCommand } from './battle.js';
+import { runDuelCommand } from './duel.js';
 
 export interface DuelArgs {
   command: 'duel';
@@ -27,7 +29,9 @@ function extractFlag(args: string[], flag: string): { value: string | undefined;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
-  const [command, ...rest] = argv;
+  // `pnpm <script> -- <args>` repassa o "--" literal para CLIs não-nativas do Node (tsx
+  // não o consome como o `node -e ... --` faria) — ignora um "--" isolado no começo.
+  const [command, ...rest] = argv[0] === '--' ? argv.slice(1) : argv;
 
   if (command === 'duel') {
     const { value: seedValue, rest: positionals } = extractFlag(rest, '--seed');
@@ -55,10 +59,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
 export function run(argv: string[]): void {
   const parsed = parseArgs(argv);
-  console.error(
-    `sim-cli ${parsed.command}: ainda não implementado (chega em M2/M3). Ver docs/spec/09-roadmap.md`,
-  );
-  process.exit(1);
+
+  if (parsed.command === 'duel') {
+    const output = runDuelCommand(parsed);
+    console.log(output);
+    return;
+  }
+
+  const output = runBattleCommand(parsed);
+  console.log(output);
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

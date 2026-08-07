@@ -1,0 +1,10 @@
+{
+  "id": "map-invalido",
+  "name": "Mapa Inválido",
+  "width": 10,
+  "height": 10,
+  "tiles": [],
+  "zocEnabled": false,
+  "winCondition": { "t": "rout" },
+  "initialValor": 5
+}

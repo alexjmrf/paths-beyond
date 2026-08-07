@@ -32,4 +32,9 @@ describe('parseArgs()', () => {
   it('rejects an empty argv', () => {
     expect(() => parseArgs([])).toThrow(ArgParseError);
   });
+
+  it('ignores a leading literal "--" (pnpm run <script> -- <args> forwarding)', () => {
+    const result = parseArgs(['--', 'duel', 'A.json', 'B.json', '--seed', '42']);
+    expect(result).toEqual({ command: 'duel', heroAFile: 'A.json', heroBFile: 'B.json', seed: 42 });
+  });
 });

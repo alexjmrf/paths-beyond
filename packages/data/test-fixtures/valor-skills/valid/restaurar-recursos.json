@@ -1,0 +1,7 @@
+{
+  "id": "valor-restaurar-recursos",
+  "name": "Restaurar Recursos",
+  "cost": 2,
+  "kind": "restoreApPp",
+  "payload": { "ap": 2, "pp": 1 }
+}

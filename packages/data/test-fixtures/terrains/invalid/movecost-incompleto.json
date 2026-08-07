@@ -1,0 +1,7 @@
+{
+  "id": "forest",
+  "moveCost": { "foot": 2, "cavalry": 3 },
+  "defBonus": 100,
+  "evaBonus": 50,
+  "blocksSight": true
+}
