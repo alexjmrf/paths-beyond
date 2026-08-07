@@ -1,0 +1,7 @@
+{
+  "id": "set-invalido",
+  "name": "Set Inválido",
+  "effects": [
+    { "t": "stat", "pieces": 3, "stat": "atk", "pct": 350 }
+  ]
+}

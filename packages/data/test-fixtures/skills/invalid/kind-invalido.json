@@ -1,0 +1,10 @@
+{
+  "id": "skill-invalida",
+  "name": "Skill Inválida",
+  "kind": "ultimate",
+  "apCost": 1,
+  "cooldown": 0,
+  "multiplier": 1000,
+  "flat": 0,
+  "scalesWith": "atk"
+}

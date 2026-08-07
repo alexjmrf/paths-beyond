@@ -1,0 +1,17 @@
+{
+  "id": "item-invalido",
+  "setId": "set-ataque",
+  "slot": "weapon",
+  "rarity": "epic",
+  "ilvl": 100,
+  "mainstat": { "stat": "atk", "value": 300 },
+  "substats": [
+    { "stat": "chc", "value": 100, "rolls": 1 },
+    { "stat": "chd", "value": 100, "rolls": 1 },
+    { "stat": "eff", "value": 100, "rolls": 1 },
+    { "stat": "efr", "value": 100, "rolls": 1 },
+    { "stat": "pen", "value": 100, "rolls": 1 }
+  ],
+  "enhance": 15,
+  "reforged": true
+}

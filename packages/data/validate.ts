@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { ZodTypeAny } from 'zod';
 
 export interface ValidationIssue {
@@ -51,7 +51,11 @@ export function validateFiles(schema: ZodTypeAny, files: string[]): ValidationRe
 }
 
 async function loadContentSchema(schemaFile: string): Promise<ZodTypeAny> {
-  const mod = (await import(pathToFileURL(schemaFile).href)) as { default?: ZodTypeAny };
+  // Node aceita file:// URLs com espaço literal (não percent-encoded) tão bem quanto
+  // com %20 — mas o loader SSR do Vitest (vite-node) só resolve corretamente a forma
+  // com espaço literal, então evitamos `%20` aqui em vez de usar `.href` puro.
+  const schemaUrl = pathToFileURL(schemaFile).href.replace(/%20/g, ' ');
+  const mod = (await import(schemaUrl)) as { default?: ZodTypeAny };
   if (!mod.default) {
     throw new Error(`${schemaFile} precisa exportar um schema Zod como default export.`);
   }
@@ -85,7 +89,9 @@ export async function validateDataset(rootDir: string): Promise<DatasetReport> {
 }
 
 async function main() {
-  const rootDir = new URL('.', import.meta.url).pathname.replace(/^\/([a-zA-Z]:)/, '$1');
+  // fileURLToPath decodifica corretamente % (ex.: espaço no diretório do projeto);
+  // `.pathname` cru não decodifica e quebra paths com espaço.
+  const rootDir = fileURLToPath(new URL('.', import.meta.url));
   const report = await validateDataset(rootDir);
 
   if (report.schemasFound === 0) {

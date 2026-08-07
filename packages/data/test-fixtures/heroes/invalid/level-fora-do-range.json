@@ -1,0 +1,20 @@
+{
+  "id": "hero-invalido",
+  "classId": "class-soldado",
+  "level": 99,
+  "exp": 0,
+  "awakening": 0,
+  "imprint": 0,
+  "talents": {},
+  "equipment": {
+    "weapon": null,
+    "helmet": null,
+    "armor": null,
+    "necklace": null,
+    "ring": null,
+    "boots": null
+  },
+  "duelSkills": [],
+  "mapSkills": [],
+  "tacticsScript": []
+}

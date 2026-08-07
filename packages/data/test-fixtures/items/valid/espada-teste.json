@@ -1,0 +1,14 @@
+{
+  "id": "item-espada-teste",
+  "setId": "set-ataque",
+  "slot": "weapon",
+  "rarity": "heroic",
+  "ilvl": 85,
+  "mainstat": { "stat": "atk", "value": 300 },
+  "substats": [
+    { "stat": "chc", "value": 100, "rolls": 2 },
+    { "stat": "chd", "value": 200, "rolls": 2 }
+  ],
+  "enhance": 9,
+  "reforged": false
+}

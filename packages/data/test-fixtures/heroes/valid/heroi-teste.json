@@ -1,0 +1,24 @@
+{
+  "id": "hero-teste",
+  "classId": "class-soldado",
+  "level": 30,
+  "exp": 12000,
+  "awakening": 3,
+  "imprint": 2,
+  "talents": {
+    "talent-vigor-basico": 3,
+    "talent-golpe-forte": 1
+  },
+  "equipment": {
+    "weapon": "item-espada-teste",
+    "helmet": null,
+    "armor": null,
+    "necklace": null,
+    "ring": null,
+    "boots": null
+  },
+  "weaponType": "sword",
+  "duelSkills": ["skill-golpe-basico"],
+  "mapSkills": [],
+  "tacticsScript": []
+}

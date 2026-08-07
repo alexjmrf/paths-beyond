@@ -1,0 +1,7 @@
+{
+  "id": "set-ataque",
+  "name": "Ataque",
+  "effects": [
+    { "t": "stat", "pieces": 4, "stat": "atk", "pct": 350 }
+  ]
+}
