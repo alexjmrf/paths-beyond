@@ -1,8 +1,8 @@
 import type { Hero, ItemInstance } from '@paths-beyond/core';
+import type { ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
-import type { ContentCatalog } from '../src/content/types.js';
 import {
   createMemoryArenaDefenseRepository,
   createMemoryHeroRepository,
@@ -16,9 +16,11 @@ import { loadShopCatalog, type ShopCatalog } from '../src/shop/catalog.js';
 const emptyCatalog: ContentCatalog = {
   classes: {},
   skills: {},
+  items: {},
   itemSets: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: {},
+  comps: [],
   baselineReactionSkillIds: [],
 };
 

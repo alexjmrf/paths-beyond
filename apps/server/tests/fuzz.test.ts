@@ -1,9 +1,9 @@
 import { RULES_VERSION, nextUint32, resolveHeroCombatProfile, seedRng, simulate } from '@paths-beyond/core';
 import type { ClassDef, GridMap, Hero, Replay, SkillDef, StatSheet, Terrain } from '@paths-beyond/core';
+import type { ArenaMap, ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
-import type { ArenaMap, ContentCatalog } from '../src/content/types.js';
 import {
   createMemoryArenaDefenseRepository,
   createMemoryHeroRepository,
@@ -99,9 +99,11 @@ const arenaMap: ArenaMap = { grid: buildGrid(), winCondition: { t: 'rout' }, ini
 const catalog: ContentCatalog = {
   classes: { [classSword.id]: classSword, [classArcane.id]: classArcane, [classBowFlying.id]: classBowFlying, [classArmored.id]: classArmored },
   skills: { [basico.id]: basico, [forte.id]: forte, [counter.id]: counter, [defend.id]: defend },
+  items: {},
   itemSets: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: { 'mapa-fuzz': arenaMap },
+  comps: [],
   baselineReactionSkillIds: [counter.id, defend.id],
 };
 

@@ -8,8 +8,8 @@ import {
   type HeroPlacement,
   type MapAiArchetype,
 } from '@paths-beyond/core';
+import type { ContentCatalog } from '@paths-beyond/content';
 import type { FastifyPluginAsync } from 'fastify';
-import type { ContentCatalog } from '../content/types.js';
 import { computeEloUpdate } from '../matchmaking/elo.js';
 import type { RateLimiter } from './rateLimit.js';
 import type { ArenaDefenseRepository, HeroRepository, PlayerRepository, ReplayRepository } from '../repository/types.js';

@@ -556,3 +556,32 @@ Nenhuma mudança de código nesta sessão — só a auditoria, as entradas M9–
 pacotes, limpo — `packages/content` pela primeira vez), `pnpm lint` sem alteração,
 `pnpm validate:data` (17 schemas, 62 arquivos, sem mudança — fatia não mexeu em
 conteúdo).
+
+### M9 — sub-sessão 2: servidor com catálogo real
+
+- **`apps/server/src/content/types.ts` deletado, não esvaziado num re-export.** A
+  alternativa (manter o arquivo como `export type { ArenaMap, ContentCatalog } from
+  '@paths-beyond/content'`) evitaria tocar nos 8 arquivos que importavam dele, mas
+  perpetuaria uma segunda "fonte" de import pros mesmos tipos — exatamente o tipo de
+  duplicação que D2 pediu pra fechar. Import direto de `@paths-beyond/content` em todo
+  lugar (`app.ts`, `battle/routes.ts`, e os 6 arquivos de teste que constroem um
+  catálogo à mão) deixa claro, pra quem ler o código depois, que o pacote novo é a
+  única fonte — sem indireção que só existiria por conveniência de migração.
+- **Nenhuma mudança de lógica em `battle/routes.ts`**, só de import — `opts.catalog.maps
+  [mapId]`/`opts.catalog.maps[defense.mapId]` já indexavam por id desde M7 (o servidor
+  sempre exigiu `mapId` explícito no corpo de `PUT /me/defense`, nunca "o mapa"). A
+  mudança de M9 sub-sessão 1 (`content.map` único → `content.maps: Record<Id,
+  ArenaMap>`) já era exatamente o shape que `apps/server` sempre teve — só `tools/balance`
+  (Coliseu, mapa único por natureza) precisou de `firstArenaMap()`.
+- **Teste novo (`realContent.test.ts`) fica ao lado do fuzz, não o substitui** — D5 é
+  literal: o fuzz continua provando o motor com conteúdo sintético (rápido, sem
+  depender do estado de `packages/data`); o teste novo prova que o catálogo real
+  carrega e resolve através do endpoint HTTP de ponta a ponta (`PUT /me/defense` →
+  `POST /battles`), usando duas classes reais (`class-espadachim`/`class-guerreiro`)
+  com equipamento vazio (por simplicidade — provar que o catálogo resolve não exige
+  equipar itens; isso já é coberto por `packages/content/tests/loadCatalogFromDisk.test.ts`).
+
+`pnpm test` (571 testes, 57 arquivos — +1 sobre a sub-sessão 1), `pnpm typecheck` (7
+pacotes, limpo), `pnpm lint`/`pnpm validate:data` sem alteração (17 schemas, 62
+arquivos). `pnpm balance -- --runs 10000` byte-a-byte idêntico à linha de base da
+sub-sessão 1 (nenhuma mudança em `tools/balance`/`packages/content` nesta fatia).

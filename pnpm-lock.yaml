@@ -57,6 +57,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@paths-beyond/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       '@paths-beyond/core':
         specifier: workspace:*
         version: link:../../packages/core

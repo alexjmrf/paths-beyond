@@ -1,8 +1,8 @@
+import type { ContentCatalog } from '@paths-beyond/content';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { authPlugin } from './auth.js';
 import type { RateLimiter } from './battle/rateLimit.js';
 import { battleRoutes } from './battle/routes.js';
-import type { ContentCatalog } from './content/types.js';
 import { matchmakingRoutes } from './matchmaking/routes.js';
 import type {
   ArenaDefenseRepository,

@@ -1,7 +1,7 @@
+import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { Pool } from 'pg';
 import { buildApp } from './app.js';
 import { createInMemoryRateLimiter } from './battle/rateLimit.js';
-import { EMPTY_CATALOG } from './content/emptyCatalog.js';
 import {
   createPostgresArenaDefenseRepository,
   createPostgresHeroRepository,
@@ -23,7 +23,7 @@ const app = buildApp({
   arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),
   replayRepository: createPostgresReplayRepository(pool),
   seasonRepository: createPostgresSeasonRepository(pool),
-  catalog: EMPTY_CATALOG,
+  catalog: loadCatalogFromDisk(),
   shopCatalog: loadShopCatalog(),
   // §9.4 — 10 batalhas/minuto por jogador; corte de escopo (ver DECISIONS.md), ajustável.
   rateLimiter: createInMemoryRateLimiter({ maxRequests: 10, windowMs: 60_000 }),

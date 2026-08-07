@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@paths-beyond/content": "workspace:*",
     "@paths-beyond/core": "workspace:*",
     "@paths-beyond/data": "workspace:*",
     "fastify": "^5.11.0",
