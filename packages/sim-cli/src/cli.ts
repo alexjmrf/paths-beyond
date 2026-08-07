@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import { runBattleCommand } from './battle.js';
 import { runDuelCommand } from './duel.js';
+import { runStatSheetCommand } from './statSheet.js';
 
 export interface DuelArgs {
   command: 'duel';
@@ -15,7 +16,13 @@ export interface BattleArgs {
   replayFile?: string;
 }
 
-export type ParsedArgs = DuelArgs | BattleArgs;
+export interface StatSheetArgs {
+  command: 'stat-sheet';
+  heroFile: string;
+  catalogDir?: string;
+}
+
+export type ParsedArgs = DuelArgs | BattleArgs | StatSheetArgs;
 
 export class ArgParseError extends Error {}
 
@@ -54,20 +61,32 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { command: 'battle', mapFile, replayFile };
   }
 
-  throw new ArgParseError(`comando desconhecido: ${command ?? '(nenhum)'}. Use "duel" ou "battle".`);
+  if (command === 'stat-sheet') {
+    const { value: catalogDir, rest: positionals } = extractFlag(rest, '--catalog-dir');
+    const [heroFile] = positionals;
+    if (!heroFile) {
+      throw new ArgParseError('uso: sim stat-sheet <hero.json> [--catalog-dir <dir>]');
+    }
+    return { command: 'stat-sheet', heroFile, catalogDir };
+  }
+
+  throw new ArgParseError(`comando desconhecido: ${command ?? '(nenhum)'}. Use "duel", "battle" ou "stat-sheet".`);
 }
 
 export function run(argv: string[]): void {
   const parsed = parseArgs(argv);
 
   if (parsed.command === 'duel') {
-    const output = runDuelCommand(parsed);
-    console.log(output);
+    console.log(runDuelCommand(parsed));
     return;
   }
 
-  const output = runBattleCommand(parsed);
-  console.log(output);
+  if (parsed.command === 'stat-sheet') {
+    console.log(runStatSheetCommand(parsed));
+    return;
+  }
+
+  console.log(runBattleCommand(parsed));
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

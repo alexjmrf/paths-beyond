@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@paths-beyond/content": "workspace:*",
     "@paths-beyond/core": "workspace:*",
     "@paths-beyond/data": "workspace:*",
     "zod": "^3.24.1"

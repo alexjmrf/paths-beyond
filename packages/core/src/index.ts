@@ -2,6 +2,13 @@ export type { Id } from './types.js';
 
 export { RULES_VERSION } from './rulesVersion.js';
 
+// §3.3 — hash canônico. Existia só como import relativo dentro de
+// packages/core/tests/determinism/ (M8 sub-sessão 7); M9 precisa dele fora do pacote
+// pela primeira vez (critério de aceite 4: "mesmo Hero produz o mesmo hash de
+// StatSheet no cliente, no servidor e no sim-cli" — o análogo de §3.3 pra camada de
+// conteúdo), então passa a ser exportado de verdade.
+export { canonicalize, fnv1a32, hashState } from './determinism/hash.js';
+
 export { FP_SCALE, fpDiv, fpMul, fpPct } from './math/fixed.js';
 
 export { nextUint32, seedRng } from './rng/xoshiro128.js';

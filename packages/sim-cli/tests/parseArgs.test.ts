@@ -25,6 +25,20 @@ describe('parseArgs()', () => {
     expect(result).toEqual({ command: 'battle', mapFile: 'map.json', replayFile: 'r.json' });
   });
 
+  it('parses a stat-sheet command without --catalog-dir', () => {
+    const result = parseArgs(['stat-sheet', 'hero.json']);
+    expect(result).toEqual({ command: 'stat-sheet', heroFile: 'hero.json', catalogDir: undefined });
+  });
+
+  it('parses a stat-sheet command with --catalog-dir', () => {
+    const result = parseArgs(['stat-sheet', 'hero.json', '--catalog-dir', 'fixtures/']);
+    expect(result).toEqual({ command: 'stat-sheet', heroFile: 'hero.json', catalogDir: 'fixtures/' });
+  });
+
+  it('rejects a stat-sheet command missing a hero file', () => {
+    expect(() => parseArgs(['stat-sheet'])).toThrow(ArgParseError);
+  });
+
   it('rejects an unknown command', () => {
     expect(() => parseArgs(['nonsense'])).toThrow(ArgParseError);
   });

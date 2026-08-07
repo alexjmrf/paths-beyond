@@ -150,6 +150,9 @@ importers:
 
   packages/sim-cli:
     dependencies:
+      '@paths-beyond/content':
+        specifier: workspace:*
+        version: link:../content
       '@paths-beyond/core':
         specifier: workspace:*
         version: link:../core

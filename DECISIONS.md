@@ -651,3 +651,73 @@ balance -- --runs 10000` continua byte-a-byte idêntico à linha de base (confir
 `firstArenaMap()` de `tools/balance` ainda escolhe `map-arena-coliseu` com 4 mapas no
 catálogo — ordem alfabética de `readdirSync` coloca "map-arena" antes de
 "map-campanha").
+
+### M9 — sub-sessão 4: sim-cli, RULES_VERSION, aceite final — MILESTONE COMPLETO
+
+- **`RULES_VERSION` bumpado de `'0.0.0'` pra `'0.1.0'` (D4), primeiro bump desde M0.**
+  Antes de bumpar, investiguei se isso quebraria `GOLDEN_HASH` (M8 sub-sessão 7):
+  `simulate()` (`packages/core/src/battle/simulate.ts`) nunca lê `replay.rulesVersion`
+  — o campo existe no `Replay` só pra quem monta a batalha (o servidor) comparar
+  contra a constante antes de rodar, fora de `packages/core`. `BattleResult` (o que
+  `hashState` hasheia) não carrega `rulesVersion`. Confirmado rodando `pnpm
+  test:browser` (3 engines) depois do bump: os 42 testes de determinismo continuam
+  batendo com o mesmo `GOLDEN_HASH` — o bump é seguro por construção, não só por sorte.
+  Escolha do valor `'0.1.0'` (não dada pelo briefing, só "bump it"): primeira versão
+  minor, sinalizando "regras agora versionadas de verdade" sem fingir reconstruir os 8
+  incrementos que nunca aconteceram em M1-M8.
+- **`hashState`/`canonicalize`/`fnv1a32` exportados no barrel público de
+  `packages/core`** (antes só acessíveis via import relativo dentro dos próprios
+  testes de `packages/core`, M8 sub-sessão 7). Primeira vez que um consumidor externo
+  (`sim-cli`) precisa do hash canônico — sem isso, `sim stat-sheet` teria que
+  reimplementar FNV-1a de novo (como `sim-cli/src/duel.ts`, código de M2, já faz com
+  `hashDuelResult`, que usa `JSON.stringify` cru — sem a garantia de chaves ordenadas
+  que `canonicalize()` existe pra dar). Não mexi em `duel.ts` (fora de escopo desta
+  sub-sessão, código pré-existente e já testado), só não repeti o mesmo padrão frágil
+  no código novo.
+- **`sim stat-sheet <hero.json> [--catalog-dir <dir>]`**: lê um `Hero` real
+  (`heroes.schema.ts`, mesmo shape usado por comps/servidor/cliente), carrega o
+  catálogo via `loadCatalogFromDisk()`, resolve `resolveHeroStatSheet` e imprime os 13
+  stats + hash canônico. `--catalog-dir` opcional (default = conteúdo real de
+  `packages/data/`) segue a mesma convenção de `rootDir`/`layout` já usada por
+  `loadCatalogFromDisk`/`loadBalanceContent`, permitindo testar contra
+  `test-fixtures/` sem inventar um segundo caminho de carregamento.
+- **Critério de aceite 4 (o análogo de §3.3 pra camada de conteúdo) — prova em duas
+  partes, não uma só:**
+  - **Automatizada em `pnpm test`** (`packages/sim-cli/tests/
+    heroStatSheetCrossConsumer.test.ts`): as pernas sim-cli e "servidor" rodam as
+    duas em Node contra o mesmo catálogo real. "Servidor" é literalmente
+    `resolveHeroCombatProfile` — a função que `apps/server/src/battle/routes.ts`
+    chama por dentro (via `buildBattleSetupFromHeroes`/`buildBattleUnit`) pra resolver
+    `.stats`, já exercitada de ponta a ponta contra conteúdo real por
+    `apps/server/tests/realContent.test.ts` (sub-sessão 2) — não uma cópia paralela de
+    lógica escrita só pra este teste.
+  - **Manual, com output real colado nesta sessão, NÃO automatizada em CI**: a perna
+    cliente. `apps/client/src/data/catalog.ts` ganhou um bloco temporário
+    (`resolveHeroStatSheet`+`hashState` sobre o mesmo `Hero` de `comp-espadachim`,
+    expondo o resultado em `window.__debugHeroStatHash`) — mesmo padrão de
+    diagnóstico descartável já usado em M8 sub-sessão 4/7, revertido antes do commit
+    (`git diff` confirmado vazio no arquivo depois de reverter). Rodei `npx vite` real
+    + Playwright/Chromium headless (mesma instalação de M8 sub-sessão 7): **hash do
+    navegador = `33998011`, idêntico ao hash computado em Node** pro mesmo `Hero`.
+    Decisão de escopo: automatizar isso em CI exigiria subir um servidor Vite +
+    Playwright dentro da suíte de testes de `packages/content` ou `apps/client`,
+    infraestrutura de E2E nova que nenhum dos dois pacotes tem hoje — desproporcional
+    ao pedido de M9 ("sim-cli passa a poder carregar do catálogo... aceite"). Fica
+    registrado como candidato natural pra M13 (superfície jogável completa), que já
+    precisa de infraestrutura de teste de UI real por outros motivos (tela de replay,
+    tela de PvP).
+- **Nenhum briefing de M10 foi escrito nesta sessão** — decisão de método já registrada
+  na "Auditoria 2026-08-07": cada milestone ganha o briefing detalhado só quando vira
+  o próximo. M9 é o único que teve briefing desde o início porque a auditoria decidiu
+  a ordem completa (integração → mecânica → conteúdo → superfície) e escreveu só o
+  primeiro passo em detalhe.
+
+`pnpm test` (579 testes, 59 arquivos — +8 sobre a sub-sessão 3: 4 em
+`statSheet.test.ts`, 3 em `parseArgs.test.ts`, 1 em
+`heroStatSheetCrossConsumer.test.ts`), `pnpm typecheck` (7 pacotes, limpo), `pnpm lint`
+sem alteração, `pnpm validate:data` sem alteração (17 schemas, 67 arquivos), `pnpm
+test:browser` (42 testes, 3 engines, `GOLDEN_HASH` intacto). `pnpm balance -- --runs
+10000` continua byte-a-byte idêntico à linha de base capturada antes da sub-sessão 1 —
+confirmado em toda fatia de M9 sem exceção. **Com esta fatia, M9 está completo: os 4
+critérios de aceite formais de `docs/milestones/M9-integracao-de-conteudo.md` §6 estão
+confirmados batendo.**
