@@ -117,4 +117,9 @@ describe('loadCatalogFromDisk() — conteúdo real e fixtures (regressão de M8 
     const catalog = loadCatalogFromDisk();
     expect(catalog.baselineReactionSkillIds).toEqual(['skill-contra-atacar', 'skill-defender']);
   });
+
+  it('carrega o efeito real (M10 — antes ausente do catálogo, skill.effects era inerte)', () => {
+    const catalog = loadCatalogFromDisk();
+    expect(catalog.effects['effect-fragilidade']).toBeDefined();
+  });
 });

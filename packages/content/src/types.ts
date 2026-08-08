@@ -1,4 +1,4 @@
-import type { ClassDef, Coord, GridMap, Hero, Id, ItemInstance, ItemSet, MapAiArchetype, SkillDef, WeaponType, WinCondition } from '@paths-beyond/core';
+import type { ClassDef, Coord, EffectDef, GridMap, Hero, Id, ItemInstance, ItemSet, MapAiArchetype, SkillDef, WeaponType, WinCondition } from '@paths-beyond/core';
 
 // Um mapa de arena precisa de mais do que o `GridMap` puro do core (terreno) — a regra de
 // vitória e o Valor inicial também são dados por mapa (§5.1/§5.6), mas não fazem parte do
@@ -38,6 +38,11 @@ export interface ContentCatalog {
   readonly skills: Readonly<Record<Id, SkillDef>>;
   readonly items: Readonly<Record<Id, ItemInstance>>;
   readonly itemSets: Readonly<Record<Id, ItemSet>>;
+  // M10 — antes ausente do catálogo: skill.effects era mecanicamente inerte (resolveDuel
+  // nunca lia EffectApplication), então nenhum chamador real precisava de EffectDef.
+  // Agora que resolveDuel aplica de verdade, servidor/cliente/tools-balance precisam
+  // deste campo para que skill.effects tenha efeito observável fora de packages/core.
+  readonly effects: Readonly<Record<Id, EffectDef>>;
   readonly weaponDuelRanges: Readonly<Record<WeaponType, number>>;
   // D2 (M9): antes um único mapa (`loadFirstValid` sempre pegava o primeiro arquivo
   // encontrado) — agora todo mapa real vira uma entrada, indexado pelo próprio `id`.

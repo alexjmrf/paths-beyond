@@ -100,7 +100,7 @@ function buildCampaignMap(mapId: Id, unitSpecs: readonly CampaignUnitSpec[]): Ca
     map: arenaMap.grid,
     permadeath: 'casual', // mesmo default já usado pela campanha desde M6
     winCondition: arenaMap.winCondition,
-    effectDefs: {},
+    effectDefs: catalog.effects,
     initialValor: arenaMap.initialValor,
     itemSets: catalog.itemSets,
     skillsCatalog: catalog.skills,

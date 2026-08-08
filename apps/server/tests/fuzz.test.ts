@@ -101,6 +101,7 @@ const catalog: ContentCatalog = {
   skills: { [basico.id]: basico, [forte.id]: forte, [counter.id]: counter, [defend.id]: defend },
   items: {},
   itemSets: {},
+  effects: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: { 'mapa-fuzz': arenaMap },
   comps: [],

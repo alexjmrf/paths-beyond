@@ -73,6 +73,7 @@ const catalog: ContentCatalog = {
   skills: { [basico.id]: basico },
   items: {},
   itemSets: {},
+  effects: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: { 'mapa-teste': arenaMap },
   comps: [],

@@ -196,7 +196,7 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
       map: arenaMap.grid,
       permadeath: 'classic', // §15 (decisões em aberto) — sugestão de default da própria spec
       winCondition: arenaMap.winCondition,
-      effectDefs: {},
+      effectDefs: opts.catalog.effects,
       initialValor: arenaMap.initialValor,
       itemSets: opts.catalog.itemSets,
       skillsCatalog: opts.catalog.skills,

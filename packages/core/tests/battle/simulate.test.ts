@@ -29,7 +29,7 @@ const strike: SkillDef = {
 const spdBuffSkill: SkillDef = {
   id: 'skill-spd-buff', name: 'Ímpeto', kind: 'map', apCost: 1, cooldown: 0,
   multiplier: 0, flat: 0, scalesWith: 'atk',
-  effects: [{ effectId: 'effect-spd-up', target: 'self', chance: 1000 }],
+  effects: [{ effectId: 'effect-spd-up', target: 'self', chance: 1000, duration: 'battle' }],
   tags: ['buff'],
 };
 

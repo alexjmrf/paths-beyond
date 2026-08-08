@@ -50,6 +50,7 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     skills: readJsonFiles(typeDir(root, 'skills', layout)),
     items: readJsonFiles(typeDir(root, 'items', layout)),
     itemSets: readJsonFiles(typeDir(root, 'item-sets', layout)),
+    effects: readJsonFiles(typeDir(root, 'effects', layout)),
     comps: readJsonFiles(typeDir(root, 'comps', layout)),
     maps: readJsonFiles(typeDir(root, 'maps', layout)),
     terrains: readJsonFiles(typeDir(root, 'terrains', layout)),

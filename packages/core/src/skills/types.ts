@@ -9,6 +9,9 @@ export interface EffectApplication {
   readonly target: 'self' | 'target';
   readonly chance: number; // fp-scale (1000 = 100%), antes de eff/efr (§6.9)
   readonly stacks?: number;
+  // §6.9 (M10) — por quanto tempo o ActiveEffect criado por esta aplicação dura; mesmo
+  // formato de ActiveEffect.duration (número = rounds de mapa, ou 'duel'/'battle').
+  readonly duration: number | 'duel' | 'battle';
 }
 
 // §8.3 — SkillDef. Cópia própria do core (regra 1: core não importa de packages/data).

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import skillSchema from './skills.schema.js';
 import {
+  effectDurationSchema,
   fullStatSheetSchema,
   idSchema,
   reactionLineSchema,
@@ -15,7 +16,7 @@ import {
 // para M3-M5, quando grid/equipamento/talentos reais existirem.
 const activeEffectSchema = z.object({
   id: idSchema, // referencia um EffectDef de effects.schema.ts
-  duration: z.union([z.number().int().nonnegative(), z.literal('duel'), z.literal('battle')]),
+  duration: effectDurationSchema,
   stacks: z.number().int().positive(),
   maxStacks: z.number().int().positive(),
   dispellable: z.boolean(),

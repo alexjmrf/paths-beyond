@@ -721,3 +721,92 @@ test:browser` (42 testes, 3 engines, `GOLDEN_HASH` intacto). `pnpm balance -- --
 confirmado em toda fatia de M9 sem exceção. **Com esta fatia, M9 está completo: os 4
 critérios de aceite formais de `docs/milestones/M9-integracao-de-conteudo.md` §6 estão
 confirmados batendo.**
+
+### M10 — sub-sessão 1/N: fundação de skill.effects no duelo
+
+Primeira fatia de M10 (roadmap: "Profundidade do duelo"). Usuário escolheu, entre as
+opções apresentadas (fundação+skill.effects / assistência aplicando HP / harness
+multi-unidade do balance), começar pela fundação — é o item citado primeiro no roadmap
+e desbloqueia DoT/regen e set specials depois.
+
+- **Campo de dano/cura periódico em `EffectDef`: percentual do HP MÁXIMO do alvo**
+  (`periodicDamagePct`/`periodicHealPct`, fp-scale), não valor fixo — decisão levada ao
+  usuário antes de codar. Reusa a convenção já existente no projeto (`damageDealtPct`,
+  `damageTakenReductionPct` já são todos percentuais) e escala automaticamente com o HP
+  do alvo sem precisar recalibrar por tier de progressão. **Declarado nesta sub-sessão,
+  ainda não tickado** — `round.ts`/`tickEffects` continua só decrementando duração
+  numérica; aplicar dano/cura de fato fica para a sub-sessão que liga DoT/regen.
+- **Campo `duration` em `EffectApplication` — mesmo union de `ActiveEffect.duration`**
+  (`number | 'duel' | 'battle'`), extraído para `effectDurationSchema` em
+  `packages/data/schemas/shared.ts` e reusado nos dois lugares. Passou a ser **campo
+  obrigatório** (não opcional/default) — duração de efeito é decisão de conteúdo, não
+  do motor; `applyMapSkill` (`packages/core/src/battle/commands.ts`) parou de usar
+  `'battle'` hardcoded (cut documentado desde M3) e passou a ler `application.duration`
+  de verdade.
+- **`skill.effects` só é aplicado para a skill do ATOR PRINCIPAL** (a que o script
+  tático escolheu, ou a skill pura de buff/debuff sem componente de dano — branch que
+  antes só logava e retornava). Reação/contra-ataque e assistência têm seus próprios
+  `effects` declaráveis em `SkillDef` mas **não são resolvidos ainda** — corte
+  explícito, pareado com o corte de reaction triggers além de `onAttacked` (ambos
+  candidatos óbvios pra próxima sub-sessão de M10, já que resolver um sem o outro seria
+  trabalho pela metade no mesmo código).
+- **Chance de aplicação usa `eff`/`efr` do formulário literal do §6.9 mesmo para
+  self-target** — o `efr` do PRÓPRIO ator (não um "defensor" separado) entra na conta
+  quando uma skill aplica um buff em si mesma. Não é exceção explícita na spec; decisão
+  de implementar literal em vez de inventar um caso especial pra self-buffs.
+- **Reaplicar um efeito já ativo refresca a `duration` para a da nova aplicação** (em
+  vez de manter a duração mais longa entre as duas, ou somar). `upsertActiveEffect`
+  (novo, `packages/core/src/duel/effects.ts` — extrai e substitui a lógica que antes só
+  existia duplicada dentro de `applyMapSkill`) segue essa convenção; stacks continuam
+  somando até o teto do `EffectDef`, só a duração é substituída.
+- **Achado que exigiu escopo maior do que "só core+data" (confirmado com o usuário
+  antes de prosseguir):** `packages/content`'s `ContentCatalog` nunca teve uma coleção
+  `effects` — inofensivo enquanto `skill.effects` era mecanicamente inerte (M2), mas
+  uma vez ligado, `apps/server`, `apps/client` e `tools/balance` continuariam rodando
+  com `effectDefs: {}` hardcoded, repetindo exatamente o padrão que a auditoria de
+  2026-08-07 criticou em "Achado 5" (skill que não faz nada mecanicamente). Fechado
+  nesta sub-sessão: `ContentCatalog.effects`, os dois adapters
+  (`loadCatalogFromDisk.ts`/`loadCatalogFromBrowser.ts`) e os 4 pontos de chamada
+  (`apps/server/src/battle/routes.ts`, `apps/client/src/data/campaign.ts`,
+  `tools/balance/src/runTournament.ts`) passaram a usar conteúdo real.
+  `packages/sim-cli/src/duel.ts` continua com `effectDefs: {}` — seu formato
+  self-contained (`DuelParticipant` autônomo, decisão de M2) não tem hoje um terceiro
+  arquivo de entrada pra um catálogo de efeitos; fica como gap documentado, não
+  resolvido, já que consertar exigiria mudar o formato do comando `sim duel`, fora do
+  escopo desta fatia.
+- **`DuelResult` ganhou `finalActiveEffectsAttacker`/`finalActiveEffectsDefender`** —
+  sem isso, um efeito aplicado dentro de `resolveDuel` evaporaria ao sincronizar de
+  volta com o `BattleUnit` no fim de `applyEngage` (que só copiava hp/ap/pp de volta).
+  `ActionLogEntry` ganhou `effectsApplied: readonly Id[]` (quais effectIds passaram na
+  rolagem de chance nesta ação) — não exigido pelo critério de aceite formal, mas
+  mínimo o suficiente pra testar diretamente em vez de só inferir por diferença de
+  dano, e é o tipo de dado que a UI de M10/M11 (ícones de status) vai precisar de
+  qualquer forma.
+- **`effect-fragilidade` (talento granted, `class-*.json` × 10 + template em
+  `authorContent.ts`) ganhou `duration: 'duel'`** — não `'battle'`. É a primeira vez
+  que este efeito (inerte desde M2) passa a fazer algo de verdade; escopo contido
+  (dura só o duelo em que foi aplicado) pareceu o default mais seguro pra uma skill de
+  assinatura de classe recém-ligada, em vez de debuff permanente de mapa. Sem
+  consequência observável em `pnpm balance` porque todo comp real usa `talents: {}`
+  (nenhum talento é alocado nos comps de balanceamento) — confirmado empiricamente
+  (`git stash` + rerun na baseline pré-M10 = output byte-a-byte idêntico ao pós-M10).
+- **Fixture `goldenReplay.ts` (`heavyBlow.effects` → `effect-bleed`) ganhou
+  `duration: 'battle'`** — já existia desde M2 como debuff mecanicamente inerte,
+  citado no próprio docstring do fixture ("...aplicação de debuff") como algo que a
+  fixture pretendia exercitar mas nunca exercitou de fato. `'battle'` (não `'duel'`)
+  porque o replay engaja os mesmos dois rivais duas vezes — dá cobertura ao caminho de
+  persistência entre duelos, não só dentro de um duelo só.
+- **`GOLDEN_HASH` mudou (`6249029d` → `c3a404a0`) e `RULES_VERSION` subiu (`0.1.0` →
+  `0.2.0`)**, no mesmo commit, seguindo o protocolo documentado no próprio
+  `crossRuntime.test.ts`: mudança de regra real (skill.effects deixou de ser inerte),
+  não regressão — confirmado rodando `pnpm test` (node) e `pnpm test:browser`
+  (Chromium/Firefox/WebKit reais) com o hash novo batendo nos quatro ambientes.
+
+`pnpm test` (594 testes, 59 arquivos), `pnpm typecheck` (7 pacotes, limpo), `pnpm lint`
+sem alteração, `pnpm validate:data` sem alteração (17 schemas, 67 arquivos), `pnpm
+test:browser` (42 testes, 3 engines, `GOLDEN_HASH` novo confirmado nos três). `pnpm
+balance -- --runs 10000` byte-a-byte idêntico à linha de base pré-M10 (comparação
+direta via `git stash`, não só inferência). Escopo restante de M10 (não iniciado):
+tick de DoT/regen, dano/cura de assistência aplicado a HP, reaction triggers além de
+`onAttacked`, efeitos `special` de set (§7.4), harness multi-unidade de
+`tools/balance` com `weaponDuelRanges`/`assistRange` reais.

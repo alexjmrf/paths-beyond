@@ -172,7 +172,7 @@ export function generateTalentTree(profile: ClassProfile, tree: 'class' | 'spec'
         {
           t: 'modifySkill' as const,
           skillId: sigId,
-          patch: { effects: [{ effectId: 'effect-fragilidade', target: 'target', chance: 500 }] },
+          patch: { effects: [{ effectId: 'effect-fragilidade', target: 'target', chance: 500, duration: 'duel' }] },
         },
       ],
     },

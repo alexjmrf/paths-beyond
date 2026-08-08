@@ -4,8 +4,10 @@ import {
   computeEffectApplicationChance,
   sumDamageDealtPct,
   sumDamageTakenReductionPct,
+  upsertActiveEffect,
 } from '../../src/duel/effects.js';
 import type { ActiveEffect, EffectDef } from '../../src/duel/types.js';
+import type { EffectApplication } from '../../src/skills/types.js';
 import type { StatSheet } from '../../src/stats/types.js';
 
 function emptySheet(overrides: Partial<StatSheet> = {}): StatSheet {
@@ -126,5 +128,69 @@ describe('sumDamageDealtPct / sumDamageTakenReductionPct — §6.6 passo 8', () 
       { id: 'effect-defense-down', duration: 'duel', stacks: 1, maxStacks: 1, dispellable: true },
     ];
     expect(sumDamageTakenReductionPct(active, { [defenseDownDef.id]: defenseDownDef })).toBe(-150);
+  });
+});
+
+describe('upsertActiveEffect — §6.9/§8.3 (M10: skill.effects criando/empilhando ActiveEffect)', () => {
+  const application: EffectApplication = {
+    effectId: atkBuffDef.id,
+    target: 'target',
+    chance: 1000,
+    duration: 'battle',
+  };
+
+  it('cria um ActiveEffect novo quando o efeito ainda não está ativo', () => {
+    const result = upsertActiveEffect([], atkBuffDef, application);
+    expect(result).toEqual([
+      { id: atkBuffDef.id, duration: 'battle', stacks: 1, maxStacks: atkBuffDef.maxStacks, dispellable: true },
+    ]);
+  });
+
+  it('respeita application.stacks ao criar (em vez de sempre 1)', () => {
+    const result = upsertActiveEffect([], atkBuffDef, { ...application, stacks: 2 });
+    expect(result[0]?.stacks).toBe(2);
+  });
+
+  it('incrementa stacks de um efeito já ativo, sem duplicar a entrada', () => {
+    const existing: ActiveEffect[] = [
+      { id: atkBuffDef.id, duration: 'duel', stacks: 1, maxStacks: 3, dispellable: true },
+    ];
+    const result = upsertActiveEffect(existing, atkBuffDef, application);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.stacks).toBe(2);
+  });
+
+  it('nunca excede maxStacks do EffectDef', () => {
+    const existing: ActiveEffect[] = [
+      { id: atkBuffDef.id, duration: 'duel', stacks: 3, maxStacks: 3, dispellable: true },
+    ];
+    const result = upsertActiveEffect(existing, atkBuffDef, application);
+    expect(result[0]?.stacks).toBe(3);
+  });
+
+  it('reaplicar atualiza (refresca) a duration para a da nova aplicação', () => {
+    const existing: ActiveEffect[] = [
+      { id: atkBuffDef.id, duration: 2, stacks: 1, maxStacks: 3, dispellable: true },
+    ];
+    const result = upsertActiveEffect(existing, atkBuffDef, { ...application, duration: 'battle' });
+    expect(result[0]?.duration).toBe('battle');
+  });
+
+  it('não muta o array recebido', () => {
+    const existing: ActiveEffect[] = [
+      { id: atkBuffDef.id, duration: 'duel', stacks: 1, maxStacks: 3, dispellable: true },
+    ];
+    const before = existing.map((e) => ({ ...e }));
+    upsertActiveEffect(existing, atkBuffDef, application);
+    expect(existing).toEqual(before);
+  });
+
+  it('outros efeitos ativos na lista permanecem intocados', () => {
+    const existing: ActiveEffect[] = [
+      { id: defenseDownDef.id, duration: 'duel', stacks: 1, maxStacks: 1, dispellable: true },
+    ];
+    const result = upsertActiveEffect(existing, atkBuffDef, application);
+    expect(result).toHaveLength(2);
+    expect(result.find((e) => e.id === defenseDownDef.id)).toEqual(existing[0]);
   });
 });

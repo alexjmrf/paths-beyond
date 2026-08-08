@@ -66,6 +66,81 @@ const defend: SkillDef = {
   tags: [],
 };
 
+// §8.3/§6.9 (M10) — skill que aplica um debuff de def ao acertar.
+const debuffStrike: SkillDef = {
+  id: 'skill-debuff-strike',
+  name: 'Golpe Corrosivo',
+  kind: 'duel',
+  apCost: 1,
+  cooldown: 0,
+  multiplier: 1200,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [{ effectId: 'effect-def-down', target: 'target', chance: 1000, duration: 'battle' }],
+  tags: ['physical'],
+};
+
+// Contra-ataque que TAMBÉM declara effects — usado para provar que reação não os aplica.
+const counterWithEffects: SkillDef = {
+  id: 'skill-counter-with-effects',
+  name: 'Contra-ataque Envenenado',
+  kind: 'reaction',
+  apCost: 0,
+  ppCost: 1,
+  cooldown: 0,
+  multiplier: 800,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [{ effectId: 'effect-def-down', target: 'target', chance: 1000, duration: 'battle' }],
+  trigger: 'onAttacked',
+  tags: ['physical'],
+};
+
+// Skill pura de buff (sem dano) — dispara sem exigir rolagem de acerto.
+const selfBuffSkill: SkillDef = {
+  id: 'skill-self-buff',
+  name: 'Fúria Interior',
+  kind: 'duel',
+  apCost: 1,
+  cooldown: 0,
+  multiplier: 0,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [{ effectId: 'effect-atk-up', target: 'self', chance: 1000, duration: 'battle' }],
+  tags: [],
+};
+
+const neverAppliesSkill: SkillDef = {
+  id: 'skill-never-applies',
+  name: 'Golpe Instável',
+  kind: 'duel',
+  apCost: 1,
+  cooldown: 0,
+  multiplier: 1200,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [{ effectId: 'effect-def-down', target: 'target', chance: 0, duration: 'battle' }],
+  tags: ['physical'],
+};
+
+const defDownEffect: EffectDef = {
+  id: 'effect-def-down',
+  name: 'Armadura Corroída',
+  kind: 'debuff',
+  dispellable: true,
+  maxStacks: 3,
+  statMods: [{ stat: 'def', pct: -500 }],
+};
+
+const atkUpEffect: EffectDef = {
+  id: 'effect-atk-up',
+  name: 'Fúria Interior',
+  kind: 'buff',
+  dispellable: true,
+  maxStacks: 3,
+  statMods: [{ stat: 'atk', flat: 200 }],
+};
+
 function participant(overrides: Partial<DuelParticipant> = {}): DuelParticipant {
   return {
     id: 'p1',
@@ -335,5 +410,143 @@ describe('resolveDuel — assistências (§6.5)', () => {
     );
     expect(result.attackerAssists).toEqual([{ assistantId: 'ally-1', skillId: counterAttack.id }]);
     expect(result.defenderAssists).toEqual([]);
+  });
+});
+
+const effectDefsWithDebuffAndBuff: Readonly<Record<string, EffectDef>> = {
+  [defDownEffect.id]: defDownEffect,
+  [atkUpEffect.id]: atkUpEffect,
+};
+
+describe('resolveDuel — skill.effects aplicado dentro do duelo (§8.3/§6.9, M10)', () => {
+  it('debuff aplicado na troca 1 altera o stat sheet efetivo (dano maior na troca 2), fica registrado em effectsApplied e persiste em finalActiveEffects*', () => {
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: debuffStrike.id, conditions: [] }],
+          knownSkills: { [debuffStrike.id]: debuffStrike, [counterAttack.id]: counterAttack, [defend.id]: defend },
+        }),
+        defender: participant({
+          id: 'hero-b',
+          pp: 0, // sem contra-ataque, para isolar o efeito na comparação de dano
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999, def: 400 }),
+        }),
+        effectDefs: effectDefsWithDebuffAndBuff,
+      }),
+    );
+
+    const attackerActions = result.trocas.map((t) => t.actions.find((a) => a.actorId === 'hero-a'));
+    const damageTroca1 = attackerActions[0]?.damage ?? 0;
+    const damageTroca2 = attackerActions[1]?.damage ?? 0;
+    expect(damageTroca1).toBeGreaterThan(0);
+    expect(damageTroca2).toBeGreaterThan(damageTroca1); // def do alvo caiu -50% depois da troca 1
+
+    expect(attackerActions[0]?.effectsApplied).toEqual([defDownEffect.id]);
+
+    expect(result.finalActiveEffectsDefender).toHaveLength(1);
+    expect(result.finalActiveEffectsDefender[0]).toMatchObject({ id: defDownEffect.id, duration: 'battle' });
+    expect(result.finalActiveEffectsAttacker).toEqual([]);
+  });
+
+  it('chance=0 nunca aplica o efeito', () => {
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: neverAppliesSkill.id, conditions: [] }],
+          knownSkills: { [neverAppliesSkill.id]: neverAppliesSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+        }),
+        defender: participant({ id: 'hero-b', pp: 0, currentHp: 999999, stats: statSheet({ hp: 999999, def: 200 }) }),
+        effectDefs: effectDefsWithDebuffAndBuff,
+      }),
+    );
+    const firstAction = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a');
+    expect(firstAction?.effectsApplied).toEqual([]);
+    expect(result.finalActiveEffectsDefender).toEqual([]);
+  });
+
+  it('skill pura de buff (multiplier=0/flat=0) aplica o efeito em si mesma sem exigir rolagem de acerto', () => {
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: selfBuffSkill.id, conditions: [] }],
+          knownSkills: { [selfBuffSkill.id]: selfBuffSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+        }),
+        defender: participant({ id: 'hero-b', currentHp: 999999, stats: statSheet({ hp: 999999, def: 200 }) }),
+        effectDefs: effectDefsWithDebuffAndBuff,
+      }),
+    );
+    const firstAction = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a');
+    expect(firstAction?.hit).toBeNull(); // sem dano, sem rolagem de acerto — como qualquer skill não-ofensiva
+    expect(firstAction?.effectsApplied).toEqual([atkUpEffect.id]);
+    expect(result.finalActiveEffectsAttacker).toHaveLength(1);
+    expect(result.finalActiveEffectsAttacker[0]).toMatchObject({ id: atkUpEffect.id });
+  });
+
+  it('reaplicar o mesmo efeito em trocas sucessivas empilha stacks (sem duplicar a entrada)', () => {
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          ap: 2, // exatamente o teto de 2 AP — debuffStrike (1 AP) dispara nas trocas 1 e 2
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: debuffStrike.id, conditions: [] }],
+          knownSkills: { [debuffStrike.id]: debuffStrike, [counterAttack.id]: counterAttack, [defend.id]: defend },
+        }),
+        defender: participant({ id: 'hero-b', pp: 0, currentHp: 999999, stats: statSheet({ hp: 999999, def: 400 }) }),
+        effectDefs: effectDefsWithDebuffAndBuff,
+      }),
+    );
+    expect(result.finalActiveEffectsDefender).toHaveLength(1);
+    expect(result.finalActiveEffectsDefender[0]?.stacks).toBe(2);
+  });
+
+  it('reação (contra-ataque) que declara effects NÃO os aplica — corte documentado (ver DECISIONS.md)', () => {
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({ id: 'hero-a', currentHp: 999999, stats: statSheet({ hp: 999999 }) }),
+        defender: participant({
+          id: 'hero-b',
+          pp: 2,
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999, def: 200 }),
+          reactionScript: [{ enabled: true, skillId: counterWithEffects.id, conditions: [] }],
+          knownSkills: { [strike.id]: strike, [counterWithEffects.id]: counterWithEffects, [defend.id]: defend },
+        }),
+        effectDefs: effectDefsWithDebuffAndBuff,
+      }),
+    );
+    const reacted = result.trocas.some(
+      (t) => t.actions.find((a) => a.actorId === 'hero-a')?.reaction?.skillId === counterWithEffects.id,
+    );
+    expect(reacted).toBe(true); // a reação de fato disparou...
+    expect(result.finalActiveEffectsAttacker).toEqual([]); // ...mas não aplicou o effect que declara
+  });
+
+  it('determinismo: mesma seed produz o mesmo DuelResult, incluindo finalActiveEffects*', () => {
+    const input = baseInput({
+      attacker: participant({
+        id: 'hero-a',
+        currentHp: 999999,
+        stats: statSheet({ hp: 999999 }),
+        tacticsScript: [{ enabled: true, skillId: debuffStrike.id, conditions: [] }],
+        knownSkills: { [debuffStrike.id]: debuffStrike, [counterAttack.id]: counterAttack, [defend.id]: defend },
+      }),
+      defender: participant({ id: 'hero-b', currentHp: 999999, stats: statSheet({ hp: 999999, def: 400 }) }),
+      effectDefs: effectDefsWithDebuffAndBuff,
+    });
+    const a = resolveDuel(input);
+    const b = resolveDuel(input);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });

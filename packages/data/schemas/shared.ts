@@ -92,12 +92,20 @@ export const reactionTriggerSchema = z.enum([
   'onLethal',
 ]);
 
+// §6.9 — duração de um ActiveEffect: rounds de MAPA (número) ou até dispelado
+// (persiste pelo duelo/batalha inteira). Extraído aqui (era inline só em
+// duel-participants.schema.ts) porque M10 passou a exigir o mesmo union também em
+// EffectApplication — uma skill precisa DECLARAR por quanto tempo o efeito que ela
+// aplica dura (ver DECISIONS.md, M10).
+export const effectDurationSchema = z.union([z.number().int().nonnegative(), z.literal('duel'), z.literal('battle')]);
+
 // §8.3 — EffectApplication (payload de skill.effects).
 export const effectApplicationSchema = z.object({
   effectId: idSchema,
   target: z.enum(['self', 'target']),
   chance: z.number().int().min(0).max(1000),
   stacks: z.number().int().positive().optional(),
+  duration: effectDurationSchema,
 });
 
 // Tipo laxo de propósito: uma união discriminada recursiva precisa de uma âncora de tipo

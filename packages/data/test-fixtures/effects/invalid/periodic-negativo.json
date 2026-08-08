@@ -1,0 +1,9 @@
+{
+  "id": "effect-periodico-invalido",
+  "name": "Periódico Inválido",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [],
+  "periodicDamagePct": -30
+}

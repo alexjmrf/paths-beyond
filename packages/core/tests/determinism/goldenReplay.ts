@@ -59,7 +59,7 @@ const strike: SkillDef = {
 const heavyBlow: SkillDef = {
   id: 'skill-heavy', name: 'Golpe Pesado', kind: 'duel', apCost: 2, cooldown: 1,
   multiplier: 2200, flat: 0, scalesWith: 'atk',
-  effects: [{ effectId: 'effect-bleed', target: 'target', chance: 700 }],
+  effects: [{ effectId: 'effect-bleed', target: 'target', chance: 700, duration: 'battle' }],
   tags: ['physical'],
 };
 

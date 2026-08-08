@@ -14,4 +14,9 @@
 // M9 em si (M9 é só integração — "nenhuma mecânica nova") — é a auditoria fechando uma
 // lacuna de disciplina de processo. Rebaseia a contagem em vez de tentar reconstruir
 // retroativamente 8 incrementos que nunca aconteceram.
-export const RULES_VERSION = '0.1.0';
+//
+// M10, sub-sessão 1/N: skill.effects passou a ser aplicado dentro de resolveDuel (era
+// mecanicamente inerte desde M2 — ver DECISIONS.md). Mudança de regra real, não de
+// integração: GOLDEN_HASH em crossRuntime.test.ts mudou no mesmo commit (protocolo
+// documentado no próprio teste).
+export const RULES_VERSION = '0.2.0';

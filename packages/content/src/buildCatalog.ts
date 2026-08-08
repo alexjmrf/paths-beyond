@@ -1,6 +1,7 @@
-import type { ClassDef, GridMap, Id, ItemInstance, ItemSet, SkillDef, Terrain, WeaponType, WinCondition } from '@paths-beyond/core';
+import type { ClassDef, EffectDef, GridMap, Id, ItemInstance, ItemSet, SkillDef, Terrain, WeaponType, WinCondition } from '@paths-beyond/core';
 import classSchema from '@paths-beyond/data/schemas/classes.schema.js';
 import compSchema from '@paths-beyond/data/schemas/comps.schema.js';
+import effectSchema from '@paths-beyond/data/schemas/effects.schema.js';
 import itemSchema from '@paths-beyond/data/schemas/items.schema.js';
 import itemSetSchema from '@paths-beyond/data/schemas/item-sets.schema.js';
 import mapSchema from '@paths-beyond/data/schemas/maps.schema.js';
@@ -32,6 +33,7 @@ export interface ParsedContentFiles {
   readonly skills: readonly unknown[];
   readonly items: readonly unknown[];
   readonly itemSets: readonly unknown[];
+  readonly effects: readonly unknown[];
   readonly comps: readonly unknown[];
   readonly maps: readonly unknown[];
   readonly terrains: readonly unknown[];
@@ -67,6 +69,8 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
 
   const itemSets = indexById(input.itemSets.map((raw) => itemSetSchema.parse(raw) as ItemSet));
 
+  const effects = indexById(input.effects.map((raw) => effectSchema.parse(raw) as EffectDef));
+
   // Mesmo descompasso, pra variante recursiva `not` de `Condition` (`hero.tacticsScript`
   // dentro de cada unidade de uma composição).
   const comps = input.comps.map((raw) => compSchema.parse(raw) as unknown as Composition);
@@ -93,6 +97,7 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     skills,
     items,
     itemSets,
+    effects,
     weaponDuelRanges,
     maps,
     comps,

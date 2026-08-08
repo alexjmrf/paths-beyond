@@ -1,5 +1,6 @@
 import { fpMul, FP_SCALE } from '../math/fixed.js';
 import { addFlat, multiplyByPctSum } from '../stats/aggregate.js';
+import type { EffectApplication } from '../skills/types.js';
 import type { StatModifier, StatSheet } from '../stats/types.js';
 import type { Id } from '../types.js';
 import type { ActiveEffect, EffectDef } from './types.js';
@@ -76,4 +77,35 @@ export function sumDamageTakenReductionPct(
   defs: Readonly<Record<Id, EffectDef>>,
 ): number {
   return sumEffectField(activeEffects, defs, 'damageTakenReductionPct');
+}
+
+// §6.9/§8.3 (M10) — cria ou empilha um ActiveEffect a partir de uma EffectApplication já
+// aprovada pela rolagem de chance. Reaplicar um efeito já ativo refresca a duration para a
+// da nova aplicação (decisão registrada em DECISIONS.md) e soma stacks até o teto do
+// EffectDef. Compartilhado por resolveDuel.ts (skill.effects em duelo) e
+// battle/commands.ts (applyMapSkill) — a mesma lógica existia duplicada só neste último
+// antes de M10.
+export function upsertActiveEffect(
+  effects: readonly ActiveEffect[],
+  def: EffectDef,
+  application: EffectApplication,
+): ActiveEffect[] {
+  const stacksToAdd = application.stacks ?? 1;
+  const existing = effects.find((e) => e.id === application.effectId);
+  if (existing) {
+    const stacks = Math.min(existing.stacks + stacksToAdd, def.maxStacks);
+    return effects.map((e) =>
+      e.id === application.effectId ? { ...e, stacks, duration: application.duration } : e,
+    );
+  }
+  return [
+    ...effects,
+    {
+      id: application.effectId,
+      duration: application.duration,
+      stacks: Math.min(stacksToAdd, def.maxStacks),
+      maxStacks: def.maxStacks,
+      dispellable: def.dispellable,
+    },
+  ];
 }

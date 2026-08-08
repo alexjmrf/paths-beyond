@@ -44,13 +44,27 @@ const assistStrike: SkillDef = {
 const selfBuffSkill: SkillDef = {
   id: 'skill-self-buff', name: 'Grito de Guerra', kind: 'map', apCost: 1, cooldown: 0,
   multiplier: 0, flat: 0, scalesWith: 'atk',
-  effects: [{ effectId: 'effect-atk-up', target: 'self', chance: 1000 }],
+  effects: [{ effectId: 'effect-atk-up', target: 'self', chance: 1000, duration: 'battle' }],
   tags: ['buff'],
 };
 
 const atkUpEffect: EffectDef = {
   id: 'effect-atk-up', name: 'Fúria', kind: 'buff', dispellable: true, maxStacks: 1,
   statMods: [{ stat: 'atk', flat: 100 }],
+};
+
+// §8.3/§6.9 (M10) — skill de duelo que aplica um debuff ao acertar, usada para provar
+// que applyEngage persiste o ActiveEffect de volta no BattleUnit.
+const debuffStrike: SkillDef = {
+  id: 'skill-debuff-strike', name: 'Golpe Corrosivo', kind: 'duel', apCost: 1, cooldown: 0,
+  multiplier: 1200, flat: 0, scalesWith: 'atk',
+  effects: [{ effectId: 'effect-def-down', target: 'target', chance: 1000, duration: 'battle' }],
+  tags: ['physical'],
+};
+
+const defDownEffect: EffectDef = {
+  id: 'effect-def-down', name: 'Armadura Corroída', kind: 'debuff', dispellable: true, maxStacks: 1,
+  statMods: [{ stat: 'def', pct: -300 }],
 };
 
 function buildUnit(overrides: Partial<BattleUnit> = {}): BattleUnit {
@@ -63,7 +77,13 @@ function buildUnit(overrides: Partial<BattleUnit> = {}): BattleUnit {
     moveType: 'foot', moveRange: 4,
     tacticsScript: [{ enabled: true, skillId: strike.id, conditions: [] }],
     reactionScript: [{ enabled: true, skillId: counter.id, conditions: [] }],
-    knownSkills: { [strike.id]: strike, [counter.id]: counter, [assistStrike.id]: assistStrike, [selfBuffSkill.id]: selfBuffSkill },
+    knownSkills: {
+      [strike.id]: strike,
+      [counter.id]: counter,
+      [assistStrike.id]: assistStrike,
+      [selfBuffSkill.id]: selfBuffSkill,
+      [debuffStrike.id]: debuffStrike,
+    },
     ...overrides,
   };
 }
@@ -78,7 +98,7 @@ function buildState(units: readonly BattleUnit[], overrides: Partial<BattleState
     distanceMovedThisTurn: {},
     permadeath: 'classic',
     winCondition: { t: 'rout' },
-    effectDefs: { [atkUpEffect.id]: atkUpEffect },
+    effectDefs: { [atkUpEffect.id]: atkUpEffect, [defDownEffect.id]: defDownEffect },
     outcome: 'ongoing',
     seed: 42,
     ...overrides,
@@ -168,6 +188,10 @@ describe('applyCommand — mapSkill (self-only em M3, ver DECISIONS.md)', () => 
     expect(buffed?.hasActedThisRound).toBe(true);
     expect(buffed?.effects).toHaveLength(1);
     expect(buffed?.effects[0]?.id).toBe(atkUpEffect.id);
+    // M10 — duration agora vem da própria EffectApplication (era hardcoded 'battle' em
+    // M3, ver DECISIONS.md); a fixture acima declara 'battle', então o valor bate, mas a
+    // asserção prova que o campo REALMENTE flui, não que o default coincide por acaso.
+    expect(buffed?.effects[0]?.duration).toBe('battle');
   });
 
   it('rejeita se a unidade não conhece a skill ou não tem AP suficiente', () => {
@@ -242,5 +266,19 @@ describe('applyCommand — engage (integra de verdade com resolveDuel de M2)', (
     const allyAfter = outcome.state.units.find((u) => u.unitId === 'ally');
     expect(allyAfter?.hasActedThisRound).toBe(false);
     expect(allyAfter?.pp).toBeLessThan(ally.pp); // gastou PP assistindo
+  });
+
+  it('persiste no BattleUnit o efeito que skill.effects aplicou dentro do duelo (M10 — sem isto, o efeito evaporaria ao sincronizar com o mapa)', () => {
+    const attacker = buildUnit({
+      unitId: 'atk', side: 'player', pos: { x: 0, y: 0 },
+      tacticsScript: [{ enabled: true, skillId: debuffStrike.id, conditions: [] }],
+    });
+    const defender = buildUnit({ unitId: 'def', side: 'enemy', pos: { x: 1, y: 0 }, stats: statSheet({ def: 200, hp: 999999 }) });
+    const state = buildState([attacker, defender]);
+
+    const outcome = applyCommand(state, { t: 'engage', unitId: 'atk', targetId: 'def' });
+    const finalDefender = outcome.state.units.find((u) => u.unitId === 'def');
+    expect(finalDefender?.effects).toHaveLength(1);
+    expect(finalDefender?.effects[0]).toMatchObject({ id: defDownEffect.id, duration: 'battle' });
   });
 });

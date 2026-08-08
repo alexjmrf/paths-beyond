@@ -7,6 +7,7 @@ import { validatePath } from '../grid/pathfinding.js';
 import type { ConditionUnitView } from '../tactics/types.js';
 import { canAffordAp, spendAp, type DuelEconomyState } from '../duel/economy.js';
 import { resolveDuel, type DuelResult } from '../duel/resolveDuel.js';
+import { upsertActiveEffect } from '../duel/effects.js';
 import type { AssistCandidate, AssistResult } from '../duel/assist.js';
 import type { DuelEngagementContext, DuelParticipant, EffectDef } from '../duel/types.js';
 import { computePositionalModifiers } from './positional.js';
@@ -102,8 +103,7 @@ function applyWait(state: BattleState, cmd: Extract<BattleCommand, { t: 'wait' }
 
 // §5.4 — "cura em área, artilharia, buff de zona". M3 corta escopo para alvo único (a
 // própria unidade); AOE de verdade precisaria de um sistema de raio em tile — ver
-// DECISIONS.md. `EffectApplication` também não declara duração; usamos 'battle' como
-// default até a spec normatizar um campo (ver DECISIONS.md).
+// DECISIONS.md.
 function applyMapSkill(state: BattleState, cmd: Extract<BattleCommand, { t: 'mapSkill' }>): CommandOutcome {
   const unit = findUnit(state, cmd.unitId);
   if (!canAct(unit)) return rejected(state, 'unidade inexistente, morta ou já agiu neste round');
@@ -124,23 +124,7 @@ function applyMapSkill(state: BattleState, cmd: Extract<BattleCommand, { t: 'map
     const roll = nextUint32(rngFor(state.seed, state.round, unit.unitId, `mapskill:${application.effectId}`)).value % 1000;
     if (roll >= application.chance) continue;
 
-    const existing = nextEffects.find((e) => e.id === application.effectId);
-    const stacksToAdd = application.stacks ?? 1;
-    if (existing) {
-      const stacks = Math.min(existing.stacks + stacksToAdd, def.maxStacks);
-      nextEffects = nextEffects.map((e) => (e.id === application.effectId ? { ...e, stacks } : e));
-    } else {
-      nextEffects = [
-        ...nextEffects,
-        {
-          id: application.effectId,
-          duration: 'battle',
-          stacks: Math.min(stacksToAdd, def.maxStacks),
-          maxStacks: def.maxStacks,
-          dispellable: def.dispellable,
-        },
-      ];
-    }
+    nextEffects = upsertActiveEffect(nextEffects, def, application);
   }
 
   return accepted(
@@ -330,12 +314,22 @@ function applyEngage(state: BattleState, cmd: Extract<BattleCommand, { t: 'engag
         hp: duelResult.finalHpAttacker,
         ap: duelResult.finalApAttacker,
         pp: duelResult.finalPpAttacker,
+        // §8.3/§6.9 (M10) — skill.effects aplicado dentro do duelo (resolveDuel.ts)
+        // precisa persistir de volta no mapa, senão evapora ao sincronizar com o
+        // BattleUnit (mesmo padrão de hp/ap/pp acima).
+        effects: duelResult.finalActiveEffectsAttacker,
         hasActedThisRound: true,
       };
     }
     if (u.unitId === defender.unitId) {
       // §5.4 — ser engajado NÃO consome o turno do defensor no mapa.
-      return { ...u, hp: duelResult.finalHpDefender, ap: duelResult.finalApDefender, pp: duelResult.finalPpDefender };
+      return {
+        ...u,
+        hp: duelResult.finalHpDefender,
+        ap: duelResult.finalApDefender,
+        pp: duelResult.finalPpDefender,
+        effects: duelResult.finalActiveEffectsDefender,
+      };
     }
     return u;
   });

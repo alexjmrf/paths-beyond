@@ -28,6 +28,7 @@ const classModules = import.meta.glob('../../../../packages/data/classes/*.json'
 const skillModules = import.meta.glob('../../../../packages/data/skills/*.json', { eager: true, import: 'default' });
 const itemModules = import.meta.glob('../../../../packages/data/items/*.json', { eager: true, import: 'default' });
 const itemSetModules = import.meta.glob('../../../../packages/data/item-sets/*.json', { eager: true, import: 'default' });
+const effectModules = import.meta.glob('../../../../packages/data/effects/*.json', { eager: true, import: 'default' });
 const compModules = import.meta.glob('../../../../packages/data/comps/*.json', { eager: true, import: 'default' });
 const mapModules = import.meta.glob('../../../../packages/data/maps/*.json', { eager: true, import: 'default' });
 const terrainModules = import.meta.glob('../../../../packages/data/terrains/*.json', { eager: true, import: 'default' });
@@ -43,6 +44,7 @@ export function loadCatalogFromBrowser(): ContentCatalog {
     skills: globJsonValues(skillModules),
     items: globJsonValues(itemModules),
     itemSets: globJsonValues(itemSetModules),
+    effects: globJsonValues(effectModules),
     comps: globJsonValues(compModules),
     maps: globJsonValues(mapModules),
     terrains: globJsonValues(terrainModules),

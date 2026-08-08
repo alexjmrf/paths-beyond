@@ -29,6 +29,7 @@ function baseInput(): ParsedContentFiles {
     skills: readAllJson(fixtureDir('skills', 'valid')),
     items: readAllJson(fixtureDir('items', 'valid')),
     itemSets: readAllJson(fixtureDir('item-sets', 'valid')),
+    effects: readAllJson(fixtureDir('effects', 'valid')),
     comps: readAllJson(fixtureDir('comps', 'valid')),
     maps: readAllJson(fixtureDir('maps', 'valid')),
     terrains: readAllJson(fixtureDir('terrains', 'valid')),
@@ -37,12 +38,13 @@ function baseInput(): ParsedContentFiles {
 }
 
 describe('buildCatalog()', () => {
-  it('indexa classes/skills/items/itemSets por id', () => {
+  it('indexa classes/skills/items/itemSets/effects por id', () => {
     const catalog = buildCatalog(baseInput());
     expect(catalog.classes['class-soldado']).toBeDefined();
     expect(catalog.skills['skill-golpe-basico']).toBeDefined();
     expect(catalog.items['item-espada-teste']).toBeDefined();
     expect(catalog.itemSets['set-ataque']).toBeDefined();
+    expect(catalog.effects['effect-furia']).toBeDefined();
   });
 
   it('funde maps.schema (layout) + terrains.schema (terreno) num GridMap de verdade', () => {

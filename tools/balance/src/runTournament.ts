@@ -94,7 +94,7 @@ function runOneBattle(attacker: Composition, defender: Composition, content: Con
     map: map.grid,
     permadeath: 'classic',
     winCondition: map.winCondition,
-    effectDefs: {},
+    effectDefs: content.effects,
     initialValor: map.initialValor,
     itemSets: content.itemSets,
     skillsCatalog: content.skills,

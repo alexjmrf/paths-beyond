@@ -524,7 +524,8 @@
               {
                 "effectId": "effect-fragilidade",
                 "target": "target",
-                "chance": 500
+                "chance": 500,
+                "duration": "duel"
               }
             ]
           }

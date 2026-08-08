@@ -5,15 +5,28 @@ import type { Id } from '../types.js';
 import { computeHitChance } from './accuracy.js';
 import { canAffordAp, canAffordPp, spendAp, spendPp, type DuelEconomyState } from './economy.js';
 import { computeDamage, isCriticalHit, rollDamageVariance } from './damage.js';
-import { applyActiveEffectsToStats, sumDamageDealtPct, sumDamageTakenReductionPct } from './effects.js';
+import {
+  applyActiveEffectsToStats,
+  computeEffectApplicationChance,
+  sumDamageDealtPct,
+  sumDamageTakenReductionPct,
+  upsertActiveEffect,
+} from './effects.js';
 import { selectReaction } from './reactions.js';
 import { selectTacticsAction } from '../tactics/selectTacticsAction.js';
 import { combinedTypeDamageMultiplier, weaponTriangleResult } from './triangle.js';
 import { computeEvasionFromSpd } from './evasion.js';
 import { resolveAssists, type AssistCandidate, type AssistResult } from './assist.js';
-import { BASIC_ATTACK_SKILL, type DuelEngagementContext, type DuelParticipant, type EffectDef } from './types.js';
+import {
+  BASIC_ATTACK_SKILL,
+  type ActiveEffect,
+  type DuelEngagementContext,
+  type DuelParticipant,
+  type EffectDef,
+} from './types.js';
 import type { ConditionContext, ConditionUnitView } from '../tactics/types.js';
-import type { SkillDef } from '../skills/types.js';
+import type { EffectApplication, SkillDef } from '../skills/types.js';
+import type { StatSheet } from '../stats/types.js';
 
 const MAX_TROCAS = 3;
 // §6.7.2 — defensor preempta na troca 1 se spd_defensor >= spd_atacante × 1,15.
@@ -46,6 +59,10 @@ export interface ActionLogEntry {
   readonly isCrit: boolean;
   readonly damage: number;
   readonly reaction: { readonly skillId: Id; readonly lineIndex: number; readonly counterDamage: number | null } | null;
+  // §8.3/§6.9 (M10) — effectIds de skill.effects que passaram na rolagem de chance nesta
+  // ação. Só a skill do ator principal (tactics/pure-buff) aplica; reação/assistência não
+  // (corte documentado em DECISIONS.md).
+  readonly effectsApplied: readonly Id[];
 }
 
 export interface TrocaLog {
@@ -69,6 +86,12 @@ export interface DuelResult {
   readonly finalPpDefender: number;
   readonly attackerAssists: readonly AssistResult[];
   readonly defenderAssists: readonly AssistResult[];
+  // §8.3/§6.9 (M10) — estado final de activeEffects dos dois lados, incluindo o que
+  // skill.effects aplicou dentro deste duelo. A camada de batalha (commands.ts) precisa
+  // disto para persistir de volta no BattleUnit — sem isto, um efeito aplicado em duelo
+  // evaporaria ao sincronizar com o mapa.
+  readonly finalActiveEffectsAttacker: readonly ActiveEffect[];
+  readonly finalActiveEffectsDefender: readonly ActiveEffect[];
 }
 
 function rngRoll(seed: number, troca: number, actorId: Id, purpose: string): number {
@@ -131,6 +154,54 @@ function buildContext(
   };
 }
 
+interface EffectApplicationOutcome {
+  readonly actor: DuelParticipant;
+  readonly opponent: DuelParticipant;
+  readonly appliedEffectIds: readonly Id[];
+}
+
+// §8.3/§6.9 (M10) — aplica skill.effects da skill que o ATOR principal executou (tactics
+// ou pure-buff/debuff). Reação/contra-ataque e assistência têm seus próprios `effects`
+// declaráveis em SkillDef, mas não são resolvidos aqui — corte documentado em
+// DECISIONS.md, pareado com o corte de reaction triggers além de onAttacked.
+function applyEffectApplications(
+  seed: number,
+  trocaNumber: 1 | 2 | 3,
+  actor: DuelParticipant,
+  actorStats: StatSheet,
+  opponent: DuelParticipant,
+  opponentStats: StatSheet,
+  applications: readonly EffectApplication[],
+  effectDefs: Readonly<Record<Id, EffectDef>>,
+): EffectApplicationOutcome {
+  let nextActor = actor;
+  let nextOpponent = opponent;
+  const appliedEffectIds: Id[] = [];
+
+  for (const application of applications) {
+    const def = effectDefs[application.effectId];
+    if (!def) continue;
+
+    const targetStats = application.target === 'self' ? actorStats : opponentStats;
+    const chance = computeEffectApplicationChance({
+      baseChance: application.chance,
+      attackerEff: actorStats.eff,
+      defenderEfr: targetStats.efr,
+    });
+    const roll = rollPercent(rngRoll(seed, trocaNumber, actor.id, `effect-application:${application.effectId}`));
+    if (roll >= chance) continue;
+
+    if (application.target === 'self') {
+      nextActor = { ...nextActor, activeEffects: upsertActiveEffect(nextActor.activeEffects, def, application) };
+    } else {
+      nextOpponent = { ...nextOpponent, activeEffects: upsertActiveEffect(nextOpponent.activeEffects, def, application) };
+    }
+    appliedEffectIds.push(application.effectId);
+  }
+
+  return { actor: nextActor, opponent: nextOpponent, appliedEffectIds };
+}
+
 interface ExchangeOutcome {
   readonly actor: DuelParticipant;
   readonly opponent: DuelParticipant;
@@ -171,6 +242,7 @@ function resolveExchange(
       isCrit: false,
       damage: 0,
       reaction: null,
+      effectsApplied: [],
     },
   });
 
@@ -199,9 +271,24 @@ function resolveExchange(
 
   const isOffensive = skill.multiplier > 0 || skill.flat > 0;
   if (!isOffensive) {
-    return {
+    // §8.3/§6.9 — skill sem componente de dano (multiplier=0/flat=0): o "efeito" dela É
+    // o skill.effects, e não passa por rolagem de acerto (só ataques ofensivos usam
+    // accuracy — buffs/debuffs puros não têm o que "errar" contra si mesmo).
+    const effectiveActorStats = applyActiveEffectsToStats(actor.stats, actor.activeEffects, effectDefs);
+    const effectiveOpponentStats = applyActiveEffectsToStats(opponent.stats, opponent.activeEffects, effectDefs);
+    const applied = applyEffectApplications(
+      seed,
+      trocaNumber,
       actor,
+      effectiveActorStats,
       opponent,
+      effectiveOpponentStats,
+      skill.effects,
+      effectDefs,
+    );
+    return {
+      actor: applied.actor,
+      opponent: applied.opponent,
       apSpent: nextApSpent,
       ppSpentTroca: nextPpSpentTroca,
       log: {
@@ -214,6 +301,7 @@ function resolveExchange(
         isCrit: false,
         damage: 0,
         reaction: null,
+        effectsApplied: applied.appliedEffectIds,
       },
     };
   }
@@ -253,6 +341,7 @@ function resolveExchange(
         isCrit: false,
         damage: 0,
         reaction: null,
+        effectsApplied: [],
       },
     };
   }
@@ -328,6 +417,22 @@ function resolveExchange(
 
   opponent = { ...opponent, currentHp: Math.max(0, opponent.currentHp - damage) };
 
+  // §8.3/§6.9 — a skill do ator aplica seus efeitos como parte da própria ação, depois
+  // do dano principal e antes do contra-ataque do oponente (que usa seu próprio script,
+  // não o desta skill).
+  const effectApplicationResult = applyEffectApplications(
+    seed,
+    trocaNumber,
+    actor,
+    effectiveActorStats,
+    opponent,
+    effectiveOpponentStats,
+    skill.effects,
+    effectDefs,
+  );
+  actor = effectApplicationResult.actor;
+  opponent = effectApplicationResult.opponent;
+
   if (counterSkill && opponent.currentHp > 0) {
     const counterTriangle = combinedTypeDamageMultiplier({
       attackerWeapon: opponent.weaponType,
@@ -374,6 +479,7 @@ function resolveExchange(
       isCrit,
       damage,
       reaction: reactionLog,
+      effectsApplied: effectApplicationResult.appliedEffectIds,
     },
   };
 }
@@ -443,5 +549,7 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
     finalPpDefender: defender.pp,
     attackerAssists,
     defenderAssists,
+    finalActiveEffectsAttacker: attacker.activeEffects,
+    finalActiveEffectsDefender: defender.activeEffects,
   };
 }

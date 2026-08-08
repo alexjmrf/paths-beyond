@@ -24,6 +24,11 @@ export interface EffectDef {
   readonly statMods: readonly StatModifier[]; // §4.1 passo 8 — aplicado ao stat sheet dentro do duelo
   readonly damageDealtPct?: number; // §6.6 passo 8
   readonly damageTakenReductionPct?: number; // §6.6 passo 8
+  // §6.9 — DoT/regeneração: percentual do HP MÁXIMO do alvo, por tick de round de mapa.
+  // Campo normativo exigido por M10 (ver DECISIONS.md); ainda não consumido por
+  // round.ts nesta sub-sessão — só declarado, pronto para a sub-sessão que liga o tick.
+  readonly periodicDamagePct?: number;
+  readonly periodicHealPct?: number;
 }
 
 // §6.9 — ActiveEffect, exatamente como a spec define (estado da instância).

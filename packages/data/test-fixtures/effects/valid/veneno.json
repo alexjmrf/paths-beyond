@@ -1,0 +1,9 @@
+{
+  "id": "effect-veneno",
+  "name": "Veneno",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 3,
+  "statMods": [],
+  "periodicDamagePct": 30
+}

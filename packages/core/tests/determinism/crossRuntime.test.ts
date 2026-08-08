@@ -25,7 +25,11 @@ import { buildGoldenReplay } from './goldenReplay.js';
 //   (b) não foi intencional → você acabou de encontrar uma regressão. Não atualize o valor.
 // Atualizar esta constante para "fazer o teste passar" desliga a única defesa que o
 // projeto tem contra divergência silenciosa de PvP.
-const GOLDEN_HASH = '6249029d';
+// M10, sub-sessão 1/N: mudou de '6249029d' — skill.effects passou a ser aplicado dentro
+// do duelo (era inerte desde M2), e o replay canônico já exercitava exatamente isso
+// (`heavyBlow.effects` aplica `effect-bleed` no defensor). Intencional: RULES_VERSION
+// subiu no mesmo commit (packages/core/src/rulesVersion.ts).
+const GOLDEN_HASH = 'c3a404a0';
 
 describe('determinismo entre runtimes (§3.3)', () => {
   it('o replay canônico produz o hash congelado', () => {
