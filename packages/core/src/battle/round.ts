@@ -1,4 +1,6 @@
-import type { ActiveEffect } from '../duel/types.js';
+import { computePeriodicEffects } from '../duel/effects.js';
+import type { ActiveEffect, EffectDef } from '../duel/types.js';
+import type { Id } from '../types.js';
 import type { BattleState, BattleUnit } from './types.js';
 
 export function isRoundComplete(state: BattleState): boolean {
@@ -14,7 +16,7 @@ function decrementCooldowns(cooldowns: Readonly<Record<string, number>>): Record
 }
 
 // §5.3 — só a duração numérica (rounds de mapa) ticka; 'duel' e 'battle' persistem até
-// dispelados. DoT/regeneração de §6.9 não são aplicados aqui — ver DECISIONS.md.
+// dispelados.
 function tickEffects(effects: readonly ActiveEffect[]): readonly ActiveEffect[] {
   const next: ActiveEffect[] = [];
   for (const effect of effects) {
@@ -28,14 +30,27 @@ function tickEffects(effects: readonly ActiveEffect[]): readonly ActiveEffect[] 
   return next;
 }
 
+// §6.9 — DoT/regeneração calculados a partir dos efeitos ativos ANTES do tick de duração
+// (um efeito que expira neste round ainda causa seu último tick), aplicados a `hp` em
+// lote no fim do round (decisão de sessão, M10 — ver DECISIONS.md; §5.3 já trata o tick de
+// duração/cooldown assim, e §6.9 não exige literalmente o oposto). Regen não se aplica a
+// uma unidade que o próprio DoT deste tick derrubou a 0.
+function applyPeriodicHp(unit: BattleUnit, effectDefs: Readonly<Record<Id, EffectDef>>): number {
+  const { damage, heal } = computePeriodicEffects(unit.effects, effectDefs, unit.stats.hp);
+  const afterDamage = Math.max(0, unit.hp - damage);
+  if (afterDamage <= 0) return afterDamage;
+  return Math.min(unit.stats.hp, afterDamage + heal);
+}
+
 // §5.3 — "O round termina quando todas as unidades vivas agiram. Então
 // hasActedThisRound reseta, cooldowns de mapa decrementam, e efeitos com duração em
-// rounds tickam." + §5.6 ("+1 por round" de Valor).
+// rounds tickam." + §5.6 ("+1 por round" de Valor) + §6.9 (DoT/regeneração).
 export function endRound(state: BattleState): BattleState {
   const units: readonly BattleUnit[] = state.units.map((unit) => {
     if (unit.hp <= 0) return unit;
     return {
       ...unit,
+      hp: applyPeriodicHp(unit, state.effectDefs),
       hasActedThisRound: false,
       cooldowns: decrementCooldowns(unit.cooldowns),
       effects: tickEffects(unit.effects),

@@ -124,6 +124,34 @@ describe('simulate — batalha completa via BattleCommand[] (critério de aceite
   });
 });
 
+const poisonEffect: EffectDef = {
+  id: 'effect-veneno', name: 'Veneno', kind: 'debuff', dispellable: true, maxStacks: 3,
+  statMods: [], periodicDamagePct: 500, // 50% do HP máximo por tick, só pra este teste
+};
+
+describe('simulate — DoT tickando no fim do round mata a unidade e decide a batalha (§6.9, M10)', () => {
+  it('uma unidade com veneno morre no fim do round mesmo sem nenhum duelo acontecer, decidindo a batalha', () => {
+    const attacker = buildUnit({ unitId: 'atk', side: 'player' });
+    const defender = buildUnit({
+      unitId: 'def', side: 'enemy', pos: { x: 1, y: 0 }, hp: 40, stats: statSheet({ hp: 100 }),
+      effects: [{ id: poisonEffect.id, duration: 5, stacks: 1, maxStacks: 3, dispellable: true }],
+    });
+    const replay: Replay = {
+      rulesVersion: '0.0.0',
+      seed: 3,
+      initialState: buildSetup([attacker, defender], { effectDefs: { [spdUpEffect.id]: spdUpEffect, [poisonEffect.id]: poisonEffect } }),
+      commands: [
+        { t: 'wait', unitId: 'atk' },
+        { t: 'wait', unitId: 'def' }, // fecha o round → endRound tickka o veneno: fpPct(100, 500) = 50 > 40 HP restante
+      ],
+    };
+    const result = simulate(replay);
+    const finalDefender = result.finalUnits.find((u) => u.unitId === 'def');
+    expect(finalDefender?.hp).toBe(0);
+    expect(result.outcome).toBe('victory');
+  });
+});
+
 describe('simulate — replay determinístico (§3.3: "mesmo replay 1000x, mesmo hash")', () => {
   it('roda o mesmo replay 1000 vezes e produz sempre o mesmo resultado (hash idêntico)', () => {
     const attacker = buildUnit({ unitId: 'atk', side: 'player' });

@@ -4,6 +4,7 @@ import { computeInitiativeOrder } from '../../src/battle/initiative.js';
 import type { BattleState, BattleUnit } from '../../src/battle/types.js';
 import type { GridMap, Terrain } from '../../src/grid/types.js';
 import type { StatSheet } from '../../src/stats/types.js';
+import type { EffectDef } from '../../src/duel/types.js';
 
 const plain: Terrain = { id: 'plain', moveCost: { foot: 1, cavalry: 1, flying: 1, heavy: 1, aquatic: 2 }, defBonus: 0, evaBonus: 0, blocksSight: false };
 
@@ -123,6 +124,85 @@ describe('endRound — §5.3 ("hasActedThisRound reseta, cooldowns decrementam, 
   it('zera distanceMovedThisTurn para o próximo round', () => {
     const result = endRound(buildState([buildUnit()], { distanceMovedThisTurn: { a: 3 } }));
     expect(result.distanceMovedThisTurn).toEqual({});
+  });
+});
+
+const poisonDef: EffectDef = {
+  id: 'effect-veneno', name: 'Veneno', kind: 'debuff', dispellable: true, maxStacks: 3,
+  statMods: [], periodicDamagePct: 30,
+};
+
+const regenDef: EffectDef = {
+  id: 'effect-regeneracao', name: 'Regeneração', kind: 'buff', dispellable: true, maxStacks: 2,
+  statMods: [], periodicHealPct: 50,
+};
+
+describe('endRound — §6.9 (DoT/regeneração, lote no fim do round — decisão de sessão, M10)', () => {
+  it('aplica dano periódico: fpPct(5000, 30) = 150', () => {
+    const units = [buildUnit({ effects: [{ id: poisonDef.id, duration: 3, stacks: 1, maxStacks: 3, dispellable: true }] })];
+    const result = endRound(buildState(units, { effectDefs: { [poisonDef.id]: poisonDef } }));
+    expect(result.units[0]?.hp).toBe(4850);
+  });
+
+  it('dano periódico escala por stacks (2 stacks de 150 = 300)', () => {
+    const units = [buildUnit({ effects: [{ id: poisonDef.id, duration: 3, stacks: 2, maxStacks: 3, dispellable: true }] })];
+    const result = endRound(buildState(units, { effectDefs: { [poisonDef.id]: poisonDef } }));
+    expect(result.units[0]?.hp).toBe(4700);
+  });
+
+  it('aplica cura periódica sem passar do HP máximo do stat sheet', () => {
+    const units = [
+      buildUnit({ hp: 4900, effects: [{ id: regenDef.id, duration: 3, stacks: 1, maxStacks: 2, dispellable: true }] }),
+    ];
+    const result = endRound(buildState(units, { effectDefs: { [regenDef.id]: regenDef } }));
+    expect(result.units[0]?.hp).toBe(5000); // 4900 + 250 de cura, capado em 5000
+  });
+
+  it('cura periódica soma normalmente quando não estoura o teto', () => {
+    const units = [
+      buildUnit({ hp: 4000, effects: [{ id: regenDef.id, duration: 3, stacks: 1, maxStacks: 2, dispellable: true }] }),
+    ];
+    const result = endRound(buildState(units, { effectDefs: { [regenDef.id]: regenDef } }));
+    expect(result.units[0]?.hp).toBe(4250);
+  });
+
+  it('dano periódico pode matar a unidade (hp vai a 0, não negativo)', () => {
+    const units = [
+      buildUnit({ hp: 100, effects: [{ id: poisonDef.id, duration: 3, stacks: 1, maxStacks: 3, dispellable: true }] }),
+    ];
+    const result = endRound(buildState(units, { effectDefs: { [poisonDef.id]: poisonDef } }));
+    expect(result.units[0]?.hp).toBe(0);
+  });
+
+  it('regeneração não se aplica se o dano periódico do mesmo tick já derrubou a unidade a 0', () => {
+    const units = [
+      buildUnit({
+        hp: 100,
+        effects: [
+          { id: poisonDef.id, duration: 3, stacks: 1, maxStacks: 3, dispellable: true },
+          { id: regenDef.id, duration: 3, stacks: 1, maxStacks: 2, dispellable: true },
+        ],
+      }),
+    ];
+    const result = endRound(buildState(units, { effectDefs: { [poisonDef.id]: poisonDef, [regenDef.id]: regenDef } }));
+    expect(result.units[0]?.hp).toBe(0);
+  });
+
+  it('um efeito que expira neste round ainda causa seu último tick de dano (DoT antes do tick de duração)', () => {
+    const units = [
+      buildUnit({ effects: [{ id: poisonDef.id, duration: 1, stacks: 1, maxStacks: 3, dispellable: true }] }),
+    ];
+    const result = endRound(buildState(units, { effectDefs: { [poisonDef.id]: poisonDef } }));
+    expect(result.units[0]?.hp).toBe(4850);
+    expect(result.units[0]?.effects).toHaveLength(0);
+  });
+
+  it('unidades já mortas não tickam DoT/regen', () => {
+    const units = [
+      buildUnit({ hp: 0, effects: [{ id: regenDef.id, duration: 3, stacks: 1, maxStacks: 2, dispellable: true }] }),
+    ];
+    const result = endRound(buildState(units, { effectDefs: { [regenDef.id]: regenDef } }));
+    expect(result.units[0]?.hp).toBe(0);
   });
 });
 

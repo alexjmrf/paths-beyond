@@ -13,8 +13,8 @@ const effectSchema = z.object({
   damageDealtPct: z.number().int().optional(), // §6.6 passo 8
   damageTakenReductionPct: z.number().int().optional(), // §6.6 passo 8
   // §6.9 — DoT/regeneração: percentual do HP MÁXIMO do alvo, por tick (round de mapa),
-  // fp-scale (1000 = 100%). Campo normativo exigido por M10 (ver DECISIONS.md) — ainda
-  // não tickado nesta sub-sessão (fica para a sub-sessão que liga round.ts a HP).
+  // fp-scale (1000 = 100%). Tickado em lote no fim do round por `battle/round.ts`
+  // (`computePeriodicEffects`, M10 — ver DECISIONS.md).
   periodicDamagePct: z.number().int().nonnegative().optional(),
   periodicHealPct: z.number().int().nonnegative().optional(),
 });

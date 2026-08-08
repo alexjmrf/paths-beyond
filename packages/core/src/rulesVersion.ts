@@ -27,4 +27,12 @@
 // verdade (achado desta sub-sessão, gap pré-existente da fixture, não corrigido aqui
 // por estar fora de escopo). `pnpm balance` também não muda: os 9 comps reais de M8
 // são de 1 unidade só, sem aliado pra assistir.
-export const RULES_VERSION = '0.3.0';
+//
+// M10, sub-sessão 3/N: DoT/regeneração (§6.9) passam a tickar de verdade em
+// `battle/round.ts` (`periodicDamagePct`/`periodicHealPct` existiam no schema desde a
+// sub-sessão 1, mas nunca eram lidos — mecanicamente inertes). Mudança de regra real
+// mesmo GOLDEN_HASH não tendo mudado desta vez — o replay canônico não tem nenhum
+// efeito com campo periódico, e nenhum conteúdo real de `packages/data` declara esses
+// campos ainda (só `test-fixtures/`). `pnpm balance` também byte-a-byte idêntico pelo
+// mesmo motivo.
+export const RULES_VERSION = '0.4.0';

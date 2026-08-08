@@ -1,4 +1,4 @@
-import { fpMul, FP_SCALE } from '../math/fixed.js';
+import { fpMul, fpPct, FP_SCALE } from '../math/fixed.js';
 import { addFlat, multiplyByPctSum } from '../stats/aggregate.js';
 import type { EffectApplication } from '../skills/types.js';
 import type { StatModifier, StatSheet } from '../stats/types.js';
@@ -77,6 +77,37 @@ export function sumDamageTakenReductionPct(
   defs: Readonly<Record<Id, EffectDef>>,
 ): number {
   return sumEffectField(activeEffects, defs, 'damageTakenReductionPct');
+}
+
+// §6.9 (M10) — "DoT → tick de duração → regeneração → ação". `periodicDamagePct`/
+// `periodicHealPct` são percentual do HP MÁXIMO (fp-scale) por tick; escalam por stack
+// via soma repetida, mesma convenção de `sumEffectField` (regra 2 do CLAUDE.md — nunca
+// `value * stacks` cru). Decisão de sessão (M10 sub-sessão 3): o tick roda em lote no fim
+// do round (junto do decremento de duração em round.ts), não por turno individual da
+// unidade — ver DECISIONS.md.
+export interface PeriodicEffectResult {
+  readonly damage: number;
+  readonly heal: number;
+}
+
+export function computePeriodicEffects(
+  activeEffects: readonly ActiveEffect[],
+  defs: Readonly<Record<Id, EffectDef>>,
+  maxHp: number,
+): PeriodicEffectResult {
+  let damage = 0;
+  let heal = 0;
+  for (const active of activeEffects) {
+    const def = defs[active.id];
+    if (!def) continue;
+    const perStackDamage = def.periodicDamagePct ? fpPct(maxHp, def.periodicDamagePct) : 0;
+    const perStackHeal = def.periodicHealPct ? fpPct(maxHp, def.periodicHealPct) : 0;
+    for (let i = 0; i < active.stacks; i++) {
+      damage += perStackDamage;
+      heal += perStackHeal;
+    }
+  }
+  return { damage, heal };
 }
 
 // §6.9/§8.3 (M10) — cria ou empilha um ActiveEffect a partir de uma EffectApplication já

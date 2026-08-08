@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyActiveEffectsToStats,
   computeEffectApplicationChance,
+  computePeriodicEffects,
   sumDamageDealtPct,
   sumDamageTakenReductionPct,
   upsertActiveEffect,
@@ -128,6 +129,68 @@ describe('sumDamageDealtPct / sumDamageTakenReductionPct — §6.6 passo 8', () 
       { id: 'effect-defense-down', duration: 'duel', stacks: 1, maxStacks: 1, dispellable: true },
     ];
     expect(sumDamageTakenReductionPct(active, { [defenseDownDef.id]: defenseDownDef })).toBe(-150);
+  });
+});
+
+const poisonDef: EffectDef = {
+  id: 'effect-veneno',
+  name: 'Veneno',
+  kind: 'debuff',
+  dispellable: true,
+  maxStacks: 3,
+  statMods: [],
+  periodicDamagePct: 30,
+};
+
+const regenDef: EffectDef = {
+  id: 'effect-regeneracao',
+  name: 'Regeneração',
+  kind: 'buff',
+  dispellable: true,
+  maxStacks: 2,
+  statMods: [],
+  periodicHealPct: 50,
+};
+
+describe('computePeriodicEffects — §6.9 (DoT/regeneração, % do HP máximo, fp-scale)', () => {
+  it('calcula dano periódico como % do HP máximo (fpPct(5000, 30) = 150)', () => {
+    const active: ActiveEffect[] = [{ id: poisonDef.id, duration: 3, stacks: 1, maxStacks: 3, dispellable: true }];
+    const result = computePeriodicEffects(active, { [poisonDef.id]: poisonDef }, 5000);
+    expect(result).toEqual({ damage: 150, heal: 0 });
+  });
+
+  it('calcula cura periódica como % do HP máximo', () => {
+    const active: ActiveEffect[] = [{ id: regenDef.id, duration: 3, stacks: 1, maxStacks: 2, dispellable: true }];
+    const result = computePeriodicEffects(active, { [regenDef.id]: regenDef }, 5000);
+    expect(result).toEqual({ damage: 0, heal: 250 });
+  });
+
+  it('escala por stacks via soma repetida (2 stacks de 150 = 300)', () => {
+    const active: ActiveEffect[] = [{ id: poisonDef.id, duration: 3, stacks: 2, maxStacks: 3, dispellable: true }];
+    const result = computePeriodicEffects(active, { [poisonDef.id]: poisonDef }, 5000);
+    expect(result.damage).toBe(300);
+  });
+
+  it('efeitos sem periodicDamagePct/periodicHealPct não contribuem', () => {
+    const active: ActiveEffect[] = [{ id: atkBuffDef.id, duration: 'duel', stacks: 1, maxStacks: 3, dispellable: true }];
+    const result = computePeriodicEffects(active, { [atkBuffDef.id]: atkBuffDef }, 5000);
+    expect(result).toEqual({ damage: 0, heal: 0 });
+  });
+
+  it('ignora efeitos cujo id não está no catálogo de defs, sem lançar', () => {
+    const active: ActiveEffect[] = [{ id: 'effect-fantasma', duration: 3, stacks: 1, maxStacks: 1, dispellable: true }];
+    expect(() => computePeriodicEffects(active, {}, 5000)).not.toThrow();
+    expect(computePeriodicEffects(active, {}, 5000)).toEqual({ damage: 0, heal: 0 });
+  });
+
+  it('soma dano e cura de vários efeitos ativos simultaneamente', () => {
+    const active: ActiveEffect[] = [
+      { id: poisonDef.id, duration: 3, stacks: 1, maxStacks: 3, dispellable: true },
+      { id: regenDef.id, duration: 3, stacks: 1, maxStacks: 2, dispellable: true },
+    ];
+    const defs = { [poisonDef.id]: poisonDef, [regenDef.id]: regenDef };
+    const result = computePeriodicEffects(active, defs, 5000);
+    expect(result).toEqual({ damage: 150, heal: 250 });
   });
 });
 

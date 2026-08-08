@@ -886,3 +886,87 @@ arquivos — fatia não mexeu em conteúdo), `pnpm test:browser` (42 testes, 3 e
 (precisa de fórmula nova, checkpoint com usuário), tick de DoT/regen, reaction
 triggers além de `onAttacked`, efeitos `special` de set, harness multi-unidade de
 `tools/balance`.
+
+### M10 — sub-sessão 3/N: DoT/regeneração tickando de verdade
+
+Continuação, sessão diferente, autorizada pelo usuário ("pode continuar"). Entre os
+itens restantes do roadmap de M10, o usuário escolheu este (entre 4 opções
+apresentadas) por ter escopo bem definido, sem decisão de fórmula nova pendente —
+`periodicDamagePct`/`periodicHealPct` já existiam no `EffectDef` desde a sub-sessão 1
+(percentual do HP máximo, fp-scale, decisão já tomada naquela sub-sessão), só nunca
+eram lidos por código nenhum.
+
+- **Tensão real entre §5.3 e §6.9, levada ao usuário antes de codar** (já estava
+  registrada como decisão em aberto desde M3, sub-sessão M8-7): §5.3 descreve o tick
+  de duração como em lote, no fim do round, depois que TODAS as unidades já agiram;
+  §6.9 descreve DoT/regen numa ordem por TURNO INDIVIDUAL da unidade ("DoT → tick de
+  duração → regeneração → ação"), o que implicaria aplicar o dano/cura periódico
+  antes daquela unidade agir naquele round — inclusive antes de sua própria decisão
+  tática (uma condition `selfHpBelow` já veria o HP pós-DoT no mesmo round). Isso
+  muda resultado de jogo de verdade (uma unidade pode morrer de veneno antes de agir;
+  uma decisão tática pode virar por causa do tick), não é só um detalhe de
+  implementação — perguntei antes de escolher. **Decisão do usuário: lote no fim do
+  round**, consistente com o tick de duração/cooldown que `endRound` já fazia; evita
+  plumbing novo de "início de turno" (não existe hoje — `commands.ts` só tem
+  `move`/`rest`/`wait`/`mapSkill`/`useValor`/`engage`, comandos diretos, sem um passo
+  de "a unidade X começou seu turno"). Consequência aceita: DoT/regen aplicado no
+  round N só afeta a decisão tática da unidade no round N+1, não no round em que foi
+  tickado.
+- **Stacks escalam o tick, também perguntado antes**: 2 stacks de veneno causam 2×
+  `periodicDamagePct` por tick — dá sentido mecânico a `maxStacks > 1`, que já existia
+  no schema desde M1 mas nunca influenciava dano nenhum antes desta fatia. Escolhido
+  via soma repetida (`for (let i = 0; i < active.stacks; i++)`), mesma convenção já
+  estabelecida em `sumEffectField` (`duel/effects.ts`, M10 sub-sessão 1) para nunca
+  fazer `value * stacks` cru fora dos helpers de `math/fixed.ts` (regra 2 do
+  CLAUDE.md).
+- **`computePeriodicEffects` (novo, `duel/effects.ts`)**: função pura que soma dano e
+  cura periódicos de todos os efeitos ativos de uma unidade, em HP absoluto (não
+  percentual) — `fpPct(maxHp, periodicDamagePct)` por stack, somado. Vive em
+  `duel/effects.ts` (não em `battle/round.ts`) porque esse arquivo já é o módulo
+  compartilhado de "matemática de `ActiveEffect`" reusado por `resolveDuel.ts` e
+  `battle/commands.ts` desde M10 sub-sessão 1 — `battle/round.ts` só chama a função e
+  aplica o resultado a `hp`, não recalcula nada.
+- **`applyPeriodicHp` (novo, `battle/round.ts`)**: aplica o resultado a `unit.hp`
+  seguindo a ordem literal de §6.9 mesmo em lote — dano primeiro (`Math.max(0, hp -
+  damage)`), só então cura, capada em `unit.stats.hp` (`Math.min`). Uma unidade que o
+  próprio DoT deste tick derrubou a 0 NÃO recebe a cura do mesmo tick (checada com
+  `if (afterDamage <= 0) return afterDamage`) — decisão implícita, não perguntada
+  separadamente, mas segue diretamente da ordem "DoT → regeneração" já decidida
+  acima (se a unidade já morreu no passo 1, não há "ação" nem passo seguinte pra ela).
+  DoT/regen calculado a partir dos efeitos ANTES do tick de duração (`tickEffects`) —
+  um efeito com `duration: 1` ainda causa seu último tick de dano/cura no round em que
+  expira, só desaparece no round seguinte. Cura é a primeira mecânica de cura de
+  verdade no motor inteiro (o corte documentado em M10 sub-sessão 2 — "`heal` nunca
+  foi lido em código nenhum" — falava de cura de SKILL/assistência, que continua sem
+  fórmula; regen periódico é um mecanismo diferente, já totalmente especificado por
+  `periodicHealPct`, sem tensão com aquele corte).
+- **`pnpm balance -- --runs 10000` continua byte-a-byte idêntico**: nenhum conteúdo
+  real de `packages/data` (fora de `test-fixtures/`) declara `periodicDamagePct`/
+  `periodicHealPct` — confirmado via grep antes de rodar o comando, não só inferido. O
+  relatório bate número a número com o já documentado em `DECISIONS.md`/`PROGRESS.md`
+  desde M8 sub-sessão 7 (Arcanista 38,7%, Grifeiro 35,8%, Couraçado 31,2% abaixo do
+  piso de 40% — limitação conhecida e já aceita, não é regressão desta fatia).
+  `GOLDEN_HASH` também intacto pelo mesmo motivo: o replay canônico não tem nenhum
+  `EffectDef` com campo periódico.
+- **`RULES_VERSION` subiu** (`0.3.0`→`0.4.0`) — mudança de regra real (DoT/regen
+  passam de campos declarados-mas-inertes para mecanicamente ativos), mesmo não sendo
+  observável nem pelo replay canônico nem por `pnpm balance` pelo motivo acima (mesmo
+  padrão já estabelecido nas duas sub-sessões anteriores de M10).
+
+Testes novos: 6 em `effects.test.ts` (`computePeriodicEffects` — dano/cura isolados,
+escala por stacks, efeito sem campo periódico contribui 0, efeito ausente do
+catálogo de defs ignorado sem lançar, soma de múltiplos efeitos simultâneos) + 8 em
+`round.test.ts` (`endRound` — dano reduz hp, stacks escalam, cura capada no HP
+máximo, cura soma normalmente abaixo do teto, dano pode matar sem ir negativo,
+regen não se aplica se o dano do mesmo tick já matou, efeito que expira neste round
+ainda causa seu último tick, unidade já morta não ticka) + 1 em `simulate.test.ts`
+(integração ponta a ponta: uma unidade com veneno morre no fim do round SEM nenhum
+duelo acontecer, e isso decide `outcome: 'victory'` via `checkWinCondition`, provando
+que o caminho `applyCommandAndAdvance` → `endRound` → `checkWinCondition` fecha
+corretamente). `pnpm test` (**621 testes, 59 arquivos** — +15 sobre a sub-sessão 2),
+`pnpm typecheck` (7 pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data`
+sem alteração (17 schemas, 67 arquivos — fatia não mexeu em conteúdo), `pnpm
+test:browser` (42 testes, 3 engines, `GOLDEN_HASH` intacto). Pendente do restante do
+roadmap de M10: cura de assistência/skill (fórmula nova, checkpoint pendente com
+usuário — corte diferente deste, não resolvido aqui), reaction triggers além de
+`onAttacked`, efeitos `special` de set, harness multi-unidade de `tools/balance`.
