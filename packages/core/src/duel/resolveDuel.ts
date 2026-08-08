@@ -16,7 +16,7 @@ import { selectReaction } from './reactions.js';
 import { selectTacticsAction } from '../tactics/selectTacticsAction.js';
 import { combinedTypeDamageMultiplier, weaponTriangleResult } from './triangle.js';
 import { computeEvasionFromSpd } from './evasion.js';
-import { resolveAssists, type AssistCandidate, type AssistResult } from './assist.js';
+import { applyAssistDamage, resolveAssists, type AppliedAssistResult, type AssistCandidate } from './assist.js';
 import {
   BASIC_ATTACK_SKILL,
   type ActiveEffect,
@@ -84,8 +84,8 @@ export interface DuelResult {
   readonly finalPpAttacker: number;
   readonly finalApDefender: number;
   readonly finalPpDefender: number;
-  readonly attackerAssists: readonly AssistResult[];
-  readonly defenderAssists: readonly AssistResult[];
+  readonly attackerAssists: readonly AppliedAssistResult[];
+  readonly defenderAssists: readonly AppliedAssistResult[];
   // §8.3/§6.9 (M10) — estado final de activeEffects dos dois lados, incluindo o que
   // skill.effects aplicou dentro deste duelo. A camada de batalha (commands.ts) precisa
   // disto para persistir de volta no BattleUnit — sem isto, um efeito aplicado em duelo
@@ -487,11 +487,37 @@ function resolveExchange(
 export function resolveDuel(input: ResolveDuelInput): DuelResult {
   const { seed, effectDefs, engagement } = input;
 
-  const attackerAssists = resolveAssists(input.attackerAssistCandidates ?? []);
-  const defenderAssists = resolveAssists(input.defenderAssistCandidates ?? []);
-
   let attacker = input.attacker;
   let defender = input.defender;
+
+  // §6.5.3 (M10) — "depois que o duelo é declarado e antes da primeira troca": dano de
+  // assistência aplicado a HP de verdade aqui, antes do loop de trocas. Aliado do
+  // atacante mira o defensor; aliado do defensor mira o atacante.
+  const attackerAssistDecisions = resolveAssists(input.attackerAssistCandidates ?? []);
+  const attackerAssistOutcome = applyAssistDamage({
+    seed,
+    sideLabel: 'attacker-assist',
+    results: attackerAssistDecisions,
+    candidates: input.attackerAssistCandidates ?? [],
+    target: { stats: defender.stats, unitType: defender.unitType, weaponType: defender.weaponType, activeEffects: defender.activeEffects },
+    effectDefs,
+  });
+  defender = { ...defender, currentHp: Math.max(0, defender.currentHp - attackerAssistOutcome.totalDamage) };
+
+  const defenderAssistDecisions = resolveAssists(input.defenderAssistCandidates ?? []);
+  const defenderAssistOutcome = applyAssistDamage({
+    seed,
+    sideLabel: 'defender-assist',
+    results: defenderAssistDecisions,
+    candidates: input.defenderAssistCandidates ?? [],
+    target: { stats: attacker.stats, unitType: attacker.unitType, weaponType: attacker.weaponType, activeEffects: attacker.activeEffects },
+    effectDefs,
+  });
+  attacker = { ...attacker, currentHp: Math.max(0, attacker.currentHp - defenderAssistOutcome.totalDamage) };
+
+  const attackerAssists = attackerAssistOutcome.results;
+  const defenderAssists = defenderAssistOutcome.results;
+
   let apSpent: Record<Id, number> = { [attacker.id]: 0, [defender.id]: 0 };
   const ppLockedForTroca1 = input.ppLockedForTroca1 ?? [];
 

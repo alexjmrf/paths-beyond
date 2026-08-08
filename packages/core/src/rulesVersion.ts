@@ -19,4 +19,12 @@
 // mecanicamente inerte desde M2 — ver DECISIONS.md). Mudança de regra real, não de
 // integração: GOLDEN_HASH em crossRuntime.test.ts mudou no mesmo commit (protocolo
 // documentado no próprio teste).
-export const RULES_VERSION = '0.2.0';
+//
+// M10, sub-sessão 2/N: assistência (§6.5.3) passa a causar dano de verdade a HP (era
+// decisão-only desde M2 — resolveAssists decidia QUEM assistia, nunca aplicava o
+// dano). Mudança de regra real mesmo GOLDEN_HASH não tendo mudado desta vez — o
+// replay canônico não exercita nenhum assistente com trigger onAllyEngagedNearby de
+// verdade (achado desta sub-sessão, gap pré-existente da fixture, não corrigido aqui
+// por estar fora de escopo). `pnpm balance` também não muda: os 9 comps reais de M8
+// são de 1 unidade só, sem aliado pra assistir.
+export const RULES_VERSION = '0.3.0';

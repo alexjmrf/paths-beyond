@@ -262,6 +262,9 @@ describe('applyCommand — engage (integra de verdade com resolveDuel de M2)', (
 
     const outcome = applyCommand(state, { t: 'engage', unitId: 'atk', targetId: 'def' });
     expect(outcome.duelResult?.attackerAssists.length).toBeGreaterThan(0);
+    // M10 — a assistência agora causa dano de verdade a HP, não só decide quem assiste.
+    const assistDamage = outcome.duelResult!.attackerAssists[0]!.damageDealt;
+    expect(assistDamage).toBeGreaterThan(0);
 
     const allyAfter = outcome.state.units.find((u) => u.unitId === 'ally');
     expect(allyAfter?.hasActedThisRound).toBe(false);

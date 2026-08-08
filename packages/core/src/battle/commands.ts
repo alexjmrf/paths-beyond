@@ -223,6 +223,11 @@ function buildAssistCandidates(
       battleRound: state.round,
       alliesAdjacentCount: 0,
     },
+    // §6.5.3 (M10) — necessário pra computar o dano de 50% quando a assistência é ofensiva.
+    stats: ally.stats,
+    unitType: ally.unitType,
+    weaponType: ally.weaponType,
+    activeEffects: ally.effects,
   }));
 }
 

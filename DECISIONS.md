@@ -810,3 +810,79 @@ direta via `git stash`, não só inferência). Escopo restante de M10 (não inic
 tick de DoT/regen, dano/cura de assistência aplicado a HP, reaction triggers além de
 `onAttacked`, efeitos `special` de set (§7.4), harness multi-unidade de
 `tools/balance` com `weaponDuelRanges`/`assistRange` reais.
+
+### M10 — sub-sessão 2/N: assistência causa dano de verdade a HP
+
+Continuação direta da sub-sessão 1, sessão diferente, autorizada pelo usuário ("pode
+continuar"). Item explícito do roadmap de M10 ("assistência muda o HP final do duelo",
+critério de aceite formal) e o corte mais "pronto pra ligar" segundo a sub-sessão 1:
+`resolveAssists` já decidia QUEM assiste (testado desde M2); faltava só aplicar
+`ASSIST_DAMAGE_MULTIPLIER` a HP de verdade.
+
+- **Achado que restringiu o escopo antes de codar:** o roadmap agrupa "dano **e cura**
+  de assistência" como um item só, mas investigação mostrou que **cura não tem
+  mecânica nenhuma no motor hoje** — `heal` existe só como campo de `StatSheet` (§4.1,
+  "Cura dada/recebida", %), nunca lido em código nenhum; o único discriminador de
+  "isto é uma skill de cura" é `tags.includes('heal')` (§06-classes-e-talentos.md
+  linha 64), mas não existe fórmula normativa de magnitude (nenhum §6.6-equivalente
+  pra heal). Decisão: **esta sub-sessão implementa só o dano de assistência**
+  (totalmente especificado, sem invenção); cura de assistência fica cortada,
+  documentada, candidata a uma sub-sessão própria que primeiro precisa inventar a
+  fórmula de cura do zero (decisão de design que merece checkpoint com o usuário
+  antes, não algo pra decidir em silêncio no meio de outra fatia).
+- **Dano de assistência reusa a mesma matemática de `computeDamage` (§6.6)**, com
+  duas simplificações explícitas: (1) **sem rolagem de acerto própria** — mesma
+  convenção já adotada para contra-ataques em resolveDuel.ts ("Contra-ataques sempre
+  acertam"), estendida agora à assistência; (2) **`positionalMultiplier: 1000`
+  (neutro)** — o assistente não tem posição própria resolvida dentro do duelo (ele
+  ataca de uma tile diferente da dos dois duelistas principais); calcular
+  flanco/cerco/altura pro assistente exigiria resolver uma segunda posição dentro do
+  mesmo `DuelEngagementContext`, fora de escopo desta fatia.
+- **Crítico e variância de dano SÃO rolados** para a assistência (ao contrário do
+  acerto) — mantém a assistência sujeita à mesma aleatoriedade que qualquer outro
+  golpe, só sem o passo de "será que erra".
+- **Novo stream de rng**: `rngFor(seed, 0, assistantId, '<lado>-assist:crit'/'<lado>-
+  assist:damage-variance')` — `round=0` nunca colide com as trocas reais (1/2/3),
+  `<lado>` (`attacker-assist`/`defender-assist`) distingue os dois lados.
+  `upsertActiveEffect`/`applyActiveEffectsToStats` reusados para computar os stats
+  efetivos do assistente E do alvo (ambos podem ter `activeEffects` de duração
+  `battle` herdados de duelos anteriores no mesmo mapa).
+- **`AssistCandidate` ganhou `stats`/`unitType`/`weaponType`/`activeEffects`** — antes
+  só carregava o necessário pra `resolveAssists` DECIDIR quem assiste (script de
+  reação + economia + `ConditionContext`), nada que permitisse calcular dano de
+  verdade. `commands.ts`'s `buildAssistCandidates` agora repassa `ally.stats`/
+  `ally.unitType`/`ally.weaponType`/`ally.effects`.
+- **`AssistResult` (decisão pura, `resolveAssists`) ficou inalterado** — `AppliedAssistResult`
+  (novo, `= AssistResult & { damageDealt: number }`) é o tipo que carrega o dano,
+  produzido por `applyAssistDamage` (novo, `assist.ts`) e é o que `DuelResult.
+  attackerAssists`/`defenderAssists` expõe agora. Mantém a separação já estabelecida
+  em M2: "quem assiste" (decisão, testado isoladamente, sem stats) vs "o que
+  acontece" (aplicação, precisa de stats/rng/HP).
+- **Assistência sem componente de dano (skill `multiplier=0 && flat=0`, ex.: tag
+  `'heal'`) contribui `damageDealt: 0`**, sem erro — resultado esperado dado o corte
+  de cura acima, não um bug.
+- **Achado sobre o replay canônico**: `goldenReplay.ts` (fixture de determinismo desde
+  M2/M9) tem um arqueiro posicionado "pra entrar como assistência" (comentário no
+  próprio arquivo), mas seu `reactionScript` só tem uma linha com trigger
+  `onAttacked` — nunca teve uma linha `onAllyEngagedNearby`, então `resolveAssists`
+  sempre retornou `[]` pra ele, em qualquer sub-sessão de M2 a M10. **`GOLDEN_HASH`
+  não mudou nesta fatia** (confirmado rodando `pnpm test` e `pnpm test:browser` nas 3
+  engines) — não porque a mudança seja cosmética, mas porque a fixture nunca exercitou
+  de verdade o caminho que mudou. Gap pré-existente da fixture, não corrigido aqui
+  (fora de escopo; corrigir mudaria o que a fixture testa, não é uma correção
+  "grátis"). **`RULES_VERSION` subiu mesmo assim** (`0.2.0`→`0.3.0`) — a regra mudou
+  de verdade, só não é observável por ESTE fixture específico.
+- **`pnpm balance -- --runs 10000` continua byte-a-byte idêntico** à baseline pré-M10
+  — todos os 9 comps reais de M8 são de 1 unidade só (sem aliados), então assistência
+  nunca é candidata a acontecer nesses torneios. Confirmado (`diff` direto contra o
+  arquivo salvo na sub-sessão 1, não só inferência).
+
+`pnpm test` (606 testes, 59 arquivos — +12 sobre a sub-sessão 1: 8 novos em
+`assist.test.ts`, mais os testes estendidos em `resolveDuel.test.ts`/
+`commands.test.ts` contam nas mesmas suítes), `pnpm typecheck` (7 pacotes, limpo),
+`pnpm lint` sem alteração, `pnpm validate:data` sem alteração (17 schemas, 67
+arquivos — fatia não mexeu em conteúdo), `pnpm test:browser` (42 testes, 3 engines,
+`GOLDEN_HASH` intacto). Pendente do restante do roadmap de M10: cura de assistência
+(precisa de fórmula nova, checkpoint com usuário), tick de DoT/regen, reaction
+triggers além de `onAttacked`, efeitos `special` de set, harness multi-unidade de
+`tools/balance`.

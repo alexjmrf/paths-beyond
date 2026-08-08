@@ -369,47 +369,205 @@ describe('resolveDuel — ppLockedForTroca1 (§5.5, M3: Flanco trava PP do defen
   });
 });
 
+const noOpSkill: SkillDef = {
+  id: 'skill-no-op',
+  name: 'Nada',
+  kind: 'duel',
+  apCost: 0,
+  cooldown: 0,
+  multiplier: 0,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [],
+  tags: [],
+};
+
+function assistCandidate(id: string, overrides: Partial<import('../../src/duel/assist.js').AssistCandidate> = {}) {
+  return {
+    id,
+    reactionScript: [{ enabled: true, skillId: counterAttack.id, conditions: [] }],
+    skills: { [counterAttack.id]: { ...counterAttack, trigger: 'onAllyEngagedNearby' as const } },
+    economy: { pools: { ap: 2, pp: 2 }, apSpentThisDuel: 0, ppSpentThisTroca: 0 },
+    context: {
+      self: {
+        currentHpPct: 1000,
+        ap: 2,
+        pp: 2,
+        unitType: 'infantry' as const,
+        weaponType: 'sword' as const,
+        activeBuffIds: [],
+        activeDebuffIds: [],
+      },
+      target: {
+        currentHpPct: 1000,
+        ap: 2,
+        pp: 2,
+        unitType: 'infantry' as const,
+        weaponType: 'sword' as const,
+        activeBuffIds: [],
+        activeDebuffIds: [],
+      },
+      isSelfAttacker: true,
+      hasPositionalBonus: false,
+      trocaNumber: 1 as const,
+      battleRound: 1,
+      alliesAdjacentCount: 0,
+    },
+    stats: statSheet(),
+    unitType: 'infantry' as const,
+    weaponType: 'sword' as const,
+    activeEffects: [],
+    ...overrides,
+  };
+}
+
 describe('resolveDuel — assistências (§6.5)', () => {
-  it('repassa o resultado de resolveAssists para cada lado no DuelResult', () => {
+  it('repassa o resultado de resolveAssists para cada lado no DuelResult, com damageDealt (M10)', () => {
     const result = resolveDuel(
       baseInput({
+        attackerAssistCandidates: [assistCandidate('ally-1')],
+      }),
+    );
+    expect(result.attackerAssists).toHaveLength(1);
+    expect(result.attackerAssists[0]).toMatchObject({ assistantId: 'ally-1', skillId: counterAttack.id });
+    expect(result.attackerAssists[0]?.damageDealt).toBeGreaterThan(0);
+    expect(result.defenderAssists).toEqual([]);
+  });
+});
+
+describe('resolveDuel — assistência causa dano de verdade a HP (§6.5.3, M10)', () => {
+  it('assistência do atacante reduz o HP do defensor ANTES da troca 1, isolado de qualquer dano de troca', () => {
+    const defenderStartingHp = 999999;
+    const result = resolveDuel(
+      baseInput({
+        // Ator principal sem componente de dano — isola o efeito da assistência.
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: noOpSkill.id, conditions: [] }],
+          knownSkills: { [noOpSkill.id]: noOpSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+          reactionScript: [], // sem isso, o atacante contra-atacaria o strike do defensor
+        }),
+        defender: participant({
+          id: 'hero-b',
+          pp: 0, // sem contra-ataque — hero-b nunca causa dano a si mesmo de qualquer forma
+          currentHp: defenderStartingHp,
+          stats: statSheet({ hp: defenderStartingHp, def: 200 }),
+        }),
+        attackerAssistCandidates: [assistCandidate('ally-1')],
+      }),
+    );
+    const assistDamage = result.attackerAssists[0]!.damageDealt;
+    expect(assistDamage).toBeGreaterThan(0);
+    expect(result.finalHpDefender).toBe(defenderStartingHp - assistDamage);
+  });
+
+  it('assistência do defensor reduz o HP do atacante (simétrico)', () => {
+    const attackerStartingHp = 999999;
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: attackerStartingHp,
+          stats: statSheet({ hp: attackerStartingHp }),
+          tacticsScript: [{ enabled: true, skillId: noOpSkill.id, conditions: [] }],
+          knownSkills: { [noOpSkill.id]: noOpSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+        }),
+        defender: participant({
+          id: 'hero-b',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999, def: 200 }),
+          tacticsScript: [{ enabled: true, skillId: noOpSkill.id, conditions: [] }],
+          knownSkills: { [noOpSkill.id]: noOpSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+        }),
+        defenderAssistCandidates: [assistCandidate('ally-2')],
+      }),
+    );
+    const assistDamage = result.defenderAssists[0]!.damageDealt;
+    expect(assistDamage).toBeGreaterThan(0);
+    expect(result.finalHpAttacker).toBe(attackerStartingHp - assistDamage);
+  });
+
+  it('soma o dano das duas assistências do mesmo lado (teto de 2, §6.5)', () => {
+    const defenderStartingHp = 999999;
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: noOpSkill.id, conditions: [] }],
+          knownSkills: { [noOpSkill.id]: noOpSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+          reactionScript: [],
+        }),
+        defender: participant({
+          id: 'hero-b',
+          pp: 0,
+          currentHp: defenderStartingHp,
+          stats: statSheet({ hp: defenderStartingHp, def: 200 }),
+        }),
+        attackerAssistCandidates: [assistCandidate('ally-1'), assistCandidate('ally-2')],
+      }),
+    );
+    expect(result.attackerAssists).toHaveLength(2);
+    const totalAssistDamage = result.attackerAssists.reduce((sum, a) => sum + a.damageDealt, 0);
+    expect(result.finalHpDefender).toBe(defenderStartingHp - totalAssistDamage);
+    expect(result.attackerAssists.every((a) => a.damageDealt > 0)).toBe(true);
+  });
+
+  it('assistência sem componente de dano (heal/buff) não muda o HP do alvo', () => {
+    const healAssistSkill: SkillDef = {
+      ...counterAttack,
+      id: 'skill-assist-heal',
+      multiplier: 0,
+      flat: 0,
+      tags: ['heal'],
+      trigger: 'onAllyEngagedNearby',
+    };
+    const defenderStartingHp = 999999;
+    const result = resolveDuel(
+      baseInput({
+        attacker: participant({
+          id: 'hero-a',
+          currentHp: 999999,
+          stats: statSheet({ hp: 999999 }),
+          tacticsScript: [{ enabled: true, skillId: noOpSkill.id, conditions: [] }],
+          knownSkills: { [noOpSkill.id]: noOpSkill, [counterAttack.id]: counterAttack, [defend.id]: defend },
+          reactionScript: [],
+        }),
+        defender: participant({
+          id: 'hero-b',
+          pp: 0,
+          currentHp: defenderStartingHp,
+          stats: statSheet({ hp: defenderStartingHp, def: 200 }),
+        }),
         attackerAssistCandidates: [
-          {
-            id: 'ally-1',
-            reactionScript: [{ enabled: true, skillId: counterAttack.id, conditions: [] }],
-            skills: { [counterAttack.id]: { ...counterAttack, trigger: 'onAllyEngagedNearby' } },
-            economy: { pools: { ap: 2, pp: 2 }, apSpentThisDuel: 0, ppSpentThisTroca: 0 },
-            context: {
-              self: {
-                currentHpPct: 1000,
-                ap: 2,
-                pp: 2,
-                unitType: 'infantry',
-                weaponType: 'sword',
-                activeBuffIds: [],
-                activeDebuffIds: [],
-              },
-              target: {
-                currentHpPct: 1000,
-                ap: 2,
-                pp: 2,
-                unitType: 'infantry',
-                weaponType: 'sword',
-                activeBuffIds: [],
-                activeDebuffIds: [],
-              },
-              isSelfAttacker: true,
-              hasPositionalBonus: false,
-              trocaNumber: 1,
-              battleRound: 1,
-              alliesAdjacentCount: 0,
-            },
-          },
+          assistCandidate('ally-1', {
+            reactionScript: [{ enabled: true, skillId: healAssistSkill.id, conditions: [] }],
+            skills: { [healAssistSkill.id]: healAssistSkill },
+          }),
         ],
       }),
     );
-    expect(result.attackerAssists).toEqual([{ assistantId: 'ally-1', skillId: counterAttack.id }]);
-    expect(result.defenderAssists).toEqual([]);
+    expect(result.attackerAssists[0]?.damageDealt).toBe(0);
+    expect(result.finalHpDefender).toBe(defenderStartingHp);
+  });
+
+  it('sem candidatos de assistência, comportamento idêntico a antes de M10 (campo aditivo)', () => {
+    const a = resolveDuel(baseInput());
+    const b = resolveDuel(baseInput({ attackerAssistCandidates: [], defenderAssistCandidates: [] }));
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+
+  it('determinismo: mesma seed produz o mesmo dano de assistência', () => {
+    const input = baseInput({
+      defender: participant({ id: 'hero-b', pp: 0, currentHp: 999999, stats: statSheet({ hp: 999999, def: 200 }) }),
+      attackerAssistCandidates: [assistCandidate('ally-1')],
+    });
+    const a = resolveDuel(input);
+    const b = resolveDuel(input);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
 
