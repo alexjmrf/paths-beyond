@@ -1069,3 +1069,79 @@ engines, `GOLDEN_HASH` intacto — o replay canônico usa fixture própria, não
 real). Pendente do restante do roadmap de M10: reaction triggers além de `onAttacked`
 (`onDamaged`, `onLethal`), efeitos `special` de set (§7.4), cura de assistência/skill
 (fórmula nova, checkpoint pendente com o usuário).
+
+### M10 — sub-sessão 5/N: gatilhos de reação além de `onAttacked`
+
+Continuação da sub-sessão 4, mesma sessão, autorizada pelo usuário ("pode continuar,
+deixe o commit pra mais tarde"). Item nomeado no roadmap de M10: "gatilhos de reação
+além de `onAttacked` (`onDamaged`, `onLethal`)". Das 5 variantes de `ReactionTrigger`
+(§6.4), duas já eram resolvidas — `onAttacked` (M2) e `onAllyEngagedNearby`
+(assistências, M2 + M10 sub-sessões 2/4).
+
+- **`onLethal` NÃO foi implementado — decisão de design do usuário, não corte por
+  tempo.** Levei ao usuário a questão de o que um `onLethal` poderia fazer, já que cura
+  não tem fórmula na spec (§6.4 lista "Cura de emergência" entre as reações que classes
+  e talentos adicionam, mas nenhuma seção dá magnitude de cura). A resposta reenquadrou o
+  problema em vez de escolher entre as opções oferecidas: **`onLethal` como checagem de
+  ativação de script é estranho, porque implica prever a própria morte** — "não é
+  interessante conseguir prever quando for morrer". O que faria sentido é "no máximo uma
+  passiva ou skill que ativasse AO MORRER, pra prevenir ou pra fazer algum efeito". Isso
+  é um mecanismo diferente do de reações: `selectReaction` é uma DECISÃO (script ordenado
+  + conditions + custo de PP), e o que o usuário descreve é uma CONSEQUÊNCIA automática
+  de um evento. Encaminhamento: `onLethal` fica sem resolução; quando for implementado,
+  deve ser como gatilho automático de morte (passiva), não como linha de script — e
+  provavelmente junto da decisão de fórmula de cura, que segue pendente.
+- **`onDamaged` e `onDebuffed` são genuinamente reativos** (você levou dano; você foi
+  debuffado — nenhum dos dois exige previsão), então entram pelo caminho normal de
+  `selectReaction`, sem mecanismo novo. `onDebuffed` entrou junto por escolha do usuário,
+  fechando o enum de §6.4 exceto por `onLethal` — deixar um trigger do enum sem resolução
+  é exatamente o tipo de ponta solta que a auditoria de 2026-08-07 apontou.
+- **Onde cada gatilho é resolvido, e por quê:** `onAttacked` continua ANTES do dano (o
+  `-40%` de Defender precisa reduzir a troca corrente); `onDamaged` e `onDebuffed` são
+  resolvidos DEPOIS do dano e depois de `applyEffectApplications` — antes disso não há o
+  que reagir. A ordem entre os três é cronológica (a ordem dos eventos), não uma
+  prioridade arbitrária.
+- **Na prática no máximo UM dos três dispara por troca**, e isso não é regra nova: o teto
+  de 1 PP por troca (§6.4, já implementado em `canAffordPp`) faz o primeiro gatilho que
+  passar consumir o recurso. Por isso `ActionLogEntry.reaction` continua sendo um campo
+  único em vez de virar array; ganhou `trigger` (aditivo, nenhum consumidor quebrou —
+  `apps/client/DuelPreviewPanel.tsx` e `sim-cli/duel.ts` leem só `skillId`/`lineIndex`/
+  `counterDamage`).
+- **Uma reação `onDamaged`/`onDebuffed` sem componente de dano gasta o PP e não faz mais
+  nada.** O `-40%` de Defender é específico de `onAttacked` (§6.4 descreve Defender como
+  "-40% de dano NA TROCA"), e depois que o golpe já entrou não há dano a reduzir.
+- **O corte "reação não aplica os próprios `skill.effects`" (sub-sessão 1) foi
+  PRESERVADO**, embora estivesse documentado como pareado com este trabalho. Existe teste
+  explícito afirmando esse comportamento (`counterWithEffects` em `resolveDuel.test.ts`);
+  reverter seria decisão de design própria, não consequência de ligar os gatilhos. Fica
+  como candidato a fatia futura — é o que tornaria `onDebuffed` interessante de verdade
+  (reagir a um debuff limpando-o ou se buffando, em vez de só revidar).
+- **Nenhum conteúdo real usa os gatilhos novos ainda** — gap consciente e documentado,
+  da mesma categoria que a auditoria criticou no "Achado 5". Autorar uma reação
+  `onDamaged` real exigiria concedê-la por talento (§6.4 fecha a lista de universais em
+  duas — ver sub-sessão 4), fazer os comps alocarem esse talento, e portanto **outro
+  ciclo completo de rebalanceamento** — a sub-sessão 4 acabou de mostrar que mexer no que
+  os comps alocam quebra o teto de 65%. Por isso não entrou junto: é fatia própria, não
+  detalhe desta.
+
+`RULES_VERSION` subiu (`0.5.0`→`0.6.0`) — mudança de regra real. **Não observável** em
+`pnpm balance` (numericamente idêntico à rodada da sub-sessão 4: Espadachim 63,5% …
+Couraçado 26,2%, `spd` em 22,4%) nem no `GOLDEN_HASH` (42 testes, 3 engines, intacto),
+porque nenhuma skill do catálogo real — nem a fixture do replay canônico — declara
+`onDamaged`/`onDebuffed`.
+
+Testes novos: 8 em `resolveDuel.test.ts` (onDamaged dispara e contra-ataca; o contra-dano
+de onDamaged reduz HP de verdade, medido contra um duelo idêntico sem a reação; onDamaged
+não dispara em ação sem dano; onDamaged não dispara se onAttacked já gastou o PP da troca;
+onDebuffed dispara quando o debuff de fato é aplicado; não dispara quando a rolagem de
+chance falha; não dispara para buff que o ator aplica em si mesmo; determinismo).
+**Achado durante os testes:** uma primeira versão do teste "ação sem dano não dispara
+onDamaged" falhou por motivo legítimo — o teto de 2 AP por duelo (§6.2) faz o atacante cair
+para ataque básico na troca 3, que causa dano e dispara o gatilho corretamente; a asserção
+foi restringida à troca 1, onde a ação medida é de fato a sem dano. `pnpm test` (**645
+testes, 60 arquivos** — +8 sobre a sub-sessão 4), `pnpm typecheck` (7 pacotes, limpo),
+`pnpm lint` sem alteração, `pnpm validate:data` (17 schemas, 68 arquivos — fatia não mexeu
+em conteúdo), `pnpm test:browser` (42 testes, 3 engines). Pendente do restante do roadmap
+de M10: efeitos `special` de set (§7.4), cura de assistência/skill (fórmula nova,
+checkpoint pendente), `onLethal` como gatilho de morte (encaminhamento acima), e conteúdo
+real usando os gatilhos novos.

@@ -42,4 +42,9 @@
 // enquanto essas duas eram as únicas reações do catálogo. Com `skill-assistir` no
 // catálogo, a regra antiga daria assistência de graça a toda unidade. Mudança de regra
 // real e observável: o `reactionScript` resolvido por `combatProfile.ts` muda.
-export const RULES_VERSION = '0.5.0';
+// M10, sub-sessão 5/N: `onDamaged` e `onDebuffed` (§6.4) passam a ser resolvidos dentro do
+// duelo — antes só `onAttacked` (M2) e `onAllyEngagedNearby` (assistências) eram. Mudança
+// de regra real; não observável em `pnpm balance` nem no `GOLDEN_HASH` porque nenhuma skill
+// do catálogo real (nem a fixture do replay canônico) declara esses triggers ainda.
+// `onLethal` continua sem resolução, por decisão de design registrada em DECISIONS.md.
+export const RULES_VERSION = '0.6.0';

@@ -25,7 +25,7 @@ import {
   type EffectDef,
 } from './types.js';
 import type { ConditionContext, ConditionUnitView } from '../tactics/types.js';
-import type { EffectApplication, SkillDef } from '../skills/types.js';
+import type { EffectApplication, ReactionTrigger, SkillDef } from '../skills/types.js';
 import type { StatSheet } from '../stats/types.js';
 
 const MAX_TROCAS = 3;
@@ -58,7 +58,14 @@ export interface ActionLogEntry {
   readonly hit: boolean | null;
   readonly isCrit: boolean;
   readonly damage: number;
-  readonly reaction: { readonly skillId: Id; readonly lineIndex: number; readonly counterDamage: number | null } | null;
+  // §6.4 — no máximo UMA reação por troca chega a disparar (teto de 1 PP por troca), então
+  // um campo único basta; `trigger` diz qual gatilho venceu (M10 sub-sessão 5/N).
+  readonly reaction: {
+    readonly skillId: Id;
+    readonly lineIndex: number;
+    readonly counterDamage: number | null;
+    readonly trigger: ReactionTrigger;
+  } | null;
   // §8.3/§6.9 (M10) — effectIds de skill.effects que passaram na rolagem de chance nesta
   // ação. Só a skill do ator principal (tactics/pure-buff) aplica; reação/assistência não
   // (corte documentado em DECISIONS.md).
@@ -158,6 +165,9 @@ interface EffectApplicationOutcome {
   readonly actor: DuelParticipant;
   readonly opponent: DuelParticipant;
   readonly appliedEffectIds: readonly Id[];
+  // §6.4 (M10 sub-sessão 5/N) — o gatilho `onDebuffed` precisa distinguir "um debuff caiu
+  // no OPONENTE" de "o ator se buffou": `appliedEffectIds` sozinho não diz o alvo.
+  readonly debuffedOpponent: boolean;
 }
 
 // §8.3/§6.9 (M10) — aplica skill.effects da skill que o ATOR principal executou (tactics
@@ -177,6 +187,7 @@ function applyEffectApplications(
   let nextActor = actor;
   let nextOpponent = opponent;
   const appliedEffectIds: Id[] = [];
+  let debuffedOpponent = false;
 
   for (const application of applications) {
     const def = effectDefs[application.effectId];
@@ -195,11 +206,12 @@ function applyEffectApplications(
       nextActor = { ...nextActor, activeEffects: upsertActiveEffect(nextActor.activeEffects, def, application) };
     } else {
       nextOpponent = { ...nextOpponent, activeEffects: upsertActiveEffect(nextOpponent.activeEffects, def, application) };
+      if (def.kind === 'debuff') debuffedOpponent = true;
     }
     appliedEffectIds.push(application.effectId);
   }
 
-  return { actor: nextActor, opponent: nextOpponent, appliedEffectIds };
+  return { actor: nextActor, opponent: nextOpponent, appliedEffectIds, debuffedOpponent };
 }
 
 interface ExchangeOutcome {
@@ -392,7 +404,12 @@ function resolveExchange(
       } else {
         counterSkill = reactionSkill;
       }
-      reactionLog = { skillId: reactionSkill.id, lineIndex: reactionDecision.lineIndex, counterDamage: null };
+      reactionLog = {
+        skillId: reactionSkill.id,
+        lineIndex: reactionDecision.lineIndex,
+        counterDamage: null,
+        trigger: 'onAttacked',
+      };
     }
   }
 
@@ -432,6 +449,45 @@ function resolveExchange(
   );
   actor = effectApplicationResult.actor;
   opponent = effectApplicationResult.opponent;
+
+  // §6.4 (M10, sub-sessão 5/N) — gatilhos posteriores ao golpe. `onAttacked` já foi
+  // resolvido lá em cima (antes do dano, porque Defender precisa reduzir ESTA troca);
+  // `onDamaged` e `onDebuffed` só fazem sentido DEPOIS que o dano entrou e os efeitos da
+  // skill foram aplicados. Na prática no máximo um dos três chega a disparar: o teto de 1
+  // PP por troca (§6.4, `canAffordPp`) faz o primeiro que passar consumir o recurso — a
+  // ordem aqui é a ordem cronológica dos eventos, não uma prioridade arbitrária.
+  function tryLateReaction(trigger: ReactionTrigger): void {
+    if (reactionLog !== null || opponent.currentHp <= 0 || opponentPpLocked) return;
+
+    const economy = economyOf(opponent, nextApSpent[opponent.id] ?? 0, nextPpSpentTroca[opponent.id] ?? 0);
+    // Contexto reconstruído aqui (e não reaproveitado do onAttacked) porque o HP dos dois
+    // lados e os efeitos ativos mudaram desde então — uma condition como `selfHpBelow`
+    // precisa enxergar o estado pós-dano.
+    const decision = selectReaction({
+      reactionScript: opponent.reactionScript,
+      skills: opponent.knownSkills,
+      trigger,
+      economy,
+      context: buildContext(opponent, actor, actorRole !== 'attacker', trocaNumber, engagement, effectDefs),
+    });
+    if (decision.kind !== 'reaction') return;
+
+    const skillDef = opponent.knownSkills[decision.skillId];
+    if (!skillDef || !canAffordPp(economy, skillDef.ppCost ?? 0)) return;
+
+    const spent = spendPp(economy, skillDef.ppCost ?? 0);
+    opponent = { ...opponent, pp: spent.pools.pp };
+    nextPpSpentTroca[opponent.id] = spent.ppSpentThisTroca;
+
+    // Diferente de `onAttacked`, aqui não há dano a reduzir — o golpe já entrou. Uma
+    // reação sem componente de dano gasta o PP e não faz mais nada (o `-40%` de Defender
+    // é específico de `onAttacked`, §6.4).
+    if (skillDef.multiplier > 0 || skillDef.flat > 0) counterSkill = skillDef;
+    reactionLog = { skillId: skillDef.id, lineIndex: decision.lineIndex, counterDamage: null, trigger };
+  }
+
+  if (damage > 0) tryLateReaction('onDamaged');
+  if (effectApplicationResult.debuffedOpponent) tryLateReaction('onDebuffed');
 
   if (counterSkill && opponent.currentHp > 0) {
     const counterTriangle = combinedTypeDamageMultiplier({

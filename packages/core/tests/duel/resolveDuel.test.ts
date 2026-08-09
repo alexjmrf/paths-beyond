@@ -123,6 +123,38 @@ const neverAppliesSkill: SkillDef = {
   tags: ['physical'],
 };
 
+// §6.4 (M10, sub-sessão 5/N) — gatilhos além de onAttacked. Mesma forma do
+// `counterAttack` acima; só o `trigger` muda.
+const counterOnDamaged: SkillDef = {
+  id: 'skill-counter-on-damaged',
+  name: 'Revide',
+  kind: 'reaction',
+  apCost: 0,
+  ppCost: 1,
+  cooldown: 0,
+  multiplier: 800,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [],
+  trigger: 'onDamaged',
+  tags: ['physical'],
+};
+
+const counterOnDebuffed: SkillDef = {
+  id: 'skill-counter-on-debuffed',
+  name: 'Represália',
+  kind: 'reaction',
+  apCost: 0,
+  ppCost: 1,
+  cooldown: 0,
+  multiplier: 800,
+  flat: 0,
+  scalesWith: 'atk',
+  effects: [],
+  trigger: 'onDebuffed',
+  tags: ['physical'],
+};
+
 const defDownEffect: EffectDef = {
   id: 'effect-def-down',
   name: 'Armadura Corroída',
@@ -706,5 +738,167 @@ describe('resolveDuel — skill.effects aplicado dentro do duelo (§8.3/§6.9, M
     const a = resolveDuel(input);
     const b = resolveDuel(input);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+// §6.4 (M10, sub-sessão 5/N) — o enum ReactionTrigger tem 5 variantes; até aqui só
+// `onAttacked` (M2) e `onAllyEngagedNearby` (assistências, M2/M10) eram resolvidos.
+// `onLethal` fica de fora por decisão de design registrada em DECISIONS.md.
+describe('resolveDuel — gatilhos de reação além de onAttacked (§6.4, M10)', () => {
+  // Sem linha `onAttacked` no script: senão ela dispara primeiro e consome o único PP da
+  // troca (§6.4: "uma unidade gasta no máximo 1 PP por troca"), escondendo o gatilho novo.
+  function defenderReactingTo(skill: SkillDef): DuelParticipant {
+    return participant({
+      id: 'hero-b',
+      currentHp: 999999,
+      stats: statSheet({ hp: 999999, def: 200 }),
+      reactionScript: [{ enabled: true, skillId: skill.id, conditions: [] }],
+      knownSkills: { [strike.id]: strike, [skill.id]: skill },
+    });
+  }
+
+  function tankAttacker(overrides: Partial<DuelParticipant> = {}): DuelParticipant {
+    return participant({
+      id: 'hero-a',
+      currentHp: 999999,
+      stats: statSheet({ hp: 999999 }),
+      reactionScript: [], // o atacante não reage — isola o contra-dano do gatilho medido
+      ...overrides,
+    });
+  }
+
+  describe('onDamaged', () => {
+    it('dispara depois de o dano do ator de fato entrar, e contra-ataca', () => {
+      const result = resolveDuel(
+        baseInput({ attacker: tankAttacker(), defender: defenderReactingTo(counterOnDamaged) }),
+      );
+      const reaction = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a')?.reaction;
+      expect(reaction?.skillId).toBe(counterOnDamaged.id);
+      expect(reaction?.trigger).toBe('onDamaged');
+      expect(reaction?.counterDamage).toBeGreaterThan(0);
+    });
+
+    it('o contra-dano de onDamaged reduz o HP do ator de verdade', () => {
+      const withReaction = resolveDuel(
+        baseInput({ attacker: tankAttacker(), defender: defenderReactingTo(counterOnDamaged) }),
+      );
+      const withoutReaction = resolveDuel(
+        baseInput({
+          attacker: tankAttacker(),
+          defender: participant({
+            id: 'hero-b',
+            currentHp: 999999,
+            stats: statSheet({ hp: 999999, def: 200 }),
+            reactionScript: [],
+            knownSkills: { [strike.id]: strike },
+          }),
+        }),
+      );
+      expect(withReaction.finalHpAttacker).toBeLessThan(withoutReaction.finalHpAttacker);
+    });
+
+    // Só a troca 1: o teto de 2 AP por duelo (§6.2) faz o atacante cair para ataque básico
+    // na troca 3, e aí o gatilho dispara legitimamente — o que se afirma aqui é que uma
+    // ação SEM dano não o dispara, não que ele nunca dispare neste duelo.
+    it('NÃO dispara quando a ação do ator não causa dano (skill pura de buff)', () => {
+      const result = resolveDuel(
+        baseInput({
+          attacker: tankAttacker({
+            tacticsScript: [{ enabled: true, skillId: selfBuffSkill.id, conditions: [] }],
+            knownSkills: { [selfBuffSkill.id]: selfBuffSkill },
+          }),
+          defender: defenderReactingTo(counterOnDamaged),
+          effectDefs: effectDefsWithDebuffAndBuff,
+        }),
+      );
+      const buffAction = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a');
+      expect(buffAction?.skillId).toBe(selfBuffSkill.id); // a ação medida é mesmo a sem dano
+      expect(buffAction?.damage).toBe(0);
+      expect(buffAction?.reaction).toBeNull();
+    });
+
+    it('§6.4 — não dispara se uma reação onAttacked já gastou o único PP da troca', () => {
+      const defender = participant({
+        id: 'hero-b',
+        currentHp: 999999,
+        stats: statSheet({ hp: 999999, def: 200 }),
+        pp: 5, // pool sobrando: o que trava é o teto de 1 PP por TROCA, não o pool
+        reactionScript: [
+          { enabled: true, skillId: counterAttack.id, conditions: [] },
+          { enabled: true, skillId: counterOnDamaged.id, conditions: [] },
+        ],
+        knownSkills: { [strike.id]: strike, [counterAttack.id]: counterAttack, [counterOnDamaged.id]: counterOnDamaged },
+      });
+      const result = resolveDuel(baseInput({ attacker: tankAttacker(), defender }));
+
+      for (const troca of result.trocas) {
+        const firedTriggers = troca.actions.map((a) => a.reaction?.trigger).filter(Boolean);
+        expect(firedTriggers).not.toContain('onDamaged'); // onAttacked venceu, PP acabou
+      }
+    });
+  });
+
+  describe('onDebuffed', () => {
+    it('dispara quando um debuff de skill.effects de fato é aplicado, e contra-ataca', () => {
+      const result = resolveDuel(
+        baseInput({
+          attacker: tankAttacker({
+            tacticsScript: [{ enabled: true, skillId: debuffStrike.id, conditions: [] }],
+            knownSkills: { [debuffStrike.id]: debuffStrike },
+          }),
+          defender: defenderReactingTo(counterOnDebuffed),
+          effectDefs: effectDefsWithDebuffAndBuff,
+        }),
+      );
+      const reaction = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a')?.reaction;
+      expect(reaction?.skillId).toBe(counterOnDebuffed.id);
+      expect(reaction?.trigger).toBe('onDebuffed');
+      expect(reaction?.counterDamage).toBeGreaterThan(0);
+    });
+
+    it('NÃO dispara quando a skill declara o efeito mas a rolagem de chance falha', () => {
+      const result = resolveDuel(
+        baseInput({
+          attacker: tankAttacker({
+            tacticsScript: [{ enabled: true, skillId: neverAppliesSkill.id, conditions: [] }],
+            knownSkills: { [neverAppliesSkill.id]: neverAppliesSkill },
+          }),
+          defender: defenderReactingTo(counterOnDebuffed),
+          effectDefs: effectDefsWithDebuffAndBuff,
+        }),
+      );
+      const action = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a');
+      expect(action?.damage).toBeGreaterThan(0); // o golpe entrou…
+      expect(action?.effectsApplied).toEqual([]); // …mas o debuff não pegou
+      expect(action?.reaction).toBeNull(); // …então onDebuffed não tinha o que disparar
+    });
+
+    it('NÃO dispara para um buff que o ator aplica em si mesmo — só debuff NO reagente conta', () => {
+      const result = resolveDuel(
+        baseInput({
+          attacker: tankAttacker({
+            tacticsScript: [{ enabled: true, skillId: selfBuffSkill.id, conditions: [] }],
+            knownSkills: { [selfBuffSkill.id]: selfBuffSkill },
+          }),
+          defender: defenderReactingTo(counterOnDebuffed),
+          effectDefs: effectDefsWithDebuffAndBuff,
+        }),
+      );
+      const action = result.trocas[0]?.actions.find((a) => a.actorId === 'hero-a');
+      expect(action?.effectsApplied).toEqual([atkUpEffect.id]); // o buff foi aplicado…
+      expect(action?.reaction).toBeNull(); // …mas em si mesmo, então não conta como debuff
+    });
+  });
+
+  it('determinismo: mesma seed produz o mesmo resultado com os gatilhos novos', () => {
+    const input = baseInput({
+      attacker: tankAttacker({
+        tacticsScript: [{ enabled: true, skillId: debuffStrike.id, conditions: [] }],
+        knownSkills: { [debuffStrike.id]: debuffStrike },
+      }),
+      defender: defenderReactingTo(counterOnDebuffed),
+      effectDefs: effectDefsWithDebuffAndBuff,
+    });
+    expect(JSON.stringify(resolveDuel(input))).toBe(JSON.stringify(resolveDuel(input)));
   });
 });
