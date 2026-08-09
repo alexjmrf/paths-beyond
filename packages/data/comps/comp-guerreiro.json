@@ -4,13 +4,15 @@
   "units": [
     {
       "hero": {
-        "id": "heroi-guerreiro",
+        "id": "heroi-guerreiro-1",
         "classId": "class-guerreiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
-        "talents": {},
+        "talents": {
+          "talent-guerreiro-foco-em-equipe": 1
+        },
         "equipment": {
           "weapon": "item-arma-guerreiro",
           "helmet": null,
@@ -35,6 +37,86 @@
       },
       "pos": {
         "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-guerreiro-2",
+        "classId": "class-guerreiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-guerreiro-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-guerreiro-3",
+        "classId": "class-guerreiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-guerreiro-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
         "y": 0
       },
       "height": 0,

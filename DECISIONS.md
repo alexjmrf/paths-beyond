@@ -970,3 +970,102 @@ test:browser` (42 testes, 3 engines, `GOLDEN_HASH` intacto). Pendente do restant
 roadmap de M10: cura de assistência/skill (fórmula nova, checkpoint pendente com
 usuário — corte diferente deste, não resolvido aqui), reaction triggers além de
 `onAttacked`, efeitos `special` de set, harness multi-unidade de `tools/balance`.
+
+### M10 — sub-sessão 4/N: harness multi-unidade com assistência real
+
+Sessão de `/milestone`. Fecha o **critério de aceite 3 de M10** ("`pnpm balance` roda
+com comps de múltiplas unidades e os dois critérios de M8 continuam batendo com o
+motor novo"). Segue a ordem do próprio roadmap, que chama o harness multi-unidade de
+pré-requisito ("sem isso as mudanças desta milestone não são mensuráveis") — os itens
+restantes de M10 nascem medíveis.
+
+- **Achado que mudou a forma do trabalho, antes de codar:** `tools/balance` **já
+  suportava multi-unidade estruturalmente** — `toPlacements` (`runTournament.ts`) mapeia
+  `comp.units` sem assumir aridade, e `simulate`/`resolveAiTurns` já rodam times
+  multi-unidade desde M7 (é o que o fuzz de 1000 partidas faz). Os bloqueios eram de
+  CONTEÚDO: (1) nenhuma skill do catálogo tinha `trigger: 'onAllyEngagedNearby'`, então
+  `resolveAssists` devolvia `[]` sempre e o dano de assistência da sub-sessão 2 nunca
+  disparava em conteúdo real; (2) os 9 comps tinham 1 unidade cada. Nenhuma linha de
+  `tools/balance` precisou mudar nesta fatia.
+- **`skill-assistir` é concedida por talento, não universal (decisão do usuário).**
+  §6.4 fecha a lista de reações universais em duas (Contra-atacar, Defender) e diz
+  literalmente que "classes e talentos adicionam outras". A skill entra no nó
+  `talent-<slug>-foco-em-equipe` (row 7), que já dava `assistRangeBonus +1` e é
+  exclusivo com `foco-solo` — a escolha da row 7 vira literalmente "jogo em time vs.
+  jogo sozinho", sem nó novo nem mudança na estrutura da árvore de §8.2.
+- **`SkillDef.baseline` (campo novo, decisão do usuário) reverte a derivação de M9.**
+  M9 decidiu "toda skill `kind:'reaction'` do catálogo é baseline" — o que só estava
+  certo por acidente: as duas únicas reações existentes eram justamente as duas que
+  §6.4 chama de universais. Com `skill-assistir` no catálogo, a regra antiga daria
+  assistência de graça a toda unidade, contradizendo a decisão acima. `baseline`
+  default `false` (a lista fechada de §6.4 tem 2 itens; tudo o mais vem de talento);
+  `deriveBaselineReactionSkillIds` passa a filtrar por `kind === 'reaction' &&
+  baseline === true`. As duas reações universais passaram a ser geradas por
+  `authorContent.ts` (antes escritas à mão desde M8) pra o campo viver num lugar só.
+  **`RULES_VERSION` subiu** (`0.4.0`→`0.5.0`): o `reactionScript` resolvido por
+  `combatProfile.ts` muda de verdade.
+- **Comps: 3 unidades da MESMA classe (decisão do usuário: substituem os de 1
+  unidade).** Mesma classe, e não um time misto, pra o comp continuar significando "um
+  time desta classe" — que é o que a matriz de winrate mede desde M8. Um time misto
+  introduziria, junto com a multi-unidade, um segundo eixo de variação (qual aliado cada
+  classe ganha) que tornaria impossível atribuir uma mudança de winrate à classe.
+  Posições em L dentro de raio 2 (Manhattan), porque §6.5.2 exige o aliado dentro do
+  `assistRange` (melee = 2) pra a janela de assistência abrir.
+- **`skill-assistir.multiplier = 1000`, leitura literal de §6.5.3.** "Executa uma ação
+  reduzida: 50% do dano da skill" — os 50% são aplicados pelo motor
+  (`ASSIST_DAMAGE_MULTIPLIER`, sub-sessão 2), então o multiplicador aqui é o da skill
+  cheia (o mesmo do ataque básico), e uma assistência entrega exatamente metade de um
+  ataque normal, sem número novo escondido no meio.
+
+**Rebalanceamento forçado pelo resultado (regra 10 do CLAUDE.md — relatório rodado
+antes de mexer em número).** A primeira rodada real com comps multi-unidade **quebrou o
+critério de aceite 1 de M8**: Espadachim 68,7% e Guerreiro 68,4%, ambos acima do teto de
+65%. Antes de tocar em qualquer número, isolei a causa com um diagnóstico descartável
+(mesmo padrão de M8 sub-sessões 4/7): zerando o multiplicador de `skill-assistir`, o
+spread volta a 22,3–63,9% e nada passa de 65% — ou seja, o desequilíbrio vem do dano de
+assistência, não do formato multi-unidade em si. Baixar só o multiplicador não resolveu
+(1000→500 moveu Espadachim de 68,7% pra 67,2%: o efeito é de limiar, não linear — com
+3 unidades por lado, quem mata primeiro fica em superioridade numérica e a vantagem
+composta), então a correção foi na causa estrutural real: **as 6 classes `physical`
+equipam `set-forca` (+10% atk) e as 3 `magic` equipam `set-guardiao`, que dava +15%
+`def` — e `def` é praticamente inerte nos valores reais do roster** (a mitigação de §6.6
+é calibrada pra def~1000; heróis nível 10 têm def~30-56 — descompasso já documentado
+desde M8 sub-sessão 2). Enquanto o torneio era 1v1 isso só encolhia o roster efetivo;
+com assistência viva, que escala com `atk`, o lado físico passou a levar dois comps
+acima do teto. `set-guardiao` trocou o eixo pra `hp`, magnitude calibrada
+empiricamente: +15% hp inverteu o desequilíbrio (Druida a 70,5%), **+8% deixa o roster
+inteiro abaixo de 65%**.
+
+**Os dois critérios de aceite raiz de M8 confirmados batendo com o motor novo**
+(`pnpm balance -- --runs 10000`): winrate global entre 26,2% (Couraçado) e **63,5%**
+(Espadachim) — nenhuma composição acima de 65%; **22,4%** das unidades vencedoras com
+`spd` acima da mediana (limiar 60%). Observações sem ação, consistentes com a decisão
+de M8 sub-sessão 7/8 (piso de 40% e hard counters são diagnóstico, **não** gate de
+aceite): Arqueiro (36,2%) e Couraçado (26,2%) abaixo do piso — Arqueiro caiu de 58,6%
+(matriz 1v1 de M8) porque tem `pp: 1`, e com assistência viva o PP passou a ser
+disputado entre assistir e contra-atacar; é consequência mecânica genuína do formato
+novo, não bug. Hard counters caíram de 29 pares (M8) pra 17 — o formato multi-unidade
+de fato reduziu os confrontos decididos antes da primeira jogada, que era o benefício
+esperado.
+
+**Correção de infraestrutura de teste, não de regra:** `apps/server/tests/fuzz.test.ts`
+(1000 partidas) começou a estourar o timeout default de 5s do Vitest sob a suíte
+inteira em paralelo — isolado roda em ~1,9s, mas já vinha batendo em ~4,6s sob
+contenção, e o teste novo desta fatia (que carrega o catálogo real do disco) tipou a
+balança. Timeout explícito de 30s; nada do que o teste verifica mudou.
+
+Testes novos: 2 em `buildCatalog.test.ts` (baseline explícito; reação não-baseline fica
+fora de `baselineReactionSkillIds` mas continua no catálogo), 7 em
+`authorContent.test.ts` (skill-assistir válida/não-baseline, as 2 universais marcadas,
+comps com >1 unidade, heroId único por unidade, 1 herói = 1 tile, talento alocado em
+toda unidade, o talento de fato concede a skill, todo par de unidades dentro de 2
+tiles) e 7 em `tools/balance/tests/multiUnitAssist.test.ts` (novo — conteúdo real
+dispara assistência de verdade, dano > 0 a HP, teto de 2 por lado, 1 PP do assistente,
+assistir não consome o turno do assistente, toda unidade conhece a skill via talento,
+determinismo). `pnpm test` (**637 testes, 60 arquivos** — +16 sobre a sub-sessão 3),
+`pnpm typecheck` (7 pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data`
+(17 schemas, **68 arquivos** — +1, `skill-assistir`), `pnpm test:browser` (42 testes, 3
+engines, `GOLDEN_HASH` intacto — o replay canônico usa fixture própria, não conteúdo
+real). Pendente do restante do roadmap de M10: reaction triggers além de `onAttacked`
+(`onDamaged`, `onLethal`), efeitos `special` de set (§7.4), cura de assistência/skill
+(fórmula nova, checkpoint pendente com o usuário).

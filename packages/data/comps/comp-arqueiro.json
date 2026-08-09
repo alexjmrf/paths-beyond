@@ -4,13 +4,15 @@
   "units": [
     {
       "hero": {
-        "id": "heroi-arqueiro",
+        "id": "heroi-arqueiro-1",
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
-        "talents": {},
+        "talents": {
+          "talent-arqueiro-foco-em-equipe": 1
+        },
         "equipment": {
           "weapon": "item-arma-arqueiro",
           "helmet": null,
@@ -35,6 +37,86 @@
       },
       "pos": {
         "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-arqueiro-2",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-arqueiro-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-arqueiro-3",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-arqueiro-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
         "y": 0
       },
       "height": 0,

@@ -16,6 +16,13 @@ const skillSchema = z.object({
   duelRange: z.number().int().positive().optional(),
   effects: z.array(effectApplicationSchema).default([]),
   trigger: reactionTriggerSchema.optional(),
+  // §6.4 (M10 sub-sessão 4/N) — "Reações padrão que toda unidade tem: Contra-atacar,
+  // Defender. Classes e talentos adicionam outras: Cobrir aliado, Esquiva, Escudo
+  // reativo, Cura de emergência." Só faz sentido em `kind:'reaction'`. M9 derivava
+  // "universal" do próprio `kind`, o que só funcionava enquanto as duas únicas reações do
+  // catálogo eram justamente as duas universais; default `false` porque a lista fechada de
+  // §6.4 tem 2 itens e tudo o mais vem de talento (ver DECISIONS.md).
+  baseline: z.boolean().default(false),
   tags: z.array(z.string().min(1)).default([]),
 });
 

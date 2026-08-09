@@ -228,7 +228,12 @@ describe('fuzz: servidor vs. core local em 1000 partidas (critério de aceite ra
 
       expect(JSON.stringify(localResult)).toBe(JSON.stringify(serverBody.result));
     }
-  });
+    // Timeout explícito: isolado este teste roda em ~2s, mas ele simula 1000 batalhas
+    // completas e a suíte inteira roda em paralelo — sob contenção já vinha batendo em
+    // ~4,6s contra o default de 5s do Vitest, e estourou de vez quando M10 sub-sessão 4/N
+    // acrescentou um teste que carrega o catálogo real do disco. O limite generoso abaixo
+    // é sobre agendamento, não sobre o que o teste verifica.
+  }, 30_000);
 });
 
 describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério de aceite raiz de M7)', () => {

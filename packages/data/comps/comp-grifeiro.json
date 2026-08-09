@@ -4,13 +4,15 @@
   "units": [
     {
       "hero": {
-        "id": "heroi-grifeiro",
+        "id": "heroi-grifeiro-1",
         "classId": "class-grifeiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
-        "talents": {},
+        "talents": {
+          "talent-grifeiro-foco-em-equipe": 1
+        },
         "equipment": {
           "weapon": "item-arma-grifeiro",
           "helmet": null,
@@ -35,6 +37,86 @@
       },
       "pos": {
         "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-grifeiro-2",
+        "classId": "class-grifeiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-grifeiro-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-grifeiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-grifeiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-grifeiro-3",
+        "classId": "class-grifeiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-grifeiro-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-grifeiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-grifeiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
         "y": 0
       },
       "height": 0,

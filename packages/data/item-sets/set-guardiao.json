@@ -5,8 +5,8 @@
     {
       "t": "stat",
       "pieces": 2,
-      "stat": "def",
-      "pct": 150
+      "stat": "hp",
+      "pct": 80
     }
   ]
 }

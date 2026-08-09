@@ -76,7 +76,7 @@ describe('buildCatalog()', () => {
     }
   });
 
-  it('deriva baselineReactionSkillIds a partir de skills kind:"reaction" do catálogo', () => {
+  it('deriva baselineReactionSkillIds a partir de skills kind:"reaction" MARCADAS baseline', () => {
     const input = baseInput();
     const contraAtacar = {
       id: 'skill-contra-atacar',
@@ -89,6 +89,7 @@ describe('buildCatalog()', () => {
       flat: 0,
       scalesWith: 'atk',
       trigger: 'onAttacked',
+      baseline: true,
       tags: [],
     };
     const defender = {
@@ -102,6 +103,7 @@ describe('buildCatalog()', () => {
       flat: 0,
       scalesWith: 'atk',
       trigger: 'onAttacked',
+      baseline: true,
       tags: [],
     };
     const catalog = buildCatalog({ ...input, skills: [...input.skills, contraAtacar, defender] });
@@ -109,6 +111,31 @@ describe('buildCatalog()', () => {
     expect(catalog.baselineReactionSkillIds).toEqual(['skill-contra-atacar', 'skill-defender']);
     // O ataque básico (kind:'duel') do fixture não entra — só reação é baseline.
     expect(catalog.baselineReactionSkillIds).not.toContain('skill-golpe-basico');
+  });
+
+  // §6.4 (M10 sub-sessão 4/N) — "classes e talentos adicionam outras: Cobrir aliado,
+  // Esquiva, Escudo reativo, Cura de emergência". Ser `kind:'reaction'` NÃO basta pra ser
+  // universal; a M9 derivava só do `kind` porque as duas únicas reações do catálogo eram
+  // justamente as duas que §6.4 chama de universais. Ver DECISIONS.md.
+  it('uma reação NÃO marcada baseline fica de fora — é concedida por talento, não universal', () => {
+    const input = baseInput();
+    const assistir = {
+      id: 'skill-assistir',
+      name: 'Assistir',
+      kind: 'reaction',
+      apCost: 0,
+      ppCost: 1,
+      cooldown: 0,
+      multiplier: 1000,
+      flat: 0,
+      scalesWith: 'atk',
+      trigger: 'onAllyEngagedNearby',
+      tags: [],
+    };
+    const catalog = buildCatalog({ ...input, skills: [...input.skills, assistir] });
+
+    expect(catalog.skills['skill-assistir']).toBeDefined(); // está no catálogo…
+    expect(catalog.baselineReactionSkillIds).not.toContain('skill-assistir'); // …mas não é universal
   });
 
   it('rejeita conteúdo inválido — schema.parse real acontece dentro de buildCatalog', () => {

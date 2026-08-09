@@ -9,5 +9,6 @@
   "flat": 0,
   "scalesWith": "atk",
   "trigger": "onAttacked",
+  "baseline": true,
   "tags": []
 }

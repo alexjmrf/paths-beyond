@@ -35,4 +35,11 @@
 // efeito com campo periódico, e nenhum conteúdo real de `packages/data` declara esses
 // campos ainda (só `test-fixtures/`). `pnpm balance` também byte-a-byte idêntico pelo
 // mesmo motivo.
-export const RULES_VERSION = '0.4.0';
+// M10, sub-sessão 4/N: quais reações uma unidade tem deixou de ser derivado do `kind` da
+// skill e passou a ser explícito no dado (`SkillDef.baseline`). §6.4 fecha a lista de
+// reações universais em duas (Contra-atacar, Defender) e diz que o resto vem de classe ou
+// talento; a derivação de M9 ("toda skill kind:'reaction' é baseline") só estava certa
+// enquanto essas duas eram as únicas reações do catálogo. Com `skill-assistir` no
+// catálogo, a regra antiga daria assistência de graça a toda unidade. Mudança de regra
+// real e observável: o `reactionScript` resolvido por `combatProfile.ts` muda.
+export const RULES_VERSION = '0.5.0';

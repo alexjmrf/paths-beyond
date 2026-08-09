@@ -578,6 +578,10 @@
       ],
       "effects": [
         {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        },
+        {
           "t": "assistRangeBonus",
           "n": 1
         },

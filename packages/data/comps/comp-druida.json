@@ -4,13 +4,15 @@
   "units": [
     {
       "hero": {
-        "id": "heroi-druida",
+        "id": "heroi-druida-1",
         "classId": "class-druida",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
-        "talents": {},
+        "talents": {
+          "talent-druida-foco-em-equipe": 1
+        },
         "equipment": {
           "weapon": "item-arma-druida",
           "helmet": null,
@@ -35,6 +37,86 @@
       },
       "pos": {
         "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-druida-2",
+        "classId": "class-druida",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-druida-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-druida",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "nature",
+        "duelSkills": [
+          "skill-ataque-druida",
+          "skill-especial-druida"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-druida",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-druida-3",
+        "classId": "class-druida",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-druida-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-druida",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "nature",
+        "duelSkills": [
+          "skill-ataque-druida",
+          "skill-especial-druida"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-druida",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
         "y": 0
       },
       "height": 0,

@@ -98,6 +98,63 @@ export function generateSignatureSkill(profile: ClassProfile) {
   };
 }
 
+// §6.4 — "Reações padrão que TODA unidade tem: Contra-atacar (1 PP), Defender (1 PP,
+// -40% de dano na troca)." Estas duas, e só estas, são `baseline: true`. Estavam em
+// `packages/data/skills/` desde M8 sub-sessão 2 escritas à mão; passam pelo gerador a
+// partir de M10 sub-sessão 4/N pra o campo `baseline` ficar num lugar só.
+// A convenção `multiplier: 0 && flat: 0` = Defender é lida por `resolveDuel` (M2).
+export const BASELINE_REACTIONS = [
+  {
+    id: 'skill-contra-atacar',
+    name: 'Contra-atacar',
+    kind: 'reaction' as const,
+    apCost: 0,
+    ppCost: 1,
+    cooldown: 0,
+    multiplier: 800,
+    flat: 0,
+    scalesWith: 'atk' as const,
+    trigger: 'onAttacked' as const,
+    baseline: true,
+    tags: [],
+  },
+  {
+    id: 'skill-defender',
+    name: 'Defender',
+    kind: 'reaction' as const,
+    apCost: 0,
+    ppCost: 1,
+    cooldown: 0,
+    multiplier: 0,
+    flat: 0,
+    scalesWith: 'atk' as const,
+    trigger: 'onAttacked' as const,
+    baseline: true,
+    tags: [],
+  },
+];
+
+// §6.5 — a assistência que "substitui o esquadrão": um aliado dentro do assistRange
+// gasta 1 PP e executa "uma ação reduzida: 50% do dano da skill". Os 50% são aplicados
+// pelo motor (`ASSIST_DAMAGE_MULTIPLIER`, M10 sub-sessão 2), então o `multiplier` aqui é
+// o da skill cheia — 1000 (mesmo do ataque básico), de forma que uma assistência entregue
+// exatamente metade de um ataque normal, sem número novo escondido no meio.
+// NÃO é baseline: §6.4 lista só Contra-atacar/Defender como universais, e assistir é
+// justamente a recompensa por investir em posicionamento (talento de row 7, abaixo).
+export const SKILL_ASSISTIR = {
+  id: 'skill-assistir',
+  name: 'Assistir',
+  kind: 'reaction' as const,
+  apCost: 0,
+  ppCost: 1,
+  cooldown: 0,
+  multiplier: 1000,
+  flat: 0,
+  scalesWith: 'atk' as const,
+  trigger: 'onAllyEngagedNearby' as const,
+  tags: [],
+};
+
 // §8.2 — regras de design da árvore aplicadas por um template comum a todas as 7
 // classes desta fatia (só varia id/nome/números por perfil):
 //   - 8 linhas, 11 nós no total.
@@ -197,6 +254,11 @@ export function generateTalentTree(profile: ClassProfile, tree: 'class' | 'spec'
       maxRank: 1 as const,
       exclusiveWith: [`talent-${s}-foco-solo`],
       effects: [
+        // §6.5 — assistir é a recompensa por investir em posicionamento, não algo que
+        // toda unidade tem de graça (§6.4 fecha a lista de universais em 2). Fica no
+        // MESMO nó que já dava +1 de assistRange, e continua exclusivo com `foco-solo`:
+        // a escolha da row 7 é literalmente "jogo em time vs. jogo sozinho".
+        { t: 'grantReaction' as const, reactionId: SKILL_ASSISTIR.id },
         { t: 'assistRangeBonus' as const, n: 1 },
         { t: 'extraTacticsCondition' as const },
       ],
@@ -324,7 +386,17 @@ export const ITEM_SETS = [
   {
     id: SET_GUARDIAO_ID,
     name: 'Guardião',
-    effects: [{ t: 'stat' as const, pieces: 2 as const, stat: 'def' as const, pct: 150 }],
+    // M10, sub-sessão 4/N — era `def +15%`; virou `hp +8%` ao rodar `pnpm balance` com os
+    // comps multi-unidade. Motivo (medido, não suposto): as 6 classes `physical` equipam
+    // set-forca (+10% atk) e as 3 `magic` equipam este set, e `def` é praticamente inerte
+    // nos valores reais do roster — a mitigação de §6.6 é calibrada pra def~1000 e heróis
+    // nível 10 têm def~30-56 (descompasso já documentado desde M8 sub-sessão 2). Enquanto
+    // o torneio era 1v1 isso só encolhia o roster efetivo; com assistência viva (que escala
+    // com `atk`) o lado físico passou a levar dois comps acima de 65%, quebrando o critério
+    // de aceite de M8. Trocar o eixo pra `hp` dá ao lado mágico um contrapeso que de fato
+    // conta na guerra de atrito. Magnitude calibrada empiricamente: +15% hp inverteu o
+    // desequilíbrio (Druida a 70,5%); +8% deixa o roster inteiro abaixo de 65%.
+    effects: [{ t: 'stat' as const, pieces: 2 as const, stat: 'hp' as const, pct: 80 }],
   },
 ];
 
@@ -332,38 +404,54 @@ function necklaceIdFor(profile: ClassProfile): string {
   return profile.tag === 'physical' ? NECKLACE_FORCA.id : NECKLACE_GUARDIAO.id;
 }
 
+// M10, sub-sessão 4/N — comps deixam de ser 1 unidade. Critério de aceite 3 de M10:
+// "`pnpm balance` roda com comps de múltiplas unidades". Três unidades DA MESMA CLASSE
+// por comp, em vez de um time misto: mantém o comp comparável a si mesmo (um comp continua
+// significando "um time desta classe", que é o que a matriz de winrate mede desde M8) e
+// evita introduzir, junto com a multi-unidade, um segundo eixo de variação — qual aliado
+// cada classe ganha — que tornaria impossível atribuir uma mudança de winrate à classe.
+// Posições em L dentro de um raio de 2 (Manhattan): §6.5.2 exige o aliado dentro do
+// `assistRange` (melee = 2) em relação ao duelo pra a janela de assistência abrir.
+const COMP_UNIT_POSITIONS = [
+  { x: 0, y: 0 },
+  { x: 0, y: 1 },
+  { x: 1, y: 0 },
+] as const;
+
 export function generateComp(profile: ClassProfile) {
   return {
     id: `comp-${profile.slug}`,
     name: profile.name,
-    units: [
-      {
-        hero: {
-          id: `heroi-${profile.slug}`,
-          classId: `class-${profile.slug}`,
-          level: 10,
-          exp: 0,
-          awakening: 0,
-          imprint: 0,
-          talents: {},
-          equipment: {
-            weapon: weaponItemId(profile),
-            helmet: null,
-            armor: null,
-            necklace: necklaceIdFor(profile),
-            ring: null,
-            boots: null,
-          },
-          weaponType: profile.weaponType,
-          duelSkills: [basicSkillId(profile), signatureSkillId(profile)],
-          mapSkills: [],
-          tacticsScript: [{ enabled: true, skillId: signatureSkillId(profile), conditions: [] }],
+    units: COMP_UNIT_POSITIONS.map((pos, index) => ({
+      hero: {
+        id: `heroi-${profile.slug}-${index + 1}`,
+        classId: `class-${profile.slug}`,
+        level: 10,
+        exp: 0,
+        awakening: 0,
+        imprint: 0,
+        // §6.5 — sem este talento nenhuma unidade tem `skill-assistir` (não é baseline por
+        // §6.4), e a janela de assistência nunca abriria: o comp seria multi-unidade no
+        // papel e continuaria medindo duelos isolados, que é exatamente o que a auditoria
+        // de 2026-08-07 apontou como o buraco da matriz de M8.
+        talents: { [`talent-${profile.slug}-foco-em-equipe`]: 1 },
+        equipment: {
+          weapon: weaponItemId(profile),
+          helmet: null,
+          armor: null,
+          necklace: necklaceIdFor(profile),
+          ring: null,
+          boots: null,
         },
-        pos: { x: 0, y: 0 },
-        height: 0,
-        aiArchetype: 'aggressive',
+        weaponType: profile.weaponType,
+        duelSkills: [basicSkillId(profile), signatureSkillId(profile)],
+        mapSkills: [],
+        tacticsScript: [{ enabled: true, skillId: signatureSkillId(profile), conditions: [] }],
       },
-    ],
+      pos: { x: pos.x, y: pos.y },
+      height: 0,
+      aiArchetype: 'aggressive',
+    })),
   };
 }
 
@@ -532,6 +620,13 @@ function main(): void {
     writeJson(compsDir, comp.id, comp);
   }
 
+  // §6.4/§6.5 (M10 sub-sessão 4/N) — as 3 reações do catálogo passam pelo gerador, pra o
+  // campo `baseline` (quem é universal e quem vem de talento) viver num lugar só.
+  for (const reaction of [...BASELINE_REACTIONS, SKILL_ASSISTIR]) {
+    skillSchema.parse(reaction);
+    writeJson(skillsDir, reaction.id, reaction);
+  }
+
   for (const shared of SHARED_ITEMS) {
     itemSchema.parse(shared);
     writeJson(itemsDir, shared.id, shared);
@@ -557,7 +652,7 @@ function main(): void {
   writeJson(skillsDir, promotedSignature.id, promotedSignature);
 
   console.log(
-    `Gerado: ${CLASS_PROFILES.length + 1} classes (${CLASS_PROFILES.length} base + 1 promovida), ${CLASS_PROFILES.length * 2 + 2} skills, ${CLASS_PROFILES.length} comps, ${CLASS_PROFILES.length + SHARED_ITEMS.length} itens, ${ITEM_SETS.length} sets.`,
+    `Gerado: ${CLASS_PROFILES.length + 1} classes (${CLASS_PROFILES.length} base + 1 promovida), ${CLASS_PROFILES.length * 2 + 2 + BASELINE_REACTIONS.length + 1} skills, ${CLASS_PROFILES.length} comps de ${COMP_UNIT_POSITIONS.length} unidades, ${CLASS_PROFILES.length + SHARED_ITEMS.length} itens, ${ITEM_SETS.length} sets.`,
   );
 }
 

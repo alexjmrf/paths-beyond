@@ -5,9 +5,11 @@ import itemSchema from '../schemas/items.schema.js';
 import itemSetSchema from '../schemas/item-sets.schema.js';
 import skillSchema from '../schemas/skills.schema.js';
 import {
+  BASELINE_REACTIONS,
   CLASS_PROFILES,
   ITEM_SETS,
   SHARED_ITEMS,
+  SKILL_ASSISTIR,
   generateBasicSkill,
   generateClass,
   generateComp,
@@ -138,6 +140,81 @@ describe('itens e sets (M8, sub-sessão 3/N)', () => {
   it('classes physical e magic equipam sets diferentes', () => {
     const setIds = new Set(CLASS_PROFILES.map((p) => generateWeaponItem(p).setId));
     expect(setIds).toEqual(new Set(['set-forca', 'set-guardiao']));
+  });
+});
+
+// M10, sub-sessão 4/N — o critério de aceite 3 de M10 exige `pnpm balance` rodando com
+// comps MULTI-UNIDADE e assistência real. Antes desta fatia todo comp tinha 1 unidade, e
+// nenhuma skill do catálogo tinha trigger `onAllyEngagedNearby` — `resolveAssists` (M2)
+// devolvia `[]` sempre, então o dano de assistência da sub-sessão 2 nunca disparava em
+// conteúdo real.
+describe('comps multi-unidade com assistência real (M10, sub-sessão 4/N)', () => {
+  it('skill-assistir é uma reação onAllyEngagedNearby de 1 PP, e NÃO é baseline', () => {
+    expect(() => skillSchema.parse(SKILL_ASSISTIR)).not.toThrow();
+    expect(SKILL_ASSISTIR.kind).toBe('reaction');
+    expect(SKILL_ASSISTIR.trigger).toBe('onAllyEngagedNearby');
+    expect(SKILL_ASSISTIR.ppCost).toBe(1); // §6.5.3 — "assistir gasta 1 PP do assistente"
+    expect(skillSchema.parse(SKILL_ASSISTIR).baseline).toBe(false);
+  });
+
+  it('as duas reações universais de §6.4 continuam marcadas baseline', () => {
+    for (const reaction of BASELINE_REACTIONS) {
+      expect(skillSchema.parse(reaction).baseline).toBe(true);
+    }
+    expect(BASELINE_REACTIONS.map((r) => r.id).sort()).toEqual(['skill-contra-atacar', 'skill-defender']);
+  });
+
+  it('todo comp gerado tem mais de uma unidade', () => {
+    for (const profile of CLASS_PROFILES) {
+      expect(generateComp(profile).units.length).toBeGreaterThan(1);
+    }
+  });
+
+  it('cada unidade do comp tem um heroId único (unitId vem daí em runTournament)', () => {
+    for (const profile of CLASS_PROFILES) {
+      const ids = generateComp(profile).units.map((u) => u.hero.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it('cada unidade ocupa um tile próprio — 1 herói = 1 tile', () => {
+    for (const profile of CLASS_PROFILES) {
+      const coords = generateComp(profile).units.map((u) => `${u.pos.x},${u.pos.y}`);
+      expect(new Set(coords).size).toBe(coords.length);
+    }
+  });
+
+  it('toda unidade aloca o talento que concede skill-assistir — sem isso nenhuma assistiria', () => {
+    for (const profile of CLASS_PROFILES) {
+      const talentId = `talent-${profile.slug}-foco-em-equipe`;
+      for (const unit of generateComp(profile).units) {
+        expect(unit.hero.talents[talentId]).toBe(1);
+      }
+    }
+  });
+
+  it('o talento alocado de fato concede skill-assistir na árvore da classe', () => {
+    for (const profile of CLASS_PROFILES) {
+      const node = generateTalentTree(profile).find((n) => n.id === `talent-${profile.slug}-foco-em-equipe`);
+      expect(node).toBeDefined();
+      expect(node!.effects).toContainEqual({ t: 'grantReaction', reactionId: SKILL_ASSISTIR.id });
+    }
+  });
+
+  // §6.5.2 — o aliado precisa estar "dentro do assistRange da sua arma em relação ao
+  // duelo". assistRange de melee é 2 (MELEE_ASSIST_RANGE, M7); manter todos os aliados
+  // dentro de 2 de distância Manhattan entre si garante que a janela de assistência
+  // possa abrir independente de qual unidade do comp for engajada.
+  it('todo par de unidades do comp fica a no máximo 2 tiles de distância Manhattan', () => {
+    for (const profile of CLASS_PROFILES) {
+      const units = generateComp(profile).units;
+      for (const a of units) {
+        for (const b of units) {
+          const distance = Math.abs(a.pos.x - b.pos.x) + Math.abs(a.pos.y - b.pos.y);
+          expect(distance).toBeLessThanOrEqual(2);
+        }
+      }
+    }
   });
 });
 

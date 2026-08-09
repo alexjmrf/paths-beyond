@@ -48,9 +48,14 @@ function indexById<T extends { id: Id }>(list: readonly T[]): Record<Id, T> {
 
 // Toda skill `kind:'reaction'` do catálogo é baseline (decisão desta sub-sessão,
 // registrada em DECISIONS.md — ver comentário em `types.ts`).
+// §6.4 — "Reações padrão que toda unidade tem: Contra-atacar, Defender. Classes e
+// talentos adicionam outras." Até M10 sub-sessão 3 bastava ser `kind:'reaction'`, o que
+// só estava certo por acidente: as duas únicas reações do catálogo eram exatamente as
+// duas que §6.4 chama de universais. Com `skill-assistir` (concedida por talento, M10
+// sub-sessão 4/N) a distinção passou a ser explícita no dado — ver DECISIONS.md.
 function deriveBaselineReactionSkillIds(skills: readonly SkillDef[]): readonly Id[] {
   return skills
-    .filter((skill) => skill.kind === 'reaction')
+    .filter((skill) => skill.kind === 'reaction' && skill.baseline === true)
     .map((skill) => skill.id)
     .sort();
 }

@@ -1,14 +1,13 @@
 {
-  "id": "skill-defender",
-  "name": "Defender",
+  "id": "skill-assistir",
+  "name": "Assistir",
   "kind": "reaction",
   "apCost": 0,
   "ppCost": 1,
   "cooldown": 0,
-  "multiplier": 0,
+  "multiplier": 1000,
   "flat": 0,
   "scalesWith": "atk",
-  "trigger": "onAttacked",
-  "baseline": true,
+  "trigger": "onAllyEngagedNearby",
   "tags": []
 }

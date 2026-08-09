@@ -28,5 +28,10 @@ export interface SkillDef {
   readonly duelRange?: number; // herda da arma se ausente
   readonly effects: readonly EffectApplication[];
   readonly trigger?: ReactionTrigger;
+  // §6.4 (M10) — reação que TODA unidade tem, sem precisar de talento (Contra-atacar,
+  // Defender). Ausente/false = concedida por classe ou talento. O core não deriva nada
+  // daqui — quem monta o reactionScript recebe `baselineReactionSkillIds` já pronto
+  // (combatProfile.ts); o campo existe pra `packages/content` poder derivar essa lista.
+  readonly baseline?: boolean;
   readonly tags: readonly string[];
 }

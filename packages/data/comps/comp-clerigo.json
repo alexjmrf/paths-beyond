@@ -4,13 +4,15 @@
   "units": [
     {
       "hero": {
-        "id": "heroi-clerigo",
+        "id": "heroi-clerigo-1",
         "classId": "class-clerigo",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
-        "talents": {},
+        "talents": {
+          "talent-clerigo-foco-em-equipe": 1
+        },
         "equipment": {
           "weapon": "item-arma-clerigo",
           "helmet": null,
@@ -35,6 +37,86 @@
       },
       "pos": {
         "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-clerigo-2",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-clerigo-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-clerigo-3",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-clerigo-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
         "y": 0
       },
       "height": 0,
