@@ -48,6 +48,7 @@ export function buildBattleUnit(input: BuildBattleUnitInput): BattleUnit {
     tacticsScript: profile.tacticsScript,
     reactionScript: profile.reactionScript,
     knownSkills: profile.knownSkills,
+    setSpecialEffectIds: profile.setSpecialEffectIds,
   };
 }
 

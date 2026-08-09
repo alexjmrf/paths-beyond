@@ -39,6 +39,7 @@ export function buildInitialState(setup: BattleSetup, seed: number): BattleState
     round: 1,
     valor: setup.initialValor,
     distanceMovedThisTurn: {},
+    freeAssistUsedThisRound: [],
     permadeath: setup.permadeath,
     winCondition: setup.winCondition,
     effectDefs: setup.effectDefs,

@@ -1,0 +1,12 @@
+{
+  "id": "set-duelista",
+  "name": "Duelista",
+  "effects": [
+    {
+      "t": "special",
+      "pieces": 4,
+      "effectId": "set-special:duelista-contra-atacar-livre-troca-1",
+      "description": "Contra-atacar custa 0 PP na primeira troca."
+    }
+  ]
+}

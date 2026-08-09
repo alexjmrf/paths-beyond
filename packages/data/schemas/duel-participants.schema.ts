@@ -37,6 +37,12 @@ const duelParticipantSchema = z.object({
   cooldowns: z.record(idSchema, z.number().int().nonnegative()).default({}),
   activeEffects: z.array(activeEffectSchema).default([]),
   positionalMultiplier: z.number().int(), // flanco/cerco/altura/terreno já resolvidos (grid é M3)
+  // §7.4 (M10 sub-sessão 6/N) — efeitos `special` de set que o duelo interpreta
+  // (Duelista, Imunidade), já resolvidos a partir do equipamento. Opcional com default
+  // vazio: o formato é self-contained e não tem equipamento pra derivar. Os ids válidos
+  // são os canônicos de `packages/core/src/items/sets.ts` (`set-special:*`); um id
+  // desconhecido é simplesmente ignorado pelo motor.
+  setSpecialEffectIds: z.array(idSchema).default([]),
 });
 
 export default duelParticipantSchema;

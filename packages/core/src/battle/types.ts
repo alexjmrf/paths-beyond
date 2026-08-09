@@ -47,6 +47,11 @@ export interface BattleUnit {
   readonly tacticsScript: TacticsScript;
   readonly reactionScript: readonly ReactionLine[];
   readonly knownSkills: Readonly<Record<Id, SkillDef>>;
+  // §7.4 (M10 sub-sessão 6/N) — efeitos `special` de set ativos (ids canônicos de
+  // items/sets.ts). Opcional pelo mesmo motivo de `aiArchetype`: unidades montadas sem
+  // passar por resolveHeroCombatProfile (as self-contained de M2-M6, fixtures de teste)
+  // não têm equipamento resolvido. Ausente = nenhum efeito special.
+  readonly setSpecialEffectIds?: readonly Id[];
 }
 
 // §5.7 — "Data-driven por mapa: rout, seize, survive N rounds, escort, defend." Só
@@ -95,6 +100,10 @@ export interface BattleState {
   readonly round: number;
   readonly valor: number;
   readonly distanceMovedThisTurn: Readonly<Record<Id, number>>; // p/ regra do `rest`
+  // §7.4 Sentinela (M10 sub-sessão 6/N) — "Assistir custa 0 PP UMA VEZ POR ROUND DE MAPA":
+  // única regra de set cujo escopo é o round, não o duelo, então precisa de estado que
+  // sobreviva entre duelos. Zerado por endRound, junto de distanceMovedThisTurn.
+  readonly freeAssistUsedThisRound: readonly Id[];
   readonly permadeath: PermadeathMode;
   readonly winCondition: WinCondition;
   readonly effectDefs: Readonly<Record<Id, EffectDef>>;

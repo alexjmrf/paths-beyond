@@ -12,7 +12,8 @@ import {
   sumDamageTakenReductionPct,
   upsertActiveEffect,
 } from './effects.js';
-import { selectReaction } from './reactions.js';
+import { effectivePpCost, selectReaction } from './reactions.js';
+import { SET_SPECIAL_DUELISTA, SET_SPECIAL_IMUNIDADE } from '../items/sets.js';
 import { selectTacticsAction } from '../tactics/selectTacticsAction.js';
 import { combinedTypeDamageMultiplier, weaponTriangleResult } from './triangle.js';
 import { computeEvasionFromSpd } from './evasion.js';
@@ -121,6 +122,11 @@ function economyOf(p: DuelParticipant, apSpentThisDuel: number, ppSpentThisTroca
   return { pools: { ap: p.ap, pp: p.pp }, apSpentThisDuel, ppSpentThisTroca };
 }
 
+// §7.4 — efeitos `special` de set que o duelo interpreta (Duelista, Imunidade).
+function hasSetSpecial(p: DuelParticipant, effectId: Id): boolean {
+  return p.setSpecialEffectIds?.includes(effectId) === true;
+}
+
 function buildConditionView(p: DuelParticipant, effectDefs: Readonly<Record<Id, EffectDef>>): ConditionUnitView {
   const maxHp = p.stats.hp;
   const currentHpPct = maxHp > 0 ? fpDiv(p.currentHp, maxHp) : 0;
@@ -192,6 +198,12 @@ function applyEffectApplications(
   for (const application of applications) {
     const def = effectDefs[application.effectId];
     if (!def) continue;
+
+    // §7.4 Imunidade — "imune a debuffs na troca 1 do duelo". Barrado ANTES da rolagem de
+    // chance: imunidade não é resistência, não há o que rolar. Vale para quem RECEBE o
+    // efeito (não para quem aplica) e só para `kind:'debuff'` — buff passa normalmente.
+    const recipient = application.target === 'self' ? nextActor : nextOpponent;
+    if (trocaNumber === 1 && def.kind === 'debuff' && hasSetSpecial(recipient, SET_SPECIAL_IMUNIDADE)) continue;
 
     const targetStats = application.target === 'self' ? actorStats : opponentStats;
     const chance = computeEffectApplicationChance({
@@ -378,6 +390,11 @@ function resolveExchange(
   );
   // §5.5 (M3) — Flanco trava o PP do defensor só na troca 1.
   const opponentPpLocked = trocaNumber === 1 && ppLockedForTroca1.includes(opponent.id);
+  // §7.4 Duelista — "Contra-atacar custa 0 PP na primeira troca". O core não pode fixar o
+  // id `skill-contra-atacar` (regra 4: conteúdo vive em packages/data), então a gratuidade
+  // vale para a reação `onAttacked` da troca 1 — que, pela lista fechada de §6.4, são
+  // exatamente as duas reações universais. Leitura registrada em DECISIONS.md.
+  const duelistaFreeCounter = trocaNumber === 1 && hasSetSpecial(opponent, SET_SPECIAL_DUELISTA);
   const reactionDecision = opponentPpLocked
     ? ({ kind: 'none' } as const)
     : selectReaction({
@@ -386,6 +403,7 @@ function resolveExchange(
         trigger: 'onAttacked',
         economy: opponentEconomy,
         context: opponentContext,
+        freePp: duelistaFreeCounter,
       });
 
   let extraReduction = 0;
@@ -394,8 +412,9 @@ function resolveExchange(
 
   if (reactionDecision.kind === 'reaction') {
     const reactionSkill = opponent.knownSkills[reactionDecision.skillId];
-    if (reactionSkill && canAffordPp(opponentEconomy, reactionSkill.ppCost ?? 0)) {
-      const spent = spendPp(opponentEconomy, reactionSkill.ppCost ?? 0);
+    const reactionPpCost = reactionSkill ? effectivePpCost(reactionSkill, duelistaFreeCounter) : 0;
+    if (reactionSkill && canAffordPp(opponentEconomy, reactionPpCost)) {
+      const spent = spendPp(opponentEconomy, reactionPpCost);
       opponent = { ...opponent, pp: spent.pools.pp };
       nextPpSpentTroca[opponent.id] = spent.ppSpentThisTroca;
 

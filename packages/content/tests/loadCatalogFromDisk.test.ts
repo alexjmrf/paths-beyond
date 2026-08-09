@@ -10,10 +10,13 @@ import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
 // entrando na conta do torneio) e precisam continuar passando sem mudar de expectativa
 // depois que o loader virou `@paths-beyond/content`.
 describe('loadCatalogFromDisk() — itens/sets reais (regressão de M8 sub-sessão 3/N)', () => {
-  it('carrega os 11 itens reais (9 armas + 2 colares) e os 2 item-sets', () => {
+  it('carrega os 11 itens reais (9 armas + 2 colares) e os 6 item-sets', () => {
     const catalog = loadCatalogFromDisk();
     expect(Object.keys(catalog.items)).toHaveLength(11);
-    expect(Object.keys(catalog.itemSets)).toHaveLength(2);
+    // 2 de stat (força/guardião) + os 4 `special` de §7.4 (M10 sub-sessão 6/N). Os 4
+    // special existem como conteúdo válido mas nenhum item pertence a eles ainda — o
+    // catálogo os carrega mesmo assim, que é o que permite equipá-los sem mexer no loader.
+    expect(Object.keys(catalog.itemSets)).toHaveLength(6);
   });
 
   it('todo comp equipa arma + colar, e os dois ids resolvem contra o catálogo de itens carregado', () => {

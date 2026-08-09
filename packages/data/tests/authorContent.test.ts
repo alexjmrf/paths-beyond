@@ -10,6 +10,7 @@ import {
   ITEM_SETS,
   SHARED_ITEMS,
   SKILL_ASSISTIR,
+  SPECIAL_ITEM_SETS,
   generateBasicSkill,
   generateClass,
   generateComp,
@@ -117,7 +118,7 @@ describe('itens e sets (M8, sub-sessão 3/N)', () => {
     }
   });
 
-  it('os 2 item-sets são válidos', () => {
+  it('todos os item-sets são válidos', () => {
     for (const set of ITEM_SETS) {
       expect(() => itemSetSchema.parse(set)).not.toThrow();
     }
@@ -279,6 +280,53 @@ describe('classe promovida (M8, sub-sessão 4/N)', () => {
       for (const unit of comp.units) {
         expect(unit.hero.classId).not.toBe(promoted.id);
       }
+    }
+  });
+});
+
+describe('sets `special` de §7.4 (M10, sub-sessão 6/N)', () => {
+  const byId = new Map(SPECIAL_ITEM_SETS.map((set) => [set.id, set]));
+
+  it('os 4 sets da tabela de §7.4 que mudam comportamento existem', () => {
+    expect([...byId.keys()].sort()).toEqual(['set-duelista', 'set-imunidade', 'set-reserva', 'set-sentinela']);
+  });
+
+  it('cada um é um ItemSet válido, com um único efeito `special` de 4 peças', () => {
+    for (const set of SPECIAL_ITEM_SETS) {
+      expect(() => itemSetSchema.parse(set)).not.toThrow();
+      expect(set.effects).toHaveLength(1);
+      expect(set.effects[0]!.t).toBe('special');
+      expect(set.effects[0]!.pieces).toBe(4);
+    }
+  });
+
+  // Os effectId NÃO são conteúdo livre: são os ids canônicos que o motor reconhece,
+  // declarados em packages/core/src/items/sets.ts. packages/data não depende de
+  // @paths-beyond/core, então as strings estão espelhadas — este teste é o que impede as
+  // duas cópias de divergirem em silêncio (uma divergência deixaria o set inerte).
+  it('os effectId batem exatamente com os ids canônicos do motor', () => {
+    expect(byId.get('set-duelista')!.effects[0]!.effectId).toBe('set-special:duelista-contra-atacar-livre-troca-1');
+    expect(byId.get('set-reserva')!.effects[0]!.effectId).toBe('set-special:reserva-ap');
+    expect(byId.get('set-sentinela')!.effects[0]!.effectId).toBe('set-special:sentinela-assistencia-livre-por-round');
+    expect(byId.get('set-imunidade')!.effects[0]!.effectId).toBe('set-special:imunidade-debuff-troca-1');
+  });
+
+  it('entram no catálogo geral de item-sets', () => {
+    for (const set of SPECIAL_ITEM_SETS) {
+      expect(ITEM_SETS).toContain(set);
+    }
+  });
+
+  // Corte de escopo consciente desta fatia (ver DECISIONS.md): os sets existem como
+  // conteúdo válido, mas ninguém os equipa — é o que mantém `pnpm balance` numericamente
+  // idêntico à sub-sessão 4. Equipá-los é um ciclo de rebalanceamento próprio.
+  it('nenhum item gerado pertence a um set special, e nenhum comp os equipa', () => {
+    const specialIds = new Set(byId.keys());
+    for (const item of SHARED_ITEMS) {
+      expect(specialIds.has(item.setId)).toBe(false);
+    }
+    for (const profile of CLASS_PROFILES) {
+      expect(specialIds.has(generateWeaponItem(profile).setId)).toBe(false);
     }
   });
 });

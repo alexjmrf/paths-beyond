@@ -63,6 +63,8 @@ export function endRound(state: BattleState): BattleState {
     round: state.round + 1,
     valor: state.valor + 1,
     distanceMovedThisTurn: {},
+    // §7.4 Sentinela — a janela de assistência gratuita é "uma vez por round de mapa".
+    freeAssistUsedThisRound: [],
   };
 }
 

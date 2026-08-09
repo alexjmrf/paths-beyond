@@ -124,7 +124,14 @@ export { generateItem } from './items/generate.js';
 export type { GenerateItemInput } from './items/generate.js';
 export { applyReforge } from './items/reforge.js';
 export type { ApplyReforgeInput, ApplyReforgeResult } from './items/reforge.js';
-export { resolveSetBonuses } from './items/sets.js';
+export {
+  SET_SPECIAL_DUELISTA,
+  SET_SPECIAL_IMUNIDADE,
+  SET_SPECIAL_RESERVA,
+  SET_SPECIAL_SENTINELA,
+  resolveSetBonuses,
+  resolveSetSpecialEffects,
+} from './items/sets.js';
 export { ENHANCE_MILESTONES } from './items/types.js';
 export type {
   EnhanceLevel,

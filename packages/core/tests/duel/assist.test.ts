@@ -117,7 +117,7 @@ describe('resolveAssists — §6.5', () => {
 
   it('um candidato elegível assiste, gastando a reação onAllyEngagedNearby', () => {
     const result = resolveAssists([candidate('ally-1')]);
-    expect(result).toEqual([{ assistantId: 'ally-1', skillId: assistSkill.id }]);
+    expect(result).toEqual([{ assistantId: 'ally-1', skillId: assistSkill.id, freePp: false }]);
   });
 
   it('candidato sem PP não assiste', () => {
@@ -144,7 +144,7 @@ describe('resolveAssists — §6.5', () => {
     });
     const eligible = candidate('ally-2');
     const result = resolveAssists([blocked, eligible]);
-    expect(result).toEqual([{ assistantId: 'ally-2', skillId: assistSkill.id }]);
+    expect(result).toEqual([{ assistantId: 'ally-2', skillId: assistSkill.id, freePp: false }]);
   });
 
   it('ASSIST_DAMAGE_MULTIPLIER é 50% (§6.5.3: dano de assistência é reduzido pela metade)', () => {
@@ -164,7 +164,9 @@ describe('applyAssistDamage — §6.5.3 (M10: dano de assistência aplicado a HP
       effectDefs: noEffectDefs,
     });
     expect(outcome.totalDamage).toBeGreaterThan(0);
-    expect(outcome.results).toEqual([{ assistantId: 'ally-1', skillId: assistSkill.id, damageDealt: outcome.totalDamage }]);
+    expect(outcome.results).toEqual([
+      { assistantId: 'ally-1', skillId: assistSkill.id, freePp: false, damageDealt: outcome.totalDamage },
+    ]);
   });
 
   it('assistência sem componente de dano (heal/buff) contribui 0 dano', () => {
@@ -181,7 +183,9 @@ describe('applyAssistDamage — §6.5.3 (M10: dano de assistência aplicado a HP
       effectDefs: noEffectDefs,
     });
     expect(outcome.totalDamage).toBe(0);
-    expect(outcome.results).toEqual([{ assistantId: 'ally-1', skillId: assistHealSkill.id, damageDealt: 0 }]);
+    expect(outcome.results).toEqual([
+      { assistantId: 'ally-1', skillId: assistHealSkill.id, freePp: false, damageDealt: 0 },
+    ]);
   });
 
   it('soma o dano de até 2 assistentes', () => {
@@ -245,13 +249,15 @@ describe('applyAssistDamage — §6.5.3 (M10: dano de assistência aplicado a HP
     const outcome = applyAssistDamage({
       seed: 42,
       sideLabel: 'attacker-assist',
-      results: [{ assistantId: 'fantasma', skillId: assistSkill.id }],
+      results: [{ assistantId: 'fantasma', skillId: assistSkill.id, freePp: false }],
       candidates: [],
       target: target(),
       effectDefs: noEffectDefs,
     });
     expect(outcome.totalDamage).toBe(0);
-    expect(outcome.results).toEqual([{ assistantId: 'fantasma', skillId: assistSkill.id, damageDealt: 0 }]);
+    expect(outcome.results).toEqual([
+      { assistantId: 'fantasma', skillId: assistSkill.id, freePp: false, damageDealt: 0 },
+    ]);
   });
 
   it('determinístico: mesma seed produz o mesmo dano', () => {

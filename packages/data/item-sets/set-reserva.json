@@ -1,0 +1,12 @@
+{
+  "id": "set-reserva",
+  "name": "Reserva",
+  "effects": [
+    {
+      "t": "special",
+      "pieces": 4,
+      "effectId": "set-special:reserva-ap",
+      "description": "+1 AP máximo e `rest` recupera +2 AP."
+    }
+  ]
+}

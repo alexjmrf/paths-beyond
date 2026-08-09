@@ -36,11 +36,18 @@ export interface AssistCandidate {
   readonly unitType: UnitType;
   readonly weaponType: WeaponType;
   readonly activeEffects: readonly ActiveEffect[];
+  // §7.4 Sentinela (M10 sub-sessão 6/N) — este candidato tem a janela de assistência
+  // gratuita do round disponível. Quem sabe disso é a camada de batalha (o escopo é o
+  // round de mapa, não o duelo), então chega aqui já resolvido.
+  readonly freePp?: boolean;
 }
 
 export interface AssistResult {
   readonly assistantId: Id;
   readonly skillId: Id;
+  // Ecoa de volta se ESTA assistência saiu de graça — a camada de batalha precisa saber
+  // pra não debitar PP e pra marcar a janela do round como consumida.
+  readonly freePp: boolean;
 }
 
 // Candidatos já vêm filtrados por alcance e ordenados por iniciativa (grid é M3) —
@@ -57,10 +64,18 @@ export function resolveAssists(candidates: readonly AssistCandidate[]): readonly
       trigger: 'onAllyEngagedNearby',
       economy: candidate.economy,
       context: candidate.context,
+      freePp: candidate.freePp,
     });
 
     if (decision.kind === 'reaction') {
-      results.push({ assistantId: candidate.id, skillId: decision.skillId });
+      // A janela do round só é consumida se ela de fato pagou alguma coisa: uma
+      // assistência que já custava 0 PP não gasta a gratuidade de Sentinela.
+      const ppCost = candidate.skills[decision.skillId]?.ppCost ?? 0;
+      results.push({
+        assistantId: candidate.id,
+        skillId: decision.skillId,
+        freePp: candidate.freePp === true && ppCost > 0,
+      });
     }
   }
 

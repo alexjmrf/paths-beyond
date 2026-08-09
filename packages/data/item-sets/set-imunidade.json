@@ -1,0 +1,12 @@
+{
+  "id": "set-imunidade",
+  "name": "Imunidade",
+  "effects": [
+    {
+      "t": "special",
+      "pieces": 4,
+      "effectId": "set-special:imunidade-debuff-troca-1",
+      "description": "Imune a debuffs na troca 1 do duelo."
+    }
+  ]
+}

@@ -1145,3 +1145,95 @@ em conteúdo), `pnpm test:browser` (42 testes, 3 engines). Pendente do restante 
 de M10: efeitos `special` de set (§7.4), cura de assistência/skill (fórmula nova,
 checkpoint pendente), `onLethal` como gatilho de morte (encaminhamento acima), e conteúdo
 real usando os gatilhos novos.
+
+### M10 — sub-sessão 6/N: efeitos `special` de set (§7.4)
+
+Item nomeado no roadmap de M10 ("efeitos `special` de set (§7.4)"). Até aqui os quatro
+sets que §7.4 marca em negrito — os que "atacam diretamente a economia de recursos" e são
+"o principal contrapeso a builds de `spd`" — eram **mecanicamente inertes**:
+`resolveSetBonuses` (M4) descartava todo `effect.t !== 'stat'`, e nada levava um efeito
+comportamental de equipamento até o duelo ou a batalha.
+
+- **Encanamento novo, em uma função só.** `resolveSetSpecialEffects` (`items/sets.ts`) é o
+  espelho de `resolveSetBonuses`: mesma contagem de peças, mesmo limiar lido do dado
+  (`effect.pieces`, não fixado em 4), mas devolve `effectId`s em vez de `StatModifier`s. O
+  resultado desce por `HeroCombatProfile.setSpecialEffectIds` → `BattleUnit` →
+  `DuelParticipant`. Nos dois últimos o campo é **opcional**, mesmo precedente de
+  `aiArchetype`: as unidades self-contained de M2–M6, as fixtures de teste e o formato que
+  `sim-cli` lê não têm equipamento resolvido; ausente = nenhum efeito special. Em
+  `HeroCombatProfile` é obrigatório, porque ali sempre há equipamento pra resolver.
+- **Os ids são do MOTOR, não conteúdo livre.** `SET_SPECIAL_DUELISTA` e companhia vivem em
+  `packages/core/src/items/sets.ts` com prefixo `set-special:`, mesma categoria de
+  `BASIC_ATTACK_SKILL` (regra de motor, não número de balanceamento). `packages/data` repete
+  as strings porque não depende de `@paths-beyond/core` — o mesmo espelhamento que `ItemSet`
+  e `EffectDef` já fazem. O que impede as duas cópias de divergirem em silêncio (uma
+  divergência deixaria o set inerte de novo, sem erro nenhum) é um teste explícito em
+  `packages/data/tests/authorContent.test.ts` travando os 4 valores.
+- **Duelista — leitura mais ampla que a letra, de propósito.** §7.4 diz "Contra-atacar custa
+  0 PP na primeira troca", mas o core não pode fixar o id `skill-contra-atacar` (regra 4:
+  conteúdo vive em `packages/data`). Implementado como *a reação `onAttacked` da troca 1
+  custa 0 PP*. Na prática é a mesma coisa: pela lista fechada de §6.4, as reações
+  `onAttacked` universais são exatamente Contra-atacar e Defender.
+- **A gratuidade de Duelista não consome o teto de 1 PP por troca.** O teto de §6.4 é sobre
+  PP *gasto*, e uma reação que custa 0 não gasta nada. O que continua garantindo no máximo
+  uma reação por troca é `reactionLog` (M10 sub-sessão 5/N), não o orçamento de PP — então
+  o comportamento não muda, mas a razão é outra e vale estar escrita.
+- **Imunidade — barra ANTES da rolagem de chance.** Imunidade não é resistência (`efr`), não
+  há o que rolar: o debuff simplesmente não entra. Implementado sobre quem RECEBE o efeito
+  (não sobre quem aplica) e só para `kind: 'debuff'`; buff passa normalmente, inclusive o
+  que o atacante aplica em si mesmo. Consequência que virou teste: com o debuff barrado, o
+  gatilho `onDebuffed` da sub-sessão 5/N **não** dispara — não houve debuff.
+- **Reserva "+1 AP máximo" = +1 AP inicial (decisão do usuário).** Este motor não tem teto de
+  AP em runtime — `rest`/`wait` somam sem clamp, e `startingAp` é só o pool com que a unidade
+  entra na batalha. A alternativa (criar um cap real, com clamp em toda recuperação) seria
+  regra nova afetando o roster inteiro, não só quem usa o set, e exigiria rebalanceamento
+  junto. O bônus é cumulativo com o `maxAp` de talento (§8.2), pelo mesmo caminho.
+- **Reserva "`rest` recupera +2 AP" = 2 no total, não 1+2.** §5.4 dá +1 AP e +1 PP; o set
+  substitui o ganho de AP por 2. O PP não é citado por §7.4 e continua em +1. A
+  pré-condição de movimento de §5.4 não muda — o set mexe no ganho, não no gate. `wait`
+  também não muda, porque §7.4 só cita `rest`.
+- **Sentinela é o único cujo escopo é o ROUND, não o duelo** — daí o campo novo
+  `BattleState.freeAssistUsedThisRound`, zerado por `endRound` junto de
+  `distanceMovedThisTurn`. Um detalhe deliberado: a janela só é marcada como consumida se
+  ela de fato pagou alguma coisa — uma assistência que já custava 0 PP não gasta a
+  gratuidade. `AssistResult` ganhou `freePp` pra a camada de batalha saber o que não debitar
+  (`resolveDuel` decide quem assiste, mas quem mexe no pool do assistente é `applyEngage`).
+- **Um mecanismo só para Duelista e Sentinela:** `SelectReactionInput.freePp` +
+  `effectivePpCost(skill, freePp)`, exportado de `reactions.ts` para que quem *decide* e
+  quem *cobra* usem exatamente o mesmo número. Sem isso, uma reação poderia ser escolhida
+  como gratuita e debitada como paga.
+- **Conteúdo autorado, mas ninguém equipa (decisão do usuário).** Os 4 sets existem como
+  JSON válido em `packages/data/item-sets/` (gerados por `authorContent.ts`), e nenhum item
+  pertence a eles — nenhum comp de balanceamento os equipa. É o que mantém `pnpm balance`
+  numericamente idêntico à sub-sessão 4. Equipá-los é fatia própria: a sub-sessão 4 mostrou
+  que mexer no equipamento dos comps quebra o teto de 65% de M8, e misturar mecânica nova
+  com rebalanceamento tornaria impossível atribuir a causa de qualquer mudança de winrate.
+  Mesma categoria de gap consciente da sub-sessão 5/N, e agora são dois acumulados —
+  candidato natural a uma fatia "conteúdo real usa o que M10 construiu".
+
+**Nenhum número de balanceamento se moveu** (`pnpm balance -- --runs 10000`, rodado como
+verificação e não como calibração): winrate global de 26,2% (Couraçado) a **63,5%**
+(Espadachim), **22,4%** das unidades vencedoras com `spd` acima da mediana, 17 hard
+counters — **byte a byte o mesmo relatório da sub-sessão 4**, o que é o resultado correto:
+nenhuma unidade de conteúdo real tem um efeito `special` ativo. Os dois critérios de aceite
+raiz de M8 continuam batendo. `GOLDEN_HASH` intacto pelo mesmo motivo (`pnpm test:browser`,
+42 testes, 3 engines). `RULES_VERSION` `0.6.0`→`0.7.0` — a mudança de regra é real mesmo sem
+ser observável nestes dois lugares.
+
+Testes novos: 7 em `items/sets.test.ts` (limiar de peças; limiar lido do dado e não fixado
+em 4; `stat` e `special` não vazam um para o outro; set misto resolvendo os dois limiares;
+dois sets simultâneos; set desconhecido), 4 em `hero/combatProfile.test.ts`
+(`setSpecialEffectIds` vindo do equipamento; Reserva no `startingAp`; cumulativo com o
+talento `maxAp`; 3 peças não bastam), 13 em `duel/setSpecial.test.ts` (novo — Duelista com
+PP zerado na troca 1 e não nas trocas 2/3, sem debitar PP, sem mudar nada além do custo
+quando há PP; Imunidade barrando na troca 1 e deixando passar na 2, não bloqueando buff,
+não disparando `onDebuffed`, não interferindo em `onDamaged`; determinismo dos dois) e 12
+em `battle/setSpecial.test.ts` (novo — `rest` com e sem Reserva, gate de movimento
+preservado, `wait` inalterado; Sentinela grátis na primeira assistência do round, cobrada
+na segunda, devolvida no round seguinte, sem debitar PP, marcando só quem usou;
+determinismo). `pnpm test` (**686 testes, 62 arquivos** — +41 sobre a sub-sessão 5),
+`pnpm typecheck` (7 pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data`
+(17 schemas, **72 arquivos** — +4, os sets novos). Pendente do restante do roadmap de M10:
+cura de assistência/skill (fórmula nova, checkpoint pendente com o usuário), `onLethal`
+como gatilho de morte (encaminhamento da sub-sessão 5/N), e conteúdo real usando o que M10
+construiu — os gatilhos novos E os sets `special`, os dois gaps acumulados.

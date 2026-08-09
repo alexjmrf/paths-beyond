@@ -1,0 +1,12 @@
+{
+  "id": "set-sentinela",
+  "name": "Sentinela",
+  "effects": [
+    {
+      "t": "special",
+      "pieces": 4,
+      "effectId": "set-special:sentinela-assistencia-livre-por-round",
+      "description": "Assistir custa 0 PP uma vez por round de mapa."
+    }
+  ]
+}

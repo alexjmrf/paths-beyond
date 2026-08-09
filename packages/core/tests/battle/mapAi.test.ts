@@ -42,6 +42,7 @@ function buildState(units: readonly BattleUnit[]): BattleState {
     round: 1,
     valor: 5,
     distanceMovedThisTurn: {},
+    freeAssistUsedThisRound: [],
     permadeath: 'classic',
     winCondition: { t: 'rout' },
     effectDefs: {},

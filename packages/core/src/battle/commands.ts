@@ -9,6 +9,8 @@ import { canAffordAp, spendAp, type DuelEconomyState } from '../duel/economy.js'
 import { resolveDuel, type DuelResult } from '../duel/resolveDuel.js';
 import { upsertActiveEffect } from '../duel/effects.js';
 import type { AssistCandidate, AssistResult } from '../duel/assist.js';
+import { effectivePpCost } from '../duel/reactions.js';
+import { SET_SPECIAL_RESERVA, SET_SPECIAL_SENTINELA } from '../items/sets.js';
 import type { DuelEngagementContext, DuelParticipant, EffectDef } from '../duel/types.js';
 import { computePositionalModifiers } from './positional.js';
 import type { BattleCommand, BattleState, BattleUnit, Side } from './types.js';
@@ -80,6 +82,12 @@ function applyMove(state: BattleState, cmd: Extract<BattleCommand, { t: 'move' }
 }
 
 // §5.4 — "não pode ter movido mais que metade do alcance. Recupera +1 AP e +1 PP."
+// §7.4 Reserva — "`rest` recupera +2 AP": o set substitui o +1 de §5.4 por 2 no total (não
+// soma 2 em cima do 1). O PP não é citado pelo set e continua em +1. Leitura registrada em
+// DECISIONS.md. A pré-condição de movimento não muda — o set toca no ganho, não no gate.
+const REST_AP_GAIN = 1;
+const REST_AP_GAIN_RESERVA = 2;
+
 function applyRest(state: BattleState, cmd: Extract<BattleCommand, { t: 'rest' }>): CommandOutcome {
   const unit = findUnit(state, cmd.unitId);
   if (!canAct(unit)) return rejected(state, 'unidade inexistente, morta ou já agiu neste round');
@@ -88,7 +96,8 @@ function applyRest(state: BattleState, cmd: Extract<BattleCommand, { t: 'rest' }
   const moved = state.distanceMovedThisTurn[unit.unitId] ?? 0;
   if (moved > halfRange) return rejected(state, 'rest exige não ter andado mais que metade do moveRange');
 
-  return accepted(replaceUnit(state, unit.unitId, { ap: unit.ap + 1, pp: unit.pp + 1, hasActedThisRound: true }));
+  const apGain = unit.setSpecialEffectIds?.includes(SET_SPECIAL_RESERVA) ? REST_AP_GAIN_RESERVA : REST_AP_GAIN;
+  return accepted(replaceUnit(state, unit.unitId, { ap: unit.ap + apGain, pp: unit.pp + 1, hasActedThisRound: true }));
 }
 
 // §5.4 — "Encerra o turno. Se terminar sobre fort ou camp: +1 AP."
@@ -190,6 +199,7 @@ function toDuelParticipant(unit: BattleUnit, positionalMultiplier: number, criti
     cooldowns: unit.cooldowns,
     activeEffects: unit.effects,
     positionalMultiplier,
+    setSpecialEffectIds: unit.setSpecialEffectIds,
   };
 }
 
@@ -214,6 +224,10 @@ function buildAssistCandidates(
     reactionScript: ally.reactionScript,
     skills: ally.knownSkills,
     economy: { pools: { ap: ally.ap, pp: ally.pp }, apSpentThisDuel: 0, ppSpentThisTroca: 0 },
+    // §7.4 Sentinela — janela gratuita ainda não usada NESTE round de mapa.
+    freePp:
+      ally.setSpecialEffectIds?.includes(SET_SPECIAL_SENTINELA) === true &&
+      !state.freeAssistUsedThisRound.includes(ally.unitId),
     context: {
       self: toConditionView(ally, state.effectDefs),
       target: opponentView,
@@ -237,9 +251,23 @@ function spendAssistPp(units: readonly BattleUnit[], results: readonly AssistRes
     const assistant = next.find((u) => u.unitId === result.assistantId);
     const skill = assistant?.knownSkills[result.skillId];
     if (!assistant || !skill) continue;
-    next = next.map((u) => (u.unitId === assistant.unitId ? { ...u, pp: u.pp - (skill.ppCost ?? 0) } : u));
+    // §7.4 Sentinela — a assistência gratuita do round não debita nada.
+    const cost = effectivePpCost(skill, result.freePp);
+    next = next.map((u) => (u.unitId === assistant.unitId ? { ...u, pp: u.pp - cost } : u));
   }
   return next;
+}
+
+// §7.4 Sentinela — quem de fato consumiu a janela gratuita neste duelo. Vai para
+// BattleState.freeAssistUsedThisRound, que endRound zera na virada do round.
+function freeAssistantIds(...groups: readonly (readonly AssistResult[])[]): readonly Id[] {
+  const ids: Id[] = [];
+  for (const group of groups) {
+    for (const result of group) {
+      if (result.freePp && !ids.includes(result.assistantId)) ids.push(result.assistantId);
+    }
+  }
+  return ids;
 }
 
 // §5.4 + §6 — abre um duelo de verdade via resolveDuel (M2), com modificadores
@@ -345,7 +373,11 @@ function applyEngage(state: BattleState, cmd: Extract<BattleCommand, { t: 'engag
   nextUnits = spendAssistPp(nextUnits, duelResult.attackerAssists);
   nextUnits = spendAssistPp(nextUnits, duelResult.defenderAssists);
 
-  return accepted({ ...state, units: nextUnits }, duelResult);
+  const usedFreeAssist = freeAssistantIds(duelResult.attackerAssists, duelResult.defenderAssists);
+  const freeAssistUsedThisRound =
+    usedFreeAssist.length > 0 ? [...state.freeAssistUsedThisRound, ...usedFreeAssist] : state.freeAssistUsedThisRound;
+
+  return accepted({ ...state, units: nextUnits, freeAssistUsedThisRound }, duelResult);
 }
 
 export function applyCommand(state: BattleState, command: BattleCommand): CommandOutcome {

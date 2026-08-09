@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MELEE_ASSIST_RANGE, resolveHeroCombatProfile } from '../../src/hero/combatProfile.js';
 import { resolveHeroStatSheet } from '../../src/hero/resolve.js';
+import { SET_SPECIAL_DUELISTA, SET_SPECIAL_RESERVA } from '../../src/items/sets.js';
 import type { ClassDef, Hero } from '../../src/hero/types.js';
-import type { ItemSet } from '../../src/items/types.js';
+import type { ItemInstance, ItemSet } from '../../src/items/types.js';
 import type { SkillDef } from '../../src/skills/types.js';
 import type { StatSheet } from '../../src/stats/types.js';
 import type { TalentNode } from '../../src/talents/types.js';
@@ -150,6 +151,37 @@ const skillsCatalog: Readonly<Record<string, SkillDef>> = {
 
 const itemSets: Readonly<Record<string, ItemSet>> = {};
 
+// §7.4 (M10 sub-sessão 6/N) — sets `special` de 4 peças, pra provar que o perfil de
+// combate passa a carregar os efeitos comportamentais do equipamento (e que Reserva soma
+// no startingAp pelo mesmo caminho do bônus de talento `maxAp`).
+const specialItemSets: Readonly<Record<string, ItemSet>> = {
+  'set-reserva': {
+    id: 'set-reserva',
+    name: 'Reserva',
+    effects: [{ t: 'special', pieces: 4, effectId: SET_SPECIAL_RESERVA, description: '+1 AP máximo e rest recupera +2 AP.' }],
+  },
+  'set-duelista': {
+    id: 'set-duelista',
+    name: 'Duelista',
+    effects: [{ t: 'special', pieces: 4, effectId: SET_SPECIAL_DUELISTA, description: 'Contra-atacar custa 0 PP na primeira troca.' }],
+  },
+};
+
+function piecesOf(setId: string, count: number): ItemInstance[] {
+  const slots: ItemInstance['slot'][] = ['weapon', 'helmet', 'armor', 'necklace', 'ring', 'boots'];
+  return slots.slice(0, count).map((slot) => ({
+    id: `${setId}-${slot}`,
+    setId,
+    slot,
+    rarity: 'common' as const,
+    ilvl: 58,
+    mainstat: { stat: 'atk' as const, value: 10 },
+    substats: [],
+    enhance: 0 as const,
+    reforged: false,
+  }));
+}
+
 // bow=3 (não 2, o mesmo valor de MELEE_ASSIST_RANGE) de propósito: prova que
 // assistRange vem de fato do duelRange da arma ranged, não coincide por acaso.
 const weaponDuelRanges: Readonly<Record<WeaponType, number>> = {
@@ -224,6 +256,72 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     });
     expect(profile.startingAp).toBe(3);
     expect(profile.startingPp).toBe(3);
+  });
+
+  it('§7.4 — setSpecialEffectIds vem do equipamento; vazio quando nada atinge o limiar', () => {
+    const semSet = resolveHeroCombatProfile({
+      hero: baseHero,
+      classDef: meleeClass,
+      equippedItems: piecesOf('set-duelista', 3), // 3 de 4
+      itemSets: specialItemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+    });
+    expect(semSet.setSpecialEffectIds).toEqual([]);
+
+    const comSet = resolveHeroCombatProfile({
+      hero: baseHero,
+      classDef: meleeClass,
+      equippedItems: piecesOf('set-duelista', 4),
+      itemSets: specialItemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+    });
+    expect(comSet.setSpecialEffectIds).toEqual([SET_SPECIAL_DUELISTA]);
+  });
+
+  it('§7.4 Reserva — "+1 AP máximo" soma no startingAp, pelo mesmo caminho do talento maxAp', () => {
+    const profile = resolveHeroCombatProfile({
+      hero: baseHero,
+      classDef: meleeClass,
+      equippedItems: piecesOf('set-reserva', 4),
+      itemSets: specialItemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+    });
+    expect(profile.startingAp).toBe(3); // basePools.ap = 2, +1 do set
+    expect(profile.startingPp).toBe(2); // Reserva não toca em PP
+    expect(profile.setSpecialEffectIds).toEqual([SET_SPECIAL_RESERVA]);
+  });
+
+  it('§7.4 Reserva — o bônus do set e o do talento maxAp são cumulativos', () => {
+    const heroWithReserva: Hero = { ...baseHero, talents: { ...baseHero.talents, 'talent-reserva': 1 } };
+    const profile = resolveHeroCombatProfile({
+      hero: heroWithReserva,
+      classDef: meleeClass,
+      equippedItems: piecesOf('set-reserva', 4),
+      itemSets: specialItemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+    });
+    expect(profile.startingAp).toBe(4); // 2 base + 1 talento + 1 set
+  });
+
+  it('§7.4 Reserva — 3 peças não bastam: o startingAp fica no valor base', () => {
+    const profile = resolveHeroCombatProfile({
+      hero: baseHero,
+      classDef: meleeClass,
+      equippedItems: piecesOf('set-reserva', 3),
+      itemSets: specialItemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+    });
+    expect(profile.startingAp).toBe(2);
   });
 
   it('arma corpo-a-corpo: duelRange vem da tabela e assistRange usa MELEE_ASSIST_RANGE', () => {

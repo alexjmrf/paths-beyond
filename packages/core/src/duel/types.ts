@@ -58,6 +58,11 @@ export interface DuelParticipant {
   readonly cooldowns: Readonly<Record<Id, number>>; // rounds de MAPA restantes; fixo durante o duelo
   readonly activeEffects: readonly ActiveEffect[];
   readonly positionalMultiplier: number; // flanco/cerco/altura/terreno já resolvidos (grid é M3)
+  // §7.4 (M10 sub-sessão 6/N) — efeitos `special` de set que o duelo interpreta:
+  // Duelista (contra-atacar de graça na troca 1) e Imunidade (sem debuff na troca 1).
+  // Opcional: o formato self-contained lido por `sim-cli` e as fixtures de M2 não têm
+  // equipamento resolvido. Ausente = nenhum efeito special.
+  readonly setSpecialEffectIds?: readonly Id[];
 }
 
 // §6.2 — "o ataque básico custa 0 AP e está sempre disponível". Regra do motor, não

@@ -32,6 +32,7 @@ const profile: HeroCombatProfile = {
   assistRange: 2,
   moveType: 'foot',
   moveRange: 4,
+  setSpecialEffectIds: [],
   startingAp: 3,
   startingPp: 2,
   tacticsScript: [{ enabled: true, skillId: 'skill-basico', conditions: [] }],
@@ -85,6 +86,7 @@ describe('buildBattleUnit — HeroCombatProfile→BattleUnit (M7, sub-sessão 5)
       tacticsScript: profile.tacticsScript,
       reactionScript: profile.reactionScript,
       knownSkills: profile.knownSkills,
+      setSpecialEffectIds: profile.setSpecialEffectIds,
     });
   });
 

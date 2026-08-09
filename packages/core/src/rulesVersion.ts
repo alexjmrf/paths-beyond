@@ -47,4 +47,11 @@
 // de regra real; não observável em `pnpm balance` nem no `GOLDEN_HASH` porque nenhuma skill
 // do catálogo real (nem a fixture do replay canônico) declara esses triggers ainda.
 // `onLethal` continua sem resolução, por decisão de design registrada em DECISIONS.md.
-export const RULES_VERSION = '0.6.0';
+// M10, sub-sessão 6/N: os 4 efeitos `special` de set (§7.4) deixam de ser inertes —
+// Duelista (contra-atacar de graça na troca 1), Imunidade (sem debuff na troca 1), Reserva
+// (+1 AP inicial, `rest` recupera 2 AP) e Sentinela (uma assistência de graça por round de
+// mapa). Mudança de regra real em quatro pontos do motor (resolveDuel, applyRest,
+// buildAssistCandidates, combatProfile). Não observável em `pnpm balance` nem no
+// GOLDEN_HASH: os 4 sets existem em packages/data mas nenhum item pertence a eles, então
+// nenhuma unidade de conteúdo real ou do replay canônico tem os efeitos ativos.
+export const RULES_VERSION = '0.7.0';

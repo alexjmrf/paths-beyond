@@ -96,6 +96,7 @@ function buildState(units: readonly BattleUnit[], overrides: Partial<BattleState
     round: 1,
     valor: 5,
     distanceMovedThisTurn: {},
+    freeAssistUsedThisRound: [],
     permadeath: 'classic',
     winCondition: { t: 'rout' },
     effectDefs: { [atkUpEffect.id]: atkUpEffect, [defDownEffect.id]: defDownEffect },

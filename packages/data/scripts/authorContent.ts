@@ -377,6 +377,70 @@ const NECKLACE_GUARDIAO = {
 
 export const SHARED_ITEMS = [NECKLACE_FORCA, NECKLACE_GUARDIAO];
 
+// §7.4 (M10, sub-sessão 6/N) — os 4 sets cujo bônus de 4 peças MUDA COMPORTAMENTO em vez
+// de dar stat ("Os três sets em negrito atacam diretamente a economia de recursos — são o
+// que dá identidade ao sistema e o principal contrapeso a builds de `spd`"). O `effectId`
+// não é conteúdo livre: é o id canônico que o motor reconhece, declarado em
+// `packages/core/src/items/sets.ts`. As strings estão repetidas aqui porque
+// `packages/data` não depende de `@paths-beyond/core` (mesmo espelhamento de
+// `ItemSet`/`EffectDef`); `packages/data/tests/authorContent.test.ts` trava os valores.
+//
+// Corte de escopo consciente desta fatia (decisão do usuário): os sets existem como
+// conteúdo válido mas NENHUM comp de balanceamento os equipa, então `pnpm balance` sai
+// numericamente idêntico à sub-sessão 4. Equipá-los é um ciclo de rebalanceamento
+// próprio — a sub-sessão 4 mostrou que mexer no equipamento dos comps quebra o teto de
+// 65% de M8.
+export const SPECIAL_ITEM_SETS = [
+  {
+    id: 'set-duelista',
+    name: 'Duelista',
+    effects: [
+      {
+        t: 'special' as const,
+        pieces: 4 as const,
+        effectId: 'set-special:duelista-contra-atacar-livre-troca-1',
+        description: 'Contra-atacar custa 0 PP na primeira troca.',
+      },
+    ],
+  },
+  {
+    id: 'set-reserva',
+    name: 'Reserva',
+    effects: [
+      {
+        t: 'special' as const,
+        pieces: 4 as const,
+        effectId: 'set-special:reserva-ap',
+        description: '+1 AP máximo e `rest` recupera +2 AP.',
+      },
+    ],
+  },
+  {
+    id: 'set-sentinela',
+    name: 'Sentinela',
+    effects: [
+      {
+        t: 'special' as const,
+        pieces: 4 as const,
+        effectId: 'set-special:sentinela-assistencia-livre-por-round',
+        description: 'Assistir custa 0 PP uma vez por round de mapa.',
+      },
+    ],
+  },
+  {
+    id: 'set-imunidade',
+    name: 'Imunidade',
+    effects: [
+      {
+        t: 'special' as const,
+        pieces: 4 as const,
+        effectId: 'set-special:imunidade-debuff-troca-1',
+        description: 'Imune a debuffs na troca 1 do duelo.',
+      },
+    ],
+  },
+];
+
 export const ITEM_SETS = [
   {
     id: SET_FORCA_ID,
@@ -398,6 +462,7 @@ export const ITEM_SETS = [
     // desequilíbrio (Druida a 70,5%); +8% deixa o roster inteiro abaixo de 65%.
     effects: [{ t: 'stat' as const, pieces: 2 as const, stat: 'hp' as const, pct: 80 }],
   },
+  ...SPECIAL_ITEM_SETS,
 ];
 
 function necklaceIdFor(profile: ClassProfile): string {

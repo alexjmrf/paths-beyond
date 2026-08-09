@@ -1,6 +1,7 @@
 import { PHYSICAL_CYCLE } from '../duel/triangle.js';
 import type { ReactionLine } from '../duel/types.js';
 import type { MoveType } from '../grid/types.js';
+import { SET_SPECIAL_RESERVA, resolveSetSpecialEffects } from '../items/sets.js';
 import type { ItemInstance, ItemSet } from '../items/types.js';
 import type { SkillDef } from '../skills/types.js';
 import type { StatSheet } from '../stats/types.js';
@@ -32,6 +33,10 @@ export interface HeroCombatProfile {
   readonly tacticsScript: TacticsScript;
   readonly reactionScript: readonly ReactionLine[];
   readonly knownSkills: Readonly<Record<Id, SkillDef>>;
+  // §7.4 (M10 sub-sessão 6/N) — efeitos `special` de set já resolvidos a partir do
+  // equipamento (ids canônicos de items/sets.ts). Descem daqui até BattleUnit e
+  // DuelParticipant; quem os interpreta é a camada que cada um afeta.
+  readonly setSpecialEffectIds: readonly Id[];
 }
 
 export interface ResolveHeroCombatProfileInput {
@@ -71,6 +76,12 @@ export function resolveHeroCombatProfile(input: ResolveHeroCombatProfileInput): 
 
   const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets });
   const resolvedTalents = resolveTalentEffects(classDef.talentTree, hero.talents);
+  const setSpecialEffectIds = resolveSetSpecialEffects(equippedItems, itemSets);
+  // §7.4 Reserva — "+1 AP máximo". Este motor não tem teto de AP em runtime (`rest`/`wait`
+  // somam sem clamp), então "máximo" é o pool com que a unidade entra na batalha: mesma
+  // semântica do bônus de talento `maxAp` (§8.2), e cumulativo com ele. Decisão do
+  // usuário, registrada em DECISIONS.md.
+  const reservaApBonus = setSpecialEffectIds.includes(SET_SPECIAL_RESERVA) ? 1 : 0;
 
   const duelRange = weaponDuelRanges[hero.weaponType];
   const assistRange = isMeleeWeapon(hero.weaponType) ? MELEE_ASSIST_RANGE : duelRange;
@@ -105,10 +116,11 @@ export function resolveHeroCombatProfile(input: ResolveHeroCombatProfileInput): 
     assistRange,
     moveType: classDef.moveType,
     moveRange: classDef.moveRange,
-    startingAp: classDef.basePools.ap + resolvedTalents.maxApBonus,
+    startingAp: classDef.basePools.ap + resolvedTalents.maxApBonus + reservaApBonus,
     startingPp: classDef.basePools.pp + resolvedTalents.maxPpBonus,
     tacticsScript: hero.tacticsScript,
     reactionScript,
     knownSkills,
+    setSpecialEffectIds,
   };
 }
