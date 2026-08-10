@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ASSIST_DAMAGE_MULTIPLIER, applyAssistDamage, resolveAssists, type AssistCandidate } from '../../src/duel/assist.js';
 import { computeDamage, isCriticalHit, rollDamageVariance } from '../../src/duel/damage.js';
+import { computeHeal } from '../../src/duel/heal.js';
 import { combinedTypeDamageMultiplier } from '../../src/duel/triangle.js';
 import type { DuelEconomyState } from '../../src/duel/economy.js';
 import type { EffectDef } from '../../src/duel/types.js';
@@ -56,7 +57,9 @@ const assistSkill: SkillDef = {
   tags: ['physical'],
 };
 
-// §6.5.3 (M10) — assistência sem componente de dano (heal/buff): contribui 0 dano.
+// §6.5.3 — assistência de cura: contribui 0 dano e, desde M10 sub-sessão 7/N, cura de
+// verdade (a tag `heal` é o discriminador). `multiplier: 1000` para a cura ser observável;
+// antes da 7/N era 0, porque a única coisa afirmada aqui era "não causa dano".
 const assistHealSkill: SkillDef = {
   id: 'skill-assist-heal',
   name: 'Apoio de Cura',
@@ -64,7 +67,7 @@ const assistHealSkill: SkillDef = {
   apCost: 0,
   ppCost: 1,
   cooldown: 0,
-  multiplier: 0,
+  multiplier: 1000,
   flat: 0,
   scalesWith: 'atk',
   effects: [],
@@ -165,11 +168,11 @@ describe('applyAssistDamage — §6.5.3 (M10: dano de assistência aplicado a HP
     });
     expect(outcome.totalDamage).toBeGreaterThan(0);
     expect(outcome.results).toEqual([
-      { assistantId: 'ally-1', skillId: assistSkill.id, freePp: false, damageDealt: outcome.totalDamage },
+      { assistantId: 'ally-1', skillId: assistSkill.id, freePp: false, damageDealt: outcome.totalDamage, healDone: 0 },
     ]);
   });
 
-  it('assistência sem componente de dano (heal/buff) contribui 0 dano', () => {
+  it('assistência de cura contribui 0 dano e cura em efeito integral (§6.5.3, M10 sub-sessão 7/N)', () => {
     const healCandidate = candidate('ally-1', {
       reactionScript: [{ enabled: true, skillId: assistHealSkill.id, conditions: [] }],
     });
@@ -183,8 +186,11 @@ describe('applyAssistDamage — §6.5.3 (M10: dano de assistência aplicado a HP
       effectDefs: noEffectDefs,
     });
     expect(outcome.totalDamage).toBe(0);
+    // Cura integral: multiplier 1000 × atk 1000 = 1000, SEM o corte de 50% do dano.
+    const esperado = computeHeal({ healerStat: statSheet().atk, skill: { multiplier: 1000, flat: 0 }, healerHeal: 0 });
+    expect(outcome.totalHeal).toBe(esperado);
     expect(outcome.results).toEqual([
-      { assistantId: 'ally-1', skillId: assistHealSkill.id, freePp: false, damageDealt: 0 },
+      { assistantId: 'ally-1', skillId: assistHealSkill.id, freePp: false, damageDealt: 0, healDone: esperado },
     ]);
   });
 
@@ -256,7 +262,7 @@ describe('applyAssistDamage — §6.5.3 (M10: dano de assistência aplicado a HP
     });
     expect(outcome.totalDamage).toBe(0);
     expect(outcome.results).toEqual([
-      { assistantId: 'fantasma', skillId: assistSkill.id, freePp: false, damageDealt: 0 },
+      { assistantId: 'fantasma', skillId: assistSkill.id, freePp: false, damageDealt: 0, healDone: 0 },
     ]);
   });
 

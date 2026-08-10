@@ -12,6 +12,7 @@ import {
   sumDamageTakenReductionPct,
   upsertActiveEffect,
 } from './effects.js';
+import { applyHeal, computeHeal, isHealingSkill, scalingStatOf } from './heal.js';
 import { effectivePpCost, selectReaction } from './reactions.js';
 import { SET_SPECIAL_DUELISTA, SET_SPECIAL_IMUNIDADE } from '../items/sets.js';
 import { selectTacticsAction } from '../tactics/selectTacticsAction.js';
@@ -59,12 +60,20 @@ export interface ActionLogEntry {
   readonly hit: boolean | null;
   readonly isCrit: boolean;
   readonly damage: number;
+  // §6.5.3 (M10 sub-sessão 7/N) — cura que o ATOR aplicou em si mesmo nesta ação (skill de
+  // duelo com a tag `heal`). Num 1v1 não há aliado pra mirar, então auto-cura é o único
+  // alvo coerente. 0 para toda ação que não é de cura.
+  readonly heal: number;
   // §6.4 — no máximo UMA reação por troca chega a disparar (teto de 1 PP por troca), então
   // um campo único basta; `trigger` diz qual gatilho venceu (M10 sub-sessão 5/N).
   readonly reaction: {
     readonly skillId: Id;
     readonly lineIndex: number;
     readonly counterDamage: number | null;
+    // §6.4 (M10 sub-sessão 7/N) — "Cura de emergência": reação com a tag `heal` cura o
+    // próprio reagente em vez de contra-atacar. `null` quando a reação não é de cura,
+    // simétrico a `counterDamage`.
+    readonly healDone: number | null;
     readonly trigger: ReactionTrigger;
   } | null;
   // §8.3/§6.9 (M10) — effectIds de skill.effects que passaram na rolagem de chance nesta
@@ -125,6 +134,21 @@ function economyOf(p: DuelParticipant, apSpentThisDuel: number, ppSpentThisTroca
 // §7.4 — efeitos `special` de set que o duelo interpreta (Duelista, Imunidade).
 function hasSetSpecial(p: DuelParticipant, effectId: Id): boolean {
   return p.setSpecialEffectIds?.includes(effectId) === true;
+}
+
+// §6.4 — "Cura de emergência": uma reação com a tag `heal` cura quem reagiu. Escala com o
+// stat efetivo do próprio reagente, como qualquer outra cura (ver heal.ts).
+function healReactor(
+  skill: SkillDef,
+  reactor: DuelParticipant,
+  effectDefs: Readonly<Record<Id, EffectDef>>,
+): number {
+  const stats = applyActiveEffectsToStats(reactor.stats, reactor.activeEffects, effectDefs);
+  return computeHeal({
+    healerStat: scalingStatOf(stats, skill.scalesWith),
+    skill: { multiplier: skill.multiplier, flat: skill.flat },
+    healerHeal: stats.heal,
+  });
 }
 
 function buildConditionView(p: DuelParticipant, effectDefs: Readonly<Record<Id, EffectDef>>): ConditionUnitView {
@@ -265,6 +289,7 @@ function resolveExchange(
       hit: null,
       isCrit: false,
       damage: 0,
+      heal: 0,
       reaction: null,
       effectsApplied: [],
     },
@@ -293,7 +318,11 @@ function resolveExchange(
     nextApSpent[actor.id] = spent.apSpentThisDuel;
   }
 
-  const isOffensive = skill.multiplier > 0 || skill.flat > 0;
+  // §6.5.3 (M10 sub-sessão 7/N) — uma skill com a tag `heal` não bate: num 1v1 o único
+  // alvo coerente é o próprio ator. Cai no mesmo ramo das skills sem dano (sem rolagem de
+  // acerto: não há o que "errar" curando a si mesmo), só que aplicando a cura.
+  const isHeal = isHealingSkill(skill);
+  const isOffensive = !isHeal && (skill.multiplier > 0 || skill.flat > 0);
   if (!isOffensive) {
     // §8.3/§6.9 — skill sem componente de dano (multiplier=0/flat=0): o "efeito" dela É
     // o skill.effects, e não passa por rolagem de acerto (só ataques ofensivos usam
@@ -310,8 +339,21 @@ function resolveExchange(
       skill.effects,
       effectDefs,
     );
+
+    const heal = isHeal
+      ? computeHeal({
+          healerStat: scalingStatOf(effectiveActorStats, skill.scalesWith),
+          skill: { multiplier: skill.multiplier, flat: skill.flat },
+          healerHeal: effectiveActorStats.heal,
+        })
+      : 0;
+    const healedActor =
+      heal > 0
+        ? { ...applied.actor, currentHp: applyHeal(applied.actor.currentHp, applied.actor.stats.hp, heal) }
+        : applied.actor;
+
     return {
-      actor: applied.actor,
+      actor: healedActor,
       opponent: applied.opponent,
       apSpent: nextApSpent,
       ppSpentTroca: nextPpSpentTroca,
@@ -324,6 +366,7 @@ function resolveExchange(
         hit: null,
         isCrit: false,
         damage: 0,
+        heal,
         reaction: null,
         effectsApplied: applied.appliedEffectIds,
       },
@@ -364,6 +407,7 @@ function resolveExchange(
         hit: false,
         isCrit: false,
         damage: 0,
+        heal: 0,
         reaction: null,
         effectsApplied: [],
       },
@@ -418,7 +462,15 @@ function resolveExchange(
       opponent = { ...opponent, pp: spent.pools.pp };
       nextPpSpentTroca[opponent.id] = spent.ppSpentThisTroca;
 
-      if (reactionSkill.multiplier === 0 && reactionSkill.flat === 0) {
+      // §6.4 (M10 sub-sessão 7/N) — três classes de reação, nesta ordem: cura ("Cura de
+      // emergência"), Defender (sem componente nenhum → -40% na troca), contra-ataque.
+      // A cura vem primeiro porque uma skill de cura tem multiplier > 0 e cairia no ramo
+      // de contra-ataque, virando dano.
+      let reactionHeal: number | null = null;
+      if (isHealingSkill(reactionSkill)) {
+        reactionHeal = healReactor(reactionSkill, opponent, effectDefs);
+        opponent = { ...opponent, currentHp: applyHeal(opponent.currentHp, opponent.stats.hp, reactionHeal) };
+      } else if (reactionSkill.multiplier === 0 && reactionSkill.flat === 0) {
         extraReduction = DEFEND_DAMAGE_REDUCTION_PCT;
       } else {
         counterSkill = reactionSkill;
@@ -427,6 +479,7 @@ function resolveExchange(
         skillId: reactionSkill.id,
         lineIndex: reactionDecision.lineIndex,
         counterDamage: null,
+        healDone: reactionHeal,
         trigger: 'onAttacked',
       };
     }
@@ -500,9 +553,22 @@ function resolveExchange(
 
     // Diferente de `onAttacked`, aqui não há dano a reduzir — o golpe já entrou. Uma
     // reação sem componente de dano gasta o PP e não faz mais nada (o `-40%` de Defender
-    // é específico de `onAttacked`, §6.4).
-    if (skillDef.multiplier > 0 || skillDef.flat > 0) counterSkill = skillDef;
-    reactionLog = { skillId: skillDef.id, lineIndex: decision.lineIndex, counterDamage: null, trigger };
+    // é específico de `onAttacked`, §6.4). Cura, porém, funciona igual nos três gatilhos:
+    // reagir a ter levado dano curando-se é justamente o caso de "Cura de emergência".
+    let reactionHeal: number | null = null;
+    if (isHealingSkill(skillDef)) {
+      reactionHeal = healReactor(skillDef, opponent, effectDefs);
+      opponent = { ...opponent, currentHp: applyHeal(opponent.currentHp, opponent.stats.hp, reactionHeal) };
+    } else if (skillDef.multiplier > 0 || skillDef.flat > 0) {
+      counterSkill = skillDef;
+    }
+    reactionLog = {
+      skillId: skillDef.id,
+      lineIndex: decision.lineIndex,
+      counterDamage: null,
+      healDone: reactionHeal,
+      trigger,
+    };
   }
 
   if (damage > 0) tryLateReaction('onDamaged');
@@ -553,6 +619,7 @@ function resolveExchange(
       hit: true,
       isCrit,
       damage,
+      heal: 0, // ação ofensiva: cura do ator só existe no ramo da tag `heal`, acima
       reaction: reactionLog,
       effectsApplied: effectApplicationResult.appliedEffectIds,
     },
@@ -578,6 +645,9 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
     effectDefs,
   });
   defender = { ...defender, currentHp: Math.max(0, defender.currentHp - attackerAssistOutcome.totalDamage) };
+  // §6.5.3 (M10 sub-sessão 7/N) — assistência de cura mira o ALIADO duelista, não o inimigo:
+  // quem o aliado do atacante socorre é o atacante.
+  attacker = { ...attacker, currentHp: applyHeal(attacker.currentHp, attacker.stats.hp, attackerAssistOutcome.totalHeal) };
 
   const defenderAssistDecisions = resolveAssists(input.defenderAssistCandidates ?? []);
   const defenderAssistOutcome = applyAssistDamage({
@@ -589,6 +659,7 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
     effectDefs,
   });
   attacker = { ...attacker, currentHp: Math.max(0, attacker.currentHp - defenderAssistOutcome.totalDamage) };
+  defender = { ...defender, currentHp: applyHeal(defender.currentHp, defender.stats.hp, defenderAssistOutcome.totalHeal) };
 
   const attackerAssists = attackerAssistOutcome.results;
   const defenderAssists = defenderAssistOutcome.results;

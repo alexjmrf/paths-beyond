@@ -12,6 +12,7 @@ import {
   sumDamageTakenReductionPct,
 } from './effects.js';
 import type { DuelEconomyState } from './economy.js';
+import { computeHeal, isHealingSkill, scalingStatOf } from './heal.js';
 import { selectReaction } from './reactions.js';
 import { combinedTypeDamageMultiplier } from './triangle.js';
 import type { ActiveEffect, EffectDef } from './types.js';
@@ -92,6 +93,9 @@ function rollPercent(rngValue: number): number {
 
 export interface AppliedAssistResult extends AssistResult {
   readonly damageDealt: number;
+  // §6.5.3 (M10 sub-sessão 7/N) — cura entregue ao ALIADO duelista por uma assistência com
+  // a tag `heal`. Mutuamente exclusivo com damageDealt: uma assistência ou bate ou cura.
+  readonly healDone: number;
 }
 
 export interface AssistDamageTarget {
@@ -115,36 +119,58 @@ export interface ApplyAssistDamageInput {
 
 export interface ApplyAssistDamageOutcome {
   readonly totalDamage: number;
+  // §6.5.3 — cura total a aplicar no aliado duelista. Quem aplica é resolveDuel (só ele
+  // sabe quem é o aliado e qual o HP máximo dele); aqui só a soma.
+  readonly totalHeal: number;
   readonly results: readonly AppliedAssistResult[];
 }
 
-// §6.5.3 — "dano de assistência é 50% do dano da skill". Reusa a mesma matemática de
-// computeDamage (§6.6), com posicional neutro (o assistente não tem posição própria
-// resolvida no duelo — simplificação documentada em DECISIONS.md) e SEM rolagem de
-// acerto própria (mesma convenção já adotada para contra-ataques em resolveDuel.ts:
-// "Contra-ataques sempre acertam"). Corte explícito: assistências que não causam dano
-// (heal/buff, tag 'heal' ou skill.effects) contribuem 0 aqui — a mecânica de cura ainda
-// não existe no motor (nenhuma fórmula normativa pra §4.1 "Cura dada/recebida") e
-// skill.effects de assistência continua fora de escopo (mesmo corte de reação/M10
-// sub-sessão 1).
+// §6.5.3 — "executa uma ação reduzida: 50% do dano da skill, ou cura/buff em efeito
+// integral". As duas metades dessa frase vivem aqui:
+//
+// DANO: reusa a matemática de computeDamage (§6.6), com posicional neutro (o assistente não
+// tem posição própria resolvida no duelo — simplificação documentada em DECISIONS.md) e SEM
+// rolagem de acerto própria (mesma convenção dos contra-ataques em resolveDuel.ts:
+// "Contra-ataques sempre acertam"), reduzido por ASSIST_DAMAGE_MULTIPLIER.
+//
+// CURA (M10 sub-sessão 7/N): assistência com a tag `heal` não bate — cura o aliado
+// duelista, e "em efeito integral" significa literalmente SEM o corte de 50%. Escala com o
+// stat do assistente, como o dano; quem aplica ao HP é resolveDuel.
+//
+// Corte que permanece: `skill.effects` de assistência continua fora de escopo (mesmo corte
+// de reação, M10 sub-sessão 1), então a metade "buff" de §6.5.3 ainda não existe.
 export function applyAssistDamage(input: ApplyAssistDamageInput): ApplyAssistDamageOutcome {
   const targetEffectiveStats = applyActiveEffectsToStats(input.target.stats, input.target.activeEffects, input.effectDefs);
   const damageTakenReductionPctSum = sumDamageTakenReductionPct(input.target.activeEffects, input.effectDefs);
 
   const results: AppliedAssistResult[] = [];
   let totalDamage = 0;
+  let totalHeal = 0;
 
   for (const result of input.results) {
     const candidate = input.candidates.find((c) => c.id === result.assistantId);
     const skill = candidate?.skills[result.skillId];
     if (!candidate || !skill) {
-      results.push({ ...result, damageDealt: 0 });
+      results.push({ ...result, damageDealt: 0, healDone: 0 });
+      continue;
+    }
+
+    // §6.5.3 — a bifurcação: cura em efeito integral (sem os 50%) vs. dano reduzido.
+    if (isHealingSkill(skill)) {
+      const healerStats = applyActiveEffectsToStats(candidate.stats, candidate.activeEffects, input.effectDefs);
+      const healDone = computeHeal({
+        healerStat: scalingStatOf(healerStats, skill.scalesWith),
+        skill: { multiplier: skill.multiplier, flat: skill.flat },
+        healerHeal: healerStats.heal,
+      });
+      results.push({ ...result, damageDealt: 0, healDone });
+      totalHeal += healDone;
       continue;
     }
 
     const isOffensive = skill.multiplier > 0 || skill.flat > 0;
     if (!isOffensive) {
-      results.push({ ...result, damageDealt: 0 });
+      results.push({ ...result, damageDealt: 0, healDone: 0 });
       continue;
     }
 
@@ -177,9 +203,9 @@ export function applyAssistDamage(input: ApplyAssistDamageInput): ApplyAssistDam
     });
 
     const damageDealt = Math.max(1, fpMul(rawDamage, ASSIST_DAMAGE_MULTIPLIER));
-    results.push({ ...result, damageDealt });
+    results.push({ ...result, damageDealt, healDone: 0 });
     totalDamage += damageDealt;
   }
 
-  return { totalDamage, results };
+  return { totalDamage, totalHeal, results };
 }

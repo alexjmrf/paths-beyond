@@ -54,4 +54,13 @@
 // buildAssistCandidates, combatProfile). Não observável em `pnpm balance` nem no
 // GOLDEN_HASH: os 4 sets existem em packages/data mas nenhum item pertence a eles, então
 // nenhuma unidade de conteúdo real ou do replay canônico tem os efeitos ativos.
-export const RULES_VERSION = '0.7.0';
+// M10, sub-sessão 7/N: cura passa a existir no motor. A spec não tinha fórmula nenhuma
+// (§2 só lista `heal` como "cura dada/recebida, %"; §6.5.3 diz "cura/buff em efeito
+// integral" sem dizer integral de quê), então a fórmula é decisão de design registrada em
+// DECISIONS.md: multiplier × stat de `scalesWith` + flat, modificada pelo `heal` de quem
+// cura, sem mitigação/triângulo/posicional e sem crítico nem variância. Três caminhos
+// ligados: assistência de cura (cura o aliado duelista, SEM o corte de 50% do dano), skill
+// de duelo com a tag `heal` (auto-cura) e reação com a tag `heal` ("Cura de emergência",
+// §6.4). Mudança de regra real; não observável em `pnpm balance` nem no GOLDEN_HASH porque
+// nenhuma skill do catálogo real declara a tag.
+export const RULES_VERSION = '0.8.0';

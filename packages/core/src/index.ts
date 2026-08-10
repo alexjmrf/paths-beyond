@@ -132,6 +132,8 @@ export {
   resolveSetBonuses,
   resolveSetSpecialEffects,
 } from './items/sets.js';
+export { HEAL_TAG, applyHeal, computeHeal, isHealingSkill, scalingStatOf } from './duel/heal.js';
+export type { HealInput, HealSkillInput } from './duel/heal.js';
 export { ENHANCE_MILESTONES } from './items/types.js';
 export type {
   EnhanceLevel,

@@ -1237,3 +1237,84 @@ determinismo). `pnpm test` (**686 testes, 62 arquivos** — +41 sobre a sub-sess
 cura de assistência/skill (fórmula nova, checkpoint pendente com o usuário), `onLethal`
 como gatilho de morte (encaminhamento da sub-sessão 5/N), e conteúdo real usando o que M10
 construiu — os gatilhos novos E os sets `special`, os dois gaps acumulados.
+
+### M10 — sub-sessão 7/N: cura de assistência e de skill
+
+Último item nomeado no roadmap de M10 ainda aberto ("dano **e cura** de assistência
+aplicados a HP de verdade"). O dano saiu na sub-sessão 2; a cura ficou parada desde então
+por um motivo que não era de escopo: **a spec não define fórmula de cura em lugar nenhum.**
+As três únicas menções são não-normativas — §2 lista `heal` como "cura dada/recebida, %"
+(percentual sobre uma base que ninguém define), §6.4 cita "Cura de emergência" entre as
+reações que classes e talentos adicionam, e §6.5.3 diz que assistir aplica "cura/buff em
+efeito integral" sem dizer integral de quê.
+
+- **Fórmula (decisão do usuário):** `cura = fpMul(base, FP_SCALE + heal_do_curador)`, onde
+  `base = fpMul(stat_de_scalesWith_do_curador, skill.multiplier) + skill.flat`. É a forma
+  dos passos 1-2 de §6.6 e nada além: **sem** mitigação por `def` (mitigar cura não
+  significa nada), sem triângulo de armas, sem posicional. Reusa `multiplier`/`flat`/
+  `scalesWith`, que toda `SkillDef` já tem — zero campo novo em `packages/data`, zero número
+  mágico novo no core, e a magnitude de cada cura fica em dados (regra 4). Escala com o
+  build de quem cura, então equipar um curador importa e o stat `heal` deixa de ser inerte.
+- **Sem crítico e sem variância (decisão do usuário):** cura é determinística. Alinha com o
+  pilar de previsibilidade ("o algoritmo é literal; previsibilidade é o produto") — quem
+  monta o script tático consegue saber se a cura salva o aliado — e não consome stream de
+  RNG novo dentro do duelo.
+- **O stat `heal` entra UMA vez, do lado de quem cura.** §2 o chama de "cura
+  dada/recebida", mas aplicá-lo também do lado de quem recebe dobraria o mesmo stat na
+  mesma conta. Leitura levada ao usuário junto da fórmula e aprovada com ela.
+- **A tag `heal` é o discriminador, não um campo novo.** Uma skill cura quando declara
+  `tags: ['heal']`. Precedente direto: `combinedTypeDamageMultiplier` já interpreta
+  `skillTags` ('physical', 'armored') dentro do motor, e o comentário de corte de
+  `assist.ts` (sub-sessão 2) já usava essa convenção por escrito. `SkillDef` fica intacta.
+- **Três caminhos, um `computeHeal` só:**
+  1. **Assistência de cura** (§6.5.3, o item do roadmap) — mira o **aliado duelista**, alvo
+     que o motor não tinha: `applyAssistDamage` só sabia mirar o inimigo. "Efeito integral"
+     é lido literalmente: a cura **não** leva o `ASSIST_DAMAGE_MULTIPLIER` de 50% que o dano
+     leva. `AppliedAssistResult` ganhou `healDone`; quem aplica ao HP é `resolveDuel`, único
+     lugar que sabe quem é o aliado e qual o HP máximo dele.
+  2. **Skill de duelo com a tag** — num 1v1 não existe aliado pra mirar, então o único alvo
+     coerente é o próprio ator (auto-cura). Cai no mesmo ramo das skills sem dano, sem
+     rolagem de acerto: não há o que "errar" curando a si mesmo.
+  3. **Reação com a tag** ("Cura de emergência", §6.4) — cura o reagente. Exigiu ramo novo:
+     `resolveExchange` classificava reação por `multiplier === 0 && flat === 0` (Defender)
+     senão contra-ataque, então uma cura (que tem `multiplier > 0`) viraria dano. A ordem
+     agora é cura → Defender → contra-ataque, e vale igual nos três gatilhos — reagir a ter
+     levado dano curando-se é justamente o caso que §6.4 descreve.
+- **Bordas:** cura nunca passa de `stats.hp` e **não ressuscita** — alvo em 0 continua em 0,
+  mesmo precedente já adotado por `applyPeriodicHp` (`battle/round.ts`) para regeneração.
+  `heal` negativo o bastante zera a cura em vez de virar dano.
+- **`lifesteal` continua inerte** — stat declarado em `stats/types.ts` que nenhuma linha do
+  motor lê. Não está nomeado no roadmap de M10; fica registrado aqui como ponta solta
+  conhecida, candidata a M12 junto do resto da autoria de conteúdo.
+- **Nenhum conteúdo real ganhou a tag `heal`.** Autorar uma skill de cura e dá-la a uma
+  classe é escopo declarado de M12 ("skills que usam os efeitos de M10") e mexeria no
+  balanceamento. Fixtures em teste, como a regra de `packages/data` exige.
+
+**Nenhum número de balanceamento se moveu** (`pnpm balance -- --runs 10000`, rodado como
+verificação): winrate global de 26,2% (Couraçado) a 63,5% (Espadachim), 22,4% das unidades
+vencedoras com `spd` acima da mediana, 17 hard counters — **o mesmo relatório das
+sub-sessões 4 e 6**, que é o resultado correto: nenhuma skill do catálogo real declara a
+tag `heal`. Os dois critérios de aceite raiz de M8 continuam batendo. `GOLDEN_HASH` intacto
+(`pnpm test:browser`, 42 testes, 3 engines). `RULES_VERSION` `0.7.0`→`0.8.0`.
+
+Testes novos: 14 em `duel/heal.test.ts` (a tag como discriminador; multiplier × stat +
+flat; escala com o stat do curador; `heal` como bônus percentual; `heal` negativo não vira
+dano; cura só-flat ignora o build; determinismo; truncamento; e as bordas de `applyHeal` —
+soma, cap no HP máximo, não ressuscita, cura 0) e 16 em `duel/healInDuel.test.ts` (novo —
+assistência de cura mira o aliado e não o inimigo, não sofre o corte de 50%, não causa
+dano, assistência ofensiva segue com `healDone` 0, cura do lado do defensor, cap no HP
+máximo, determinismo; auto-cura de skill de duelo com valor batendo com `computeHeal`, o
+stat `heal` aumentando a cura, skill de dano seguindo com `heal` 0; reação de cura curando
+em vez de contra-atacar, atacante não levando contra-dano, PP gasto normalmente, reação de
+dano seguindo com `healDone` null, determinismo). O fixture `assistHealSkill` de
+`assist.test.ts` saiu de `multiplier: 0` para `1000`: com cura inexistente ele só afirmava
+"não causa dano", e agora prova o caminho integral. `pnpm test` (**716 testes, 64
+arquivos** — +30 sobre a sub-sessão 6), `pnpm typecheck` (7 pacotes, limpo), `pnpm lint`
+sem alteração, `pnpm validate:data` (17 schemas, 72 arquivos — fatia não mexeu em
+conteúdo).
+
+**Com esta fatia acabam os itens nomeados de M10**, exceto `onLethal` (adiado por decisão
+de design do usuário na sub-sessão 5/N). Os 3 critérios de aceite formais de M10 já batiam
+desde a sub-sessão 4. Duas pontas soltas conhecidas, nenhuma delas escopo de M10:
+`lifesteal` inerte, e `sim-cli`/`DuelPreviewPanel` sem exibir cura no log troca a troca (o
+motor registra `heal` e `reaction.healDone`; exibir é trabalho de UI).
