@@ -1,0 +1,13 @@
+{
+  "id": "effect-bencao",
+  "name": "Bênção",
+  "kind": "buff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [
+    {
+      "stat": "def",
+      "pct": 450
+    }
+  ]
+}

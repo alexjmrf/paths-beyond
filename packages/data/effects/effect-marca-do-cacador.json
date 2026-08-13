@@ -1,0 +1,9 @@
+{
+  "id": "effect-marca-do-cacador",
+  "name": "Marca do Caçador",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [],
+  "damageTakenReductionPct": -100
+}

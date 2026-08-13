@@ -1,0 +1,9 @@
+{
+  "id": "effect-guarda-cerrada",
+  "name": "Guarda Cerrada",
+  "kind": "buff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [],
+  "damageTakenReductionPct": 70
+}

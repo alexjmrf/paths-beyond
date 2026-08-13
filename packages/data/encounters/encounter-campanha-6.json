@@ -1,0 +1,395 @@
+{
+  "id": "encounter-campanha-6",
+  "name": "Capítulo 6 — A Fortaleza do Mestre",
+  "mapId": "map-campanha-6",
+  "chapter": 6,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 9,
+        "y": 12
+      },
+      "height": 0
+    },
+    {
+      "unitId": "ally-clerigo",
+      "side": "player",
+      "hero": {
+        "id": "ally-clerigo",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-clerigo-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 8,
+        "y": 12
+      },
+      "height": 0
+    },
+    {
+      "unitId": "ally-arqueiro",
+      "side": "player",
+      "hero": {
+        "id": "ally-arqueiro",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-arqueiro-reacao-propria": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 10,
+        "y": 12
+      },
+      "height": 0
+    },
+    {
+      "unitId": "ally-arcanista",
+      "side": "player",
+      "hero": {
+        "id": "ally-arcanista",
+        "classId": "class-arcanista",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arcanista",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "arcane",
+        "duelSkills": [
+          "skill-ataque-arcanista",
+          "skill-especial-arcanista"
+        ],
+        "mapSkills": [
+          "skill-salva-arcana"
+        ],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arcanista",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 9,
+        "y": 13
+      },
+      "height": 0
+    },
+    {
+      "unitId": "ally-couracado",
+      "side": "player",
+      "hero": {
+        "id": "ally-couracado",
+        "classId": "class-couracado",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-couracado",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-couracado",
+          "skill-especial-couracado"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 8,
+        "y": 13
+      },
+      "height": 0
+    },
+    {
+      "unitId": "unit-guarda-portao",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-guarda-portao",
+        "classId": "class-couracado",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-couracado",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-couracado",
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 9,
+        "y": 8
+      },
+      "height": 0,
+      "aiArchetype": "guard-tile"
+    },
+    {
+      "unitId": "unit-sentinela-alada",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-sentinela-alada",
+        "classId": "class-grifeiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-grifeiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-grifeiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 11,
+        "y": 3
+      },
+      "height": 1,
+      "aiArchetype": "flank"
+    },
+    {
+      "unitId": "unit-capelao",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-capelao",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-clerigo-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 8,
+        "y": 3
+      },
+      "height": 1,
+      "aiArchetype": "support-nearest"
+    },
+    {
+      "unitId": "unit-chefe",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-chefe",
+        "classId": "class-mestre-espadachim",
+        "level": 11,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-mestre-espadachim",
+          "skill-especial-mestre-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-mestre-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 9,
+        "y": 4
+      },
+      "height": 2,
+      "aiArchetype": "hold-position"
+    }
+  ]
+}

@@ -419,6 +419,19 @@
   ],
   "talentTree": [
     {
+      "id": "talent-arqueiro-reacao-propria",
+      "tree": "class",
+      "row": 8,
+      "maxRank": 1,
+      "exclusiveWith": [],
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-folego-de-combate"
+        }
+      ]
+    },
+    {
       "id": "talent-arqueiro-agressivo",
       "tree": "class",
       "row": 1,

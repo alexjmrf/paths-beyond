@@ -7,6 +7,14 @@
   "multiplier": 1500,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-quebra-armadura",
+      "target": "target",
+      "chance": 500,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "physical"
   ]

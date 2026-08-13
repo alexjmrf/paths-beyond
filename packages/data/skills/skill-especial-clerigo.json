@@ -4,9 +4,17 @@
   "kind": "duel",
   "apCost": 1,
   "cooldown": 2,
-  "multiplier": 1300,
+  "multiplier": 1450,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-bencao",
+      "target": "self",
+      "chance": 1000,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "magic"
   ]

@@ -63,6 +63,11 @@ export interface DuelParticipant {
   // Opcional: o formato self-contained lido por `sim-cli` e as fixtures de M2 não têm
   // equipamento resolvido. Ausente = nenhum efeito special.
   readonly setSpecialEffectIds?: readonly Id[];
+  // §6.4 (M10 sub-sessão 8/N) — gatilhos de morte `lethalUses:'perBattle'` já consumidos
+  // em duelos anteriores desta batalha. Opcional pelo mesmo motivo de `setSpecialEffectIds`:
+  // as fixtures self-contained de M2-M6 e o formato de `sim-cli` não têm esse estado.
+  // Ausente = nenhum gatilho gasto ainda.
+  readonly lethalTriggersUsed?: readonly Id[];
 }
 
 // §6.2 — "o ataque básico custa 0 AP e está sempre disponível". Regra do motor, não

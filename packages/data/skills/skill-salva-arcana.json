@@ -1,0 +1,23 @@
+{
+  "id": "skill-salva-arcana",
+  "name": "Salva Arcana",
+  "kind": "map",
+  "apCost": 1,
+  "cooldown": 2,
+  "multiplier": 900,
+  "flat": 0,
+  "scalesWith": "atk",
+  "duelRange": 4,
+  "areaRadius": 1,
+  "effects": [
+    {
+      "effectId": "effect-lentidao",
+      "target": "target",
+      "chance": 1000,
+      "duration": 2
+    }
+  ],
+  "tags": [
+    "magic"
+  ]
+}

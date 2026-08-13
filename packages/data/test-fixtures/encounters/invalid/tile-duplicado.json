@@ -1,0 +1,73 @@
+{
+  "id": "encounter-invalido",
+  "name": "Encontro Inválido",
+  "mapId": "map-teste",
+  "chapter": 1,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "u-a",
+      "side": "enemy",
+      "hero": {
+        "id": "u-a",
+        "classId": "class-teste",
+        "level": 1,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": null,
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-teste"
+        ],
+        "mapSkills": [],
+        "tacticsScript": []
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0
+    },
+    {
+      "unitId": "u-b",
+      "side": "enemy",
+      "hero": {
+        "id": "u-b",
+        "classId": "class-teste",
+        "level": 1,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": null,
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-teste"
+        ],
+        "mapSkills": [],
+        "tacticsScript": []
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0
+    }
+  ]
+}

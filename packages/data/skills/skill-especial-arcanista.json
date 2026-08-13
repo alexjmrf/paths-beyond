@@ -7,6 +7,14 @@
   "multiplier": 1500,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-queimadura",
+      "target": "target",
+      "chance": 650,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "magic"
   ]

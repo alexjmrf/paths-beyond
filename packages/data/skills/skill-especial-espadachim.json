@@ -7,6 +7,14 @@
   "multiplier": 1400,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-sangramento",
+      "target": "target",
+      "chance": 400,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "physical"
   ]

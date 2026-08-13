@@ -1,0 +1,9 @@
+{
+  "id": "effect-regeneracao",
+  "name": "Regeneração",
+  "kind": "buff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [],
+  "periodicHealPct": 40
+}

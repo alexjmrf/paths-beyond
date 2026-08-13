@@ -24,7 +24,8 @@
         "weaponType": "axe",
         "duelSkills": [
           "skill-ataque-couracado",
-          "skill-especial-couracado"
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
@@ -64,7 +65,8 @@
         "weaponType": "axe",
         "duelSkills": [
           "skill-ataque-couracado",
-          "skill-especial-couracado"
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
@@ -104,7 +106,8 @@
         "weaponType": "axe",
         "duelSkills": [
           "skill-ataque-couracado",
-          "skill-especial-couracado"
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
         ],
         "mapSkills": [],
         "tacticsScript": [

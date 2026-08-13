@@ -24,10 +24,21 @@
         "weaponType": "holy",
         "duelSkills": [
           "skill-ataque-clerigo",
-          "skill-especial-clerigo"
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
         ],
         "mapSkills": [],
         "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
           {
             "enabled": true,
             "skillId": "skill-especial-clerigo",
@@ -64,10 +75,21 @@
         "weaponType": "holy",
         "duelSkills": [
           "skill-ataque-clerigo",
-          "skill-especial-clerigo"
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
         ],
         "mapSkills": [],
         "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
           {
             "enabled": true,
             "skillId": "skill-especial-clerigo",
@@ -104,10 +126,21 @@
         "weaponType": "holy",
         "duelSkills": [
           "skill-ataque-clerigo",
-          "skill-especial-clerigo"
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
         ],
         "mapSkills": [],
         "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
           {
             "enabled": true,
             "skillId": "skill-especial-clerigo",

@@ -9,7 +9,11 @@ import {
   CLASS_PROFILES,
   ITEM_SETS,
   SHARED_ITEMS,
+  SIGNATURE_EFFECTS,
   SKILL_ASSISTIR,
+  SKILL_CURA_CLERIGO,
+  SKILL_REVIDE_PRECISO,
+  SKILL_ULTIMO_SUSPIRO,
   SPECIAL_ITEM_SETS,
   generateBasicSkill,
   generateClass,
@@ -328,5 +332,235 @@ describe('sets `special` de §7.4 (M10, sub-sessão 6/N)', () => {
     for (const profile of CLASS_PROFILES) {
       expect(specialIds.has(generateWeaponItem(profile).setId)).toBe(false);
     }
+  });
+});
+
+// M10, sub-sessão 8/N — `SkillDef.lethalUses` (frequência do gatilho de morte, §6.4).
+// Escopo declarado no dado, não no motor: o core tem um default ('perDuel'), mas omitir o
+// campo mudaria silenciosamente o poder da skill inteira, então o schema exige.
+describe('gatilho de morte — schema de `lethalUses`', () => {
+  const lethalSkill = {
+    id: 'skill-fixture-onlethal',
+    name: 'Fixture',
+    kind: 'duel' as const,
+    apCost: 0,
+    cooldown: 0,
+    multiplier: 0,
+    flat: 0,
+    scalesWith: 'atk' as const,
+    effects: [],
+    trigger: 'onLethal' as const,
+    tags: ['survive'],
+  };
+
+  it('aceita `perDuel` e `perBattle` com trigger onLethal', () => {
+    expect(skillSchema.parse({ ...lethalSkill, lethalUses: 'perDuel' }).lethalUses).toBe('perDuel');
+    expect(skillSchema.parse({ ...lethalSkill, lethalUses: 'perBattle' }).lethalUses).toBe('perBattle');
+  });
+
+  it('rejeita trigger onLethal sem `lethalUses`', () => {
+    expect(() => skillSchema.parse(lethalSkill)).toThrow();
+  });
+
+  it('rejeita `lethalUses` em skill que não é gatilho de morte', () => {
+    expect(() => skillSchema.parse({ ...lethalSkill, trigger: undefined, lethalUses: 'perDuel' })).toThrow();
+  });
+
+  // Gap consciente desta fatia, mesmo padrão dos sets `special` acima: o motor entende o
+  // gatilho, mas autorar skill que o use é escopo declarado de M12 ("skills que usam os
+  // efeitos de M10"). É o que mantém `pnpm balance` e o GOLDEN_HASH intactos.
+  it('nenhuma skill do catálogo real declara trigger onLethal ainda', () => {
+    // As skills geradas nem sequer têm o campo `trigger` no tipo — a leitura frouxa é
+    // proposital: o que importa é o valor final, venha ele do gerador ou do JSON.
+    const triggerOf = (skill: object): unknown => (skill as { trigger?: unknown }).trigger;
+    for (const profile of CLASS_PROFILES) {
+      expect(triggerOf(generateBasicSkill(profile))).not.toBe('onLethal');
+      expect(triggerOf(generateSignatureSkill(profile))).not.toBe('onLethal');
+    }
+    for (const reaction of BASELINE_REACTIONS) {
+      expect(reaction.trigger).not.toBe('onLethal');
+    }
+    expect(SKILL_ASSISTIR.trigger).not.toBe('onLethal');
+  });
+});
+
+// M11, sub-sessão 2/N — `SkillDef.areaRadius` (§5.4, "cura em área, artilharia, buff de
+// zona"). Ao contrário de `lethalUses`, é opcional: skill de mapa de alvo único é
+// legítima e a ausência é o caso conservador (raio 0 = só o tile alvo).
+describe('skill de mapa em área — schema de `areaRadius`', () => {
+  const mapSkill = {
+    id: 'skill-fixture-artilharia',
+    name: 'Fixture',
+    kind: 'map' as const,
+    apCost: 1,
+    cooldown: 0,
+    multiplier: 1200,
+    flat: 0,
+    scalesWith: 'atk' as const,
+    duelRange: 4,
+    effects: [],
+    tags: ['physical'],
+  };
+
+  it('aceita raio em skill de mapa, e a ausência dele', () => {
+    expect(skillSchema.parse({ ...mapSkill, areaRadius: 2 }).areaRadius).toBe(2);
+    expect(skillSchema.parse(mapSkill).areaRadius).toBeUndefined();
+  });
+
+  it('aceita raio 0 — alvo único é uma skill de mapa legítima', () => {
+    expect(skillSchema.parse({ ...mapSkill, areaRadius: 0 }).areaRadius).toBe(0);
+  });
+
+  it('rejeita raio negativo', () => {
+    expect(() => skillSchema.parse({ ...mapSkill, areaRadius: -1 })).toThrow();
+  });
+
+  it('rejeita raio em skill que não é de mapa — seria número inerte', () => {
+    expect(() => skillSchema.parse({ ...mapSkill, kind: 'duel', areaRadius: 2 })).toThrow();
+  });
+
+  // Gap consciente, mesmo padrão dos efeitos de M10: autorar a skill de área e dá-la a uma
+  // classe é escopo de M12 (§10, campanha com objetivos variados), e mexeria no balanceamento.
+  it('nenhuma skill do catálogo real declara `areaRadius` ainda', () => {
+    const areaRadiusOf = (skill: object): unknown => (skill as { areaRadius?: unknown }).areaRadius;
+    for (const profile of CLASS_PROFILES) {
+      expect(areaRadiusOf(generateBasicSkill(profile))).toBeUndefined();
+      expect(areaRadiusOf(generateSignatureSkill(profile))).toBeUndefined();
+    }
+  });
+});
+
+// M12, sub-sessão 2/N — o critério de aceite raiz de M12 ("nenhuma skill do catálogo é só
+// um número de dano") vira teste executável em vez de afirmação em prosa. A EXCEÇÃO é
+// declarada e decidida com o usuário: o ataque básico e as duas reações universais de §6.4
+// são o fallback que toda unidade tem de graça (§6.2: "o ataque básico custa 0 AP e está
+// sempre disponível"), e dar efeito a eles inflaria a linha de base em vez de criar
+// escolha. O critério vale para toda skill que o jogador ESCOLHE.
+describe('nenhuma skill escolhível é só um número de dano (critério de aceite de M12)', () => {
+  const BASELINE_IDS = new Set(['skill-contra-atacar', 'skill-defender']);
+  const isBasicAttack = (id: string): boolean => id.startsWith('skill-ataque-');
+
+  // `skill-assistir` é a terceira exceção, e por um motivo MECÂNICO, não de design: uma
+  // assistência é ou 50% do dano da skill, ou cura em efeito integral (§6.5.3) — e mais
+  // nada. `applyAssistDamage` (M10 sub-sessão 2) IGNORA `skill.effects` de propósito, corte
+  // documentado desde M10 sub-sessão 1. Dar um efeito a ela seria autorar conteúdo morto,
+  // que é pior do que assumir que é um número. Para uma assistência ser "mais que um
+  // número" sem mentir, o motor teria que aplicar efeitos de assistência — mudança de core,
+  // não de conteúdo. Registrado em DECISIONS.md como limitação conhecida.
+  const ASSIST_ID = 'skill-assistir';
+
+  function isMoreThanDamage(skill: Record<string, unknown>): boolean {
+    const effects = (skill.effects ?? []) as unknown[];
+    const tags = (skill.tags ?? []) as string[];
+    return (
+      effects.length > 0 || // aplica buff/debuff/DoT
+      tags.includes('heal') || // cura (M10 sub-sessão 7/N)
+      skill.trigger === 'onLethal' || // gatilho de morte (M10 sub-sessão 8/N)
+      (skill.multiplier === 0 && skill.flat === 0) // não causa dano nenhum (Defender)
+    );
+  }
+
+  const allSkills = [
+    ...CLASS_PROFILES.map(generateSignatureSkill),
+    SKILL_ASSISTIR,
+    SKILL_CURA_CLERIGO,
+    SKILL_ULTIMO_SUSPIRO,
+    SKILL_REVIDE_PRECISO,
+  ] as unknown as Record<string, unknown>[];
+
+  it('toda especial de classe aplica um efeito', () => {
+    for (const profile of CLASS_PROFILES) {
+      const signature = generateSignatureSkill(profile);
+      expect(signature.effects.length).toBeGreaterThan(0);
+      expect(signature.effects[0]!.duration).toBe('duel');
+    }
+  });
+
+  it('nenhuma skill escolhível do catálogo é só dano', () => {
+    for (const skill of allSkills) {
+      const id = skill.id as string;
+      if (isBasicAttack(id) || BASELINE_IDS.has(id) || id === ASSIST_ID) continue;
+      expect(isMoreThanDamage(skill), `${id} é só um número de dano`).toBe(true);
+    }
+  });
+
+  // Trava a razão da exceção: se um dia o motor passar a aplicar efeitos de assistência,
+  // este teste falha e a exceção precisa ser reavaliada em vez de virar folclore.
+  it('a assistência continua sem poder expressar mais que um número (limitação do motor)', () => {
+    expect((SKILL_ASSISTIR as { effects?: unknown[] }).effects ?? []).toEqual([]);
+    expect(SKILL_ASSISTIR.tags).not.toContain('heal');
+  });
+
+  it('a exceção declarada continua sendo só o básico e as 2 reações universais de §6.4', () => {
+    for (const profile of CLASS_PROFILES) {
+      expect(generateBasicSkill(profile).id).toMatch(/^skill-ataque-/);
+    }
+    expect(BASELINE_REACTIONS.map((r) => r.id).sort()).toEqual([...BASELINE_IDS].sort());
+  });
+
+  it('todo effectId aplicado por uma especial existe entre os EffectDef autorados', () => {
+    const known = new Set([...SIGNATURE_EFFECTS.map((e) => e.id), 'effect-fragilidade']);
+    for (const profile of CLASS_PROFILES) {
+      for (const application of generateSignatureSkill(profile).effects) {
+        expect(known.has(application.effectId)).toBe(true);
+      }
+    }
+  });
+});
+
+// As três mecânicas de M10 que passaram M10 inteira sem UM consumidor real (gap registrado
+// quatro sub-sessões seguidas). Estes testes são o que impede a regressão silenciosa: sem
+// eles, remover a skill deixaria o motor de novo com uma mecânica que ninguém usa.
+describe('as mecânicas de M10 ganham consumidor real (M12, sub-sessão 2/N)', () => {
+  it('a tag `heal` tem uma skill de conteúdo real', () => {
+    expect(SKILL_CURA_CLERIGO.tags).toContain('heal');
+    expect(() => skillSchema.parse(SKILL_CURA_CLERIGO)).not.toThrow();
+  });
+
+  it('`onLethal` tem uma passiva real, com escopo declarado', () => {
+    expect(SKILL_ULTIMO_SUSPIRO.trigger).toBe('onLethal');
+    expect(SKILL_ULTIMO_SUSPIRO.lethalUses).toBe('perBattle');
+    expect(SKILL_ULTIMO_SUSPIRO.tags).toContain('survive');
+    expect(() => skillSchema.parse(SKILL_ULTIMO_SUSPIRO)).not.toThrow();
+  });
+
+  // O motivo de `ppCost: 0` está no comentário da própria skill: com 1 PP ela nunca
+  // dispararia, porque Contra-atacar (onAttacked, baseline, sem condições) vence sempre e
+  // `tryLateReaction` sai cedo se já houve reação na troca. Este teste trava o 0.
+  it('`onDamaged` tem uma reação real: cura, custando 0 PP — senão nunca dispararia', () => {
+    expect(SKILL_REVIDE_PRECISO.trigger).toBe('onDamaged');
+    expect(SKILL_REVIDE_PRECISO.ppCost).toBe(0);
+    // §6.4 "Cura de emergência": curar é a única forma de uma reação ser mais que um
+    // número de dano, porque `resolveDuel` ignora os `skill.effects` de reação.
+    expect(SKILL_REVIDE_PRECISO.tags).toContain('heal');
+    expect(() => skillSchema.parse(SKILL_REVIDE_PRECISO)).not.toThrow();
+  });
+
+  it('as três chegam a uma unidade de verdade: duelSkills, talento e script', () => {
+    const clerigo = CLASS_PROFILES.find((p) => p.slug === 'clerigo')!;
+    const couracado = CLASS_PROFILES.find((p) => p.slug === 'couracado')!;
+    const arqueiro = CLASS_PROFILES.find((p) => p.slug === 'arqueiro')!;
+
+    // Cura: em duelSkills E numa linha de script com condição (decisão, não troca fixa).
+    const compClerigo = generateComp(clerigo);
+    expect(compClerigo.units[0]!.hero.duelSkills).toContain(SKILL_CURA_CLERIGO.id);
+    expect(compClerigo.units[0]!.hero.tacticsScript[0]!.skillId).toBe(SKILL_CURA_CLERIGO.id);
+    expect(compClerigo.units[0]!.hero.tacticsScript[0]!.conditions.length).toBeGreaterThan(0);
+
+    // onLethal: passiva em duelSkills (é assim que chega a `knownSkills`), sem linha de script.
+    const compCouracado = generateComp(couracado);
+    expect(compCouracado.units[0]!.hero.duelSkills).toContain(SKILL_ULTIMO_SUSPIRO.id);
+    expect(compCouracado.units[0]!.hero.tacticsScript.map((l) => l.skillId)).not.toContain(SKILL_ULTIMO_SUSPIRO.id);
+
+    // onDamaged: concedida por talento, e o comp PRECISA alocar o talento — sem isso o
+    // gatilho continuaria sem consumidor no torneio.
+    const compArqueiro = generateComp(arqueiro);
+    expect(generateTalentTree(arqueiro).some((n) => n.effects.some((e) => (e as { reactionId?: string }).reactionId === SKILL_REVIDE_PRECISO.id))).toBe(true);
+    expect(Object.keys(compArqueiro.units[0]!.hero.talents)).toContain('talent-arqueiro-reacao-propria');
+  });
+
+  it('só o Arqueiro tem reação própria — §6.4 fecha as universais em duas', () => {
+    const comReacao = CLASS_PROFILES.filter((p) => p.grantedReactionId !== undefined);
+    expect(comReacao.map((p) => p.slug)).toEqual(['arqueiro']);
   });
 });

@@ -1,0 +1,16 @@
+{
+  "id": "skill-folego-de-combate",
+  "name": "Fôlego de Combate",
+  "kind": "reaction",
+  "apCost": 0,
+  "ppCost": 0,
+  "cooldown": 0,
+  "multiplier": 120,
+  "flat": 0,
+  "scalesWith": "atk",
+  "effects": [],
+  "trigger": "onDamaged",
+  "tags": [
+    "heal"
+  ]
+}

@@ -13,6 +13,10 @@ export function UnitActionBar() {
   const openInventory = useBattleStore((s) => s.openInventory);
   const openTalentEditor = useBattleStore((s) => s.openTalentEditor);
 
+  const targetingMode = useBattleStore((s) => s.targetingMode);
+  const beginMapSkillTargeting = useBattleStore((s) => s.beginMapSkillTargeting);
+  const cancelTargeting = useBattleStore((s) => s.cancelTargeting);
+
   const unit = battleState.units.find((u) => u.unitId === selectedUnitId);
 
   if (!unit) {
@@ -24,6 +28,12 @@ export function UnitActionBar() {
   }
 
   const distanceMoved = battleState.distanceMovedThisTurn[unit.unitId] ?? 0;
+
+  // §5.4 — "No seu turno, uma unidade faz: mover? + uma das opções", e `mapSkill` é uma
+  // delas. O comando existe no core desde M3 e resolve área desde M11, mas o cliente não
+  // tinha como emiti-lo: o mapa só sabia mover e engajar, então toda skill de mapa
+  // autorada era inalcançável por um humano.
+  const mapSkills = Object.values(unit.knownSkills).filter((skill) => skill.kind === 'map');
 
   return (
     <div className="unit-action-bar">
@@ -41,6 +51,21 @@ export function UnitActionBar() {
         <button type="button" disabled={unit.hasActedThisRound} onClick={restSelectedUnit}>
           Descansar (+1 AP +1 PP)
         </button>
+        {mapSkills.map((skill) => {
+          const targeting = targetingMode?.kind === 'mapSkill' && targetingMode.skillId === skill.id;
+          const cooldown = unit.cooldowns[skill.id] ?? 0;
+          return (
+            <button
+              key={skill.id}
+              type="button"
+              className={targeting ? 'targeting' : ''}
+              disabled={unit.hasActedThisRound || unit.ap < skill.apCost || cooldown > 0}
+              onClick={() => (targeting ? cancelTargeting() : beginMapSkillTargeting(skill.id))}
+            >
+              {skill.name} ({skill.apCost} AP{skill.areaRadius ? `, área ${skill.areaRadius}` : ''})
+            </button>
+          );
+        })}
         <button type="button" onClick={() => openTacticsEditor(unit.unitId)}>
           Editar táticas
         </button>
@@ -51,6 +76,9 @@ export function UnitActionBar() {
           Talentos
         </button>
       </div>
+      {targetingMode?.kind === 'mapSkill' ? (
+        <p className="targeting-hint">Clique num tile dentro do alcance para lançar.</p>
+      ) : null}
       {lastCommandReason ? <p className="error">{lastCommandReason}</p> : null}
     </div>
   );

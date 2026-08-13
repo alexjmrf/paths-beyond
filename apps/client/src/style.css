@@ -782,3 +782,88 @@ main {
   background: #374151;
   color: white;
 }
+
+/* M12, sub-sessão 4/N — objetivo do mapa, Valor e mira. */
+.objective-panel {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-left: 3px solid #facc15;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.objective-panel h2 {
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+
+.objective-title {
+  margin: 0;
+  font-weight: 600;
+  color: #facc15;
+  font-size: 0.85rem;
+}
+
+.objective-detail {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.round-counter {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+}
+
+.valor-section {
+  margin-top: 0.75rem;
+  border-top: 1px solid #1f2937;
+  padding-top: 0.5rem;
+}
+
+.valor-section h3 {
+  font-size: 0.8rem;
+  margin: 0 0 0.4rem;
+}
+
+.valor-amount {
+  color: #a855f7;
+  font-weight: 700;
+}
+
+.valor-skills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.valor-skills button {
+  width: 100%;
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+.valor-skills .cost {
+  color: #9ca3af;
+}
+
+/* Mesma cor do overlay de mira no mapa, pra o botão ativo e os tiles legais se lerem
+   como a mesma coisa. */
+button.targeting {
+  outline: 2px solid #a855f7;
+}
+
+.targeting-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: #a855f7;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}

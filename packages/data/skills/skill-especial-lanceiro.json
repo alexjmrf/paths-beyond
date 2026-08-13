@@ -7,6 +7,14 @@
   "multiplier": 1350,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-desarme",
+      "target": "target",
+      "chance": 500,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "physical"
   ]

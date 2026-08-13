@@ -7,6 +7,14 @@
   "multiplier": 1450,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-lentidao",
+      "target": "target",
+      "chance": 700,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "physical"
   ]

@@ -43,6 +43,7 @@ export function buildInitialState(setup: BattleSetup, seed: number): BattleState
     permadeath: setup.permadeath,
     winCondition: setup.winCondition,
     effectDefs: setup.effectDefs,
+    valorSkills: setup.valorSkills,
     outcome: 'ongoing',
     seed,
   });

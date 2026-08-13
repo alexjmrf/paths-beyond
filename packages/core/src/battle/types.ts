@@ -5,6 +5,7 @@ import type { SkillDef } from '../skills/types.js';
 import type { StatSheet } from '../stats/types.js';
 import type { Id } from '../types.js';
 import type { InitiativeEntry } from './initiative.js';
+import type { ValorSkillDef } from './valor.js';
 
 // Só há dois lados na lista única de iniciativa (§5.3: "todas as unidades, dos dois
 // lados"). Não normativo na spec — decisão registrada em DECISIONS.md.
@@ -52,16 +53,23 @@ export interface BattleUnit {
   // passar por resolveHeroCombatProfile (as self-contained de M2-M6, fixtures de teste)
   // não têm equipamento resolvido. Ausente = nenhum efeito special.
   readonly setSpecialEffectIds?: readonly Id[];
+  // §6.4 (M10 sub-sessão 8/N) — gatilhos de morte `lethalUses:'perBattle'` já consumidos
+  // nesta batalha, seja em duelo ou no tick de DoT. É o que faz "uma vez por batalha"
+  // significar de fato uma vez, atravessando duelos. Ausente = nenhum gasto ainda.
+  readonly lethalTriggersUsed?: readonly Id[];
 }
 
-// §5.7 — "Data-driven por mapa: rout, seize, survive N rounds, escort, defend." Só
-// `rout` é resolvido em M3 (ver DECISIONS.md); os demais têm shape mas não implementação.
+// §5.7 — "Data-driven por mapa: rout, seize, survive N rounds, escort, defend." Todas
+// resolvidas em `winCondition.ts` desde M11; a spec nomeia as cinco sem definir nenhuma,
+// então as leituras estão registradas em DECISIONS.md.
 export type WinCondition =
   | { readonly t: 'rout' }
   | { readonly t: 'seize'; readonly target: Coord }
   | { readonly t: 'surviveRounds'; readonly n: number }
   | { readonly t: 'escort'; readonly unitId: Id; readonly target: Coord }
-  | { readonly t: 'defend'; readonly rounds: number };
+  // `target` é campo de M11: sem ele `defend` seria um sinônimo de `surviveRounds`
+  // (decisão do usuário). Segure `rounds` rounds SEM deixar inimigo pisar no tile.
+  | { readonly t: 'defend'; readonly rounds: number; readonly target: Coord };
 
 // §5.7 — "Permadeath é flag do BattleSetup (casual | classic | ironman)".
 export type PermadeathMode = 'casual' | 'classic' | 'ironman';
@@ -74,6 +82,11 @@ export interface BattleSetup {
   readonly permadeath: PermadeathMode;
   readonly winCondition: WinCondition;
   readonly effectDefs: Readonly<Record<Id, EffectDef>>;
+  // §5.6 (M11 sub-sessão 3/N) — catálogo de `data/valor-skills/*.json` que `useValor`
+  // resolve. Opcional pelo mesmo motivo de `setSpecialEffectIds`/`aiArchetype`: as
+  // batalhas montadas à mão em M2-M6 e as fixtures de teste não têm catálogo. Ausente =
+  // nenhuma skill de Valor resolvível, e todo `useValor` é rejeitado.
+  readonly valorSkills?: Readonly<Record<Id, ValorSkillDef>>;
   readonly initialValor: number; // §5.6 — "Começa em 5"
 }
 
@@ -107,6 +120,7 @@ export interface BattleState {
   readonly permadeath: PermadeathMode;
   readonly winCondition: WinCondition;
   readonly effectDefs: Readonly<Record<Id, EffectDef>>;
+  readonly valorSkills?: Readonly<Record<Id, ValorSkillDef>>; // §5.6 — ver BattleSetup
   readonly outcome: 'ongoing' | 'victory' | 'defeat';
   readonly seed: number;
 }

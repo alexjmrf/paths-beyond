@@ -9,12 +9,16 @@ const tileSchema = z.object({
 
 // §5.7 — "Data-driven por mapa: rout, seize, survive N rounds, escort, defend." Só
 // `rout` é resolvido pelo motor em M3 (ver DECISIONS.md); os demais só têm schema.
-const winConditionSchema = z.discriminatedUnion('t', [
+// Exportado desde M12: `encounters.schema.ts` reusa a mesma união para poder sobrepor a
+// condição do layout (um mapa de `escort` nomeia uma unidade que só existe no elenco).
+export const winConditionSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('rout') }),
   z.object({ t: z.literal('seize'), target: coordSchema }),
   z.object({ t: z.literal('surviveRounds'), n: z.number().int().positive() }),
   z.object({ t: z.literal('escort'), unitId: idSchema, target: coordSchema }),
-  z.object({ t: z.literal('defend'), rounds: z.number().int().positive() }),
+  // §5.7 (M11) — `target` é o que separa `defend` de `surviveRounds`: segure `rounds`
+  // rounds E não deixe inimigo pisar no tile (decisão do usuário, ver DECISIONS.md).
+  z.object({ t: z.literal('defend'), rounds: z.number().int().positive(), target: coordSchema }),
 ]);
 
 // §5.1 — Mapa. "Grid quadrado ortogonal, 15×15 a 30×30."

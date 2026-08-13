@@ -6,6 +6,7 @@ import type { SkillDef } from '../skills/types.js';
 import type { WeaponType } from '../tactics/types.js';
 import type { Id } from '../types.js';
 import type { BattleSetup, BattleUnit, MapAiArchetype, PermadeathMode, Side, WinCondition } from './types.js';
+import type { ValorSkillDef } from './valor.js';
 import type { EffectDef } from '../duel/types.js';
 
 export interface BuildBattleUnitInput {
@@ -74,6 +75,13 @@ export interface BuildBattleSetupFromHeroesInput {
   readonly skillsCatalog: Readonly<Record<Id, SkillDef>>;
   readonly weaponDuelRanges: Readonly<Record<WeaponType, number>>;
   readonly baselineReactionSkillIds: readonly Id[];
+  // §5.6 (M12, sub-sessão 4/N) — o catálogo de skills de Valor da batalha. Opcional pelo
+  // mesmo motivo que em `BattleSetup`/`BattleState` (M11, sub-sessão 3/N): mapa sem
+  // valor-skills declaradas é legítimo, e `applyUseValor` já rejeita alto nesse caso.
+  // Sem este repasse o campo era inalcançável por quem monta a batalha a partir de
+  // heróis — ou seja, por cliente, servidor e `tools/balance` — e Valor só existia em
+  // teste, com o saldo aparecendo no HUD sem nada que o gastasse.
+  readonly valorSkills?: Readonly<Record<Id, ValorSkillDef>>;
 }
 
 // Compõe as duas etapas anteriores (resolveHeroCombatProfile, sub-sessão 4;
@@ -114,5 +122,6 @@ export function buildBattleSetupFromHeroes(input: BuildBattleSetupFromHeroesInpu
     winCondition: input.winCondition,
     effectDefs: input.effectDefs,
     initialValor: input.initialValor,
+    ...(input.valorSkills ? { valorSkills: input.valorSkills } : {}),
   };
 }

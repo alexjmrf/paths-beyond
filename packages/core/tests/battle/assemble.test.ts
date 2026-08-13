@@ -241,4 +241,57 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
     const b = JSON.stringify(buildBattleSetupFromHeroes(input));
     expect(a).toBe(b);
   });
+  // §5.6 (M12, sub-sessão 4/N) — `valorSkills` repassadas ao `BattleSetup`. O campo existe
+  // em `BattleSetup`/`BattleState` desde M11 e é lido por `applyUseValor`, mas era
+  // inalcançável por quem monta a batalha a partir de heróis: cliente, servidor e
+  // `tools/balance` passam por aqui, e nenhum tinha como declarar as skills de Valor do
+  // mapa. Na prática Valor era saldo no HUD sem nada que o gastasse.
+  it('repassa as valorSkills declaradas para o BattleSetup', () => {
+    const valorSkills = {
+      'valor-teste': {
+        id: 'valor-teste',
+        name: 'Teste',
+        cost: 2,
+        kind: 'globalBuff' as const,
+        payload: { effectId: 'effect-x' },
+      },
+    };
+
+    const setup = buildBattleSetupFromHeroes({
+      placements: [
+        { unitId: 'u-atk', hero: buildHero(), classDef, equippedItems: [], side: 'player', pos: { x: 0, y: 0 }, height: 0 },
+      ],
+      map,
+      permadeath: 'casual',
+      winCondition: { t: 'rout' },
+      effectDefs: {},
+      initialValor: 5,
+      itemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+      valorSkills,
+    });
+
+    expect(setup.valorSkills).toEqual(valorSkills);
+  });
+
+  it('omite o campo quando não há valorSkills — mapa sem Valor declarado é legítimo', () => {
+    const setup = buildBattleSetupFromHeroes({
+      placements: [
+        { unitId: 'u-atk', hero: buildHero(), classDef, equippedItems: [], side: 'player', pos: { x: 0, y: 0 }, height: 0 },
+      ],
+      map,
+      permadeath: 'casual',
+      winCondition: { t: 'rout' },
+      effectDefs: {},
+      initialValor: 5,
+      itemSets,
+      skillsCatalog,
+      weaponDuelRanges,
+      baselineReactionSkillIds,
+    });
+
+    expect('valorSkills' in setup).toBe(false);
+  });
 });

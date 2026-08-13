@@ -1,0 +1,16 @@
+{
+  "id": "skill-ultimo-suspiro",
+  "name": "Último Suspiro",
+  "kind": "duel",
+  "apCost": 0,
+  "cooldown": 0,
+  "multiplier": 0,
+  "flat": 0,
+  "scalesWith": "atk",
+  "effects": [],
+  "trigger": "onLethal",
+  "lethalUses": "perBattle",
+  "tags": [
+    "survive"
+  ]
+}

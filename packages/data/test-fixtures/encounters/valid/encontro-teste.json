@@ -1,0 +1,74 @@
+{
+  "id": "encounter-teste",
+  "name": "Encontro de Teste",
+  "mapId": "map-teste",
+  "chapter": 1,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "u-heroi",
+      "side": "player",
+      "hero": {
+        "id": "u-heroi",
+        "classId": "class-teste",
+        "level": 1,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": null,
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-teste"
+        ],
+        "mapSkills": [],
+        "tacticsScript": []
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0
+    },
+    {
+      "unitId": "u-inimigo",
+      "side": "enemy",
+      "hero": {
+        "id": "u-inimigo",
+        "classId": "class-teste",
+        "level": 1,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": null,
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-teste"
+        ],
+        "mapSkills": [],
+        "tacticsScript": []
+      },
+      "pos": {
+        "x": 3,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

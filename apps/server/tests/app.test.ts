@@ -16,9 +16,11 @@ const emptyCatalog: ContentCatalog = {
   items: {},
   itemSets: {},
   effects: {},
+  valorSkills: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: {},
   comps: [],
+  encounters: [],
   baselineReactionSkillIds: [],
 };
 

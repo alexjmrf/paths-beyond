@@ -1,0 +1,88 @@
+{
+  "id": "encounter-campanha-1",
+  "name": "Capítulo 1 — O Bloqueio na Estrada",
+  "mapId": "map-campanha-1",
+  "chapter": 1,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "unit-bandido-1",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-bandido-1",
+        "classId": "class-guerreiro",
+        "level": 8,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 12,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

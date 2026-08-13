@@ -10,10 +10,16 @@ function tileCenter(coord: Coord): { x: number; y: number } {
   return { x: coord.x * TILE_SIZE + TILE_SIZE / 2, y: coord.y * TILE_SIZE + TILE_SIZE / 2 };
 }
 
+// As chaves são os `TerrainId` REAIS de `packages/data/terrains/*.json`. Eram
+// `plain`/`forest`/`mountain` (os ids dos fixtures de M6) e nenhuma batia desde que M9
+// trocou o conteúdo de demonstração pelo catálogo real — o mapa inteiro caía no cinza de
+// fallback. Ficou invisível enquanto todo mapa de campanha era planície pura; com o
+// terreno real de M12 (sub-sessão 3/N), floresta e montanha mudam movimento, defesa e
+// evasão, e o jogador precisa ver onde estão.
 const TERRAIN_COLORS: Record<string, number> = {
-  plain: 0x8fbc5a,
-  forest: 0x2f5d34,
-  mountain: 0x8a8a86,
+  'terrain-planicie': 0x8fbc5a,
+  'terrain-floresta': 0x2f5d34,
+  'terrain-montanha': 0x8a8a86,
 };
 
 const SIDE_COLORS: Record<string, number> = {
@@ -87,6 +93,8 @@ export function MapCanvas() {
   const selectUnit = useBattleStore((s) => s.selectUnit);
   const moveSelectedUnitTo = useBattleStore((s) => s.moveSelectedUnitTo);
   const previewEngage = useBattleStore((s) => s.previewEngage);
+  const targetingMode = useBattleStore((s) => s.targetingMode);
+  const confirmTargetAt = useBattleStore((s) => s.confirmTargetAt);
 
   // Anima um "fantasma" deslizando tile a tile pelo `path` antes de commitar o movimento
   // de verdade — o estado do core só muda quando a animação termina (`moveSelectedUnitTo`
@@ -174,9 +182,18 @@ export function MapCanvas() {
   }, []);
 
   useEffect(() => {
+    // A campanha real (M12, sub-sessão 3/N) deixou de ser toda 15×15: há mapas 16×16,
+    // 18×18 e 20×15. O `Application` é inicializado uma vez com o tamanho do primeiro
+    // mapa, então sem este resize os capítulos maiores apareceriam cortados ao avançar.
+    const app = appRef.current;
+    const width = battleState.map.width * TILE_SIZE;
+    const height = battleState.map.height * TILE_SIZE;
+    if (app && (app.renderer.width !== width || app.renderer.height !== height)) {
+      app.renderer.resize(width, height);
+    }
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [battleState, selectedUnitId, reachableTiles, duelPreview]);
+  }, [battleState, selectedUnitId, reachableTiles, duelPreview, targetingMode]);
 
   function redraw() {
     const layer = layerRef.current;
@@ -188,28 +205,59 @@ export function MapCanvas() {
     const threatened = computeThreatenedTiles(battleState);
     const selectedUnit = selectedUnitId ? units.find((u) => u.unitId === selectedUnitId) : undefined;
     const engageableEnemyIds = computeEngageableEnemyIds(units, selectedUnit);
+    const targetableSet = new Set((targetingMode?.tiles ?? []).map(tileKey));
+    // O tile que a condição de vitória nomeia (§5.7). `rout`/`surviveRounds` não têm tile
+    // — a condição não é sobre lugar nenhum.
+    const objectiveTile =
+      'target' in battleState.winCondition ? (battleState.winCondition.target as Coord) : undefined;
 
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const tile = map.tiles[y]?.[x];
-        const terrainId = tile?.terrain ?? 'plain';
+        const terrainId = tile?.terrain ?? 'terrain-planicie';
         const color = TERRAIN_COLORS[terrainId] ?? 0x888888;
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
 
         const g = new Graphics();
         g.rect(px, py, TILE_SIZE - 1, TILE_SIZE - 1).fill(color);
+        // Altura do tile (§6.6 dá dano e acerto a quem ataca de cima): um véu branco por
+        // nível, pra o relevo aparecer sem precisar de outra paleta.
+        if (tile && tile.height > 0) {
+          g.rect(px, py, TILE_SIZE - 1, TILE_SIZE - 1).fill({ color: 0xffffff, alpha: 0.08 * tile.height });
+        }
         if (threatened.has(tileKey({ x, y }))) {
           g.rect(px, py, TILE_SIZE - 1, TILE_SIZE - 1).fill({ color: 0xef4444, alpha: 0.22 });
         }
         if (reachableSet.has(tileKey({ x, y }))) {
           g.rect(px, py, TILE_SIZE - 1, TILE_SIZE - 1).fill({ color: 0x60a5fa, alpha: 0.4 });
         }
+        // Alcance de lançamento da skill de mapa / do Valor em mira (§5.4/§5.6).
+        if (targetableSet.has(tileKey({ x, y }))) {
+          g.rect(px, py, TILE_SIZE - 1, TILE_SIZE - 1).fill({ color: 0xa855f7, alpha: 0.3 });
+        }
+        // Rocha intransponível, desenhada DEPOIS dos overlays: o de ameaça cobre o tile
+        // inteiro e fazia a muralha do capítulo 6 se ler como zona de perigo em vez de
+        // parede. Terreno que decide o traçado do mapa não pode ser apagado por um véu.
+        if (tile && map.terrains[tile.terrain]?.moveCost.foot === 'impassable') {
+          g.rect(px + 1, py + 1, TILE_SIZE - 3, TILE_SIZE - 3).stroke({ width: 2, color: 0x4b5563 });
+        }
+        // O objetivo do mapa, sempre marcado: sem isto um mapa de `seize`/`defend`/
+        // `escort` manda o jogador procurar uma coordenada que só existe no JSON.
+        if (objectiveTile && objectiveTile.x === x && objectiveTile.y === y) {
+          g.rect(px + 2, py + 2, TILE_SIZE - 5, TILE_SIZE - 5).stroke({ width: 3, color: 0xfacc15 });
+        }
         g.eventMode = 'static';
         g.cursor = 'pointer';
         g.on('pointertap', () => {
           if (duelPreview) return; // precisa confirmar/cancelar o preview antes de outra ação
           if (animatingUnitIdRef.current) return; // uma animação de movimento já está em andamento
+          // Em mira, o clique é o alvo — inclusive em cima de unidade (artilharia mira o
+          // tile, e o tile pode estar ocupado).
+          if (targetingMode) {
+            confirmTargetAt({ x, y });
+            return;
+          }
           const occupant = unitAt(units, { x, y });
           if (occupant) {
             if (selectedUnit && engageableEnemyIds.has(occupant.unitId)) {

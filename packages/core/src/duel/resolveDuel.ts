@@ -13,6 +13,12 @@ import {
   upsertActiveEffect,
 } from './effects.js';
 import { applyHeal, computeHeal, isHealingSkill, scalingStatOf } from './heal.js';
+import {
+  LETHAL_SURVIVE_HP,
+  findLethalTriggerSkill,
+  isSurviveLethalSkill,
+  persistentLethalTriggersUsed,
+} from './lethal.js';
 import { effectivePpCost, selectReaction } from './reactions.js';
 import { SET_SPECIAL_DUELISTA, SET_SPECIAL_IMUNIDADE } from '../items/sets.js';
 import { selectTacticsAction } from '../tactics/selectTacticsAction.js';
@@ -82,6 +88,18 @@ export interface ActionLogEntry {
   readonly effectsApplied: readonly Id[];
 }
 
+// §6.4 (M10 sub-sessão 8/N) — um disparo de gatilho de morte. Fica fora de `ActionLogEntry`
+// porque nem todo disparo acontece dentro de uma troca: a janela de assistências (§6.5)
+// também mata, e ali não existe ação de troca a que anexar o registro.
+export interface LethalTriggerLog {
+  readonly unitId: Id; // quem estava morrendo
+  readonly skillId: Id;
+  readonly survived: boolean; // variante `survive` (previne) vs. efeito ao morrer
+  readonly damageToKiller: number | null; // null quando não há dano — simétrico a counterDamage
+  readonly effectsApplied: readonly Id[];
+  readonly trocaNumber: 1 | 2 | 3 | null; // null = janela de assistências, antes da troca 1
+}
+
 export interface TrocaLog {
   readonly trocaNumber: 1 | 2 | 3;
   readonly firstMoverId: Id;
@@ -109,6 +127,14 @@ export interface DuelResult {
   // evaporaria ao sincronizar com o mapa.
   readonly finalActiveEffectsAttacker: readonly ActiveEffect[];
   readonly finalActiveEffectsDefender: readonly ActiveEffect[];
+  // §6.4 (M10 sub-sessão 8/N) — todo gatilho de morte que disparou neste duelo, na ordem
+  // cronológica (assistências primeiro, depois as trocas).
+  readonly lethalTriggers: readonly LethalTriggerLog[];
+  // Só o que é `lethalUses:'perBattle'` — a camada de batalha persiste isto de volta no
+  // BattleUnit, pelo mesmo caminho de `finalActiveEffects*`. O que é `perDuel` fica de fora
+  // de propósito: recarrega no duelo seguinte.
+  readonly finalLethalTriggersUsedAttacker: readonly Id[];
+  readonly finalLethalTriggersUsedDefender: readonly Id[];
 }
 
 function rngRoll(seed: number, troca: number, actorId: Id, purpose: string): number {
@@ -213,6 +239,10 @@ function applyEffectApplications(
   opponentStats: StatSheet,
   applications: readonly EffectApplication[],
   effectDefs: Readonly<Record<Id, EffectDef>>,
+  // Prefixo do stream de RNG. O gatilho de morte passa o seu próprio: adicionar uma
+  // rolagem em um sistema não pode deslocar as rolagens de outro, e sem isto a aplicação
+  // de efeito da skill do ator e a do gatilho de morte dele dividiriam o mesmo stream.
+  purposePrefix = 'effect-application',
 ): EffectApplicationOutcome {
   let nextActor = actor;
   let nextOpponent = opponent;
@@ -235,7 +265,7 @@ function applyEffectApplications(
       attackerEff: actorStats.eff,
       defenderEfr: targetStats.efr,
     });
-    const roll = rollPercent(rngRoll(seed, trocaNumber, actor.id, `effect-application:${application.effectId}`));
+    const roll = rollPercent(rngRoll(seed, trocaNumber, actor.id, `${purposePrefix}:${application.effectId}`));
     if (roll >= chance) continue;
 
     if (application.target === 'self') {
@@ -250,12 +280,137 @@ function applyEffectApplications(
   return { actor: nextActor, opponent: nextOpponent, appliedEffectIds, debuffedOpponent };
 }
 
+interface LethalDamageInput {
+  readonly seed: number;
+  readonly trocaNumber: 1 | 2 | 3 | null; // null = janela de assistências (§6.5)
+  readonly victim: DuelParticipant;
+  readonly damage: number;
+  readonly effectDefs: Readonly<Record<Id, EffectDef>>;
+  // Ausente = sem matador identificável (dano de assistência: quem assiste não é
+  // participante do duelo). Nesse caminho só a variante `survive` tem o que fazer.
+  readonly killer?: { readonly participant: DuelParticipant; readonly stats: StatSheet };
+}
+
+interface LethalDamageOutcome {
+  readonly victim: DuelParticipant;
+  readonly killer: DuelParticipant | null;
+  readonly log: LethalTriggerLog | null;
+}
+
+// §6.4 (M10 sub-sessão 8/N) — ÚNICO ponto por onde dano vira HP dentro do duelo. Existiam
+// quatro (`golpe principal`, contra-ataque e as duas assistências); todos passam por aqui
+// pra o gatilho de morte não depender de por qual caminho o dano veio.
+function applyDamageWithLethalTrigger(input: LethalDamageInput): LethalDamageOutcome {
+  const { seed, trocaNumber, damage, effectDefs } = input;
+  const killerInput = input.killer;
+
+  const wasAlive = input.victim.currentHp > 0;
+  const hpAfterDamage = input.victim.currentHp - damage;
+  const victim: DuelParticipant = { ...input.victim, currentHp: Math.max(0, hpAfterDamage) };
+  const killer = killerInput?.participant ?? null;
+
+  if (!wasAlive || hpAfterDamage > 0) return { victim, killer, log: null };
+
+  const skill = findLethalTriggerSkill({
+    knownSkills: victim.knownSkills,
+    usedSkillIds: victim.lethalTriggersUsed,
+    cooldowns: victim.cooldowns,
+    requireSurvive: killerInput === undefined,
+  });
+  if (!skill) return { victim, killer, log: null };
+
+  const used = [...(victim.lethalTriggersUsed ?? []), skill.id];
+
+  if (isSurviveLethalSkill(skill)) {
+    return {
+      victim: { ...victim, currentHp: LETHAL_SURVIVE_HP, lethalTriggersUsed: used },
+      killer,
+      log: {
+        unitId: victim.id,
+        skillId: skill.id,
+        survived: true,
+        damageToKiller: null,
+        effectsApplied: [],
+        trocaNumber,
+      },
+    };
+  }
+
+  // Variante "efeito ao morrer": a morte acontece; a skill acerta quem deu o golpe fatal.
+  // `findLethalTriggerSkill` já garante que há matador (requireSurvive), e todo caminho com
+  // matador acontece dentro de uma troca — o TypeScript é que não sabe disso.
+  if (!killerInput || trocaNumber === null) return { victim, killer, log: null };
+
+  const deadVictim: DuelParticipant = { ...victim, lethalTriggersUsed: used };
+  const victimStats = applyActiveEffectsToStats(victim.stats, victim.activeEffects, effectDefs);
+
+  const hasDamageComponent = skill.multiplier > 0 || skill.flat > 0;
+  let damageToKiller: number | null = null;
+  let struckKiller = killerInput.participant;
+
+  if (hasDamageComponent) {
+    const critRoll = rollPercent(rngRoll(seed, trocaNumber, victim.id, 'lethal-crit'));
+    const variance = rollDamageVariance(rngRoll(seed, trocaNumber, victim.id, 'lethal-damage-variance'));
+    damageToKiller = computeDamage({
+      attackerAtk: victimStats.atk,
+      attackerDef: victimStats.def,
+      attackerHp: victimStats.hp,
+      defenderDef: killerInput.stats.def,
+      skill: { multiplier: skill.multiplier, flat: skill.flat, scalesWith: skill.scalesWith },
+      attackerPen: victimStats.pen,
+      typeDamageMultiplier: combinedTypeDamageMultiplier({
+        attackerWeapon: victim.weaponType,
+        defenderWeapon: killerInput.participant.weaponType,
+        defenderUnitType: killerInput.participant.unitType,
+        skillTags: skill.tags,
+      }),
+      positionalMultiplier: victim.positionalMultiplier,
+      isCriticalHit: isCriticalHit(critRoll, victimStats.chc),
+      criticalDamageMultiplier: victimStats.chd,
+      // Mesma simplificação do contra-ataque: buffs de %dano/%redução não entram.
+      damageDealtPctSum: 0,
+      damageTakenReductionPctSum: 0,
+      varianceRoll: variance,
+    });
+    // NÃO encadeia: se este dano matar o matador, o gatilho DELE não dispara. Chamar o
+    // helper recursivamente aqui seria um laço sem fim entre duas unidades com o gatilho.
+    struckKiller = { ...struckKiller, currentHp: Math.max(0, struckKiller.currentHp - damageToKiller) };
+  }
+
+  const applied = applyEffectApplications(
+    seed,
+    trocaNumber,
+    deadVictim,
+    victimStats,
+    struckKiller,
+    applyActiveEffectsToStats(struckKiller.stats, struckKiller.activeEffects, effectDefs),
+    skill.effects,
+    effectDefs,
+    'lethal-effect-application',
+  );
+
+  return {
+    victim: applied.actor,
+    killer: applied.opponent,
+    log: {
+      unitId: victim.id,
+      skillId: skill.id,
+      survived: false,
+      damageToKiller,
+      effectsApplied: applied.appliedEffectIds,
+      trocaNumber,
+    },
+  };
+}
+
 interface ExchangeOutcome {
   readonly actor: DuelParticipant;
   readonly opponent: DuelParticipant;
   readonly apSpent: Record<Id, number>;
   readonly ppSpentTroca: Record<Id, number>;
   readonly log: ActionLogEntry;
+  // 0..2 por troca: o golpe principal e o contra-ataque são dois caminhos de dano letal.
+  readonly lethalTriggers: readonly LethalTriggerLog[];
 }
 
 function resolveExchange(
@@ -280,6 +435,7 @@ function resolveExchange(
     opponent,
     apSpent: nextApSpent,
     ppSpentTroca: nextPpSpentTroca,
+    lethalTriggers: [],
     log: {
       actorId: actor.id,
       targetId: opponent.id,
@@ -357,6 +513,7 @@ function resolveExchange(
       opponent: applied.opponent,
       apSpent: nextApSpent,
       ppSpentTroca: nextPpSpentTroca,
+      lethalTriggers: [],
       log: {
         actorId: actor.id,
         targetId: opponent.id,
@@ -398,6 +555,7 @@ function resolveExchange(
       opponent,
       apSpent: nextApSpent,
       ppSpentTroca: nextPpSpentTroca,
+      lethalTriggers: [],
       log: {
         actorId: actor.id,
         targetId: opponent.id,
@@ -504,7 +662,20 @@ function resolveExchange(
     varianceRoll,
   });
 
-  opponent = { ...opponent, currentHp: Math.max(0, opponent.currentHp - damage) };
+  // §6.4 — o dano principal passa pelo gatilho de morte: o oponente pode sobreviver com 1
+  // HP, ou morrer e acertar o ator de volta.
+  const lethalTriggers: LethalTriggerLog[] = [];
+  const mainLethal = applyDamageWithLethalTrigger({
+    seed,
+    trocaNumber,
+    victim: opponent,
+    damage,
+    effectDefs,
+    killer: { participant: actor, stats: effectiveActorStats },
+  });
+  opponent = mainLethal.victim;
+  if (mainLethal.killer) actor = mainLethal.killer;
+  if (mainLethal.log) lethalTriggers.push(mainLethal.log);
 
   // §8.3/§6.9 — a skill do ator aplica seus efeitos como parte da própria ação, depois
   // do dano principal e antes do contra-ataque do oponente (que usa seu próprio script,
@@ -601,7 +772,18 @@ function resolveExchange(
       varianceRoll: counterVariance,
     });
 
-    actor = { ...actor, currentHp: Math.max(0, actor.currentHp - counterDamage) };
+    // §6.4 — o contra-ataque também pode ser o golpe fatal, e o gatilho vale igual.
+    const counterLethal = applyDamageWithLethalTrigger({
+      seed,
+      trocaNumber,
+      victim: actor,
+      damage: counterDamage,
+      effectDefs,
+      killer: { participant: opponent, stats: effectiveOpponentStats },
+    });
+    actor = counterLethal.victim;
+    if (counterLethal.killer) opponent = counterLethal.killer;
+    if (counterLethal.log) lethalTriggers.push(counterLethal.log);
     reactionLog = reactionLog && { ...reactionLog, counterDamage };
   }
 
@@ -610,6 +792,7 @@ function resolveExchange(
     opponent,
     apSpent: nextApSpent,
     ppSpentTroca: nextPpSpentTroca,
+    lethalTriggers,
     log: {
       actorId: actor.id,
       targetId: opponent.id,
@@ -644,7 +827,18 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
     target: { stats: defender.stats, unitType: defender.unitType, weaponType: defender.weaponType, activeEffects: defender.activeEffects },
     effectDefs,
   });
-  defender = { ...defender, currentHp: Math.max(0, defender.currentHp - attackerAssistOutcome.totalDamage) };
+  const lethalTriggers: LethalTriggerLog[] = [];
+  // §6.4 (M10 sub-sessão 8/N) — morte por dano de assistência: quem matou não é
+  // participante do duelo, então só a variante `survive` do gatilho tem o que fazer.
+  const defenderAssistLethal = applyDamageWithLethalTrigger({
+    seed,
+    trocaNumber: null,
+    victim: defender,
+    damage: attackerAssistOutcome.totalDamage,
+    effectDefs,
+  });
+  defender = defenderAssistLethal.victim;
+  if (defenderAssistLethal.log) lethalTriggers.push(defenderAssistLethal.log);
   // §6.5.3 (M10 sub-sessão 7/N) — assistência de cura mira o ALIADO duelista, não o inimigo:
   // quem o aliado do atacante socorre é o atacante.
   attacker = { ...attacker, currentHp: applyHeal(attacker.currentHp, attacker.stats.hp, attackerAssistOutcome.totalHeal) };
@@ -658,7 +852,15 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
     target: { stats: attacker.stats, unitType: attacker.unitType, weaponType: attacker.weaponType, activeEffects: attacker.activeEffects },
     effectDefs,
   });
-  attacker = { ...attacker, currentHp: Math.max(0, attacker.currentHp - defenderAssistOutcome.totalDamage) };
+  const attackerAssistLethal = applyDamageWithLethalTrigger({
+    seed,
+    trocaNumber: null,
+    victim: attacker,
+    damage: defenderAssistOutcome.totalDamage,
+    effectDefs,
+  });
+  attacker = attackerAssistLethal.victim;
+  if (attackerAssistLethal.log) lethalTriggers.push(attackerAssistLethal.log);
   defender = { ...defender, currentHp: applyHeal(defender.currentHp, defender.stats.hp, defenderAssistOutcome.totalHeal) };
 
   const attackerAssists = attackerAssistOutcome.results;
@@ -699,6 +901,7 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
       apSpent = outcome.apSpent;
       ppSpentTroca = outcome.ppSpentTroca;
       actions.push(outcome.log);
+      lethalTriggers.push(...outcome.lethalTriggers);
     }
 
     trocas.push({ trocaNumber: trocaNumber as 1 | 2 | 3, firstMoverId: order[0] === 'attacker' ? attacker.id : defender.id, actions });
@@ -723,5 +926,14 @@ export function resolveDuel(input: ResolveDuelInput): DuelResult {
     defenderAssists,
     finalActiveEffectsAttacker: attacker.activeEffects,
     finalActiveEffectsDefender: defender.activeEffects,
+    lethalTriggers,
+    finalLethalTriggersUsedAttacker: persistentLethalTriggersUsed(
+      attacker.lethalTriggersUsed ?? [],
+      attacker.knownSkills,
+    ),
+    finalLethalTriggersUsedDefender: persistentLethalTriggersUsed(
+      defender.lethalTriggersUsed ?? [],
+      defender.knownSkills,
+    ),
   };
 }

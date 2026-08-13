@@ -1,221 +1,11 @@
 {
-  "id": "map-campanha-1-provisorio",
-  "name": "Campanha — Mapa 1 (provisório, portado de M6)",
+  "id": "map-campanha-2",
+  "name": "Acampamento da Serra",
   "width": 15,
   "height": 15,
   "tiles": [
     [
       {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
         "terrain": "terrain-floresta",
         "height": 0
       },
@@ -233,428 +23,6 @@
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-floresta",
         "height": 0
       },
       {
@@ -667,6 +35,40 @@
       },
       {
         "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-floresta",
         "height": 0
       },
       {
@@ -683,6 +85,46 @@
       },
       {
         "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
         "height": 0
       }
     ],
@@ -716,132 +158,8 @@
         "height": 0
       },
       {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
+        "terrain": "terrain-montanha",
+        "height": 3
       },
       {
         "terrain": "terrain-planicie",
@@ -899,8 +217,42 @@
       },
       {
         "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
         "height": 0
       },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
       {
         "terrain": "terrain-planicie",
         "height": 0
@@ -930,14 +282,666 @@
         "height": 0
       },
       {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
         "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-montanha",
+        "height": 3
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-floresta",
         "height": 0
       }
     ]
   ],
   "zocEnabled": true,
+  "initialValor": 5,
   "winCondition": {
-    "t": "rout"
-  },
-  "initialValor": 5
+    "t": "seize",
+    "target": {
+      "x": 12,
+      "y": 7
+    }
+  }
 }

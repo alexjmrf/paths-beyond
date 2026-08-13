@@ -6,6 +6,7 @@ import compSchema from '../schemas/comps.schema.js';
 import itemSchema from '../schemas/items.schema.js';
 import itemSetSchema from '../schemas/item-sets.schema.js';
 import skillSchema from '../schemas/skills.schema.js';
+import effectSchema from '../schemas/effects.schema.js';
 
 // M8, sub-sessão 2/N — conteúdo real balanceado. Ver DECISIONS.md pro roster completo
 // e o raciocínio por trás do template de árvore de talentos.
@@ -37,6 +38,20 @@ export interface ClassProfile {
   readonly atkPerLevel: number;
   readonly defPerLevel: number;
   readonly signatureMultiplier: number;
+  // M12, sub-sessão 2/N — o efeito que a especial da classe aplica. §12 do roadmap:
+  // "nenhuma skill do catálogo é só um número de dano" (o ataque básico e as duas reações
+  // universais de §6.4 são a exceção declarada — ver DECISIONS.md).
+  readonly signatureEffectId: string;
+  // Chance de aplicação em escala 1000, ANTES de eff/efr (§6.9). Varia por classe: é a
+  // alavanca de balanceamento do efeito, junto do `signatureMultiplier`.
+  readonly signatureEffectChance: number;
+  // Onde o efeito cai: 'target' (debuff no oponente) ou 'self' (buff em quem usou).
+  readonly signatureEffectTarget: 'self' | 'target';
+  // M12, sub-sessão 2/N — mecânicas de M10 que só uma classe tem. `extraDuelSkillId` entra
+  // em `duelSkills` (é como uma passiva `onLethal` chega a `knownSkills`); `grantedReactionId`
+  // vira um nó de talento, porque §6.4 fecha a lista de reações universais em duas.
+  readonly extraDuelSkillId?: string;
+  readonly grantedReactionId?: string;
 }
 
 // Mesmo perfil de crescimento de spd observado em class-soldado.json (M1): degraus de
@@ -94,6 +109,18 @@ export function generateSignatureSkill(profile: ClassProfile) {
     multiplier: profile.signatureMultiplier,
     flat: 0,
     scalesWith: 'atk' as const,
+    // §8.3/§6.9 (M12 sub-sessão 2/N) — `duration: 'duel'` em todos: o efeito vale a troca
+    // seguinte do mesmo duelo e não vaza para o mapa. Duração em rounds de mapa é uma
+    // alavanca bem mais forte (efeito `battle` acumula vantagem entre duelos, §6.9) e fica
+    // reservada para conteúdo que a queira de propósito.
+    effects: [
+      {
+        effectId: profile.signatureEffectId,
+        target: profile.signatureEffectTarget,
+        chance: profile.signatureEffectChance,
+        duration: 'duel' as const,
+      },
+    ],
     tags: [profile.tag],
   };
 }
@@ -171,7 +198,25 @@ export function generateTalentTree(profile: ClassProfile, tree: 'class' | 'spec'
   const s = profile.slug;
   const sigId = signatureSkillId(profile);
 
+  // M12 — nó exclusivo da classe que tem uma reação própria (hoje só o Arqueiro). Não é
+  // linha de escolha: some para as demais classes em vez de virar um nó vazio.
+  const grantedReactionNodes = profile.grantedReactionId
+    ? [
+        {
+          id: `talent-${s}-reacao-propria`,
+          tree,
+          row: 8,
+          maxRank: 1 as const,
+          // Vazio, mas presente: mantém a forma dos nós uniforme para quem percorre a
+          // árvore (o painel de talentos do cliente e os testes de estrutura de §8.2).
+          exclusiveWith: [] as string[],
+          effects: [{ t: 'grantReaction' as const, reactionId: profile.grantedReactionId }],
+        },
+      ]
+    : [];
+
   return [
+    ...grantedReactionNodes,
     {
       id: `talent-${s}-agressivo`,
       tree,
@@ -499,7 +544,12 @@ export function generateComp(profile: ClassProfile) {
         // §6.4), e a janela de assistência nunca abriria: o comp seria multi-unidade no
         // papel e continuaria medindo duelos isolados, que é exatamente o que a auditoria
         // de 2026-08-07 apontou como o buraco da matriz de M8.
-        talents: { [`talent-${profile.slug}-foco-em-equipe`]: 1 },
+        talents: {
+          [`talent-${profile.slug}-foco-em-equipe`]: 1,
+          // M12 — a reação própria da classe só existe se o comp alocar o talento; sem
+          // isto o gatilho `onDamaged` continuaria sem consumidor no torneio.
+          ...(profile.grantedReactionId ? { [`talent-${profile.slug}-reacao-propria`]: 1 } : {}),
+        },
         equipment: {
           weapon: weaponItemId(profile),
           helmet: null,
@@ -509,9 +559,21 @@ export function generateComp(profile: ClassProfile) {
           boots: null,
         },
         weaponType: profile.weaponType,
-        duelSkills: [basicSkillId(profile), signatureSkillId(profile)],
+        duelSkills: [
+          basicSkillId(profile),
+          signatureSkillId(profile),
+          ...(profile.extraDuelSkillId ? [profile.extraDuelSkillId] : []),
+        ],
         mapSkills: [],
-        tacticsScript: [{ enabled: true, skillId: signatureSkillId(profile), conditions: [] }],
+        // §6.3 — o script é lido de cima para baixo, primeira linha que passa vence. A
+        // cura do Clérigo entra ACIMA da especial e com condição: "curar ou bater" vira
+        // decisão de script, que é o produto do jogo, em vez de trocar dano por cura sempre.
+        tacticsScript: [
+          ...(profile.extraDuelSkillId === SKILL_CURA_CLERIGO.id
+            ? [{ enabled: true, skillId: SKILL_CURA_CLERIGO.id, conditions: [{ t: 'selfHpBelow' as const, pct: 250 }] }]
+            : []),
+          { enabled: true, skillId: signatureSkillId(profile), conditions: [] },
+        ],
       },
       pos: { x: pos.x, y: pos.y },
       height: 0,
@@ -519,6 +581,96 @@ export function generateComp(profile: ClassProfile) {
     })),
   };
 }
+
+
+// M12, sub-sessão 2/N — os EffectDef que as especiais aplicam. `effect-fragilidade` já
+// existia (M8) e continua sendo o efeito do talento `golpe-fragilizante`; os demais nascem
+// aqui. Magnitudes em escala 1000 (§01): `pct: -150` é -15%.
+export const SIGNATURE_EFFECTS = [
+  // DoT de §6.9: 3% do HP MÁXIMO por round de mapa. `periodicDamagePct` existe desde M10
+  // sub-sessão 1 e passou M10 inteira sem um consumidor real.
+  { id: 'effect-sangramento', name: 'Sangramento', kind: 'debuff' as const, dispellable: true, maxStacks: 3, statMods: [], periodicDamagePct: 30 },
+  { id: 'effect-queimadura', name: 'Queimadura', kind: 'debuff' as const, dispellable: true, maxStacks: 2, statMods: [], periodicDamagePct: 80 },
+  // Debuffs de stat: entram no stat sheet DENTRO do duelo (§4.1 passo 8, M10 sub-sessão 1).
+  { id: 'effect-quebra-armadura', name: 'Quebra de Armadura', kind: 'debuff' as const, dispellable: true, maxStacks: 2, statMods: [{ stat: 'def' as const, pct: -120 }], damageTakenReductionPct: -80 },
+  { id: 'effect-desarme', name: 'Desarme', kind: 'debuff' as const, dispellable: true, maxStacks: 1, statMods: [{ stat: 'atk' as const, pct: -150 }] },
+  { id: 'effect-lentidao', name: 'Lentidão', kind: 'debuff' as const, dispellable: true, maxStacks: 1, statMods: [{ stat: 'spd' as const, pct: -200 }] },
+  // §6.6 passo 8 — os dois campos de percentual de dano, também inertes desde M10.
+  { id: 'effect-marca-do-cacador', name: 'Marca do Caçador', kind: 'debuff' as const, dispellable: true, maxStacks: 1, statMods: [], damageTakenReductionPct: -100 },
+  { id: 'effect-impeto', name: 'Ímpeto', kind: 'buff' as const, dispellable: true, maxStacks: 1, statMods: [], damageDealtPct: 50 },
+  { id: 'effect-guarda-cerrada', name: 'Guarda Cerrada', kind: 'buff' as const, dispellable: true, maxStacks: 1, statMods: [], damageTakenReductionPct: 70 },
+  { id: 'effect-bencao', name: 'Bênção', kind: 'buff' as const, dispellable: true, maxStacks: 1, statMods: [{ stat: 'def' as const, pct: 450 }] },
+  { id: 'effect-regeneracao', name: 'Regeneração', kind: 'buff' as const, dispellable: true, maxStacks: 1, statMods: [], periodicHealPct: 40 },
+];
+
+// === As 3 mecânicas de M10 que ganham consumidor real nesta fatia ===
+
+// 1) Tag `heal` (M10 sub-sessão 7/N): cura de verdade. Skill PRÓPRIA do Clérigo, não a
+// especial dele — assim a decisão "curar ou bater" vira uma linha de script com condição
+// (`selfHpBelow`), que é o produto do jogo (§6.3), em vez de trocar dano por cura sempre.
+export const SKILL_CURA_CLERIGO = {
+  id: 'skill-cura-clerigo',
+  name: 'Luz Restauradora',
+  kind: 'duel' as const,
+  apCost: 1,
+  cooldown: 2,
+  multiplier: 1200,
+  flat: 0,
+  scalesWith: 'atk' as const,
+  effects: [],
+  tags: ['magic', 'heal'],
+};
+
+// 2) `onLethal` (M10 sub-sessão 8/N): gatilho de morte, variante `survive`. Vai para o
+// Couraçado — a classe cuja identidade é não cair — e é `perBattle`, então salva uma vez
+// por batalha e não por duelo. Não é reação: não entra no reactionScript nem custa PP; o
+// motor o encontra varrendo `knownSkills`, e `duelSkills` alimenta essa lista.
+export const SKILL_ULTIMO_SUSPIRO = {
+  id: 'skill-ultimo-suspiro',
+  name: 'Último Suspiro',
+  kind: 'duel' as const,
+  apCost: 0,
+  cooldown: 0,
+  multiplier: 0,
+  flat: 0,
+  scalesWith: 'atk' as const,
+  effects: [],
+  trigger: 'onLethal' as const,
+  lethalUses: 'perBattle' as const,
+  tags: ['survive'],
+};
+
+// 3) `onDamaged` (M10 sub-sessão 5/N) + "Cura de emergência" (§6.4, nomeada pela spec e
+// sem nenhum consumidor até aqui): uma reação de CURA, não de dano. A escolha de curar em
+// vez de revidar não é sabor — é mecânica: `resolveDuel` ignora os `skill.effects` de uma
+// reação (corte de M10 sub-sessão 1/N, preservado com teste), então uma reação ofensiva
+// só sabe ser um número de dano. Curar é a única forma de uma reação ser mais que isso
+// sem mentir. Concedida por talento (§6.4 fecha as universais em duas) e só ao Arqueiro:
+// a classe mais frágil e com o menor pool de PP do roster.
+// **ppCost 0 é a razão de esta skill existir de verdade**, não uma generosidade: com 1 PP
+// ela NUNCA dispararia. `resolveDuel` resolve `onAttacked` primeiro (cronologicamente) e
+// `tryLateReaction` sai cedo se já houve reação na troca — e Contra-atacar é baseline, sem
+// condições, então vence sempre. A única janela em que `onDamaged` existe é quando a
+// unidade não reagiu, ou seja, quando ficou SEM PP. Custando 0, a skill é exatamente isso:
+// "sem PP para revidar, você ainda revida uma vez ao levar o golpe" — e vai para o
+// Arqueiro, que tem o menor pool de PP do roster (1). Achado desta fatia, registrado em
+// DECISIONS.md.
+export const SKILL_REVIDE_PRECISO = {
+  id: 'skill-folego-de-combate',
+  name: 'Fôlego de Combate',
+  kind: 'reaction' as const,
+  apCost: 0,
+  ppCost: 0,
+  cooldown: 0,
+  // Sustain gratuito toda troca é a coisa mais forte que uma reação pode fazer num
+  // torneio de atrito: a 400 o Arqueiro ia a 77,7%. Calibrado empiricamente.
+  multiplier: 120,
+  flat: 0,
+  scalesWith: 'atk' as const,
+  effects: [],
+  trigger: 'onDamaged' as const,
+  tags: ['heal'],
+};
 
 // Roster desta fatia: 1 classe base por WeaponType, cobrindo os dois ciclos do
 // triângulo (físico: sword/axe/spear; mágico: arcane/nature/holy) mais o arco
@@ -543,36 +695,45 @@ export const CLASS_PROFILES: readonly ClassProfile[] = [
     slug: 'espadachim', name: 'Espadachim', weaponType: 'sword', unitType: 'infantry', moveType: 'foot', moveRange: 4, tag: 'physical',
     basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 42, spdBase: 80,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 2, signatureMultiplier: 1400,
+    signatureEffectId: 'effect-sangramento', signatureEffectChance: 400, signatureEffectTarget: 'target' as const,
   },
   {
     slug: 'guerreiro', name: 'Guerreiro', weaponType: 'axe', unitType: 'infantry', moveType: 'foot', moveRange: 4, tag: 'physical',
     basePools: { ap: 3, pp: 1 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 33, spdBase: 76,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1500,
+    signatureEffectId: 'effect-quebra-armadura', signatureEffectChance: 500, signatureEffectTarget: 'target' as const,
   },
   {
     slug: 'lanceiro', name: 'Lanceiro', weaponType: 'spear', unitType: 'infantry', moveType: 'foot', moveRange: 4, tag: 'physical',
     basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 38, spdBase: 80,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1350,
+    signatureEffectId: 'effect-desarme', signatureEffectChance: 500, signatureEffectTarget: 'target' as const,
   },
   {
     slug: 'arqueiro', name: 'Arqueiro', weaponType: 'bow', unitType: 'infantry', moveType: 'foot', moveRange: 4, tag: 'physical',
     basePools: { ap: 4, pp: 1 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 28, spdBase: 80,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1350,
+    signatureEffectId: 'effect-marca-do-cacador', signatureEffectChance: 700, signatureEffectTarget: 'target' as const,
+    grantedReactionId: 'skill-folego-de-combate',
   },
   {
     slug: 'arcanista', name: 'Arcanista', weaponType: 'arcane', unitType: 'caster', moveType: 'foot', moveRange: 4, tag: 'magic',
     basePools: { ap: 4, pp: 1 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 30, spdBase: 82,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1500,
+    signatureEffectId: 'effect-queimadura', signatureEffectChance: 650, signatureEffectTarget: 'target' as const,
   },
   {
     slug: 'druida', name: 'Druida', weaponType: 'nature', unitType: 'caster', moveType: 'foot', moveRange: 4, tag: 'magic',
     basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 36, spdBase: 80,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 2, signatureMultiplier: 1350,
+    signatureEffectId: 'effect-regeneracao', signatureEffectChance: 1000, signatureEffectTarget: 'self' as const,
   },
   {
     slug: 'clerigo', name: 'Clérigo', weaponType: 'holy', unitType: 'caster', moveType: 'foot', moveRange: 4, tag: 'magic',
     basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 33, spdBase: 78,
-    hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1300,
+    hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1450,
+    signatureEffectId: 'effect-bencao', signatureEffectChance: 1000, signatureEffectTarget: 'self' as const,
+    extraDuelSkillId: 'skill-cura-clerigo',
   },
   // M8, sub-sessão 4/N — flying/armored: testam de verdade o bônus de arqueiro contra
   // `flying` (+25% dano, §6.8) e a mitigação diferenciada de `armored` (-20% físico/+20%
@@ -592,6 +753,7 @@ export const CLASS_PROFILES: readonly ClassProfile[] = [
     slug: 'grifeiro', name: 'Grifeiro', weaponType: 'spear', unitType: 'flying', moveType: 'flying', moveRange: 5, tag: 'physical',
     basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 56, spdBase: 84,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 3, signatureMultiplier: 1350,
+    signatureEffectId: 'effect-impeto', signatureEffectChance: 1000, signatureEffectTarget: 'self' as const,
   },
   {
     // atk (não só def) abaixo do resto do roster — decisão de balanceamento: `armored`
@@ -604,6 +766,8 @@ export const CLASS_PROFILES: readonly ClassProfile[] = [
     slug: 'couracado', name: 'Couraçado', weaponType: 'axe', unitType: 'armored', moveType: 'heavy', moveRange: 3, tag: 'physical',
     basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: 45, defBase: 30, spdBase: 74,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: 2, defPerLevel: 1, signatureMultiplier: 1250,
+    signatureEffectId: 'effect-guarda-cerrada', signatureEffectChance: 1000, signatureEffectTarget: 'self' as const,
+    extraDuelSkillId: 'skill-ultimo-suspiro',
   },
 ];
 
@@ -621,6 +785,7 @@ const PROMOTED_PROFILE: ClassProfile = {
   slug: 'mestre-espadachim', name: 'Mestre-Espadachim', weaponType: 'sword', unitType: 'infantry', moveType: 'foot', moveRange: 4, tag: 'physical',
   basePools: { ap: 4, pp: 3 }, hpBase: 525, atkBase: 79, defBase: 53, spdBase: 84,
   hpPerLevel: 25, atkPerLevel: 4, defPerLevel: 2, signatureMultiplier: 1450,
+    signatureEffectId: 'effect-lentidao', signatureEffectChance: 700, signatureEffectTarget: 'target' as const,
 };
 
 const PROMOTES_FROM_ID = 'class-espadachim';
@@ -690,6 +855,18 @@ function main(): void {
   for (const reaction of [...BASELINE_REACTIONS, SKILL_ASSISTIR]) {
     skillSchema.parse(reaction);
     writeJson(skillsDir, reaction.id, reaction);
+  }
+
+  // M12, sub-sessão 2/N — os EffectDef que as especiais aplicam e as 3 skills que dão
+  // consumidor real às mecânicas de M10.
+  const effectsDir = join(root, 'effects');
+  for (const effect of SIGNATURE_EFFECTS) {
+    effectSchema.parse(effect);
+    writeJson(effectsDir, effect.id, effect);
+  }
+  for (const skill of [SKILL_CURA_CLERIGO, SKILL_ULTIMO_SUSPIRO, SKILL_REVIDE_PRECISO]) {
+    skillSchema.parse(skill);
+    writeJson(skillsDir, skill.id, skill);
   }
 
   for (const shared of SHARED_ITEMS) {

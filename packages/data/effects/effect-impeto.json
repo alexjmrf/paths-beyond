@@ -1,0 +1,9 @@
+{
+  "id": "effect-impeto",
+  "name": "Ímpeto",
+  "kind": "buff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [],
+  "damageDealtPct": 50
+}

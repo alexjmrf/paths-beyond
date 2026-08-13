@@ -11,7 +11,8 @@
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1
+          "talent-arqueiro-foco-em-equipe": 1,
+          "talent-arqueiro-reacao-propria": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",
@@ -51,7 +52,8 @@
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1
+          "talent-arqueiro-foco-em-equipe": 1,
+          "talent-arqueiro-reacao-propria": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",
@@ -91,7 +93,8 @@
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1
+          "talent-arqueiro-foco-em-equipe": 1,
+          "talent-arqueiro-reacao-propria": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",

@@ -203,16 +203,24 @@ describe('applyCommand — mapSkill (self-only em M3, ver DECISIONS.md)', () => 
   });
 });
 
-describe('applyCommand — useValor (mínimo, ver DECISIONS.md)', () => {
-  it('gasta 1 ponto de valor quando há saldo', () => {
+// M11, sub-sessão 3/N — o placeholder de M3 (custo fixo de 1, `skillId` ignorado, nenhum
+// efeito) saiu. A resolução por `kind` está em `valorSkills.test.ts`; aqui fica só o que
+// `applyCommand` garante: sem catálogo não há o que resolver.
+describe('applyCommand — useValor', () => {
+  it('rejeita um skillId que não está no catálogo de valor-skills', () => {
     const state = buildState([buildUnit()], { valor: 5 });
     const outcome = applyCommand(state, { t: 'useValor', skillId: 'valor-qualquer', target: { x: 0, y: 0 } });
-    expect(outcome.applied).toBe(true);
-    expect(outcome.state.valor).toBe(4);
+    expect(outcome.applied).toBe(false);
+    expect(outcome.state.valor).toBe(5); // e não cobra nada
   });
 
   it('rejeita sem saldo de valor', () => {
-    const state = buildState([buildUnit()], { valor: 0 });
+    const state = buildState([buildUnit()], {
+      valor: 0,
+      valorSkills: {
+        'valor-qualquer': { id: 'valor-qualquer', name: 'Qualquer', cost: 1, kind: 'globalBuff', payload: { effectId: 'nao-importa' } },
+      },
+    });
     const outcome = applyCommand(state, { t: 'useValor', skillId: 'valor-qualquer', target: { x: 0, y: 0 } });
     expect(outcome.applied).toBe(false);
   });

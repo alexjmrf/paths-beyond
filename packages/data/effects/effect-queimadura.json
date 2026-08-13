@@ -1,0 +1,9 @@
+{
+  "id": "effect-queimadura",
+  "name": "Queimadura",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 2,
+  "statMods": [],
+  "periodicDamagePct": 80
+}

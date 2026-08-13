@@ -7,6 +7,14 @@
   "multiplier": 1350,
   "flat": 0,
   "scalesWith": "atk",
+  "effects": [
+    {
+      "effectId": "effect-regeneracao",
+      "target": "self",
+      "chance": 1000,
+      "duration": "duel"
+    }
+  ],
   "tags": [
     "magic"
   ]

@@ -1,0 +1,7 @@
+{
+  "id": "valor-brado-de-guerra",
+  "name": "Brado de Guerra",
+  "cost": 5,
+  "kind": "globalBuff",
+  "payload": { "effectId": "effect-brado-de-guerra" }
+}

@@ -1,0 +1,222 @@
+{
+  "id": "encounter-campanha-2",
+  "name": "Capítulo 2 — O Acampamento da Serra",
+  "mapId": "map-campanha-2",
+  "chapter": 2,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "ally-clerigo",
+      "side": "player",
+      "hero": {
+        "id": "ally-clerigo",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-clerigo-foco-em-equipe": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [
+          "skill-luz-do-alvorecer"
+        ],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 8
+      },
+      "height": 0
+    },
+    {
+      "unitId": "unit-patrulheiro-1",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-patrulheiro-1",
+        "classId": "class-lanceiro",
+        "level": 8,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-lanceiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-lanceiro",
+          "skill-especial-lanceiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-lanceiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 11,
+        "y": 7
+      },
+      "height": 1,
+      "aiArchetype": "guard-tile"
+    },
+    {
+      "unitId": "unit-patrulheiro-2",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-patrulheiro-2",
+        "classId": "class-guerreiro",
+        "level": 8,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 9,
+        "y": 3
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "unit-patrulheiro-3",
+      "side": "enemy",
+      "hero": {
+        "id": "unit-patrulheiro-3",
+        "classId": "class-arqueiro",
+        "level": 8,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 12,
+        "y": 6
+      },
+      "height": 1,
+      "aiArchetype": "hold-position"
+    }
+  ]
+}

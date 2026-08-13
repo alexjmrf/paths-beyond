@@ -1,0 +1,15 @@
+{
+  "id": "skill-cura-clerigo",
+  "name": "Luz Restauradora",
+  "kind": "duel",
+  "apCost": 1,
+  "cooldown": 2,
+  "multiplier": 1200,
+  "flat": 0,
+  "scalesWith": "atk",
+  "effects": [],
+  "tags": [
+    "magic",
+    "heal"
+  ]
+}

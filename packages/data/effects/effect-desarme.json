@@ -1,0 +1,13 @@
+{
+  "id": "effect-desarme",
+  "name": "Desarme",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [
+    {
+      "stat": "atk",
+      "pct": -150
+    }
+  ]
+}

@@ -1318,3 +1318,697 @@ de design do usuário na sub-sessão 5/N). Os 3 critérios de aceite formais de 
 desde a sub-sessão 4. Duas pontas soltas conhecidas, nenhuma delas escopo de M10:
 `lifesteal` inerte, e `sim-cli`/`DuelPreviewPanel` sem exibir cura no log troca a troca (o
 motor registra `heal` e `reaction.healDone`; exibir é trabalho de UI).
+
+### M10 — sub-sessão 8/N: `onLethal` como gatilho de morte (fecha os itens de M10)
+
+Último item nomeado no roadmap de M10 ("gatilhos de reação além de `onAttacked`
+(`onDamaged`, `onLethal`)"). `onDamaged`/`onDebuffed` saíram na sub-sessão 5/N; `onLethal`
+ficou aberto lá por decisão de design do usuário, não por falta de tempo — **como linha de
+script ele implicaria prever a própria morte** ("não é interessante conseguir prever quando
+for morrer"). O encaminhamento registrado naquela sub-sessão era: implementar como passiva
+que dispara AO MORRER. É o que esta fatia faz. Com ela o enum `ReactionTrigger` de §6.4
+fecha: as 5 variantes têm resolução.
+
+- **Não é uma reação, e por isso não passa por `selectReaction`.** Uma reação é uma DECISÃO
+  (script ordenado + conditions + custo de PP); o gatilho de morte é uma CONSEQUÊNCIA
+  automática de um evento. Sem linha no `reactionScript`, sem conditions, sem PP — basta a
+  skill estar entre as `knownSkills`. É a diferença de mecanismo que a sub-sessão 5/N já
+  tinha identificado.
+- **Duas variantes, discriminadas pela tag `survive` (decisão do usuário).** Com a tag:
+  previne a morte, a unidade fica com `LETHAL_SURVIVE_HP = 1` (o golpe é truncado, não
+  anulado). Sem a tag: a morte acontece e a skill acerta **quem deu o golpe fatal** — dano
+  calculado como um contra-ataque (crítico e variância próprios, streams `lethal-crit` e
+  `lethal-damage-variance`) **e** os `skill.effects` dela aplicados no matador. Mesmo
+  precedente de discriminação por tag da sub-sessão 7/N (`heal`) e de
+  `combinedTypeDamageMultiplier`: zero campo novo pra dizer o que a skill faz.
+- **Os `skill.effects` do gatilho de morte SÃO aplicados** — ao contrário do corte de
+  reação/assistência (sub-sessão 1/N), preservado. Sem isso a variante "efeito ao morrer"
+  seria só "exploda causando dano", e o caso que o usuário descreveu ("pra fazer algum
+  efeito", uma maldição no matador) não existiria. Stream de RNG próprio
+  (`lethal-effect-application:*`): adicionar uma rolagem em um sistema não pode deslocar as
+  de outro, e sem o prefixo próprio a aplicação de efeito da skill do ator e a do gatilho
+  de morte dele dividiriam o mesmo stream.
+- **Frequência declarada no DADO, não no motor — `SkillDef.lethalUses`.** Resposta do
+  usuário: "varia de skill pra skill dependendo do efeito". `perDuel` é estado local de
+  `resolveDuel` e recarrega a cada duelo; `perBattle` atravessa duelos, persistido em
+  `BattleUnit.lethalTriggersUsed` pelo mesmo caminho de `finalActiveEffects*`. A
+  alternativa considerada e descartada era reusar `skill.cooldown`: **hoje nada escreve
+  cooldown de volta** — nem as skills de duelo normais põem cooldown após o uso, só
+  `endRound` decrementa — então usar esse campo exigiria abrir um caminho de escrita novo e
+  levantaria um bug pré-existente que não é de M10. O motor mantém um default (`perDuel`, o
+  escopo conservador), mas o schema Zod **exige** o campo quando o trigger é `onLethal` e o
+  **rejeita** quando não é: um escopo omitido mudaria o poder da skill inteira em silêncio,
+  que é o tipo de número invisível que a regra 4 proíbe.
+- **Onde cada variante pode disparar — derivado do que a skill faz, sem campo novo.** Esta é
+  a segunda metade da resposta do usuário sobre alcance ("também vai depender do que a skill
+  faz"). A variante de dano precisa de um matador identificável, então **não** dispara em
+  morte por dano de assistência (quem assiste não é participante do duelo) nem no tick de
+  DoT de `battle/round.ts` (o veneno não é um matador). A variante `survive` dispara em
+  qualquer morte. Fora do duelo há um filtro a mais: só `perBattle` — `perDuel` não tem
+  duelo a que se limitar, e sem esse corte uma skill `perDuel` seria imunidade permanente a
+  DoT.
+- **Um ponto de passagem só.** Existiam **quatro** lugares fazendo `Math.max(0, hp - dano)`
+  (golpe principal, contra-ataque e as duas assistências); todos passam agora por
+  `applyDamageWithLethalTrigger`, pra o gatilho não depender de por qual caminho o dano
+  veio. Um quinto caminho, o tick de DoT, ficou em `round.ts` porque ali não há duelo nem
+  matador — mas usa a mesma `findLethalTriggerSkill`.
+- **O gatilho NÃO encadeia.** Se o dano da variante "efeito ao morrer" matar o matador, o
+  gatilho DELE não dispara. Chamar o helper recursivamente ali seria um laço sem fim entre
+  duas unidades com o gatilho, e "morrer da explosão de quem você matou" já é a consequência
+  pretendida.
+- **Piso de uma vez por duelo, mesmo em `perBattle`.** Sem ele, `survive` seria
+  imortalidade: as 3 trocas de §6.1 dariam 3 sobrevivências. Na prática uma unidade que
+  sobrevive com 1 HP morre na troca seguinte — o que é o desenho, não um efeito colateral.
+- **`findLethalTriggerSkill` devolve UMA skill, escolhida por ordem lexicográfica de id.**
+  A ordenação é obrigatória por determinismo: a ordem de iteração de um `Record` é a de
+  inserção, que varia conforme quem montou as `knownSkills` (cliente, servidor, `sim-cli`),
+  e os três precisam produzir bytes idênticos. Também é o que implementa literalmente o "no
+  máximo uma passiva" da formulação do usuário.
+- **`LethalTriggerLog` fica em `DuelResult`, não em `ActionLogEntry`.** Nem todo disparo
+  acontece dentro de uma troca: a janela de assistências (§6.5) também mata, e ali não
+  existe ação de troca a que anexar o registro — daí `trocaNumber: 1|2|3|null`.
+- **`lethalTriggersUsed` só é escrito quando há o que escrever** (`lethalTriggersPatch` em
+  `commands.ts`, spread condicional em `round.ts`). Gravar lista vazia em toda unidade que
+  duela ou a todo round mudaria o estado serializado — e o hash de replay — sem nenhuma
+  mudança de regra por trás.
+- **Nenhuma skill do catálogo real declara `trigger:'onLethal'`.** Gap consciente, o
+  terceiro acumulado (gatilhos da sub-sessão 5/N, sets `special` da 6/N, tag `heal` da 7/N):
+  autorar conteúdo em cima dos efeitos de M10 é escopo declarado de M12, e daria início a um
+  ciclo de rebalanceamento próprio. Há teste em `packages/data` travando essa afirmação.
+
+`RULES_VERSION` `0.8.0`→`0.9.0`. **Nenhum número de balanceamento se moveu**
+(`pnpm balance -- --runs 10000`): Espadachim 63,5% … Couraçado 26,2%, `spd` em 22,4%, 17
+hard counters — **o mesmo relatório das sub-sessões 4, 6 e 7**, que é o resultado correto,
+já que nada no catálogo tem o trigger. `GOLDEN_HASH` intacto (`pnpm test:browser`, 42
+testes, 3 engines).
+
+Testes novos: 14 em `duel/lethal.test.ts` (classificação por trigger e por tag; a tag sem o
+trigger não faz nada; default de `lethalUses`; a busca ignorando skill já usada e skill em
+cooldown; `requireSurvive` e `requirePerBattle` filtrando; determinismo contra a ordem de
+inserção do `Record`; o filtro de persistência mantendo só `perBattle`, descartando id sem
+dono e não duplicando), 19 em `duel/lethalInDuel.test.ts` (controle sem gatilho morrendo;
+sobrevivência ao golpe principal, ao contra-ataque e ao dano de assistência; HP exatamente
+1; disparo único por duelo; não disparar em dano não-letal nem com a skill já usada; a
+variante de dano matando e ferindo o matador, aplicando efeitos nele, não encadeando e não
+disparando no caminho sem matador; `perBattle` saindo no resultado e `perDuel` não;
+determinismo nas duas variantes) e 10 em `battle/lethalOnMap.test.ts` (novo — tick de DoT
+letal com e sem gatilho, disparo único entre rounds, `perDuel` e a variante de dano não
+disparando fora do duelo, tick não-letal; e a persistência nos dois sentidos: o que o duelo
+gasta volta pro mapa, o que o mapa já gastou impede o duelo de disparar, `perDuel` não
+persistindo, e duelo e tick compartilhando o mesmo estado de uso), mais 4 em
+`packages/data/tests/authorContent.test.ts` (schema aceitando os dois escopos, rejeitando
+`onLethal` sem `lethalUses` e `lethalUses` sem `onLethal`, e travando que nenhuma skill do
+catálogo usa o trigger). `pnpm test` (**763 testes, 67 arquivos** — +47 sobre a sub-sessão
+7), `pnpm typecheck` (7 pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data`
+(17 schemas, 72 arquivos).
+
+**Com esta fatia acabam TODOS os itens nomeados no roadmap de M10**, e os 3 critérios de
+aceite formais batem desde a sub-sessão 4. Pontas soltas conhecidas, nenhuma delas escopo
+de M10: `lifesteal` inerte; `sim-cli`/`DuelPreviewPanel` sem exibir cura nem gatilho de
+morte no log troca a troca (o motor registra `heal`, `reaction.healDone` e
+`lethalTriggers`; exibir é trabalho de UI); e nenhum conteúdo real usando os efeitos de M10
+(M12).
+
+## M11 — Objetivos de mapa e Valor
+
+### M11 — sub-sessão 1/N: as 4 condições de vitória além de `rout` (§5.7)
+
+Primeira fatia de M11, escolhida por ser a mais autocontida das três frentes do milestone
+(as outras: `mapSkill` em área e catálogo real de `valor-skills`) — uma função pura de
+estado, zero conteúdo novo, zero campo novo em `SkillDef`. É também a que destrava o
+problema que o roadmap nomeia: **sem ela todo mapa da campanha é obrigatoriamente "mate
+todo mundo"**. `WinCondition` tinha as 5 formas no tipo (core) e no Zod (`packages/data`)
+desde M3, e só `rout` tinha checagem.
+
+§5.7 é uma linha e meia — *"Data-driven por mapa: `rout`, `seize`, `survive N rounds`,
+`escort`, `defend`. Permadeath é flag do `BattleSetup`"* — e **não define nenhuma das
+cinco**. As leituras abaixo foram decididas com o usuário antes de qualquer código.
+
+- **`defend` ganhou `target` no schema (decisão do usuário).** Os dois schemas existentes
+  eram `defend: {rounds}` e `surviveRounds: {n}` — sem nada que os diferenciasse, `defend`
+  seria um alias, e o critério de aceite pede 4 condições NOVAS. Agora é o clássico do
+  gênero: segure `rounds` rounds **e** não deixe inimigo pisar no tile. Derrota imediata se
+  um inimigo vivo ocupa o alvo, e ela **decide antes da contagem** — cumprir os N rounds
+  não desfaz o tile tomado. Dá também uma razão de ser ao arquétipo `guard-tile` de §9.1,
+  que existe desde M7 sem objetivo a guardar. Mudança no tipo `WinCondition` e no
+  `maps.schema.ts`; nenhum dado real precisou migrar, porque os 4 mapas usam `rout`.
+- **Perder o escoltado é derrota imediata (decisão do usuário).** Sem isso `escort` seria
+  só um `seize` que exige uma unidade específica — não há tensão em escoltar alguém que
+  pode morrer sem consequência. Um `unitId` que não existe no mapa também resolve como
+  derrota: é erro de conteúdo, e a alternativa (ficar `ongoing` para sempre) seria uma
+  partida sem desfecho possível, pior de diagnosticar.
+- **`seize` = QUALQUER unidade viva do jogador sobre o tile (decisão do usuário).** É
+  exatamente o que separa `seize` de `escort`: lá a unidade é nomeada pelo próprio schema.
+  Evita inventar um conceito de "comandante/lorde" que a spec não tem em lugar nenhum.
+- **Eliminar o time inimigo NÃO vence mais um mapa cuja condição declarada é outra.** Esta
+  é a única quebra de comportamento da fatia, e é deliberada: "data-driven por mapa" lido
+  ao pé da letra significa que a condição declarada é a única via de vitória. Antes,
+  `checkWinCondition` devolvia `victory` sempre que o time inimigo acabava, ignorando a
+  condição — o que tornaria `seize`/`escort` decorativos em qualquer mapa com inimigos
+  finitos. Decisão minha, registrada aqui em vez de perguntada (regra 13 permite as duas
+  vias), e sem efeito em nada existente: todo conteúdo real e o replay canônico usam
+  `rout`, cujo ramo é idêntico ao de antes. **A derrota por não ter unidade viva continua
+  universal** — essa não vem da condição, é a partida deixando de existir.
+- **`surviveRounds`/`defend` usam `state.round > n`.** `round` é o round CORRENTE e só vira
+  `n+1` quando o round `n` fecha em `endRound`, então `>` é literalmente "sobreviveu aos n
+  rounds". Nenhum campo de estado novo: a contagem já existia.
+- **`checkWinCondition` saiu de `round.ts` para `winCondition.ts` próprio.** Eram 3 linhas
+  e viraram 5 ramos com regras próprias; `round.ts` já carregava `isRoundComplete`,
+  `endRound` e o tick periódico. `round.ts` reexporta o símbolo, então `simulate.ts` e
+  `aiTurn.ts` não mudaram uma linha.
+
+`RULES_VERSION` `0.9.0`→`0.10.0`. **Nenhum número de balanceamento se moveu**
+(`pnpm balance -- --runs 10000`): Espadachim 63,5% … Couraçado 26,2%, `spd` em 22,4% — o
+mesmo relatório das sub-sessões 4/6/7/8 de M10, que é o esperado, já que o torneio roda em
+mapas `rout`. `GOLDEN_HASH` intacto (`pnpm test:browser`, 42 testes, 3 engines).
+
+Testes novos: 24 em `battle/winConditions.test.ts` (novo — a derrota universal valendo para
+as 5 condições; `rout` intacto e o teste explícito de que eliminar o inimigo NÃO vence
+outra condição; `seize` com unidade viva/morta/inimiga sobre o tile; `surviveRounds` nos
+três estados de contagem; `escort` com o VIP longe, com outra unidade sobre o alvo, com o
+VIP no alvo, com o VIP morto e com `unitId` inexistente; `defend` nos dois eixos — contagem
+e ocupação do tile, incluindo inimigo morto sobre ele e unidade do jogador sobre ele; **uma
+batalha completa terminando por cada uma das 4 condições novas** via
+`buildInitialState`/`applyCommandAndAdvance`, que é o critério de aceite literal; e
+determinismo das 4) e 4 em `packages/data/tests/validate.test.ts` (as 5 formas aceitas pelo
+schema, `defend` sem `target` rejeitado, as demais rejeitadas sem os campos que a resolução
+exige, e os 4 mapas reais travados em `rout`). `pnpm test` (**791 testes, 68 arquivos** —
++28), `pnpm typecheck` (7 pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data`
+(17 schemas, 72 arquivos).
+
+Pendente do resto de M11: **`mapSkill` com alvo em área** (§5.4 — `applyMapSkill` hoje
+aplica efeito só em `target:'self'`, com o comentário "alvo em área não suportado em M3";
+exige campo de raio, que a spec não define) e **catálogo real de `valor-skills`** resolvido
+por `useValor` (hoje o comando ignora o `skillId` e debita um custo fixo de 1;
+`packages/data/valor-skills/` não existe e o `ContentCatalog` não carrega valor-skills —
+os 4 `kind` do schema, em especial `summonReinforcement`, precisam de decisão de design
+própria). Autorar mapas de campanha com objetivos variados é escopo declarado de M12 (§10).
+
+### M11 — sub-sessão 2/N: `mapSkill` com alvo em área (§5.4)
+
+Segunda das três frentes de M11, escolhida antes de `valor-skills` porque o `kind:'artillery'`
+do schema de Valor é literalmente dano em área: construir a mira de área primeiro torna a
+fatia de Valor mais barata, e a ordem inversa seria trabalho duplicado.
+
+Estado anterior: `applyMapSkill` **ignorava `cmd.target` por completo** — a coordenada vinha
+no `BattleCommand` desde M3 e nunca foi lida — e aplicava efeito só em `target:'self'`, com
+o comentário `// alvo em área não suportado em M3`. Não causava dano nem cura em ninguém.
+§5.4 dá uma linha sobre a ação (*"Usa skill de mapa (cura em área, artilharia, buff de
+zona). Custa AP."*) e nada mais; as três decisões abaixo foram tomadas com o usuário.
+
+- **Quem a área atinge é DERIVADO do que a skill faz, sem campo novo (decisão do usuário).**
+  Tag `heal` → cura os ALIADOS no raio ("cura em área"); componente de dano → acerta os
+  INIMIGOS ("artilharia"); e cada `skill.effects` escolhe o lado pelo `EffectDef.kind` que
+  já existe desde M1 — buff → aliados, debuff → inimigos ("buff de zona"). Os três exemplos
+  nomeados por §5.4 saem exatamente disso, sem `areaTargets` declarado. O
+  `EffectApplication.target` ganhou a leitura natural que faltava: `'self'` = só o lançador
+  (comportamento de M3, preservado inclusive no stream de RNG), `'target'` = a área. A
+  alternativa descartada (`areaTargets: 'allies'|'enemies'|'all'`) só ganharia expressividade
+  no caso da bomba que fere os dois lados, ao custo de um campo que o autor de conteúdo pode
+  declarar incoerente com o resto da skill. Mesmo padrão das tags `heal` (M10 7/N) e
+  `survive` (M10 8/N).
+- **Alcance de lançamento reusa `skill.duelRange` (decisão do usuário).** Em `kind:'map'`
+  ele passa a significar "a que distância do lançador o centro da área pode estar"; ausente,
+  herda o `duelRange` da unidade — a mesma herança que a skill de duelo já segue. Não havia
+  colisão de sentido: `duelRange` em uma skill de mapa não significava nada antes. Sem esta
+  checagem o `target` seria só o centro da área e artilharia acertaria qualquer canto do
+  mapa do próprio spawn.
+- **Sem rolagem de acerto e sem crítico, com variância (decisão do usuário).** Reusa
+  `computeDamage` inteiro (mitigação por `def`, triângulo de armas, `damageDealtPct` do
+  lançador e `damageTakenReduction` do alvo, variância de ±3%) mas não rola acurácia —
+  artilharia não "erra" um tile — nem crítico, que §6.6 passo 7 descreve como conceito da
+  troca de duelo. Posicional fica em `FP_SCALE`: flanco/cerco/altura são modificadores de
+  `engage` (§5.5) e não existem fora do duelo. Cura em área usa `computeHeal`, já
+  determinística por decisão de M10, então o mesmo valor cai em todos os alvos.
+- **`SkillDef.areaRadius` é OPCIONAL, ao contrário de `lethalUses`.** Raio em distância
+  Manhattan (§5.1 fixa a métrica — não é decisão de design), ausente/0 = só o tile alvo.
+  Omitir é o caso conservador, e uma skill de mapa de alvo único é legítima; o schema Zod
+  só **rejeita** `areaRadius` fora de `kind:'map'`, onde seria um número inerte.
+- **Stream de RNG por ALVO.** A variância usa `mapskill-variance:<unitId>` e a aplicação de
+  efeito em área usa `mapskill-area:<effectId>:<unitId>`. Dois inimigos idênticos na mesma
+  área não podem dividir a mesma rolagem — levariam exatamente o mesmo dano sempre, e há
+  teste afirmando que não levam. O stream de `target:'self'` (`mapskill:<effectId>`) ficou
+  **intocado**, então nenhum replay existente muda de resultado.
+- **Ordem dos alvos é a da iniciativa fixa (§5.3)**, não a do array `state.units` — mesma
+  escolha de `buildAssistCandidates` (M3): a ordem de montagem do array não tem garantia
+  nenhuma, e cliente, servidor e `sim-cli` precisam produzir bytes idênticos.
+
+`RULES_VERSION` `0.10.0`→`0.11.0`. **Nenhum número de balanceamento se moveu**
+(`pnpm balance -- --runs 10000`): Espadachim 63,5% … Couraçado 26,2%, `spd` em 22,4% — o
+torneio não emite `mapSkill` e nenhuma skill do catálogo declara `areaRadius`. `GOLDEN_HASH`
+intacto (`pnpm test:browser`, 42 testes, 3 engines).
+
+Testes novos: 21 em `battle/mapSkillArea.test.ts` (novo — `unitsInArea` com o alvo
+exatamente no raio, um a mais fora, raio 0, mortos ignorados e ordem de iniciativa;
+artilharia **atingindo mais de uma unidade**, que é o critério de aceite literal, poupando
+quem está fora do raio, os aliados e o próprio lançador, gastando AP uma vez só e não
+levando ninguém abaixo de 0 HP; cura em área curando aliados e não inimigos, com cap de HP
+máximo e sem ressuscitar; buff caindo nos aliados e debuff nos inimigos pelo `kind`;
+`target:'self'` continuando só no lançador; alcance de lançamento rejeitando alvo distante,
+aceitando o limite exato e herdando o da unidade quando a skill não declara; AP insuficiente
+rejeitando antes de qualquer efeito; e os dois testes de determinismo) e 5 em
+`packages/data/tests/authorContent.test.ts` (raio aceito em skill de mapa e ausente,
+raio 0 válido, raio negativo rejeitado, raio fora de `kind:'map'` rejeitado, e nenhuma skill
+do catálogo declarando o campo ainda). `pnpm test` (**817 testes, 69 arquivos** — +26),
+`pnpm typecheck` (7 pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data`
+(17 schemas, 72 arquivos).
+
+Pendente de M11: **catálogo real de `valor-skills` resolvido por `useValor`** — o comando
+ignora o `skillId` e debita custo fixo de 1; `packages/data/valor-skills/` não existe e o
+`ContentCatalog` não carrega valor-skills; os 4 `kind` do schema precisam de decisão
+própria, e `summonReinforcement` esbarra em §5.3 ("unidades que entram depois são inseridas
+na posição correspondente ao seu valor de iniciativa" — a lista é calculada uma vez e nunca
+recalculada). Autorar mapas e skills de área reais é escopo declarado de M12 (§10).
+
+### M11 — sub-sessão 3/N: `valor-skills` resolvidas de verdade por `useValor` (§5.6)
+
+Terceira e última frente nomeada de M11. Estado anterior: `applyUseValor` **ignorava o
+`skillId`** e debitava um custo fixo de 1 sem aplicar efeito nenhum; `packages/data/valor-skills/`
+**não existia** (só a pasta de fixtures); o `ContentCatalog` não carregava valor-skills; e o
+`payload` no Zod era `z.record(z.string(), z.unknown())`, solto desde M3 porque nenhum
+`kind` tinha resolução.
+
+- **`summonReinforcement` fica sem resolução (decisão do usuário).** Invocar exige um
+  blueprint completo de `BattleUnit` — stats, scripts, `knownSkills` — que hoje só
+  `resolveHeroCombatProfile` + `assembleBattleUnit` sabem montar a partir de um `Hero` +
+  catálogo, e `packages/core` não pode importar conteúdo (regra 1). Além disso é o único
+  ponto do motor que mexeria na lista de iniciativa: §5.3 manda inserir a unidade nova "na
+  posição correspondente ao seu valor de iniciativa", o que é permitido (inserir ≠
+  recalcular) mas colide de perto com a regra 9. Os outros três kinds fecham o critério de
+  aceite com folga. **O comando rejeita alto** (`reason` nomeando o kind) em vez de gastar
+  Valor em silêncio — há teste afirmando que o saldo não se move.
+- **`artillery` = dano fixo do payload, mitigado por `def` (decisão do usuário).** Entra em
+  `computeDamage` como `flat` com `multiplier: 0`, então a mitigação de §6.6 (passos 2-4), a
+  redução de dano do alvo (passo 8) e a variância (passo 9) continuam valendo — mesma
+  família de números do resto do jogo, e um Couraçado continua duro contra artilharia. **Sem
+  triângulo de armas** (Valor não empunha arma), **sem crítico** e **sem posicional**: não há
+  lançador de quem herdar nada, e os três exigiriam inventar uma origem. As alternativas
+  descartadas eram dano cru (criaria uma segunda família de números que o `pnpm balance` não
+  sabe comparar com nada) e dano derivado do `cost` (fórmula que a spec não insinua e que
+  tira do autor de conteúdo o controle que a regra 4 manda dar).
+- **Registrado sem perguntar** (leituras literais de §5.6, regra 13 permite): usar uma skill
+  de Valor **não consome turno de nenhuma unidade** e não tem outro limite além do saldo — é
+  "recurso de exército", e a spec não dá nenhum outro limite; `restoreApPp`/`globalBuff`
+  miram os seus e `artillery` mira os inimigos, pela mesma derivação por natureza da
+  sub-sessão 2; **o alcance é o mapa inteiro** (§5.6 diz "artilharia **de mapa**", e não há
+  lançador de onde medir distância); e `globalBuff` "de 1 round" vira `duration: 1`, que
+  `endRound` já sabe tickar — a duração é do MOTOR (`GLOBAL_BUFF_DURATION`), não do payload,
+  porque deixar o autor escolhê-la seria mudar a regra de §5.6 em dado.
+- **`restoreApPp` mira um tile, não uma unidade.** `BattleCommand.useValor` tem
+  `{skillId, target: Coord}` desde M3 (forma normativa de §3.3 de `01-fundacoes-tecnicas`),
+  então a unidade é a que está no tile. Só unidade **viva do jogador**: mirar um inimigo ou
+  um tile vazio rejeita sem cobrar. `artillery` em área vazia, ao contrário, **vale e cobra**
+  — o jogador escolheu o tile, e é a mesma leitura de `applyMapSkill`, que também conjura em
+  área vazia. A assimetria é proposital: `restoreApPp` sem unidade não tem sujeito, é alvo
+  malformado; artilharia em tile vazio é uma decisão ruim, não um comando inválido.
+- **`payload` virou união discriminada por `kind`.** Com três kinds resolvidos, um payload
+  sem forma passou a ser a mesma classe de bug que o `defend` sem `target` da sub-sessão 1:
+  conteúdo que valida e não faz nada. `summonReinforcement` mantém o record solto de
+  propósito — dar forma a ele agora seria adivinhar a decisão que ficou adiada.
+- **`BattleSetup.valorSkills`/`BattleState.valorSkills` são OPCIONAIS**, mesmo precedente de
+  `setSpecialEffectIds`/`aiArchetype`/`lethalTriggersUsed`: as batalhas montadas à mão de
+  M2-M6 e as fixtures não têm catálogo. Ausente = todo `useValor` rejeita. No `ContentCatalog`
+  o campo é obrigatório, como `effects` (que entrou pelo mesmo caminho em M10) — o que
+  obrigou a acrescentar `valorSkills: {}` nos 6 catálogos inline dos testes de `apps/server`
+  e a nova entrada no loader do cliente.
+- **Catálogo real autorado** (`packages/data/valor-skills/`): `valor-restaurar-recursos`
+  (custo 2, +2 AP/+1 PP), `valor-bombardeio` (custo 4, dano 400, raio 1) e
+  `valor-brado-de-guerra` (custo 5, +15% de `atk` por 1 round), mais o `EffectDef` novo
+  `effect-brado-de-guerra` que a última referencia — o catálogo real só tinha um efeito, e
+  ele é debuff. Autorar aqui é escopo, ao contrário das skills de área: o roadmap de M11 diz
+  literalmente "catálogo real de `valor-skills` resolvido de verdade por `useValor`".
+  **Estes números não são exercitados por `pnpm balance`** (o torneio nunca emite `useValor`,
+  `decideMapAiCommand` não conhece o comando), então são um primeiro passe calibrado contra
+  §5.6 ("Começa em 5, +1 por round") e o HP do roster real, a rever quando M12 autorar
+  campanha que os use de verdade.
+- **Gap registrado: "+2 ao capturar objetivo" (§5.6) continua sem implementação.** `endRound`
+  dá o "+1 por round"; a outra fonte não tem onde acontecer — com `seize` resolvido na
+  sub-sessão 1, capturar o objetivo **termina** a batalha, então não existe captura no meio
+  dela. Precisa de um conceito de objetivo intermediário que §5.7 não tem.
+
+`RULES_VERSION` `0.11.0`→`0.12.0`. **Nenhum número de balanceamento se moveu**
+(`pnpm balance -- --runs 10000`): Espadachim 63,5% … Couraçado 26,2%, `spd` em 22,4%.
+`GOLDEN_HASH` intacto (`pnpm test:browser`, 42 testes, 3 engines) — o replay canônico não
+emite `useValor`.
+
+Testes novos: 19 em `battle/valorSkills.test.ts` (novo — `restoreApPp` devolvendo AP/PP à
+unidade do tile, não tocando em mais ninguém, cobrando o `cost` declarado em vez do custo
+fixo de 1, **não consumindo turno**, e rejeitando tile sem aliado vivo ou com inimigo;
+`artillery` ferindo todos os inimigos do raio e nenhum aliado, com o dano **mitigado por
+`def`** e menor que o número cru do payload, sem levar ninguém abaixo de 0, e gastando Valor
+em tile vazio; `globalBuff` atingindo todo aliado vivo onde quer que esteja, poupando
+inimigos e mortos, e **durando exatamente 1 round** — provado com `endRound`;
+`summonReinforcement` rejeitando sem cobrar; skillId fora do catálogo, saldo insuficiente e
+batalha sem catálogo; e os dois de determinismo), 7 em `packages/data/tests/validate.test.ts`
+(os três payloads resolvidos aceitos, payload trocado de kind rejeitado, artilharia sem dano
+ou com raio negativo rejeitada, `summonReinforcement` seguindo solto, custo zero rejeitado, o
+catálogo real cobrindo os três kinds resolvidos e todo `effectId` referenciado existindo de
+fato). Os 2 testes do placeholder de M3 em `commands.test.ts` foram reescritos para a
+semântica nova. `pnpm test` (**843 testes, 70 arquivos** — +26), `pnpm typecheck` (7 pacotes,
+limpo), `pnpm lint` sem alteração, `pnpm validate:data` (17 schemas, **76 arquivos** — +4).
+
+**Os 4 critérios de aceite de M11 batem.** Pendências registradas, nenhuma delas critério:
+`summonReinforcement` (fatia própria, decisão do usuário), "+2 ao capturar objetivo" (§5.6,
+sem onde acontecer), e nenhum mapa/skill real usando condições novas ou área — escopo
+declarado de M12 (§10: campanha de 6-10 mapas com objetivos variados).
+
+## M12 — Conteúdo e campanha real
+
+### M12 — sub-sessão 1/N: `encounters` — o elenco da campanha vira dado
+
+Primeira fatia de M12, escolhida por destravar as outras: sem roster em dado não dá para
+autorar mapa de `escort` (a condição nomeia um `unitId`, que só existe no elenco) nem de
+`defend`, e servidor e `sim-cli` continuam sem conseguir montar um mapa de campanha.
+
+Estado anterior: `apps/client/src/data/campaign.ts` montava os 3 mapas da campanha em
+TypeScript — quem entra, em que tile, com qual equipamento, tudo hardcoded, com o `Hero` de
+cada unidade DERIVADO por convenção de nome (`skill-ataque-<slug>`, `skill-especial-<slug>`)
+e `permadeath: 'casual'` fixo no código. M9 moveu classes/skills/itens/mapas para
+`packages/data` e deixou este arquivo para trás de propósito ("autoria de mapa de verdade é
+M12"); era o último canto de conteúdo hardcoded do projeto, contra a regra 4.
+
+- **Schema `encounters` próprio, separado do layout (decisão do usuário).** Um encounter é
+  `{ id, name, mapId, chapter, permadeath, winCondition?, units[] }`; o layout (tiles,
+  terreno) continua em `maps/*.json`, referenciado por `mapId`. Separar os dois deixa um
+  layout servir a capítulos diferentes sem duplicar a matriz de tiles — os mapas atuais têm
+  ~940 linhas só de `tiles`, e colar elenco no layout também faria `maps.schema.ts` servir
+  dois consumidores com necessidades opostas (a arena de `tools/balance` não quer roster).
+- **`hero` embutido inteiro, não derivado por convenção de nome.** Precedente direto de
+  `comps.schema.ts` (M8), que resolveu o mesmo problema para o torneio. A derivação por
+  convenção do `campaign.ts` antigo funcionava enquanto toda classe tivesse exatamente
+  `skill-ataque-*` + `skill-especial-*`; com M12 autorando skills variadas por unidade, uma
+  regra de nomenclatura implícita viraria armadilha. `aiArchetype` é **opcional** aqui
+  (obrigatório em comps): numa campanha a unidade do jogador é humana, e ausente = humana,
+  mesma leitura de `BattleUnit`.
+- **`winCondition` opcional no encounter, sobrepondo a do layout.** Decisão registrada, não
+  perguntada (regra 13). É praticamente forçada por `escort`: a condição referencia um
+  `unitId` que só existe no elenco, então declará-la no layout amarraria o layout a um
+  roster específico. Ausente = vale a do mapa, que é o comportamento de hoje. O schema
+  ainda **valida** que um `escort` nomeie uma unidade do jogador presente no encounter —
+  sem isso a partida nasceria sem desfecho possível (o motor resolve `unitId` inexistente
+  como derrota imediata, decisão de M11 sub-sessão 1).
+- **`permadeath` mora no encounter.** §5.7 diz "Permadeath é flag do `BattleSetup`
+  (`casual | classic | ironman`), **nunca hardcoded**" — e estava hardcoded em `campaign.ts`
+  desde M6. É conteúdo do cenário, não do layout nem do motor.
+- **Três `refine` no schema que o TypeScript não daria de graça:** pelo menos uma unidade do
+  jogador, `unitId` único, e **1 herói = 1 tile** (duas unidades não podem começar na mesma
+  coordenada) — este último é o conceito que o `CLAUDE.md` marca como "não pode confundir",
+  e é o tipo de erro que só apareceria como comportamento estranho em runtime.
+- **`RULES_VERSION` NÃO subiu** (segue `0.12.0`). Nenhuma regra do motor mudou: esta fatia
+  move conteúdo e acrescenta um schema. `permadeath` e `winCondition` passaram a vir do
+  dado, mas com os mesmos valores de antes ('casual' e a do mapa), então nem o comportamento
+  observável mudou.
+- **Gap consciente preservado: as unidades inimigas da campanha continuam sem `aiArchetype`**
+  — herança de M6, documentada em `campaign.ts` desde então. O campo agora existe no schema
+  e basta preencher; ligar a IA muda como a campanha JOGA, e isso pertence à fatia que
+  autora os mapas de verdade (3/N), não a uma migração de formato.
+
+`pnpm balance -- --runs 10000` byte a byte igual ao baseline (Espadachim 63,5% … Couraçado
+26,2%, `spd` em 22,4%) e `GOLDEN_HASH` intacto — o torneio não conhece encounters. Mesmo
+critério de fidelidade que M9 usou para provar que uma migração de conteúdo não mudou nada.
+
+Testes novos: 9 em `packages/content/tests/encounters.test.ts` (novo — os 3 encounters
+carregando e vindo **ordenados por capítulo** e não pela ordem do disco; o elenco sendo
+exatamente o que vivia em `campaign.ts`, unit a unit, com o tile do jogador conferido nos
+três capítulos; e a **integridade cruzada** que o TS dava de graça e o dado não dá: `mapId`,
+`classId`, todo skill de `duelSkills`/`mapSkills`/`tacticsScript` e todo item equipado
+existindo no catálogo, `weaponType` dentro de `classDef.allowedWeapons`, nenhuma unidade
+fora do grid; mais cada encounter virando um `BattleSetup` que `buildInitialState` aceita, e
+determinismo), 2 em `packages/data/tests/validate.test.ts` (o par valid/invalid do schema
+novo, via o `describe.each` que já cobre os outros 17). `pnpm test` (**854 testes, 71
+arquivos** — +11), `pnpm typecheck` (7 pacotes, limpo — exigiu `encounters: []` nos 6
+catálogos inline dos testes de `apps/server`, mesma mecânica de `valorSkills` na fatia
+anterior), `pnpm lint` sem alteração, `pnpm validate:data` (**18 schemas, 79 arquivos** —
++1 schema, +3 encounters).
+
+Pendente de M12: skills usando os efeitos de M10 + rebalanceamento completo (2/N), os 6+
+mapas com objetivos variados (3/N) e o aceite ponta a ponta no cliente (4/N).
+
+### M12 — sub-sessão 2/N: skills usando os efeitos de M10 + rebalanceamento completo
+
+Fatia que fecha o critério de aceite "nenhuma skill do catálogo é só um número de dano" e
+dispara o ciclo de rebalanceamento que M10 e M11 vinham adiando de propósito a cada
+sub-sessão. Ponto de partida: **22 das 23 skills do catálogo eram só multiplier + flat** (só
+`skill-defender` escapava, por não causar dano).
+
+- **O ataque básico e as duas reações universais de §6.4 são a exceção declarada (decisão
+  do usuário).** §6.2 define o básico como o fallback de 0 AP "sempre disponível"; dar efeito
+  a ele — ou a Contra-atacar/Defender, que toda unidade tem sem gastar talento — infla a
+  linha de base em vez de criar escolha, e mexeria em todo duelo do torneio. O critério vale
+  para toda skill que o jogador ESCOLHE.
+- **Toda especial de classe aplica um efeito, com `duration: 'duel'`.** Duração em rounds de
+  mapa é alavanca bem mais forte (efeito `battle` acumula vantagem entre duelos, §6.9) e fica
+  reservada para conteúdo que a queira de propósito. 10 `EffectDef` novos, escolhidos para
+  dar consumidor aos campos que M10 declarou e ninguém lia: `periodicDamagePct`
+  (sangramento, queimadura), `periodicHealPct` (regeneração), `damageDealtPct` (ímpeto),
+  `damageTakenReductionPct` (guarda cerrada, e negativo na marca do caçador) e `statMods`
+  dentro do duelo (quebra de armadura, desarme, lentidão, bênção).
+
+**Dois achados mecânicos que mudaram o desenho da fatia** — os dois vieram de o teste do
+critério ter sido escrito depois da primeira autoria, e são o argumento de por que ele
+deveria ter vindo antes:
+
+1. **Uma reação `onDamaged` com `ppCost: 1` NUNCA dispara.** `resolveDuel` resolve
+   `onAttacked` primeiro (ordem cronológica, M10 sub-sessão 5/N) e `tryLateReaction` sai
+   cedo se já houve reação na troca; Contra-atacar é baseline, sem condições, então vence
+   sempre. A única janela em que `onDamaged` existe é quando a unidade NÃO reagiu — isto é,
+   quando ficou sem PP. **Custar 0 PP é a razão de a skill existir**, não generosidade: ela
+   é literalmente "sem PP para revidar, você ainda responde ao levar o golpe". Medido: com
+   `ppCost: 1` o Arqueiro ficou em 34,4% (inerte); com 0, foi a 83,0% na mesma rodada.
+2. **Reação e assistência não conseguem ser "mais que um número de dano" neste motor.**
+   `resolveDuel` ignora os `skill.effects` de uma reação e `applyAssistDamage` ignora os de
+   uma assistência — corte deliberado de M10 sub-sessão 1/N, preservado com teste explícito.
+   Dar um efeito a elas seria autorar **conteúdo morto**, que é pior do que assumir que são
+   um número. Consequências:
+   - `skill-revide-preciso` (dano) virou **`skill-folego-de-combate` (cura)**: curar é a
+     única forma de uma reação ser mais que um número sem mentir — e isso dá consumidor à
+     "Cura de emergência" que §6.4 nomeia e que M10 sub-sessão 7/N implementou sem ninguém
+     usar. Uma mecânica a mais coberta pelo mesmo conteúdo.
+   - **`skill-assistir` fica isenta**, por motivo mecânico e não de design: uma assistência
+     é ou 50% do dano da skill ou cura em efeito integral (§6.5.3), e nada além. Há teste
+     travando a justificativa (`effects` vazio, sem tag `heal`): se um dia o motor passar a
+     aplicar efeitos de assistência, o teste falha e a isenção é reavaliada em vez de virar
+     folclore. **Tornar isso falso é mudança de core, não de conteúdo.**
+
+**As três mecânicas de M10 com consumidor real** (o gap que M10 registrou quatro
+sub-sessões seguidas esperando M12):
+
+| Mecânica | Conteúdo | Como chega à unidade |
+| --- | --- | --- |
+| tag `heal` (M10 7/N) | `skill-cura-clerigo` | `duelSkills` do Clérigo + linha de script com `selfHpBelow` |
+| `onLethal` (M10 8/N) | `skill-ultimo-suspiro`, `perBattle` | `duelSkills` do Couraçado (é assim que uma passiva chega a `knownSkills`) |
+| `onDamaged` (M10 5/N) + Cura de emergência (§6.4) | `skill-folego-de-combate` | talento exclusivo do Arqueiro, **alocado pelo comp** |
+
+A cura do Clérigo é skill PRÓPRIA e não a especial dele: assim "curar ou bater" vira uma
+linha de script com condição — o produto do jogo (§6.3) — em vez de trocar dano por cura
+sempre. O `onLethal` NÃO entra no `tacticsScript` (não é ação, é consequência), e o teste
+afirma isso. E o comp do Arqueiro precisa alocar o talento, senão o gatilho continuaria sem
+consumidor no torneio: o mesmo erro que M10 sub-sessão 4/N encontrou com `skill-assistir`.
+
+**Rebalanceamento — 4 passes de `pnpm balance -- --runs 10000`:**
+
+| | Espadachim | Grifeiro | Couraçado | Clérigo | Arqueiro | pior–melhor |
+| --- | --- | --- | --- | --- | --- | --- |
+| Baseline (M8→M11) | 63,5% | 55,1% | 26,2% | 54,2% | 36,2% | 26,2–63,5 |
+| Passe 1 (efeitos crus) | **66,3%** | **66,2%** | 58,7% | 27,0% | 34,4% | 27,0–66,3 |
+| Passe 2 (`ppCost:0`) | 59,8% | 50,0% | 42,0% | 29,9% | **83,0%** | 29,9–83,0 |
+| Passe 3 | 61,3% | 48,9% | 46,1% | 35,7% | 51,6% | 35,7–61,3 |
+| **Final** | **59,9%** | 47,5% | 44,3% | 49,5% | 48,0% | **42,5–59,9** |
+
+Ajustes finais, todos em `packages/data` (regra 4 — nenhum número de balanceamento entrou em
+código): ímpeto 120→50, guarda cerrada 150→70, bênção +10%→+45% def, sangramento 600→400 de
+chance, queimadura 50→80 de tick e 500→650 de chance, quebra de armadura ganhou
+`damageTakenReductionPct: -80` (a -12% de `def` sozinha era quase nada nos valores de nível
+10 — mesma descoberta que M8 sub-sessão 2 registrou), `signatureMultiplier` do Clérigo
+1300→1450, e a cura do Fôlego de Combate 400→120.
+
+**Resultado: o roster mais bem balanceado que o projeto já teve.** Os dois critérios de M8
+batem — nenhuma comp acima de 65% (a maior é 59,9%) e `spd` em 20,0% das vencedoras (teto
+60%) — e, **pela primeira vez desde M8, nenhuma comp está abaixo de 40%**: o alerta de §9.5
+que acusava Arqueiro (36,2%) e Couraçado (26,2%) desde a autoria original desapareceu. A
+faixa inteira do roster comprimiu de 37,3 pontos para 17,4.
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`): nenhuma regra do motor mudou — esta fatia é
+inteiramente conteúdo. `GOLDEN_HASH` intacto (o replay canônico usa fixtures próprias, não o
+catálogo real).
+
+Testes novos: 10 em `packages/data/tests/authorContent.test.ts` (o **critério de aceite de
+M12 como teste executável**: toda especial aplicando efeito com duração de duelo, nenhuma
+skill escolhível sendo só dano, a exceção continuando restrita ao básico + as 2 universais
++ a assistência com a justificativa travada, e todo `effectId` referenciado existindo; mais
+as 3 mecânicas de M10 com consumidor, cada uma verificada até a unidade — `duelSkills`,
+linha de script com condição, talento alocado pelo comp — e a trava de que só o Arqueiro tem
+reação própria). `pnpm test` (**864 testes, 71 arquivos** — +10), `pnpm typecheck` (7
+pacotes, limpo), `pnpm lint` sem alteração, `pnpm validate:data` (18 schemas, **92
+arquivos** — +13: 10 efeitos e 3 skills).
+
+Pendente de M12: os 6+ mapas com pelo menos 3 condições de vitória distintas e a IA dos
+inimigos da campanha (3/N), e o aceite ponta a ponta no cliente (4/N).
+
+### M12 — sub-sessão 3/N: os 6 mapas da campanha, com terreno e com a IA ligada
+
+Fecha os dois itens que faltavam do aceite de M12: "campanha de 6+ mapas jogável ponta a
+ponta com pelo menos 3 condições de vitória distintas" e a IA dos inimigos da campanha.
+
+Estado anterior: 3 layouts 15×15 de **planície pura** (`map-campanha-{1,2,3}-provisorio`,
+portados byte a byte de M6 pela sub-sessão 3/4 de M9), todos `rout`, com o jogador sozinho
+contra 2–3 inimigos **sem `aiArchetype`** — isto é, parados. Nenhuma das 4 condições de
+vitória que M11 implementou tinha um mapa real, `areaRadius` seguia sem conteúdo, e
+`terrain-floresta`/`terrain-montanha` existiam no catálogo sem nenhum mapa que os usasse.
+
+**Três decisões tomadas com o usuário:**
+
+- **Os 3 layouts provisórios saem; os 6 são novos, com terreno de verdade.** A alternativa
+  (manter os três e somar três) deixaria metade da campanha em planície pura, e nenhum dos
+  chokepoints que `seize`/`defend` precisam existiria nos capítulos iniciais.
+- **A party do jogador cresce por capítulo** (1 → 2 → 3 → 4 → 5 → 5). Até aqui a campanha
+  era 1 unidade contra N nos três mapas, o que deixava a assistência de M10
+  (`onAllyEngagedNearby`, cura de assistência) sem sujeito e tornava `escort` degenerado —
+  o herói escoltando a si mesmo é um `seize` com outro nome.
+- **As 5 condições de §5.7 são usadas, não as 3 do mínimo:** `rout` (cap. 1 e 6), `seize`
+  (2), `defend` (3), `surviveRounds` (4), `escort` (5). Excede o aceite e fecha a pendência
+  registrada em M11 de que "nenhum mapa real usa condição nova".
+
+**Decisões registradas sem perguntar (regra 13):**
+
+- **Chokepoint é montanha, não `object:'wall'`.** `Tile.object` (`wall | fort | gate |
+  chest | camp`) existe no schema desde M3 e **ninguém lê** — nem o core, nem o cliente.
+  Autorar um portão como `object` seria cenário decorativo se fazendo passar por regra; o
+  único bloqueio que o motor respeita é `moveCost: 'impassable'`, de `terrain-montanha`
+  (que `flying` atravessa — é o que dá sentido ao Grifeiro no capítulo 6).
+- **A altura de cada unidade é derivada do tile, não autorada.** `move` já copia a altura
+  do destino (`commands.ts`), então um número escrito à mão no encounter só poderia
+  divergir do mapa — e a vantagem posicional de §6.6 sairia de um número inventado. Há
+  teste travando a igualdade.
+- **Um mapa por gerador, como as classes.** `packages/data/scripts/authorCampaign.ts`
+  escreve os layouts em ASCII (uma linha por linha do grid, com legenda de terreno+altura)
+  e emite o JSON. 6 layouts são ~6 mil linhas de `tiles` onde um `terrain` trocado passa
+  despercebido; em ASCII o chokepoint se lê de relance. Mesmo papel de `authorContent.ts`:
+  ferramenta de autoria, fora do motor.
+- **O capítulo 1 tem UM inimigo, não dois.** Achado medido, não escolha estética: AP e PP
+  são pools da **batalha** (§6.3) e o lado em menor número gasta o dobro pra defender o
+  mesmo turno. Um herói sozinho contra dois perde por exaustão de recurso mesmo contra
+  inimigos muito abaixo do nível dele — testado com bandidos de nível 5 contra o herói de
+  nível 10: derrota. Enquanto a party tem uma unidade, o capítulo tem um inimigo; a partir
+  do capítulo 2, com aliado, a campanha pode superar o jogador em número (e supera).
+- **Nenhum inimigo nasce dentro do próprio alcance da party.** `buildInitialState` drena os
+  turnos de IA anteriores à primeira unidade humana na iniciativa (M7, sub-sessão 6), o que
+  era inofensivo com inimigos parados e deixou de ser: no primeiro traçado do capítulo 4 a
+  party já apanhava um round inteiro **antes do primeiro comando do jogador**. Vira teste:
+  nenhuma unidade sai ferida da montagem.
+- **Dificuldade graduada por nível de inimigo** (cap. 1: nível 8; 2: 8; 3–5: 9; 6: 10 com
+  chefe 11), tudo em dado. É o único lever de dificuldade que não toca regra.
+
+**As duas skills de mapa em área** (`skill-salva-arcana`, `skill-luz-do-alvorecer`) dão a
+`areaRadius` o consumidor que M11 sub-sessão 2/N deixou registrado como pendente ("a skill
+de mapa em área é conteúdo da fatia 3/N, junto dos mapas que a justificam"). Nenhuma das
+duas é só um número de dano (critério de M12): cada uma carrega um `EffectDef` que muda o
+round seguinte. A duração é em **rounds de mapa**, não `'duel'` — uma skill lançada no mapa
+não está em duelo nenhum. A tag `heal` continua sendo o discriminador de lado (M10, 7/N):
+com ela a área mira aliados, sem ela mira inimigos.
+
+**Os 5 arquétipos de §9.1 ganham consumidor real** (`aggressive`, `guard-tile`,
+`hold-position`, `flank`, `support-nearest`), com teste travando isso.
+
+**O arnês que prova "jogável".** `packages/content/tests/campaignPilot.ts` é um piloto
+automático de regras fixas que assume o lado do jogador; `campanha.test.ts` joga os 6
+capítulos com ele e exige `victory` em todos. Não é IA de jogo e por isso **não mora em
+`packages/core`** — é arnês de teste. Ele não escolhe skill, não gasta Valor e não lança
+skill de mapa: é o **piso** do que um humano faz. Duas regras dele mereceram cuidado, e as
+duas por medida: (a) mede distância ao objetivo por **rota BFS sobre o terreno**, não por
+Manhattan — com Manhattan ele empacava na muralha do capítulo 2, porque a passagem fica
+*para trás* em linha reta, e o teste passaria a medir a burrice do piloto em vez da
+jogabilidade do mapa; (b) a unidade escoltada só avança para tile que nenhum inimigo
+alcança no turno seguinte — sem isso ela se entregava na emboscada do capítulo 5 no round
+2. O portador do objetivo em `seize`/`defend` é reavaliado a cada comando: fixá-lo no
+início deixava o mapa sem ninguém indo ao objetivo assim que ele morria.
+
+**Correção no cliente, arrastada pelo conteúdo:** `MapCanvas.tsx` pintava terreno por
+`plain`/`forest`/`mountain` — os ids dos fixtures de M6 — e **nenhum batia** desde que M9
+trocou o conteúdo de demonstração pelo catálogo real (`terrain-planicie` etc.), então o mapa
+inteiro caía no cinza de fallback. Ficou invisível enquanto todo mapa era planície pura;
+com terreno real mudando movimento, defesa e evasão, o jogador precisa ver onde ele está. A
+altura ganhou um véu branco por nível pelo mesmo motivo.
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`): nenhuma regra do motor mudou — a fatia é
+conteúdo mais um arnês de teste. `pnpm balance -- --runs 10000` **idêntico** ao da
+sub-sessão 2/N (Espadachim 59,9% … Arcanista 42,5%, `spd` em 20,0% das vencedoras): o
+torneio usa `map-arena-coliseu` e os comps, nada do que esta fatia tocou.
+
+Pendente de M12: o aceite ponta a ponta **no cliente** (4/N) — a UI ainda não mostra qual é
+o objetivo do mapa nem quantos rounds faltam, o que com `rout` era dispensável e com
+`surviveRounds`/`defend` não é. Continua fora de escopo, e agora registrado: a campanha não
+recebe `valorSkills` (`buildBattleSetupFromHeroes` não tem o parâmetro), então Valor segue
+sem uso fora de teste.
+
+### M12 — sub-sessão 4/N: o aceite no cliente — objetivo, skill de mapa e Valor
+
+Fecha M12. As três fatias anteriores autoraram conteúdo que o cliente não sabia mostrar nem
+usar; esta liga as pontas.
+
+**Três lacunas encontradas ao olhar o cliente com a campanha real na mão:**
+
+- **O objetivo do mapa não existia na tela.** Enquanto toda condição era `rout` não havia o
+  que explicar; com a campanha de M12 o jogador entrava num mapa de `defend` sem saber que
+  tile segurar nem por quantos rounds, e num de `escort` sem saber quem não podia morrer.
+  `ObjectivePanel` descreve a condição em português, mostra o progresso (rounds restantes,
+  inimigos de pé) e o `MapCanvas` marca o tile do objetivo em amarelo — `rout` e
+  `surviveRounds` não marcam nada, porque a condição delas não é sobre lugar nenhum.
+- **Não havia ação de `mapSkill`.** O comando existe no core desde M3 e resolve área desde
+  M11, mas o cliente só sabia mover e engajar: as duas skills de mapa autoradas na
+  sub-sessão 3/N eram **inalcançáveis por um humano**. Agora aparecem como botão na barra
+  de ações da unidade, com custo em AP e raio no rótulo.
+- **Valor era saldo no HUD sem nada que o gastasse.** `applyUseValor` resolve contra
+  `state.valorSkills` desde M11, mas **`buildBattleSetupFromHeroes` não tinha o parâmetro**
+  — ou seja, ninguém que monta batalha a partir de heróis (cliente, servidor,
+  `tools/balance`) conseguia declarar as skills de Valor do mapa. Decisão do usuário:
+  ligar agora. A mudança no core é **aditiva** (campo opcional repassado ao `BattleSetup`,
+  onde já existia desde M11) e não altera nenhum cálculo.
+
+**Decisões de implementação registradas:**
+
+- **`mapSkill` e `useValor` compartilham um estado de mira só** (`TargetingMode`). São os
+  dois únicos comandos cujo alvo é uma COORDENADA e não uma unidade, e o gesto é o mesmo:
+  escolher a habilidade, ver os tiles legais, clicar num. O que muda é o alcance —
+  `mapSkill` usa `skill.duelRange ?? unit.duelRange`, a mesma leitura que `applyMapSkill`
+  faz no core; Valor é "artilharia **de mapa**" (§5.6) e aceita qualquer tile — e quem
+  paga. Em mira, o clique é o alvo mesmo em cima de unidade: artilharia mira o tile.
+- **O cliente recalcula o alcance só para desenhar.** Quem valida continua sendo o core:
+  clicar fora do overlay não monta comando, e o que escapar é rejeitado por
+  `applyCommandAndAdvance` com o motivo aparecendo na barra de ações (regra 3).
+- **Valor não limpa a seleção; skill de mapa limpa.** §5.6 diz que usar Valor **não
+  consome o turno de ninguém**, então a unidade selecionada segue selecionada e com o
+  alcance de movimento recomputado — enquanto `mapSkill` encerra o turno de quem lançou.
+- **`summonReinforcement` aparece desabilitado, não escondido.** Continua sem resolução
+  (decisão de M11 3/N) e o core rejeita alto; o botão diz isso antes de o jogador tentar,
+  em vez de a skill sumir sem explicação.
+- **O canvas passou a redimensionar.** O `Application` do Pixi era inicializado uma vez com
+  o tamanho do primeiro mapa; com mapas de 16×16, 18×18 e 20×15 na campanha, os capítulos
+  maiores apareceriam cortados ao avançar.
+- **Rocha intransponível é desenhada DEPOIS dos overlays.** O overlay de ameaça cobre o
+  tile inteiro e fazia a muralha do capítulo 6 se ler como zona de perigo em vez de parede.
+  Terreno que decide o traçado do mapa não pode ser apagado por um véu.
+- **Gancho de diagnóstico só em dev** (`__pathsBeyondStore`, sob `import.meta.env.DEV`).
+  O cliente não tem suíte automatizada e a verificação é um roteiro real de navegador desde
+  M9; sem um jeito de saltar de capítulo, conferir os mapas maiores exigiria vencer os
+  anteriores clicando. Não é API de jogo — nada no app lê daqui e o bloco não existe em
+  produção.
+
+**Verificação real, no navegador** (Vite + Playwright/Chromium headless, mesmo método de M9
+sub-sessão 3/4, já que `pnpm test` não cobre UI): o capítulo 1 foi **jogado até a vitória por
+cliques** (selecionar, mover, engajar, confirmar preview, avançar de mapa); `useValor`
+executado ponta a ponta (Valor 5→3, herói de AP 3→5 e PP 2→3); no capítulo 2 o Clérigo
+lançou `Luz do Alvorecer` em área pelo botão novo, sem erro; e os **6 capítulos** foram
+abertos conferindo tamanho de canvas contra o tamanho do mapa (540×540, 576×576, 720×540,
+648×648) e o texto do objetivo de cada condição. **Zero erros de console ou de página** nos
+dois roteiros.
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`): o repasse de `valorSkills` é encanamento —
+nenhum cálculo mudou, e nenhum chamador existente passa o campo novo. `pnpm balance`
+inalterado pelo mesmo motivo.
+
+Pendências que sobrevivem a M12, todas fora dos critérios de aceite: o **servidor** não
+passa `valorSkills` (Valor em PvP é decisão de §9.2, não de campanha); `Tile.object`
+(`wall`/`fort`/`gate`/`chest`/`camp`) continua sem leitor no motor; `lifesteal` continua
+inerte; e o cliente segue sem tela de replay e sem persistência entre mapas — **escopo
+declarado de M13** (§11).

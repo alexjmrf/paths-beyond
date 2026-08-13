@@ -1,0 +1,9 @@
+{
+  "id": "effect-sangramento",
+  "name": "Sangramento",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 3,
+  "statMods": [],
+  "periodicDamagePct": 30
+}

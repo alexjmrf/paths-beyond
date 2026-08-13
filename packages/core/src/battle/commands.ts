@@ -5,9 +5,20 @@ import type { Id } from '../types.js';
 import { manhattanDistance, tileAt, type Coord, type Terrain } from '../grid/types.js';
 import { validatePath } from '../grid/pathfinding.js';
 import type { ConditionUnitView } from '../tactics/types.js';
+import { FP_SCALE } from '../math/fixed.js';
 import { canAffordAp, spendAp, type DuelEconomyState } from '../duel/economy.js';
 import { resolveDuel, type DuelResult } from '../duel/resolveDuel.js';
-import { upsertActiveEffect } from '../duel/effects.js';
+import { computeDamage, rollDamageVariance } from '../duel/damage.js';
+import { combinedTypeDamageMultiplier } from '../duel/triangle.js';
+import { applyHeal, computeHeal, isHealingSkill, scalingStatOf } from '../duel/heal.js';
+import {
+  applyActiveEffectsToStats,
+  sumDamageDealtPct,
+  sumDamageTakenReductionPct,
+  upsertActiveEffect,
+} from '../duel/effects.js';
+import { unitsInArea } from './area.js';
+import { resolveValorSkill } from './valor.js';
 import type { AssistCandidate, AssistResult } from '../duel/assist.js';
 import { effectivePpCost } from '../duel/reactions.js';
 import { SET_SPECIAL_RESERVA, SET_SPECIAL_SENTINELA } from '../items/sets.js';
@@ -110,9 +121,12 @@ function applyWait(state: BattleState, cmd: Extract<BattleCommand, { t: 'wait' }
   return accepted(replaceUnit(state, unit.unitId, { ap: unit.ap + bonusAp, hasActedThisRound: true }));
 }
 
-// §5.4 — "cura em área, artilharia, buff de zona". M3 corta escopo para alvo único (a
-// própria unidade); AOE de verdade precisaria de um sistema de raio em tile — ver
-// DECISIONS.md.
+// §5.4 (M11, sub-sessão 2/N) — "cura em área, artilharia, buff de zona". Quem a área
+// atinge é DERIVADO do que a skill faz, sem campo novo (decisão do usuário, ver
+// DECISIONS.md): tag `heal` cura os aliados no raio, dano acerta os inimigos, e cada
+// `skill.effects` escolhe o lado pelo `EffectDef.kind` que já existe. O
+// `EffectApplication.target` ganha a leitura natural: 'self' = só o lançador (comportamento
+// de M3, preservado byte a byte, inclusive o stream de RNG), 'target' = a área.
 function applyMapSkill(state: BattleState, cmd: Extract<BattleCommand, { t: 'mapSkill' }>): CommandOutcome {
   const unit = findUnit(state, cmd.unitId);
   if (!canAct(unit)) return rejected(state, 'unidade inexistente, morta ou já agiu neste round');
@@ -120,40 +134,118 @@ function applyMapSkill(state: BattleState, cmd: Extract<BattleCommand, { t: 'map
   const skill = unit.knownSkills[cmd.skillId];
   if (!skill || skill.kind !== 'map') return rejected(state, 'skill de mapa desconhecida');
 
+  // §5.4 — alcance de lançamento: `skill.duelRange` quando declarado, senão o da unidade
+  // (mesma herança que a skill de duelo já segue). Sem isto o `target` do comando seria
+  // ignorado e artilharia acertaria o mapa inteiro do próprio spawn.
+  const castRange = skill.duelRange ?? unit.duelRange;
+  if (manhattanDistance(unit.pos, cmd.target) > castRange) {
+    return rejected(state, 'alvo fora do alcance de lançamento da skill');
+  }
+
   const economy: DuelEconomyState = { pools: { ap: unit.ap, pp: unit.pp }, apSpentThisDuel: 0, ppSpentThisTroca: 0 };
   if (!canAffordAp(economy, skill.apCost)) return rejected(state, 'AP insuficiente');
   const spent = spendAp(economy, skill.apCost);
 
-  let nextEffects = unit.effects;
-  for (const application of skill.effects) {
-    if (application.target !== 'self') continue; // alvo em área não suportado em M3
-    const def = state.effectDefs[application.effectId];
-    if (!def) continue;
+  const casterStats = applyActiveEffectsToStats(unit.stats, unit.effects, state.effectDefs);
+  const targets = unitsInArea(state, cmd.target, skill.areaRadius ?? 0);
+  const isHeal = isHealingSkill(skill);
+  const hasDamage = !isHeal && (skill.multiplier > 0 || skill.flat > 0);
 
-    const roll = nextUint32(rngFor(state.seed, state.round, unit.unitId, `mapskill:${application.effectId}`)).value % 1000;
-    if (roll >= application.chance) continue;
+  // §6.6 sem os passos 7 (crítico) e sem rolagem de acerto, e com posicional neutro
+  // (flanco/cerco/altura são modificadores de `engage`, não existem fora do duelo).
+  // Decisão do usuário registrada em DECISIONS.md.
+  const damageFor = (target: BattleUnit): number => {
+    const targetStats = applyActiveEffectsToStats(target.stats, target.effects, state.effectDefs);
+    return computeDamage({
+      attackerAtk: casterStats.atk,
+      attackerDef: casterStats.def,
+      attackerHp: casterStats.hp,
+      defenderDef: targetStats.def,
+      skill: { multiplier: skill.multiplier, flat: skill.flat, scalesWith: skill.scalesWith },
+      attackerPen: casterStats.pen,
+      typeDamageMultiplier: combinedTypeDamageMultiplier({
+        attackerWeapon: unit.weaponType,
+        defenderWeapon: target.weaponType,
+        defenderUnitType: target.unitType,
+        skillTags: skill.tags,
+      }),
+      positionalMultiplier: FP_SCALE,
+      isCriticalHit: false,
+      criticalDamageMultiplier: casterStats.chd,
+      damageDealtPctSum: sumDamageDealtPct(unit.effects, state.effectDefs),
+      damageTakenReductionPctSum: sumDamageTakenReductionPct(target.effects, state.effectDefs),
+      // Stream por ALVO: dois inimigos idênticos na mesma área não podem dividir a mesma
+      // rolagem (seria a mesma variância sempre).
+      varianceRoll: rollDamageVariance(
+        nextUint32(rngFor(state.seed, state.round, unit.unitId, `mapskill-variance:${target.unitId}`)).value,
+      ),
+    });
+  };
 
-    nextEffects = upsertActiveEffect(nextEffects, def, application);
-  }
+  // Cura é determinística desde M10 (sub-sessão 7/N): mesmo valor para todos os alvos.
+  const healAmount = isHeal
+    ? computeHeal({
+        healerStat: scalingStatOf(casterStats, skill.scalesWith),
+        skill: { multiplier: skill.multiplier, flat: skill.flat },
+        healerHeal: casterStats.heal,
+      })
+    : 0;
 
-  return accepted(
-    replaceUnit(state, unit.unitId, {
-      ap: spent.pools.ap,
-      pp: spent.pools.pp,
-      hasActedThisRound: true,
-      effects: nextEffects,
-    }),
-  );
+  const targetIds = new Set(targets.map((t) => t.unitId));
+  const nextUnits = state.units.map((u) => {
+    const isCaster = u.unitId === unit.unitId;
+    const inArea = targetIds.has(u.unitId);
+    const isAlly = u.side === unit.side;
+
+    let hp = u.hp;
+    if (inArea && hasDamage && !isAlly) hp = Math.max(0, hp - damageFor(u));
+    if (inArea && isHeal && isAlly) hp = applyHeal(hp, u.stats.hp, healAmount);
+
+    let effects = u.effects;
+    for (const application of skill.effects) {
+      const def = state.effectDefs[application.effectId];
+      if (!def) continue;
+
+      // 'self' = só o lançador; 'target' = a área, e o lado sai do `kind` do efeito.
+      const applies =
+        application.target === 'self'
+          ? isCaster
+          : inArea && (def.kind === 'buff' ? isAlly : !isAlly);
+      if (!applies) continue;
+
+      // O stream de 'self' é o de M3, intocado; o de área é próprio e por alvo.
+      const purpose =
+        application.target === 'self'
+          ? `mapskill:${application.effectId}`
+          : `mapskill-area:${application.effectId}:${u.unitId}`;
+      const roll = nextUint32(rngFor(state.seed, state.round, unit.unitId, purpose)).value % 1000;
+      if (roll >= application.chance) continue;
+
+      effects = upsertActiveEffect(effects, def, application);
+    }
+
+    if (!isCaster) return hp === u.hp && effects === u.effects ? u : { ...u, hp, effects };
+    return { ...u, hp, effects, ap: spent.pools.ap, pp: spent.pools.pp, hasActedThisRound: true };
+  });
+
+  return accepted({ ...state, units: nextUnits });
 }
 
-// §5.6 — Valor é recurso de exército; catálogo de `data/valor-skills/*.json` não está
-// implementado em M3 (schema mínimo só, sem efeitos) — ver DECISIONS.md. `useValor` aqui
-// só valida saldo e gasta um custo fixo, sem aplicar o efeito de fato.
-const VALOR_COMMAND_COST = 1;
+// §5.6 (M11, sub-sessão 3/N) — Valor é recurso de exército: usar uma skill **não consome
+// turno de nenhuma unidade** e não tem outro limite além do saldo (a spec não dá nenhum).
+// Até M10 este comando ignorava o `skillId` e debitava um custo fixo de 1 sem aplicar
+// efeito nenhum; agora resolve de verdade contra o catálogo (`valor.ts`).
+function applyUseValor(state: BattleState, cmd: Extract<BattleCommand, { t: 'useValor' }>): CommandOutcome {
+  const skill = state.valorSkills?.[cmd.skillId];
+  if (!skill) return rejected(state, 'skill de valor desconhecida');
+  if (state.valor < skill.cost) return rejected(state, 'valor insuficiente');
 
-function applyUseValor(state: BattleState, _cmd: Extract<BattleCommand, { t: 'useValor' }>): CommandOutcome {
-  if (state.valor < VALOR_COMMAND_COST) return rejected(state, 'valor insuficiente');
-  return accepted({ ...state, valor: state.valor - VALOR_COMMAND_COST });
+  const resolution = resolveValorSkill(state, skill, cmd.target);
+  // Nada é cobrado quando a resolução falha: um `summonReinforcement` (ainda sem
+  // implementação) ou um alvo inválido não podem consumir Valor em silêncio.
+  if (!resolution.ok) return rejected(state, resolution.reason);
+
+  return accepted({ ...state, units: resolution.units, valor: state.valor - skill.cost });
 }
 
 function terrainAt(state: BattleState, pos: Coord): Terrain | undefined {
@@ -200,6 +292,7 @@ function toDuelParticipant(unit: BattleUnit, positionalMultiplier: number, criti
     activeEffects: unit.effects,
     positionalMultiplier,
     setSpecialEffectIds: unit.setSpecialEffectIds,
+    lethalTriggersUsed: unit.lethalTriggersUsed,
   };
 }
 
@@ -268,6 +361,14 @@ function freeAssistantIds(...groups: readonly (readonly AssistResult[])[]): read
     }
   }
   return ids;
+}
+
+// §6.4 (M10 sub-sessão 8/N) — só escreve `lethalTriggersUsed` quando há o que escrever:
+// gravar lista vazia em toda unidade que duela mudaria o estado serializado (e o hash de
+// replay) sem nenhuma mudança de regra por trás.
+function lethalTriggersPatch(unit: BattleUnit, used: readonly Id[]): Partial<BattleUnit> {
+  if (used.length === 0 && unit.lethalTriggersUsed === undefined) return {};
+  return { lethalTriggersUsed: used };
 }
 
 // §5.4 + §6 — abre um duelo de verdade via resolveDuel (M2), com modificadores
@@ -351,6 +452,9 @@ function applyEngage(state: BattleState, cmd: Extract<BattleCommand, { t: 'engag
         // precisa persistir de volta no mapa, senão evapora ao sincronizar com o
         // BattleUnit (mesmo padrão de hp/ap/pp acima).
         effects: duelResult.finalActiveEffectsAttacker,
+        // §6.4 (M10 sub-sessão 8/N) — gatilho de morte `perBattle` gasto no duelo precisa
+        // sobreviver ao duelo, senão "uma vez por batalha" recarregaria a cada engajamento.
+        ...lethalTriggersPatch(u, duelResult.finalLethalTriggersUsedAttacker),
         hasActedThisRound: true,
       };
     }
@@ -362,6 +466,7 @@ function applyEngage(state: BattleState, cmd: Extract<BattleCommand, { t: 'engag
         ap: duelResult.finalApDefender,
         pp: duelResult.finalPpDefender,
         effects: duelResult.finalActiveEffectsDefender,
+        ...lethalTriggersPatch(u, duelResult.finalLethalTriggersUsedDefender),
       };
     }
     return u;

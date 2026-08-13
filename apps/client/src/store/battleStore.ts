@@ -2,8 +2,10 @@ import {
   applyCommandAndAdvance,
   buildInitialState,
   computeReachableTiles,
+  manhattanDistance,
   resetTree,
   validateAllocation,
+  type BattleCommand,
   type BattleState,
   type BattleUnit,
   type ClassDef,
@@ -16,6 +18,7 @@ import {
   type TacticsScript,
   type TalentAllocation,
   type TalentTree,
+  type ValorSkillDef,
 } from '@paths-beyond/core';
 import { create } from 'zustand';
 import { campaignMaps } from '../data/campaign.js';
@@ -53,6 +56,21 @@ export interface DuelPreview {
   readonly duelResult: DuelResult;
 }
 
+// §5.4/§5.6 (M12, sub-sessão 4/N) — mira no mapa. `mapSkill` e `useValor` são os dois
+// únicos comandos cujo alvo é uma COORDENADA e não uma unidade, e nenhum dos dois tinha
+// como ser emitido pelo cliente: o mapa só sabia mover e engajar. Os dois compartilham o
+// mesmo estado porque compartilham o mesmo gesto — escolher a habilidade, ver os tiles
+// legais, clicar num. O que muda entre eles é só o alcance (`mapSkill` é limitado pelo
+// alcance de lançamento da skill; Valor é "artilharia DE MAPA", §5.6, sem limite de
+// alcance) e quem paga.
+export interface TargetingMode {
+  readonly kind: 'mapSkill' | 'valor';
+  readonly skillId: Id;
+  readonly casterUnitId: Id | null; // Valor é recurso de exército: não sai de nenhuma unidade
+  readonly areaRadius: number;
+  readonly tiles: readonly Coord[]; // tiles legais de lançamento
+}
+
 interface BattleStore {
   readonly battleState: BattleState;
   readonly selectedUnitId: string | null;
@@ -69,6 +87,7 @@ interface BattleStore {
   readonly talentEditorUnitId: string | null;
   readonly lastTalentReason: string | null;
   readonly instantResultMode: boolean;
+  readonly targetingMode: TargetingMode | null;
 
   selectUnit: (unitId: string | null) => void;
   moveSelectedUnitTo: (destination: Coord) => void;
@@ -93,6 +112,10 @@ interface BattleStore {
   resetTalentTree: (unitId: string, tree: TalentTree) => void;
   loadBuildCode: (unitId: string, code: string) => void;
   toggleInstantResultMode: () => void;
+  beginMapSkillTargeting: (skillId: Id) => void;
+  beginValorTargeting: (skillId: Id) => void;
+  cancelTargeting: () => void;
+  confirmTargetAt: (target: Coord) => void;
 }
 
 function computeReachableForUnit(battleState: BattleState, unit: BattleUnit): readonly ReachableTile[] {
@@ -111,6 +134,26 @@ function computeReachableForUnit(battleState: BattleState, unit: BattleUnit): re
   );
 }
 
+// Tiles dentro de `radius` em distância Manhattan (§5.1) que existem no grid. O core faz
+// a mesma conta; aqui é só pra desenhar o overlay.
+function tilesWithin(battleState: BattleState, center: Coord, radius: number): readonly Coord[] {
+  const tiles: Coord[] = [];
+  for (let y = 0; y < battleState.map.height; y++) {
+    for (let x = 0; x < battleState.map.width; x++) {
+      if (manhattanDistance(center, { x, y }) <= radius) tiles.push({ x, y });
+    }
+  }
+  return tiles;
+}
+
+function allTiles(battleState: BattleState): readonly Coord[] {
+  const tiles: Coord[] = [];
+  for (let y = 0; y < battleState.map.height; y++) {
+    for (let x = 0; x < battleState.map.width; x++) tiles.push({ x, y });
+  }
+  return tiles;
+}
+
 export const useBattleStore = create<BattleStore>((set, get) => ({
   battleState: buildMapState(0),
   selectedUnitId: null,
@@ -127,6 +170,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   talentEditorUnitId: null,
   lastTalentReason: null,
   instantResultMode: false,
+  targetingMode: null,
 
   selectUnit: (unitId) => {
     if (!unitId) {
@@ -372,5 +416,93 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // §11 (acessibilidade) — "modo resultado instantâneo (pula animações) — essencial pra
   // farm." Só afeta apresentação (MapCanvas/DuelPreviewPanel); o estado do core nunca
   // muda de forma diferente com o modo ligado ou desligado.
+  // §5.4 — o alcance de LANÇAMENTO é `skill.duelRange` quando declarado, senão o da
+  // unidade; a mesma leitura que `applyMapSkill` faz no core. O cliente recalcula pra
+  // desenhar o overlay, mas quem valida continua sendo o core: clicar fora do overlay não
+  // monta comando, e um comando inválido que escape é rejeitado por
+  // `applyCommandAndAdvance` com o motivo aparecendo na barra de ações.
+  beginMapSkillTargeting: (skillId) => {
+    const { battleState, selectedUnitId } = get();
+    const unit = battleState.units.find((u) => u.unitId === selectedUnitId);
+    if (!unit) return;
+
+    const skill = unit.knownSkills[skillId];
+    if (!skill || skill.kind !== 'map') return;
+
+    const castRange = skill.duelRange ?? unit.duelRange;
+    set({
+      targetingMode: {
+        kind: 'mapSkill',
+        skillId,
+        casterUnitId: unit.unitId,
+        areaRadius: skill.areaRadius ?? 0,
+        tiles: tilesWithin(battleState, unit.pos, castRange),
+      },
+      duelPreview: null,
+      lastCommandReason: null,
+    });
+  },
+
+  // §5.6 — "artilharia DE MAPA": Valor não sai de unidade nenhuma e a spec não dá limite
+  // de alcance, então todo tile do grid é alvo legal (decisão registrada em M11 3/N).
+  beginValorTargeting: (skillId) => {
+    const { battleState } = get();
+    const skill = battleState.valorSkills?.[skillId];
+    if (!skill) return;
+
+    set({
+      targetingMode: {
+        kind: 'valor',
+        skillId,
+        casterUnitId: null,
+        areaRadius: skill.kind === 'artillery' ? skill.payload.radius : 0,
+        tiles: allTiles(battleState),
+      },
+      duelPreview: null,
+      lastCommandReason: null,
+    });
+  },
+
+  cancelTargeting: () => set({ targetingMode: null }),
+
+  confirmTargetAt: (target) => {
+    const { battleState, targetingMode } = get();
+    if (!targetingMode) return;
+    if (!targetingMode.tiles.some((tile) => tile.x === target.x && tile.y === target.y)) return;
+
+    const command: BattleCommand =
+      targetingMode.kind === 'mapSkill'
+        ? { t: 'mapSkill', unitId: targetingMode.casterUnitId ?? '', skillId: targetingMode.skillId, target }
+        : { t: 'useValor', skillId: targetingMode.skillId, target };
+
+    const result = applyCommandAndAdvance(battleState, command);
+    if (!result.applied) {
+      set({ lastCommandReason: result.reason ?? 'alvo inválido', targetingMode: null });
+      return;
+    }
+
+    // Valor não consome o turno de ninguém (§5.6), então a unidade selecionada continua
+    // selecionada e com o alcance de movimento recomputado; uma skill de mapa encerra o
+    // turno de quem lançou.
+    const caster = result.state.units.find((u) => u.unitId === get().selectedUnitId);
+    set({
+      battleState: result.state,
+      targetingMode: null,
+      lastCommandReason: null,
+      ...(targetingMode.kind === 'valor'
+        ? { reachableTiles: caster ? computeReachableForUnit(result.state, caster) : [] }
+        : { selectedUnitId: null, reachableTiles: [] }),
+    });
+  },
+
   toggleInstantResultMode: () => set((s) => ({ instantResultMode: !s.instantResultMode })),
 }));
+
+// Gancho de DIAGNÓSTICO, só em dev. O cliente não tem suíte automatizada (`pnpm test` não
+// cobre UI) e desde M9 a verificação é um roteiro real de navegador; sem um jeito de saltar
+// para um capítulo, conferir os mapas maiores da campanha (16×16, 18×18, 20×15) exigiria
+// vencer os anteriores clicando. Não é API de jogo: nada no app lê daqui, e o bloco não
+// existe no build de produção.
+if (import.meta.env.DEV) {
+  (globalThis as unknown as Record<string, unknown>).__pathsBeyondStore = useBattleStore;
+}

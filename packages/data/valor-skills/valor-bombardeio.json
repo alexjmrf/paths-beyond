@@ -1,0 +1,7 @@
+{
+  "id": "valor-bombardeio",
+  "name": "Bombardeio",
+  "cost": 4,
+  "kind": "artillery",
+  "payload": { "damage": 400, "radius": 1 }
+}

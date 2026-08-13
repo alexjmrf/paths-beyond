@@ -20,7 +20,7 @@ export type { StatKey, StatModifier, StatSheet } from './stats/types.js';
 export { addFlat, aggregateStatSheet, multiplyByPctSum } from './stats/aggregate.js';
 export type { AggregateStatsInput } from './stats/aggregate.js';
 
-export type { EffectApplication, ReactionTrigger, SkillDef } from './skills/types.js';
+export type { EffectApplication, LethalUses, ReactionTrigger, SkillDef } from './skills/types.js';
 
 export { evaluateCondition } from './tactics/evaluateCondition.js';
 export { selectTacticsAction } from './tactics/selectTacticsAction.js';
@@ -60,7 +60,17 @@ export { computeEvasionFromSpd } from './duel/evasion.js';
 export { selectReaction } from './duel/reactions.js';
 export type { ReactionDecision, SelectReactionInput } from './duel/reactions.js';
 export { resolveDuel } from './duel/resolveDuel.js';
-export type { ActionLogEntry, DuelResult, ResolveDuelInput, TrocaLog } from './duel/resolveDuel.js';
+export type { ActionLogEntry, DuelResult, LethalTriggerLog, ResolveDuelInput, TrocaLog } from './duel/resolveDuel.js';
+export {
+  LETHAL_SURVIVE_HP,
+  LETHAL_SURVIVE_TAG,
+  findLethalTriggerSkill,
+  isLethalTriggerSkill,
+  isSurviveLethalSkill,
+  lethalUsesOf,
+  persistentLethalTriggersUsed,
+} from './duel/lethal.js';
+export type { FindLethalTriggerInput } from './duel/lethal.js';
 export {
   MAGIC_CYCLE,
   PHYSICAL_CYCLE,
@@ -102,7 +112,12 @@ export { GUARD_LEASH_TILES, decideMapAiCommand } from './battle/mapAi.js';
 export type { DecideMapAiCommandInput, MapAiArchetype } from './battle/mapAi.js';
 export { computePositionalModifiers } from './battle/positional.js';
 export type { PositionalModifiers, PositionalModifiersInput } from './battle/positional.js';
-export { checkWinCondition, endRound, isRoundComplete } from './battle/round.js';
+export { endRound, isRoundComplete } from './battle/round.js';
+export { unitsInArea } from './battle/area.js';
+export { resolveValorSkill } from './battle/valor.js';
+export type { ValorResolution, ValorSkillDef } from './battle/valor.js';
+export { checkWinCondition } from './battle/winCondition.js';
+export type { BattleOutcome } from './battle/winCondition.js';
 export { applyCommandAndAdvance, buildInitialState, simulate } from './battle/simulate.js';
 export type { ApplyCommandAndAdvanceResult } from './battle/simulate.js';
 export type {

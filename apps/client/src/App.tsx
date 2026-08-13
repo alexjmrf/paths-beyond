@@ -3,6 +3,7 @@ import { DuelPreviewPanel } from './components/DuelPreviewPanel.js';
 import { InitiativePanel } from './components/InitiativePanel.js';
 import { InventoryPanel } from './components/InventoryPanel.js';
 import { MapCanvas } from './components/MapCanvas.js';
+import { ObjectivePanel } from './components/ObjectivePanel.js';
 import { ResourcePanel } from './components/ResourcePanel.js';
 import { TacticsEditor } from './components/TacticsEditor.js';
 import { TalentTreePanel } from './components/TalentTreePanel.js';
@@ -30,6 +31,7 @@ export function App() {
       <main>
         <MapCanvas />
         <div className="side-panels">
+          <ObjectivePanel />
           <InitiativePanel />
           <ResourcePanel />
           <UnitActionBar />

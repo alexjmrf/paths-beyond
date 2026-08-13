@@ -1,0 +1,24 @@
+{
+  "id": "skill-luz-do-alvorecer",
+  "name": "Luz do Alvorecer",
+  "kind": "map",
+  "apCost": 1,
+  "cooldown": 3,
+  "multiplier": 800,
+  "flat": 0,
+  "scalesWith": "atk",
+  "duelRange": 3,
+  "areaRadius": 1,
+  "effects": [
+    {
+      "effectId": "effect-regeneracao",
+      "target": "target",
+      "chance": 1000,
+      "duration": 2
+    }
+  ],
+  "tags": [
+    "holy",
+    "heal"
+  ]
+}

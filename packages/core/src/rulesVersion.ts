@@ -63,4 +63,38 @@
 // de duelo com a tag `heal` (auto-cura) e reação com a tag `heal` ("Cura de emergência",
 // §6.4). Mudança de regra real; não observável em `pnpm balance` nem no GOLDEN_HASH porque
 // nenhuma skill do catálogo real declara a tag.
-export const RULES_VERSION = '0.8.0';
+// M10, sub-sessão 8/N: `onLethal` (§6.4) deixa de ser a única variante de ReactionTrigger
+// sem resolução — o enum fecha. NÃO entrou como reação: é gatilho automático de morte, sem
+// script, sem conditions e sem PP (decisão de design do usuário registrada em DECISIONS.md
+// — reagir à própria morte implicaria prevê-la). Duas variantes discriminadas pela tag
+// `survive`: prevenir a morte (fica com 1 HP) ou acertar quem deu o golpe fatal com dano +
+// `skill.effects`. Frequência declarada no dado (`SkillDef.lethalUses`). Mudança de regra
+// real em todos os caminhos de dano do duelo e no tick de DoT de `battle/round.ts`; não
+// observável em `pnpm balance` nem no GOLDEN_HASH porque nenhuma skill do catálogo real
+// (nem a fixture do replay canônico) declara `trigger:'onLethal'`.
+// M11, sub-sessão 1/N: as 4 condições de vitória além de `rout` (§5.7) passam a ter
+// resolução — `seize`, `surviveRounds`, `escort` e `defend` tinham schema desde M3 e
+// nenhuma checagem, o que obrigava todo mapa a ser "mate todo mundo". Mudança de regra
+// real e com uma quebra deliberada: eliminar o time inimigo **não vence mais** um mapa
+// cuja condição declarada é outra ("data-driven por mapa" lido ao pé da letra). `defend`
+// ganhou `target` no schema — sem ele seria sinônimo de `surviveRounds`. Não observável em
+// `pnpm balance` nem no GOLDEN_HASH: todo conteúdo real (4 mapas) e o replay canônico usam
+// `rout`, cujo comportamento é idêntico ao de antes.
+// M11, sub-sessão 2/N: `mapSkill` passa a ter alvo em área (§5.4). `applyMapSkill`
+// ignorava `cmd.target` desde M3 e só aplicava efeito em `target:'self'`; agora lê o alvo,
+// checa alcance de lançamento (`skill.duelRange`, senão o da unidade), seleciona quem está
+// no raio Manhattan (`SkillDef.areaRadius`) e aplica dano/cura/efeitos. Quem a área atinge
+// é derivado do que a skill faz — tag `heal` → aliados, dano → inimigos, efeito → pelo
+// `EffectDef.kind`. Mudança de regra real; o caminho `target:'self'` de M3 ficou intacto,
+// stream de RNG incluído. Não observável em `pnpm balance` nem no GOLDEN_HASH: nenhuma
+// skill do catálogo real declara `areaRadius`, e o torneio não usa `mapSkill`.
+// M11, sub-sessão 3/N: `useValor` (§5.6) resolve de verdade contra um catálogo. Até aqui
+// o comando IGNORAVA o `skillId` e debitava um custo fixo de 1 sem aplicar efeito nenhum.
+// Três dos quatro `kind` têm resolução — `restoreApPp` (devolve AP/PP à unidade no tile),
+// `artillery` (dano fixo mitigado por `def`, em área) e `globalBuff` (efeito de 1 round em
+// todo aliado vivo); `summonReinforcement` rejeita alto em vez de gastar Valor em silêncio
+// (fatia própria, ver DECISIONS.md). `BattleSetup`/`BattleState` ganharam `valorSkills`
+// (opcional) e o `payload` do schema virou união discriminada por `kind`. Mudança de regra
+// real; não observável em `pnpm balance` (o torneio nunca emite `useValor`) nem no
+// GOLDEN_HASH (o replay canônico também não).
+export const RULES_VERSION = '0.12.0';

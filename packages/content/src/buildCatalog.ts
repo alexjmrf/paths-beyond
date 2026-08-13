@@ -1,14 +1,16 @@
-import type { ClassDef, EffectDef, GridMap, Id, ItemInstance, ItemSet, SkillDef, Terrain, WeaponType, WinCondition } from '@paths-beyond/core';
+import type { ClassDef, EffectDef, GridMap, Id, ItemInstance, ItemSet, SkillDef, Terrain, ValorSkillDef, WeaponType, WinCondition } from '@paths-beyond/core';
 import classSchema from '@paths-beyond/data/schemas/classes.schema.js';
 import compSchema from '@paths-beyond/data/schemas/comps.schema.js';
 import effectSchema from '@paths-beyond/data/schemas/effects.schema.js';
+import valorSkillSchema from '@paths-beyond/data/schemas/valor-skills.schema.js';
+import encounterSchema from '@paths-beyond/data/schemas/encounters.schema.js';
 import itemSchema from '@paths-beyond/data/schemas/items.schema.js';
 import itemSetSchema from '@paths-beyond/data/schemas/item-sets.schema.js';
 import mapSchema from '@paths-beyond/data/schemas/maps.schema.js';
 import skillSchema from '@paths-beyond/data/schemas/skills.schema.js';
 import terrainSchema from '@paths-beyond/data/schemas/terrains.schema.js';
 import weaponDuelRangesSchema from '@paths-beyond/data/schemas/weapon-duel-ranges.schema.js';
-import type { ArenaMap, Composition, ContentCatalog } from './types.js';
+import type { ArenaMap, Composition, ContentCatalog, Encounter } from './types.js';
 
 interface MapContent {
   readonly id: Id;
@@ -34,7 +36,9 @@ export interface ParsedContentFiles {
   readonly items: readonly unknown[];
   readonly itemSets: readonly unknown[];
   readonly effects: readonly unknown[];
+  readonly valorSkills: readonly unknown[];
   readonly comps: readonly unknown[];
+  readonly encounters: readonly unknown[];
   readonly maps: readonly unknown[];
   readonly terrains: readonly unknown[];
   readonly weaponDuelRanges: unknown;
@@ -76,9 +80,20 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
 
   const effects = indexById(input.effects.map((raw) => effectSchema.parse(raw) as EffectDef));
 
+  // §5.6 (M11 sub-sessão 3/N) — antes ausente do catálogo: `useValor` ignorava o `skillId`
+  // e nenhum consumidor precisava das definições. Agora que o comando resolve de verdade,
+  // servidor/cliente/sim-cli precisam do campo pra montar `BattleSetup.valorSkills`.
+  const valorSkills = indexById(input.valorSkills.map((raw) => valorSkillSchema.parse(raw) as ValorSkillDef));
+
   // Mesmo descompasso, pra variante recursiva `not` de `Condition` (`hero.tacticsScript`
   // dentro de cada unidade de uma composição).
   const comps = input.comps.map((raw) => compSchema.parse(raw) as unknown as Composition);
+
+  // Ordenados por `chapter`: `findJsonFiles` não garante ordem entre plataformas, e a
+  // campanha é uma sequência (§10, "campanha em capítulos").
+  const encounters = input.encounters
+    .map((raw) => encounterSchema.parse(raw) as unknown as Encounter)
+    .sort((a, b) => a.chapter - b.chapter);
 
   const terrains: Record<string, Terrain> = indexById(input.terrains.map((raw) => terrainSchema.parse(raw) as Terrain));
 
@@ -103,9 +118,11 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     items,
     itemSets,
     effects,
+    valorSkills,
     weaponDuelRanges,
     maps,
     comps,
+    encounters,
     baselineReactionSkillIds: deriveBaselineReactionSkillIds(skillList),
   };
 }

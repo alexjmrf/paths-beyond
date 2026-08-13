@@ -1,0 +1,8 @@
+{
+  "id": "effect-brado-de-guerra",
+  "name": "Brado de Guerra",
+  "kind": "buff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [{ "stat": "atk", "pct": 150 }]
+}

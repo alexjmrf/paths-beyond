@@ -1,0 +1,14 @@
+{
+  "id": "effect-quebra-armadura",
+  "name": "Quebra de Armadura",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 2,
+  "statMods": [
+    {
+      "stat": "def",
+      "pct": -120
+    }
+  ],
+  "damageTakenReductionPct": -80
+}

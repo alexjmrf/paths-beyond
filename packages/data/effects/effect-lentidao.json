@@ -1,0 +1,13 @@
+{
+  "id": "effect-lentidao",
+  "name": "Lentidão",
+  "kind": "debuff",
+  "dispellable": true,
+  "maxStacks": 1,
+  "statMods": [
+    {
+      "stat": "spd",
+      "pct": -200
+    }
+  ]
+}
