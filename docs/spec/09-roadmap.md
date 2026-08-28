@@ -35,7 +35,14 @@ Fastify, Postgres, times de defesa com IA declarativa, matchmaking por CP/ELO, r
 
 ### M8 — Conteúdo e balanceamento
 `tools/balance`, matriz de winrate, relatório de distribuição de stats, temporadas, loja de arena.
-**Aceite:** nenhuma composição acima de 65% de winrate global em 10.000 partidas; **e** builds vencedoras não concentram `spd` acima da mediana em mais de 60% dos casos (§6.7).
+**Aceite:** toda composição dentro da faixa de **40–60%** de winrate global em 10.000 partidas; **e** builds vencedoras não concentram `spd` acima da mediana em mais de 60% dos casos (§6.7).
+
+> O critério original só tinha teto ("nenhuma composição acima de 65%"). O piso entrou na
+> revisão de 2026-08-28: sem ele, uma composição em 31% passava no aceite e mesmo assim
+> ninguém a levaria para a arena — o roster efetivo fica menor que o nominal, que é o mesmo
+> problema que o teto existe para evitar, pelo outro lado. `tools/balance/src/report.ts` já
+> media os dois desde a revisão do M8 (`WINRATE_ALERT_THRESHOLD_PCT`/`WINRATE_FLOOR_THRESHOLD_PCT`);
+> esta linha é a spec alcançando a ferramenta.
 
 ---
 
@@ -98,6 +105,37 @@ progressão de awakening (0–6) e imprint, e as três moedas (`ouro`, `pedras`,
 e cosmético, **nunca poder bruto**.
 **Aceite:** um ciclo completo de farm → drop → enhance → equipar → subir de poder é jogável;
 energia limita o farm diário; nenhuma moeda compra poder bruto.
+
+---
+
+> **M15 e M16 foram definidos pela auditoria de 2026-08-14**, após a conclusão do M14.
+> Fundamentação em `DECISIONS.md`, seção "Auditoria 2026-08-14".
+
+### M15 — Fechamento do loop de PvP e pendências
+Tela de montar time de defesa de arena no cliente — `PUT /me/defense` existe desde M7
+(`apps/server/src/battle/routes.ts:162`) e **nenhum código do cliente jamais o chamou**, o que
+torna o PvP assíncrono inalcançável pelo jogador apesar de servidor, ELO, matchmaking,
+replays e anti-cheat estarem prontos. Mais as pendências herdadas de M11/M14 que ainda têm
+efeito observável: `lifesteal` inerte, `summonReinforcement` sem resolução, "+2 Valor ao
+capturar objetivo" sem ponto de aplicação, e `Tile.object` declarado com 5 valores mas com
+leitor só para 2 e sem nenhum uso no conteúdo.
+**Aceite:** um jogador monta a defesa pelo cliente, ela persiste, e um segundo jogador a
+enfrenta e vê o replay — o ciclo de PvP fecha ponta a ponta sem `curl`; `lifesteal` altera HP
+em teste; nenhum `kind` de valor-skill rejeita por falta de implementação.
+
+### M16 — Linguagem visual programática
+Direção de arte **definitiva** do jogo, e a primeira milestone a tratar apresentação como
+sistema. Zero assets raster: silhueta/glifo vetorial por classe (hoje toda unidade é um
+retângulo com texto), legibilidade de estado (AP/PP, efeitos ativos, ameaça, objetivos) e
+animação com peso. Constrói **sobre** `apps/client/src/data/overlayTheme.ts`, o sistema de
+tema que M13 4/N já criou para o modo daltônico — generalizar aquilo em tokens, não começar
+paleta do zero. O renderer ganha uma costura trocável de representação de unidade, para que
+uma camada de sprite possa entrar por cima no futuro sem reescrever `MapCanvas.tsx`.
+**Aceite:** nenhum arquivo de imagem entra no repositório; o grid, as unidades e o estado de
+batalha são legíveis sem hover e sem legenda, validado pelo usuário no browser; **a garantia
+de daltonismo de M13 4/N continua valendo** (marca própria por overlay, não só cor) e é
+reverificada, não assumida; a costura de representação de unidade existe e tem uma segunda
+implementação de teste provando que é trocável.
 
 ---
 

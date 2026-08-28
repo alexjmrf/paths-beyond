@@ -21,6 +21,14 @@ export interface BalanceReport {
   readonly globalWinrates: readonly CompGlobalStats[];
   readonly medianSpd: number;
   readonly winningBuildsAboveMedianPct: number;
+  // §6.5 — a janela de assistências. Enquanto as composições tinham 1 unidade cada, ela não
+  // podia disparar em nenhuma das partidas do torneio: não havia aliado para assistir. O
+  // relatório media, então, um jogo mais simples que o real. Estes três números são o que
+  // transforma "agora deve disparar" em medição — e o que permite ver, numa rodada futura, se
+  // uma mudança de alcance ou de custo em PP secou a mecânica sem ninguém perceber.
+  readonly totalAssists: number;
+  readonly battlesWithAssistPct: number;
+  readonly assistsPerBattle: number;
   // §04-duelo.md §6.7 — "se mais de 60% das builds vencedoras tiverem spd acima da
   // mediana, o sistema falhou."
   readonly spdAlertTriggered: boolean;
@@ -106,6 +114,13 @@ export function buildReport(records: readonly BattleOutcomeRecord[]): BalanceRep
   });
 
   const allSpd = records.flatMap((r) => r.allUnitsSpd);
+  let totalAssists = 0;
+  let battlesWithAssist = 0;
+  for (const record of records) {
+    totalAssists += record.assists;
+    if (record.assists > 0) battlesWithAssist++;
+  }
+
   const medianSpd = median(allSpd);
 
   const winningSpd = records.flatMap((r) => r.winningUnitsSpd);
@@ -138,6 +153,9 @@ export function buildReport(records: readonly BattleOutcomeRecord[]): BalanceRep
     globalWinrates,
     medianSpd,
     winningBuildsAboveMedianPct,
+    totalAssists,
+    battlesWithAssistPct: records.length > 0 ? (battlesWithAssist / records.length) * 100 : 0,
+    assistsPerBattle: records.length > 0 ? totalAssists / records.length : 0,
     spdAlertTriggered: winningBuildsAboveMedianPct > SPD_ABOVE_MEDIAN_ALERT_THRESHOLD_PCT,
     overpoweredComps: globalWinrates.filter((g) => g.winratePct > WINRATE_ALERT_THRESHOLD_PCT).map((g) => g.compId),
     underpoweredComps: globalWinrates.filter((g) => g.winratePct < WINRATE_FLOOR_THRESHOLD_PCT).map((g) => g.compId),
@@ -186,6 +204,17 @@ export function formatReport(report: BalanceReport, compNames: Readonly<Record<I
     report.spdAlertTriggered
       ? '  ALERTA: mais de 60% das builds vencedoras concentram spd acima da mediana — reduza o cap de evasão ou aumente o limiar de preempção antes de mexer em qualquer outra coisa (§6.7).'
       : '  OK: concentração de spd nas builds vencedoras dentro do esperado.',
+  );
+
+  lines.push('');
+  lines.push('=== Assistências (§6.5) ===');
+  lines.push(`  assistências aplicadas no torneio: ${report.totalAssists}`);
+  lines.push(`  batalhas com ao menos uma assistência: ${pct(report.battlesWithAssistPct)}`);
+  lines.push(`  média por batalha: ${report.assistsPerBattle.toFixed(2)}`);
+  lines.push(
+    report.totalAssists === 0
+      ? '  ALERTA: nenhuma assistência disparou. A mecânica que substituiu o esquadrão do Unicorn Overlord está inerte no torneio — confira se as composições têm aliados dentro do assistRange umas das outras.'
+      : '  OK: a janela de assistências está sendo exercitada.',
   );
 
   if (report.overpoweredComps.length > 0) {

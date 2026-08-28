@@ -2012,3 +2012,1465 @@ passa `valorSkills` (Valor em PvP é decisão de §9.2, não de campanha); `Tile
 (`wall`/`fort`/`gate`/`chest`/`camp`) continua sem leitor no motor; `lifesteal` continua
 inerte; e o cliente segue sem tela de replay e sem persistência entre mapas — **escopo
 declarado de M13** (§11).
+
+## M13 — Superfície jogável completa
+
+### M13 — sub-sessão 1/N: replay — gravar e reproduzir passo a passo
+
+Primeira fatia de M13, escolhida por destravar a perna de PvP também: "rever" uma partida
+de PvP é reproduzir um `Replay` vindo do servidor, então a mesma tela serve as duas.
+
+Estado anterior: o core tem `Replay {rulesVersion, seed, initialState, commands}` e
+`simulate()` desde M3, e o servidor persiste replays desde M7 — mas **o cliente nunca
+gravava comando nenhum**. Não havia replay de campanha para reproduzir, nem tela.
+
+**Decisão do usuário: a edição de táticas trava durante a batalha.** O editor altera o
+script fora do fluxo de comandos (M6 o tratou como configuração de fora do combate, e §11
+o descreve como ferramenta de preparação — "Testar contra um manequim configurável"). Só
+que um `Replay` reaplica `initialState + commands`: um script trocado no meio da batalha
+não estaria em nenhum dos dois, e a reprodução mostraria duelos que não aconteceram. As
+alternativas foram descartadas por ela: um `BattleCommand` novo seria **regra nova**
+(§5.4 não lista edição entre as ações de turno, e obrigaria a decidir se consome turno,
+se custa AP e se o inimigo também pode); regravar do zero a cada edição deixaria o replay
+de cobrir a batalha inteira, que é justamente o que o critério de aceite pede.
+
+**A janela de edição é a preparação do capítulo** — antes do primeiro comando. E editar
+ali **reconstrói a batalha a partir de um setup com o script aplicado**, em vez de mexer
+só no `battleState`. Isso não é detalhe: um furo real apareceu na verificação. O replay
+grava o `BattleSetup` do capítulo, e a edição pré-batalha vivia só no estado, então o
+replay reproduzia a batalha com o script ORIGINAL. Com `tacticsOverrides` entrando no
+setup, o que foi gravado é o que foi jogado — verificado no navegador desligando o script
+do herói antes do primeiro comando e comparando o estado final byte a byte.
+
+**Outras decisões registradas:**
+
+- **Comandos de IA não são gravados, e não podem ser.** `applyCommandAndAdvance` resolve
+  os turnos de IA por dentro (M7, sub-sessão 6), então reaplicar só os comandos humanos
+  reproduz a batalha inteira — é o mesmo contrato que `simulate` usa desde M3. Gravar os
+  comandos da IA duplicaria as ações dela na reprodução.
+- **O comando de `engage` entra na gravação no CONFIRMAR, não no preview.** Cancelar um
+  preview não aconteceu na batalha; o `DuelPreview` passou a carregar o comando que o
+  gerou justamente pra que o registro seja o da ação de fato.
+- **O estado do passo N é recomputado do início, sem cache de snapshots.** Só é legítimo
+  porque o core é determinístico (mesma seed + mesmo prefixo = mesmo estado), e é o que
+  garante que rebobinar mostre exatamente o que a ida mostrou; um cache poderia divergir em
+  silêncio. Há teste travando isso (o passo N reproduzido duas vezes é idêntico).
+- **O timer da reprodução automática vive na tela, não no store.** Velocidade é
+  apresentação; o estado do passo continua sendo função pura de `(replay, step)`.
+- **Reiniciar o mapa preserva os overrides de tática, trocar de capítulo zera.** Quem
+  perdeu e ajustou o script não deve ter que reconfigurar a cada tentativa; capítulo novo
+  tem elenco novo.
+
+**Testes:** `packages/content/tests/replay.test.ts` (15) grava a jogada REAL do piloto
+automático dos 6 capítulos — com IA de mapa, duelos, reações, cura, gatilho de morte e as
+5 condições de vitória — e prova que o replay bate: em lote (`simulate`) e **passo a
+passo**, que é como a tela reproduz; que todo prefixo é estado válido; e que a
+`rulesVersion` gravada é a corrente (§9.4 recusa replay de outra versão). O piloto passou a
+devolver o log de comandos, e o setup dele agora inclui `valorSkills` — um replay só vale
+como prova se a batalha for montada igual à de verdade.
+
+**Verificação no navegador** (Vite + Playwright headless): capítulo 1 jogado por cliques,
+"Rever batalha" abrindo a tela, os 2 comandos percorridos um a um pelo botão "Próximo", o
+estado do último passo **idêntico byte a byte** ao da batalha ao vivo, e a reprodução
+automática em 4× chegando ao fim sozinha e parando. A trava do editor foi verificada nos
+dois lados: editável antes do primeiro comando (1 → 2 linhas), recusada depois, com aviso
+na tela, "Salvar" desabilitado e o "Testar contra manequim" seguindo disponível. Zero
+erros de console.
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`): nada de regra mudou — a gravação é do
+cliente e a reprodução usa o caminho que já existia.
+
+Falta em M13: PvP ligando cliente ao servidor de M7, persistência entre mapas, e a
+acessibilidade (modo daltônico nos overlays, fonte escalável).
+
+### M13 — sub-sessão 2/N: PvP — o cliente contra o servidor real
+
+Estado anterior: o servidor de M7 estava pronto e **ninguém falava com ele**. O cliente não
+tinha um `fetch` sequer.
+
+**O bloqueio não era de tela, era de contrato.** §9.1 diz que "o atacante joga a camada de
+grid manualmente contra essa defesa", mas `POST /battles` (M7) recebe os comandos JÁ
+prontos e só então sorteia a seed. O cliente não tinha como jogar antes de submeter: não
+sabia a seed, e `/matchmaking/opponent` devolvia só `{playerId, displayName, elo, mapId}` —
+nenhuma rota entregava os heróis nem a defesa pra montar o `BattleSetup`. Qualquer partida
+"jogada" no cliente mostraria duelos diferentes dos que o servidor resolveria.
+
+**Decisão do usuário: ticket de batalha.** `POST /battles/ticket` monta o confronto,
+devolve `{nonce, seed, rulesVersion, setup, defenderPlayerId}`, e o cliente joga com a
+seed real. Detalhes que valem registro:
+
+- **A seed é derivada do nonce por HMAC** com um segredo do servidor
+  (`battle/ticket.ts`), não guardada. Não exige tabela nem migração: `POST /battles`
+  recomputa a mesma seed a partir do nonce que o cliente devolve, e o nonce já era
+  obrigatório e já era a chave do replay persistido (anti-reenvio de M7). §9.4 ("zero RNG
+  no cliente: seed vem do servidor") continua valendo ao pé da letra — ela só vem antes.
+- **`generateSeed()` (crypto.randomInt) saiu.** A seed aleatória por requisição era
+  incompatível com jogar antes de submeter.
+- **Grinding de seed é risco residual, contido pelo rate limiter.** Pedir vários tickets e
+  ficar com o melhor é o que um atacante faria; a emissão de ticket consome a mesma cota de
+  `POST /battles` (§9.4), e há teste travando isso. Sem o segredo, o cliente não consegue
+  procurar um nonce que produza uma seed favorável — o que sobra é reroll caro.
+- **A montagem do confronto foi extraída** (`assembleArenaBattle`) e é a MESMA para o
+  ticket e para a batalha. Se as duas divergissem, o cliente jogaria uma partida e o
+  servidor resolveria outra — §9.1 chama isso de bug crítico.
+- **`GET /me/heroes` (novo).** `POST /battles` sempre exigiu `attackerHeroIds` e não havia
+  como o cliente DESCOBRIR os seus: os ids só existiam em fixture e em seed de banco.
+  `HeroRepository.listHeroesByOwner` entrou nas duas implementações (memória e Postgres).
+- **`BATTLE_TICKET_SECRET` é obrigatório em produção** (`index.ts` falha alto, como já
+  fazia com `DATABASE_URL`) e injetado em `buildApp`, como `now` — teste precisa fixar.
+
+**Identidade: campo de token na tela (decisão do usuário).** A auth do servidor é um token
+opaco (stub de M7); o cliente não inventa um sistema de contas que §9 não especifica. A
+alternativa (rota de cadastro de convidado) seria superfície de servidor nova sem nada na
+spec que a descreva.
+
+**Ferramentas que a verificação exigiu:**
+
+- **`apps/server/src/devServer.ts`** — o mesmo `buildApp` com os repositórios em memória
+  que só os testes usavam desde M7, semeado com dois jogadores, quatro heróis do catálogo
+  REAL e uma defesa montada. `index.ts` exige Postgres, o que é certo pra produção e
+  impraticável pro laço de trabalho: verificar "o cliente conversa com o servidor real" não
+  deveria exigir subir banco.
+- **Proxy `/api` no Vite** em vez de plugin de CORS no Fastify. O cliente fala por caminho
+  relativo, que continua valendo atrás de qualquer proxy em produção.
+
+**No cliente:** `data/api.ts` (transporte puro, nenhuma regra — regra 3), uma `PvpSession`
+no store e a `PvpPanel`. A campanha e o PvP **compartilham o mesmo `battleState` e o mesmo
+gravador de comandos**; o que muda é de onde veio o setup (`mode: 'campaign' | 'pvp'`) e o
+que acontece no fim — o overlay de fim de mapa não aparece em PvP, porque lá quem decide o
+resultado é o servidor. `buildReplay` usa o setup/seed do ticket quando em PvP.
+
+**Verificação ponta a ponta, contra o servidor real** (dev server + Vite + Playwright): token
+→ roster do servidor → matchmaking → ticket → **batalha jogada de verdade no cliente** (20
+comandos, vitória em 6 rounds) → submissão → **o servidor resolveu igual** (mesma seed,
+mesmo desfecho, mesmos 6 rounds), ELO 1200→1216 e 10 marcas de arena → **replay buscado do
+servidor** e reproduzido até o fim, com as unidades finais idênticas às que o servidor
+devolveu. Zero erros de console.
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`): nenhuma regra mudou — a seed passou a ser
+derivada em vez de sorteada, o que é infraestrutura de servidor, e o resto é rota e tela.
+
+Falta em M13: persistência entre mapas e acessibilidade (modo daltônico, fonte escalável).
+Pendências registradas: em PvP os painéis de talento/inventário ficam vazios (dependem de
+`classDefForUnit`, que é da campanha), e o servidor ainda não expõe rota para o jogador
+montar a própria defesa pela UI (o `PUT /me/defense` existe desde M7 e não tem tela).
+
+### M13 — sub-sessão 3/N: persistência/save entre capítulos
+
+Estado anterior: **zero `localStorage` no cliente**. Recarregar a página devolvia o jogador
+ao capítulo 1, com talentos, equipamento e táticas zerados. Era o último dos três critérios
+de aceite de M13 em aberto — "progresso sobrevive a recarregar a página" (§11/§09-roadmap).
+
+**Decisão do usuário: o save cobre o progresso ENTRE capítulos, não a batalha em
+andamento.** Recarregar no meio de um capítulo reinicia o capítulo. A alternativa
+considerada era guardar o log de comandos e reaplicá-lo na abertura (o determinismo do core
+torna isso barato, e é o que a tela de replay de 1/N já faz) — descartada por escopo: o
+critério pede que o progresso sobreviva, não que a partida corrente sobreviva.
+
+**O save guarda ENTRADAS, nunca `BattleState`** (não foi perguntado; é a leitura direta da
+regra 12 e do determinismo do core). Um `BattleState` serializado é o mapa inteiro a cada
+gravação — centenas de `tiles` por capítulo — e é um snapshot que ninguém verifica: nada
+garante que o estado escrito no disco seja um estado que o motor poderia ter produzido. O
+que entra é o que o jogador ESCOLHEU (capítulo alcançado, táticas preparadas, equipamento,
+talentos, preferências) e a batalha é sempre remontada do `BattleSetup` pelo core. O save
+real medido no navegador tem **250 bytes**.
+
+**Decisão do usuário: save de outra `rulesVersion` não é descartado inteiro.** O que cai é
+só o que está preso à regra da batalha — os `tacticsOverrides`, que são skill + condições
+avaliadas pelo motor que mudou. Capítulo, equipamento, talentos e preferências ficam:
+perder progresso porque um número de balanceamento mudou seria punir o jogador por uma
+decisão do desenvolvedor. Na mesma linha, e sem perguntar (conteúdo é dado, §10, e muda
+entre sessões): capítulo fora de faixa é **clampado** no último que ainda existe em vez de
+devolver ao começo; item que saiu do catálogo some do slot e o resto do equipamento fica; e
+alocação de talento que a árvore atual não aceita mais é **zerada** — mantê-la travaria
+toda edição seguinte, já que o cliente revalida a árvore inteira a cada +1/-1 (M6, 7/N).
+Alocação de unidade de OUTRO capítulo é preservada: a árvore dela não é resolvível a partir
+do capítulo corrente, então não há o que afirmar.
+
+**Decisão do usuário: do PvP, só o token entra.** É digitado à mão numa caixa de texto e
+redigitá-lo a cada recarga seria hostil. Ticket, oponente e batalha em curso não são
+persistidos — um ticket guardado no disco do cliente é estado que o servidor não conhece.
+
+**O save não é conteúdo de `packages/data`, então não ganha schema Zod** — o formato é
+nosso, não autorado, e o cliente não depende de Zod. Em compensação **nada no parser confia
+no que leu**: `parseSave` valida campo a campo e devolve `null` em qualquer desvio, e o
+jogo começa do zero em vez de lançar no boot. As `Condition` (§6.3) são validadas variante
+a variante, do mesmo jeito que `createDefaultCondition` as constrói no editor: validar por
+"tem um campo `t` string" deixaria passar um `targetIsType` com tipo inexistente, que o
+motor avaliaria como falso pra sempre — uma linha de tática morta em silêncio.
+
+Encanamento: a hidratação é **síncrona, no boot do módulo do store** (o catálogo já é
+síncrono desde M9), senão a tela abriria no capítulo 1 e saltaria para o capítulo salvo um
+quadro depois. A gravação é **uma assinatura só** (`useBattleStore.subscribe`) e não uma
+chamada em cada ação: com quinze pontos que mexem no progresso, espalhar "salvar" por todos
+eles garantiria esquecer um; a projeção é pequena, então comparar o JSON gravado é mais
+barato que comparar campo a campo. `localStorage` pode não existir (Node, SSR) e pode
+LANÇAR mesmo existindo (navegação privada, cota estourada): sem armazenamento o jogo roda
+igual e não salva.
+
+**Um beco sem saída apareceu na verificação e foi corrigido:** a tela "Campanha concluída"
+nunca teve botão nenhum — antes da persistência, recarregar era o que recomeçava a
+campanha. Com o save, ela volta a cada recarga, e o overlay é `position: fixed; inset: 0`
+com `z-index: 20`, então o "Apagar progresso" do cabeçalho fica **inalcançável** (provado
+no navegador: o clique é interceptado). O painel ganhou a própria saída, "Recomeçar a
+campanha".
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`) e `pnpm balance` não pode ter mudado:
+`packages/core` e `packages/data` não têm uma linha alterada nesta fatia — ela é
+inteiramente `apps/client`.
+
+### M13 — sub-sessão 4/N: acessibilidade — modo daltônico e fonte escalável
+
+Fecha M13. §11 pede três coisas em acessibilidade: "fonte escalável, modo daltônico nos
+overlays, e modo resultado instantâneo". O terceiro existe desde M12; os outros dois não.
+
+**Decisão do usuário: paleta segura E padrão, não só paleta.** Cor sozinha não bastava por
+dois motivos concretos deste jogo: os overlays **se empilham** (um tile pode ser ameaça e
+alcance de movimento ao mesmo tempo, e o que aparece é a mistura dos dois véus), e a
+distinção mais importante do mapa — quem é meu, quem é inimigo — era azul contra vermelho,
+exatamente o par que a deuteranopia comprime. No modo daltônico cada overlay de tile ganha
+uma marca própria (hachura na ameaça, pontos no movimento, grade na mira, moldura no
+objetivo) e o inimigo vira **quadrado** enquanto o jogador segue círculo. Com isso o mapa
+continua legível até sem cor nenhuma.
+
+**Decisão do usuário: a escala vale para o mapa também, não só para o HTML.** Todo o CSS do
+cliente já estava em `rem` (47 declarações), então o HTML escala mudando a raiz; o mapa é
+canvas, e sem escalar o tile junto o **rótulo de AP/PP no tile — que §11 exige legível sem
+hover — continuaria em 10px enquanto o resto da tela dobra**. `TILE_SIZE` deixou de ser
+constante e virou `36 × escala`, com a fonte do rótulo junto.
+
+**Registrado sem perguntar:**
+
+- **A paleta padrão não muda um byte.** Quem não liga o modo vê o mapa de M6–M12 idêntico;
+  há teste travando as cores antigas uma a uma.
+- **Os terrenos saíram da faixa de verdes** no modo daltônico e viraram uma rampa de
+  LUMINÂNCIA (claro/médio/escuro) — luminância é o canal que nenhuma dicromacia afeta,
+  enquanto verde e vermelho colapsam justamente contra o véu de ameaça.
+- **Anel de seleção e anel de "dá pra engajar" viraram branco e preto.** Eram âmbar e
+  laranja, indistinguíveis entre si em deuteranopia, e os dois aparecem sobre unidades ao
+  mesmo tempo. Branco e preto não são cor: sobrevivem a qualquer condição.
+- **"Apagar progresso" não desliga a acessibilidade.** Apagar progresso é sobre progresso;
+  desligar o modo daltônico de quem depende dele seria hostil.
+- **O formato do save NÃO subiu para v2.** As duas preferências entraram **opcionais na
+  leitura**: um save gravado na fatia 3/N não tem os campos, e rejeitá-lo por isso apagaria
+  capítulo, equipamento e talentos por causa de uma preferência nova. A regra que separa os
+  tratamentos ficou explícita no parser: **erro de TIPO é formato malformado e rejeita;
+  valor fora de faixa é preferência recuperável e cai no default.**
+
+**A verificação é medida, não visual.** `overlayTheme.test.ts` simula deuteranopia e
+protanopia (matrizes de Viénot 1999, em RGB linear) sobre cada cor que carrega significado
+no mapa e exige distância mínima entre todos os pares; **o mesmo teste é virado contra a
+paleta ANTIGA e exige que ela FALHE**, senão o limiar não estaria provando nada. O par
+"ameaça × unidade inimiga" é declarado como colisão intencional em código (ameaça É o
+alcance dos inimigos) em vez de escondido no teste.
+
+**O teste pegou um erro meu na primeira execução:** a mira (roxo `CC79A7`) ficava a
+distância 15 da montanha (cinza médio `9AA0A6`) em deuteranopia — o overlay de alcance de
+skill sumia em cima de montanha. A montanha foi escurecida para `6E7378`, separando as duas
+por luminância.
+
+No navegador, a leitura de pixel **não pode sair do canvas direto**: ele é WebGL sem
+`preserveDrawingBuffer` e volta preto. O roteiro fotografa o elemento e devolve a foto ao
+navegador como data URL para ler com `getImageData` de um canvas 2D.
+
+`RULES_VERSION` **não subiu** (segue `0.12.0`): `packages/core` e `packages/data` não têm
+uma linha alterada — a fatia é inteiramente `apps/client`.
+
+## M14 — Economia PvE
+
+### M14 — sub-sessão 1/N: as regras e o conteúdo da economia
+
+§10 são cinco linhas de prosa e **nenhum número**. Quase tudo desta fatia é decisão fora da
+spec; as três maiores foram levadas ao usuário antes de qualquer código.
+
+**Decisão do usuário: o estado de conta do PvE mora no SERVIDOR**, como o PvP de M7/M8 —
+é o que §9.4 pede ("estado de conta recalculado a partir do inventário no banco") e evita
+duas economias, já que as marcas de arena e o herói já vivem lá. Consequência aceita: a
+campanha, hoje 100% local, passa a exigir o token de M7 para farmar. Esta fatia não
+implementa nada disso: implementa as REGRAS puras que o servidor vai chamar em 2/N.
+
+**Decisão do usuário: energia com regeneração contínua** (+1 a cada intervalo, até um teto
+de conta), não recarga diária. §10 só diz "energia de conta limita o farm diário".
+
+**Decisão do usuário: awakening por materiais de chefe, imprint por fragmento do herói.**
+§10 diz "Imprint: duplicatas viram bônus permanente de stat", mas o projeto não tem coleção
+de heróis e gacha está fora de escopo (§15), então a "duplicata" virou um consumível
+(`MaterialDef.kind: 'heroFragment'`) que pertence a um herói nomeado (`forHeroId`) e dropa
+na masmorra de Chefe — que §10 já define como a fonte de "materiais de promoção".
+
+**Registrado sem perguntar:**
+
+- **O tempo entra por parâmetro.** `resolveEnergy(estado, nowMs, regras)` é pura; quem lê o
+  relógio é o servidor. Sem isso a regra 1 cairia — e é o que torna a regeneração testável
+  sem esperar o tempo passar.
+- **Energia é DERIVADA, não incrementada.** O estado guardado é `{stored, asOfMs}`: a
+  energia atual sai da diferença até agora. Dispensa tarefa periódica no servidor. Três
+  bordas viraram teste: relógio andando para trás não cria nem destrói energia; a fração de
+  intervalo não se perde (o `asOfMs` só anda o que foi consumido em intervalos completos);
+  e **no teto o relógio acompanha o agora**, senão um dia parado no teto viraria um dia de
+  energia no instante em que o jogador gastasse a primeira unidade.
+- **Custo de energia não positivo é rejeitado** — uma masmorra malformada não pode virar
+  fonte de energia.
+- **Cada tipo de rolagem de drop tem stream de RNG próprio** (`dungeon:gold`,
+  `dungeon:gear:i`, `dungeon:material-amount:i`…): acrescentar material a uma masmorra não
+  desloca o ouro dela nem os itens. A seed de cada item também é rolada por posição, senão
+  os N itens de uma run sairiam do mesmo stream e viriam idênticos.
+- **A run é identificada por `runId`,** não só pela seed da conta: duas entradas na mesma
+  masmorra com a mesma seed precisam diferir, senão farmar seria repetir o mesmo drop para
+  sempre.
+- **O gate de awakening no talento é do DADO** (`TalentNode.minAwakening`), não do motor.
+  §10 nomeia 5 para o caso que descreve, mas travar o 5 no código proibiria uma classe
+  futura de exigir outro rank. O campo é opcional e `validateAllocation` trata awakening
+  ausente como 0 — nenhuma alocação de M5 a M13 muda de resultado.
+- **`intMul`/`intDiv` entraram em `math/fixed.ts`.** Energia por intervalo de tempo é
+  contagem inteira fora da escala 1000, e `fpMul`/`fpDiv` não servem (multiplicar um
+  instante em milissegundos por 1000 chega perto do limite seguro de inteiro do JS). Ficam
+  nos helpers porque a regra do projeto é que multiplicação e divisão só acontecem lá.
+- **Teto de imprint é 5 porque `ClassDef.imprintFlat` tem 6 entradas desde M1** (imprint
+  0..5). Subir além não teria bônus algum para ler. O teto 6 do awakening é da spec.
+- **Falhar alto em tabela curta:** se a tabela de custo não define o passo corrente, o
+  motor recusa em vez de despertar de graça — erro de conteúdo não vira progressão grátis.
+
+**Gap consciente, para 2/N:** `pedras` existe como moeda (§10 nomeia três) e a masmorra de
+Chefe as dropa, mas **nada as gasta ainda** — a loja de M8 cobra em marcas de arena. Criar
+um sumidouro de pedras é decisão de balanceamento do servidor, não desta fatia.
+
+**"Nunca poder bruto" ainda não virou teste** — a definição verificável (nenhuma oferta
+concede material de awakening, fragmento ou enhance garantido, e todo item vendido existe
+no mesmo pool que dropa) pertence a 2/N, onde a loja vive.
+
+`RULES_VERSION` `0.12.0` → **`0.13.0`**. `GOLDEN_HASH` intacto e `pnpm balance` idêntico: o
+torneio não farma, não desperta e não aloca talento com gate.
+
+### M14 — sub-sessão 2/N: a masmorra como batalha, e as tabelas que nunca existiram
+
+**Decisão do usuário: a masmorra é uma BATALHA de verdade, com dificuldades.** As menores
+precisam ser limpas manualmente uma vez e depois aceitam time automático — "que ainda sim
+teria que ser forte o suficiente para passar"; a alta dá mais recursos, é **sempre manual**
+e tem a entrada **travada por tempo**, resetando "em dias X da semana ou do mês dependendo
+do conteúdo". A varredura custa **a mesma energia e dá a mesma recompensa** que a entrada
+manual (segunda decisão do usuário): varrer é conveniência, não desconto nem pênalti.
+
+Isso encaixou na máquina existente sem conceito novo: uma masmorra é um **encounter** (mapa
++ elenco, M12) com recompensa e custo por cima, e a varredura é `decideMapAiCommand` (§9.1,
+M7) jogando **os dois lados** até o desfecho. **"Forte o bastante" cai fora da simulação** —
+não existe número de dificuldade, não existe rolagem de sucesso: o time que não vence, não
+vence, e perde a energia igual. Há teste com um time fraco perdendo de propósito.
+
+**Decisão do usuário: enhance cobra pedras + ouro.** §7.3 define a mecânica e as chances e
+nenhum custo. Isso fecha o gap declarado em 1/N: as pedras dropavam e nada as gastava.
+
+**Registrado sem perguntar:**
+
+- **Calendário civil próprio, sem `Date`.** Saber que dia é um instante é obrigatório para
+  a trava de tempo, e a regra 1 proíbe `Date` no core — além de `Date` ser sensível ao fuso
+  do processo, e cliente/servidor/`sim-cli` precisarem concordar byte a byte. A conversão é
+  o algoritmo de Hinnant em aritmética inteira. **O reset é em UTC**, com hora opcional no
+  dado: sem uma referência, "dia" não tem definição, e fuso por jogador é conceito que o
+  projeto não tem.
+- **Dia do mês declarado que não existe naquele mês simplesmente não acontece** (31 em
+  fevereiro): nenhum reset naquele mês, em vez de escorregar para o dia 1 do seguinte.
+- **A entrada é derivada, como a energia** (`{used, asOfMs}`): sem tarefa periódica, e
+  atravessar o mesmo reset duas vezes não devolve entrada duas vezes.
+- **Teto de comandos na varredura** (`AUTO_BATTLE_COMMAND_BUDGET`): não é regra de jogo, é
+  o que impede um mapa mal autorado de rodar para sempre dentro do servidor. Comando
+  recusado cai para `wait` em vez de virar laço infinito.
+- **Masmorra é sempre `casual`** (§5.7 exige permadeath declarada, nunca hardcoded): um mapa
+  repetível com morte permanente seria uma armadilha.
+- **O encounter de masmorra declara VAGAS, não heróis.** Quem entra é o time que o jogador
+  escolher (3/N monta o `BattleSetup` a partir do roster); um herói de referência ocupa cada
+  vaga para o confronto ser jogável por si só, do mesmo jeito que o piloto testa a campanha.
+
+**Dois erros meus que os testes pegaram, ambos corrigidos:**
+
+1. **Encounter de masmorra em `encounters/` virou capítulo de campanha.** A campanha do
+   cliente passaria de 6 para 14 capítulos, e o piloto de M12 passou a jogar masmorra. Virou
+   tipo de conteúdo próprio (`dungeon-encounters/`, schema próprio **sem `chapter`** — a
+   ausência de capítulo é exatamente o que separa os dois). O `chapter: 100 + índice` que a
+   primeira versão usava era o cheiro do erro.
+2. **Coordenadas de unidade escolhidas à mão caíram fora do mapa.** Agora o gerador
+   **deriva as posições do layout**: os tiles passáveis mais próximos de cada canto oposto,
+   em ordem determinística. Dois testes de conteúdo travam a regressão — ninguém nasce fora
+   do mapa, ninguém nasce em rocha.
+
+**Conteúdo que nunca existiu e entrou aqui por necessidade:** `substat-weights/`,
+`mainstat-weights/` e `enhance-rates/`. Os três schemas existem desde M4, mas só havia
+fixture em `test-fixtures/` — ou seja, **nada fora de teste conseguia gerar um item**, e o
+drop de masmorra depende exatamente disso. Os três números que §7.3 dá (100%, 65%, 40%)
+estão travados por teste.
+
+`RULES_VERSION` `0.13.0` → **`0.14.0`**. Nenhum comportamento pré-existente mudou.
+
+### M14 — sub-sessão 3/N: o servidor do farm
+
+Estado de conta do PvE no servidor (energia, ouro, pedras, materiais, inventário, limpezas e
+trava de entrada), o catálogo carregando a economia, e a masmorra jogável de ponta a ponta
+pelo mesmo fluxo do PvP de M13 2/N: **ticket → jogar → submeter → o servidor reexecuta**.
+
+**Registrado sem perguntar:**
+
+- **O ticket não cobra energia; a submissão cobra.** Abandonar um ticket não pode custar
+  recurso. Em compensação, pedir muitos tickets consome a mesma cota do rate limiter — o
+  mesmo contorno (e o mesmo risco residual de procurar seed favorável) já registrado em M13.
+- **Derrota gasta energia e não paga nada.** É o que dá peso à decisão de entrar com um time
+  fraco, e o que faz a frase da decisão do usuário ("ainda sim teria que ser forte o
+  suficiente") ter consequência em vez de ser only-flavor.
+- **A seed da BATALHA e a seed do DROP saem do mesmo nonce, por sufixos diferentes.** Sem
+  isso, conhecer um lado deixaria inferir o outro.
+- **A entrada da elite é consumida ANTES da energia**: gastar energia e só então descobrir
+  que não há entrada seria cobrar por uma partida que não aconteceu.
+- **Só a vitória MANUAL marca a masmorra como limpa** — é ela que libera a varredura.
+- **O encounter da masmorra declara VAGAS**: em produção elas são preenchidas pelo roster do
+  jogador, e o elenco de referência do conteúdo só existe para o confronto ser jogável (e
+  testável) sozinho.
+- **`gold` e `energy_as_of` são `bigint` no banco** (ouro acumula; instante em ms não cabe em
+  `integer`), e o driver `pg` devolve bigint como string — a conversão acontece na fronteira,
+  em `rowToPlayer`, senão o core receberia `NaN`.
+
+**Dois defeitos de conteúdo que só uma simulação pegaria, e que agora têm teste:**
+
+1. **Três masmorras NUNCA TERMINAVAM.** Com a IA de mapa dos dois lados, os dois times
+   paravam a dois tiles um do outro em lados opostos de uma crista: `mapAi` escolhe tile por
+   distância de Manhattan e trava em mínimo local contra parede — limitação de M7 que a
+   regra 6 ("nada de IA esperta") manda não resolver deixando a IA mais inteligente. **A
+   correção foi de conteúdo:** as posições passaram a ser HERDADAS dos capítulos de M12, que
+   o piloto automático já provou jogáveis nesses layouts; a Forja mudou de layout, porque o
+   do capítulo 2 vira impasse com IA nos dois lados.
+2. **A elite precisava ser dura, não impossível.** O teste afirma as duas metades: com o time
+   de referência ela é derrota (é o que a torna elite), e com um time 20 níveis acima ela
+   cai. Sem a segunda metade, "difícil" seria indistinguível de "inacabável".
+
+O `referenceLevel` entrou no gerador por causa disso: o encounter declara o time contra o
+qual a masmorra foi ajustada, o que transforma a dificuldade numa afirmação verificável.
+
+Pendências para 4/N: enhance, equipar, awakening e imprint por rota (as três primeiras já
+têm a regra no core desde 1/N e 2/N), mais a trava de "nenhuma moeda compra poder bruto". O
+cliente é 5/N. `RULES_VERSION` **não subiu** (segue `0.14.0`): esta fatia é servidor e
+conteúdo, sem regra nova.
+
+### M14 — sub-sessão 4/N: progressão por rota e a trava de "poder bruto"
+
+Enhance, equipar, awakening e imprint como rota, e o critério "nenhuma moeda compra poder
+bruto" transformado em teste. As quatro regras já existiam no core (M4; M14 1/N): esta
+fatia é autorização, ordem das operações e persistência.
+
+**Registrado sem perguntar:**
+
+- **Falhar no enhance cobra igual.** §7.3 define a chance decrescente como o freio do
+  sistema; uma chance que não custa nada não é chance, é um botão de "+15 garantido".
+- **A seed do enhance sai do nonce por HMAC**, como todo o resto. Sem isso o cliente
+  escolheria QUANDO tentar e a chance de §7.3 viraria decoração.
+- **O fragmento do imprint é resolvido pelo CATÁLOGO** (`forHeroId`), não aceito no corpo da
+  requisição. O motor já recusaria o fragmento de outro herói — mas a rota não deve nem
+  oferecer a pergunta.
+- **O item substituído ao equipar volta para o inventário.** Nada some.
+- **Uma tabela de idempotência genérica** (`economy_actions`, migração `0008`) para as
+  quatro ações, pelo mesmo motivo do nonce da batalha: um reenvio de rede (o cliente não
+  sabe se a primeira chegou) cobraria duas vezes. `dungeon_runs` não servia — ela é
+  específica de masmorra.
+
+**A definição verificável de "poder bruto"**, que 1/N deixou registrada e esta fatia
+transformou em `apps/server/tests/poderBruto.test.ts`:
+
+1. Nenhuma oferta da loja vende material, fragmento ou item já aprimorado/reforjado.
+2. Todo item vendido existe no catálogo comum, e **todo set vendido também dropa em alguma
+   masmorra** — a loja adianta o que se farmaria, não cria poder que só ela tem.
+3. Awakening e imprint são cobrados em MATERIAL, e todo material cobrado dropa em masmorra:
+   não existe rota que troque moeda por rank.
+4. O enhance é uma CHANCE (nem todo marco é 100%), não uma compra garantida.
+
+O ponto 3 é sobre o servidor, não sobre o dado, e por isso é lido do código das rotas: o que
+garante a regra é **não existir** rota que converta moeda em progressão — inclusive não
+existir conversão de ouro de PvE em marcas de arena, que compraria a loja por outro caminho.
+
+`RULES_VERSION` **não subiu** (segue `0.14.0`).
+
+### M14 — sub-sessão 5/N: a tela do farm (fecha M14)
+
+O cliente ganha a masmorra, a conta e o resto do ciclo. A batalha de masmorra **reusa
+inteira** a máquina que M13 2/N construiu para o PvP — ticket, `battleState`, `commandLog`,
+submissão —, porque do ponto de vista do cliente as duas coisas são "jogar um confronto que
+o servidor montou e devolver os comandos". Nenhuma regra nova no cliente (regra 3): a
+disponibilidade de cada masmorra (trancada, sem energia, varredura liberada) chega
+**resolvida** do servidor e o painel só desenha.
+
+**Registrado sem perguntar:**
+
+- **Submeter sai da masmorra.** Achado da verificação: com o ticket ainda em pé, o painel
+  ficava preso na visão de batalha depois da run — sem lista e sem inventário, que é
+  justamente o passo seguinte do ciclo.
+- **O servidor de desenvolvimento passou a semear ouro, pedras e o herói `hero-jogador`**
+  (o único com fragmento declarado no catálogo, portanto o único que pode ganhar imprint), e
+  os heróis subiram para nível 40: um time nível 10 perderia toda masmorra e o roteiro
+  falaria sobre dificuldade em vez de sobre tela.
+
+**Um bug real que a verificação pegou:** o overlay de fim de capítulo aparecia **por cima de
+uma masmorra vencida**, oferecendo "avançar para o próximo mapa" e interceptando os cliques
+do painel de farm. Ele só se excluía do modo PvP (`mode === 'pvp'`); agora só a CAMPANHA o
+mostra. O mesmo teria acontecido em qualquer modo futuro que não fosse campanha.
+
+**Duas medições do meu roteiro que estavam erradas e foram corrigidas** (registradas porque
+uma delas quase virou "verde falso"): contar itens equipados não prova nada, porque o drop
+**substitui** o item do mesmo slot — a prova é o item aprimorado aparecer entre os
+equipados; e o 400 do despertar sem material é provocado de propósito, então o roteiro
+afirma que ele é o **único** erro de console, em vez de exigir zero.
+
+`RULES_VERSION` **não subiu** (segue `0.14.0`).
+
+### Auditoria 2026-08-14 — roadmap pós-M14 (M15, M16) e direção de arte
+
+Sessão de auditoria, sem código. Mesmo papel dividido da auditoria de 2026-08-07: a auditoria
+decide, um agente separado implementa. O usuário pediu a preparação dos próximos passos com
+foco em começar a parte gráfica, precedida de pesquisa ampla sobre desenvolvimento gráfico
+assistido por IA bem-sucedido.
+
+**Estado verificado (rodado, não lido do `PROGRESS.md`):** M0–M14 completos, 14 componentes de
+cliente, 1184 linhas de CSS. **A camada gráfica do jogo são 9 retângulos, 2 círculos e 3
+linhas** em 358 linhas de `MapCanvas.tsx` — zero sprites, zero texturas, zero arquivos de
+imagem no repositório.
+
+**Achado que reordenou o milestone (mais urgente que gráficos):** `PUT /me/defense` existe em
+`apps/server/src/battle/routes.ts:162` desde M7 e `grep -rn "defense" apps/client/src` não
+retorna nada. O jogador não consegue montar o time que defende, então o PvP assíncrono inteiro
+— servidor, ELO, matchmaking, replays, anti-cheat, fuzz de 1000 partidas — é inalcançável sem
+`curl`. Decidido com o usuário: **M15 fecha esse loop, M16 é o gráfico.** Apresentação em cima
+de um loop de jogo que não fecha é maquiagem.
+
+**Correção de uma pendência mal registrada:** `PROGRESS.md` afirmava que `Tile.object` estava
+"sem leitor no motor". Falso — `battle/commands.ts:120` lê `fort`/`camp` para +1 AP no `rest`.
+O problema real, verificado: o tipo declara 5 valores, só 2 têm leitor, e nenhum mapa de
+`packages/data` usa o campo. Requalificado no briefing de M15 (D3: implementar `wall`/`gate`,
+remover `chest`, e autorar conteúdo que use os valores — campo que nenhum conteúdo usa é
+código morto por outro nome). As outras 3 pendências (`lifesteal` inerte,
+`summonReinforcement` rejeitando explicitamente, "+2 Valor ao capturar") foram confirmadas
+reais.
+
+#### Direção de arte — decisão e fundamentação da pesquisa
+
+**Decisão: visual programático, definitivo, zero assets raster (M16).** Não é placeholder nem
+consolo por não haver artista — é a direção de arte do jogo.
+
+A pesquisa separou duas coisas que a discussão pública confunde, e que têm perfis de risco
+opostos:
+
+- **Arte raster generativa** (difusão/LoRA → sprites, retratos, tilesets): o agente produz
+  imagens. Não determinístico, não diffável, procedência juridicamente cinzenta, **exige
+  disclosure na Steam**, e risco reputacional documentado em casos nomeados — *Hardest*
+  delistado pelo próprio autor após reviews chamarem a arte de "soulless"; *Postal: Bullet
+  Paradise* cancelado **um dia** após o anúncio; *Clair Obscur: Expedition 33* teve o GOTY do
+  Indie Game Awards **rescindido** e trocou texturas geradas em patch cinco dias após o
+  lançamento — ou seja, punição mesmo para um jogo aclamado. Tecnicamente o problema é pior
+  que o reputacional: jogo precisa de *sistema* (silhueta repetível, proporção estável, lógica
+  de luz coerente, saída animável através de centenas de assets), e até as fontes favoráveis à
+  IA convergem em que o paintover humano é etapa obrigatória. Não há artista humano neste
+  projeto, então o estágio que faz o pipeline funcionar não existe.
+- **Visual programático** (código que desenha: vetor, geometria, shader, animação): o agente
+  produz **código** — determinístico, diffável, revisável, versionado, sem licença duvidosa, e
+  **sem disclosure** (a reescrita do formulário da Steam de jan/2026 isenta explicitamente
+  ferramentas de desenvolvimento, restringindo a exigência a conteúdo gerado que o jogador
+  experimenta).
+
+**Limitação central, de fonte primária, que vira regra de processo:** o LLM **não consegue
+julgar o próprio resultado visual**. O relato de Three.js + Claude descreve um "text
+bottleneck" — o modelo domina a API mas trabalho visual-espacial exige *representational
+grounding*, e o modelo "não tem nada parecido com rotação mental"; ajustes que um humano faz
+em segundos viram diálogo verboso. O paper de evolução de shaders GLSL confirma pelo outro
+lado: funciona bem (menos de 3% de erro de compilação; novatos produziram 4,2 shaders vs. 0,6
+sem a ferramenta) **precisamente porque o humano é o juiz estético** — juiz multimodal
+autônomo é declarado trabalho futuro. Mitigação parcial: loop de screenshot via ferramenta de
+browser reduz iteração de UI de 10+ para 2–3 ciclos. **Regra para M16: o agente gera, tira
+screenshot e corrige o objetivo; o usuário julga o que é gosto. O agente nunca auto-certifica
+estética.**
+
+**O argumento decisivo é de design, não de risco.** Subset Games, sobre Into the Breach:
+"sacrifique ideias legais em nome da clareza, toda vez" — inimigos mostram o que vão fazer,
+mapa pequeno, regras legíveis; armas interessantes foram cortadas por prejudicarem a leitura.
+A regra 6 do `CLAUDE.md` deste projeto diz "previsibilidade é o produto", e o requisito mais
+importante de §11 é o preview de duelo — uma tela cujo valor inteiro é legibilidade. **Este é
+um jogo cujo produto é a leitura, não o espetáculo.** Linguagem geométrica/vetorial feita com
+capricho é a direção correta para este design, e por coincidência é a que um agente executa
+bem.
+
+**Hedge arquitetural exigido em M16:** o renderer ganha uma costura trocável de representação
+de unidade, com uma segunda implementação de teste provando que é trocável. Adia o caminho
+raster sem fechá-lo. **Limitação reconhecida e não resolvida:** retratos de personagem e key
+art para loja/marketing não têm solução programática; se o jogo for para a Steam, a resposta é
+artista humano ou pack licenciado (Kenney: ~60 mil assets CC0, uso comercial, sem atribuição).
+Decisão adiada de propósito — não é problema de M16.
+
+Briefing de M16 **não** foi escrito nesta sessão, seguindo o método estabelecido em
+2026-08-07: briefing detalhado só quando o milestone vira o próximo. A pesquisa e a decisão
+ficam registradas aqui para não se perderem.
+
+Nenhuma mudança de código nesta sessão — só a auditoria, as entradas M15/M16 em
+`docs/spec/09-roadmap.md`, o briefing `docs/milestones/M15-fechamento-do-loop-de-pvp.md` e a
+atualização de `PROGRESS.md`.
+
+## M15 — Fechamento do loop de PvP e pendências
+
+### M15 — sub-sessão 1/N: as quatro pendências do motor
+
+Só `packages/core` e o schema de mapa de `packages/data`, testes antes. Conteúdo é 2/N, a tela
+de defesa de arena é 3/N, `pnpm balance` e o aceite são 4/N — ordem do §5 do briefing
+`docs/milestones/M15-fechamento-do-loop-de-pvp.md`, que foi lido inteiro e cujas decisões
+D1–D4 **não** foram reabertas.
+
+**Duas coisas o briefing deixou em aberto de propósito, e as duas foram ao usuário antes de
+qualquer código:**
+
+**Decisão do usuário — o portão abre por um lado e QUEBRA pelo outro.** D3 dizia "`gate` como
+bloqueio destrutível **ou** abrível" e deixava a escolha; a resposta acrescentou um requisito
+que o briefing não previa: abrir pelo `wait` adjacente, "mas em algumas fases principalmente
+de PvE esse gate poderia ser lockado a abrir apenas por um lado e pelo outro lado necessitar
+ser quebrado". O tile declara `gate: { opensFor: 'player'|'enemy'|'any', durability: n }`;
+quem o lado abre, abre de vez; quem não abre, bate, e o portão cai depois de `durability`
+turnos-unidade. **Ausente = portão simples** (qualquer um abre, num turno), o que mantém
+`{ object: 'gate' }` sozinho sendo conteúdo válido.
+
+**Decisão do usuário — "objetivo" (§5.6) é o tile de controle.** A spec diz "+2 ao capturar
+objetivo" e não define objetivo em lugar nenhum. Das três leituras apresentadas, a escolhida
+foi `Tile.object` `fort`/`camp` — o mesmo par que §5.4 já trata como tile valioso (+1 AP no
+`wait`), o que dá ao campo um segundo leitor e um motivo de existir no conteúdo, que é
+justamente o que D3 exige. A alternativa "tile-alvo da `winCondition`" foi descartada com
+medida, não por gosto: em `seize` a vitória é imediata (`winCondition.ts:32`), então o +2 seria
+pago no instante em que a batalha acaba e nunca poderia ser gasto.
+
+**Registrado sem perguntar (leituras diretas da spec ou do briefing):**
+
+- **Vampirismo entra no ponto ÚNICO por onde dano vira HP no duelo**
+  (`applyDamageWithLethalTrigger`, criado em M10 8/N), não em cada chamador — golpe principal e
+  contra-ataque passam pelos dois caminhos e duplicar a regra garantiria divergência. A base é
+  o dano **efetivamente aplicado**: um golpe de 5000 num alvo com 30 de vida vampiriza sobre
+  30, não sobre 5000.
+- **Assistência não vampiriza**, e isso é limitação declarada, não esquecimento: quem assiste
+  não é participante do duelo, então seu HP não existe nessa camada — mesma limitação que M12
+  2/N já registrou ao explicar por que reação e assistência não conseguem ser mais que um
+  número de dano neste motor.
+- **`heal` (cura dada/recebida) não multiplica o vampirismo**: são dois stats distintos em §4.1
+  e D1 não os relaciona; empilhá-los seria inventar uma sinergia que ninguém pediu.
+- **`wall` bloqueia movimento, não linha de visão.** `Terrain.blocksSight` existe desde M3 e
+  **não tem um único consumidor no motor**; implementar visão seria sistema novo, fora do
+  escopo declarado do briefing (§7: "nenhuma expansão além do mínimo").
+- **Bloqueio por objeto é independente do terreno**, e é por isso que ele não podia ser escrito
+  como `moveCost: 'impassable'`: §5.1 diz que voadores custam 1 em tudo exceto impassável,
+  então um muro expresso como terreno seria atravessável por quem voa.
+- **O estado do portão mora no `BattleState`, não no `GridMap`.** O mapa é a FASE (conteúdo
+  imutável, compartilhado entre partidas); qual portão já caiu é da PARTIDA. Misturar os dois
+  faria uma batalha editar o conteúdo da outra.
+- **Durabilidade em turnos-unidade, não HP com fórmula de dano.** Arrombar não passa por
+  `computeDamage`, não rola RNG, não vira alvo de duelo e não entra na matriz de `pnpm
+  balance` — e "3 turnos para arrombar" é um número que o autor de fase controla direto. A
+  alternativa (portão como unidade-objeto com HP) mexeria em duelo, preview, iniciativa e IA
+  de mapa de uma vez, por um sistema que a spec não descreve.
+- **Nenhuma ação nova**: §5.4 lista quatro (`engage`, `mapSkill`, `rest`, `wait`) e o `wait`
+  **já** é condicional ao tile. Abrir/arrombar custa o turno, que é o preço; a quinta ação que
+  seria necessária contradiria a tabela normativa.
+- **A captura é uma vez por tile por batalha e só do jogador.** Sem o primeiro limite, entrar e
+  sair do mesmo fort seria bomba de Valor infinita; o segundo é literal de §5.6, que define
+  Valor como o recurso do exército do jogador. E é **encerrar o turno**, não pisar: capturar é
+  ficar. A checagem fica num ponto só (`applyCommand`), porque espalhá-la pelas quatro ações
+  que encerram o turno garantiria esquecer uma.
+- **O blueprint da invocação chega pronto em `BattleSetup.summonBlueprints`**, espelhando como
+  `valorSkills` entrou em M11: montar um `BattleUnit` a partir de `Hero`+catálogo é trabalho de
+  `packages/content`, e o core não importa conteúdo (regra 1). É o que torna D2 executável sem
+  violar a regra 4 — a unidade invocada é conteúdo.
+- **A invocada recebe `unitId` próprio e determinístico** (`blueprint@rN:x,y`): reusar o id do
+  blueprint criaria duas unidades com o mesmo `unitId` na segunda invocação, quebrando
+  iniciativa, duelo e replay de uma vez. Round + tile são únicos por invocação, porque o tile
+  fica ocupado logo depois.
+- **A invocada não age no round em que nasce.** Dar um turno extra imediato seria regra que
+  §5.6 não menciona; o preço em Valor já é a decisão.
+- **A rolagem de iniciativa da invocada usa o round corrente** (a lista inicial usa 0), o que
+  lhe dá stream próprio sem tocar no da montagem. **A regra 9 continua valendo byte a byte:**
+  `insertIntoInitiativeOrder` INSERE, e nenhuma entrada existente é re-rolada nem reordenada —
+  §5.3 autoriza isso explicitamente ("unidades que entram depois são inseridas na posição
+  correspondente ao seu valor de iniciativa"), e há teste comparando a lista antiga inteira,
+  entrada por entrada, antes e depois da invocação.
+- **O +1 PP do terço final não vale para a invocada**: §5.3 dá esse bônus a quem "começa a
+  batalha" na cauda da lista, e recalculá-lo a cada reforço mexeria no PP de terceiros.
+- **O `MapContent` de `packages/content` passou a usar o `Tile` do core** em vez de redeclarar
+  `{terrain, height}`: o loader sempre repassou os tiles por referência, então `object`/`gate`
+  já sobreviviam em runtime, mas o tipo local afirmava o contrário — armadilha pronta para a
+  fatia de conteúdo.
+
+**Um erro meu que os testes pegaram, e um que quase virou sujeira permanente no repositório:**
+(1) o teste do muro num 3×3 esperava contornar a parede com alcance 3, e a volta pela borda
+custa 4 — a asserção estava errada, não o motor; (2) rodei `npx tsc -b` na raiz para conferir
+tipos e ele **emitiu 171 arquivos `.js`/`.d.ts` CommonJS dentro de `src/`**, que o `pnpm test`
+da raiz então carregou no lugar dos `.ts` ("exports is not defined in ES module scope") — a
+suíte inteira "falhou" por um motivo que não tinha nada a ver com o código. Os artefatos foram
+removidos por critério explícito (só arquivo com irmão `.ts` de mesmo nome), e a árvore foi
+conferida depois. O comando de typecheck do projeto é `pnpm typecheck` (`tsc --noEmit` por
+pacote), **nunca** `tsc -b` na raiz.
+
+**O teste de M11 que travava `summonReinforcement` SEM resolução foi reescrito, não apagado:**
+ele agora mede a metade que D2 manda preservar — quando a resolução falha, o Valor não é
+debitado —, pelo caminho que ainda pode falhar (blueprint ausente do catálogo).
+
+**Números:** 64 testes novos (58 no core: 7 de vampirismo, 11 de objeto de mapa, 12 de portão,
+12 de captura de Valor, 16 de invocação; 6 no data, travando o schema do tile depois de D3).
+Suíte: **92 arquivos, 1192 testes** (era 87/1128). `RULES_VERSION` `0.14.0` → **`0.15.0`**.
+`GOLDEN_HASH` **intacto** (`c3a404a0`) e `pnpm balance` idêntico ao baseline — 42,5%–59,9% com
+`spd` em 20,0%, os dois critérios de M8 batendo: o torneio e o replay canônico têm
+`lifesteal: 0` em todo stat sheet, nenhum mapa com `object` e nenhum `useValor`.
+
+**Pendências desta fatia, todas por desenho:** nenhum mapa de `packages/data` usa `wall`/`gate`
+ainda e nenhuma valor-skill do catálogo invoca — é exatamente o que D3 ("autore pelo menos um
+mapa usando os valores implementados") e D2 exigem da **sub-sessão 2/N**, e sem isso os quatro
+consumidores novos continuam sendo código sem conteúdo. O cliente ainda não desenha portão nem
+objetivo capturado, e não sabe que `openGateCoords` existe (3/N).
+
+### M15 — sub-sessão 2/N: o conteúdo que D2 e D3 exigem
+
+A fatia 1/N ligou quatro campos no motor. Esta autora o conteúdo que os exerce, que é o que
+separa "código com teste" de "código vivo" — o §7 do briefing chama um campo sem conteúdo de
+"código morto por outro nome". Escopo: `packages/data` + o repasse mínimo em `packages/core`
+que torna a invocação alcançável por quem monta batalha.
+
+**Decisão do usuário: a fortaleza do capítulo 6 vira alvenaria de verdade.** A pergunta foi
+feita porque a leitura mais forte REVERTE uma decisão registrada em M12 3/N. Estado medido
+antes de perguntar: a muralha do capítulo 6 era montanha, montanha custa 1 para `flying`
+(§5.1), e por isso a Sentinela Alada **sobrevoava a fortaleza** — M12 3/N escolheu isso de
+propósito ("a party não pode tratar a muralha como segurança"). `wall` barra quem voa; é
+metade da razão de ele existir ao lado de terreno impassável. O usuário escolheu a fortaleza
+de verdade, com a consequência aceita: aquele inimigo sai pelo portão como todo mundo, e o voo
+dele passa a valer no campo aberto. As outras duas opções (preservar o voo e pôr `wall` no
+capítulo 2; ou não autorar `wall`) ficaram registradas na pergunta.
+
+**A arena estava fora desde o começo, e foi verificado, não suposto:** `tools/balance` monta o
+torneio no primeiro mapa de arena (`runTournament.ts`, `firstArenaMap`), então mexer em
+`map-arena-coliseu` mudaria a matriz de winrate e a regra 10 exigiria rebalanceamento inteiro.
+
+**Uma decisão de regra saiu de uma MEDIÇÃO, não de gosto: o portão trancado
+(`GateOpensFor: 'none'`).** A primeira autoria deu o portão à guarnição (`opensFor: 'enemy'`),
+que é a leitura óbvia — quem mora no castelo tem a chave. O teste "a fortaleza nasce fechada"
+falhou na primeira execução: o portão já estava aberto **antes do primeiro comando do
+jogador**. A causa é a IA de mapa de §9.1 resolvendo turno inteiro de uma vez: ela anda até o
+portão e, sem ninguém ao alcance, cai em `wait` — que é justamente o comando que abre. Com
+isso a fortaleza destrancava no round 1 e a durabilidade virava decoração. `'none'` conserta
+sem IA nova (regra 6): a guarnição barrou a porta, ninguém tem a chave, os dois lados
+arrombam. Fica também a lição geral: **num portão com dono, o dono o abre imediatamente** —
+`opensFor` de um lado só serve para mapa onde aquele lado NÃO tem motivo de se aproximar.
+
+**A evidência de que o conteúdo é exercido, e não só validado:** o piloto automático de M12
+joga o capítulo 6 e o **Couraçado arromba o portão em 3 pancadas, no round 2** — a mesma
+unidade que o conteúdo descreve desde M12 como "quem aguenta o portão enquanto o resto entra".
+Nada disso foi roteirizado no piloto: ele anda em direção ao inimigo, descobre que não passa, e
+o `wait` de fallback é o que bate na porta. **O capítulo não ficou mais difícil, ficou mais
+longo:** medido contra a versão do último commit, antes 32 comandos / 5 rounds / 1 sobrevivente
+de 5; depois 41 comandos / 7 rounds / 1 sobrevivente de 5.
+
+**Registrado sem perguntar:**
+
+- **O piloto de teste aprendeu que portão é CAMINHO, muro não.** A rota dele (BFS de M12 3/N)
+  passou a pular `wall` e a **continuar atravessando `gate` fechado**: um portão é caminho que
+  custa abrir. Tratá-lo como parede faria o piloto dar a fortaleza por inalcançável e rondar a
+  muralha. Não precisou de regra nova para ele arrombar — andando até o portão, o
+  `computeReachableTiles` (que conhece o bloqueio de verdade) não devolve o tile, e o piloto
+  cai no `wait`, que é o comando que bate na porta. Derrubar a porta da frente é o piso do que
+  um humano faz, mesma justificativa que M12 3/N usou para ensiná-lo a contornar montanha.
+- **`toSummonBlueprintPlacements` mora em `packages/content`, não em cada chamador.** São TRÊS
+  que montam batalha a partir de heróis (cliente, servidor e o piloto) e a conversão é idêntica
+  nos três; duplicá-la é o risco que `buildBattleSetupFromHeroes` existe para evitar (§9.1:
+  "divergência = bug crítico"). Ela **falha alto** em blueprint com classe ou item ausente:
+  silenciar produziria uma invocação recusada no clique, e o jogador leria "Valor insuficiente"
+  onde o problema é um id errado num JSON.
+- **O servidor repassa os blueprints nas DUAS rotas que montam batalha** (arena e masmorra).
+  Não é simetria estética: o cliente joga e o servidor **reexecuta** para conferir (M13 2/N,
+  M14 3/N) — se um lado montasse com blueprints e o outro sem, uma invocação do jogador viraria
+  "comando inválido" na reexecução e derrubaria a run inteira. `tools/balance` fica de fora de
+  propósito: o torneio não passa nem `valorSkills`, porque não emite `useValor`.
+- **A invocação é a valor-skill mais cara do catálogo (custo 6).** Valor começa em 5 e rende +1
+  por round, então ela nunca sai no round 1 — a não ser depois de capturar um objetivo (+2, a
+  regra que 1/N implementou), que é o encaixe que faz as duas metades de §5.6 conversarem.
+- **O guarda do portão saiu de cima dele.** Ele nascia em (9,8), o vão que virou portão; um
+  tile bloqueado com unidade em cima é estado que o motor não valida e ninguém deveria autorar.
+  Virou invariante de conteúdo testada para TODOS os encounters, de campanha e de masmorra:
+  ninguém nasce sobre muro ou portão.
+- **O `object`/`gate` não sobrevivia ao gerador.** `authorCampaign.ts` montava o tile como
+  `{terrain, height}` e descartava o resto em silêncio — o primeiro mapa gerado saiu sem
+  muralha nenhuma. As chaves entram condicionalmente, porque `undefined` viraria `null` no JSON
+  e o schema recusaria.
+- **`MapContent` (`packages/content`) passou a usar o `Tile` do core** em vez de redeclarar
+  `{terrain, height}`: o loader sempre repassou os tiles por referência, então os campos novos
+  já sobreviviam em runtime, mas o tipo local afirmava o contrário.
+
+**Dois testes de M11/M12 foram reescritos, não apagados:** o que travava o payload solto de
+`summonReinforcement` (agora exige `blueprintId`) e o que afirmava que o catálogo cobria "os
+três kinds resolvidos" (agora são **quatro**, que é o critério de aceite 3 medido pelo lado do
+dado — não basta o motor resolver, tem de existir conteúdo exercendo cada kind).
+
+**Números:** conteúdo novo — 1 schema (`summon-blueprints`), 1 blueprint, 1 valor-skill de
+invocação, e o capítulo 6 reautorado (23 schemas, 124 arquivos validando). 19 testes novos
+(12 em `packages/data`, 7 em `packages/content`) + 1 no core (portão trancado). Suíte: **94
+arquivos, 1211 testes** (era 92/1192). `RULES_VERSION` `0.15.0` → **`0.16.0`** (só pelo modo
+`'none'`; o resto da fatia é aditivo). `pnpm balance` **idêntico** — 42,5%–59,9% com `spd` em
+20,0%, os dois critérios de M8 batendo.
+
+**Pendências para 3/N:** o cliente **não desenha** muro, portão nem objetivo capturado —
+`MapCanvas` pinta o tile pelo terreno, então a muralha do capítulo 6 aparece como planície
+pisável, o que é uma mentira visual sobre uma regra que já vale. É trabalho de cliente, que é a
+fatia 3/N, e não é linguagem visual nova (D4): é fazer o renderer existente parar de mentir.
+
+### M15 — sub-sessão 3/N: a tela de defesa de arena, e o mapa parando de mentir
+
+A fatia que fecha o critério de aceite 1 e é a razão de o milestone existir: `PUT /me/defense`
+existia desde M7 e `grep -rn "defense" apps/client/src` não retornava nada, então o jogador não
+conseguia definir quem defendia o castelo dele e o PvP assíncrono inteiro — ELO, matchmaking,
+replays, anti-cheat, fuzz de 1000 partidas — era inalcançável sem `curl`.
+
+**Uma rota nova no servidor, e ela é o que torna o critério verificável: `GET /me/defense`.**
+O `PUT` nunca teve par de leitura. Sem ele o cliente sabe o que acabou de enviar e nada mais —
+e "a defesa **persiste**", que é metade do critério de aceite, não seria demonstrável pela tela,
+só por inspeção do banco. Devolve **404 quando não há defesa montada**, e não um corpo vazio:
+"ainda não montei" é um estado diferente de "montei um time sem ninguém", e a tela precisa
+distinguir os dois para não oferecer "salvar" como se fosse "atualizar".
+
+**Registrado sem perguntar:**
+
+- **A tela impede os quatro erros do contrato antes de eles virarem requisição** (briefing §2),
+  e ainda assim trata a resposta de erro: teto de 5 heróis, `mapId` do catálogo, um herói por
+  tile, e — regra que só existe a partir de M15 — **nada de posicionar em muro, portão ou
+  terreno intransponível**. Esta última é importante e nova: o motor **não valida colocação
+  inicial**, então uma unidade posicionada dentro de uma parede nasceria presa e a batalha
+  começaria quebrada. Quem tem de recusar é a tela.
+- **A altura sai do TILE, nunca de um campo digitado.** Mesmo raciocínio de `move` no motor e da
+  autoria de mapa em M12: um número à mão criaria vantagem posicional (§5.5) que o terreno não
+  sustenta.
+- **Só mapas de arena são oferecidos** (`map-arena-*`). O servidor aceita qualquer `mapId` do
+  catálogo, mas o atacante nasce na borda esquerda por posição fixa desde M7, e um mapa de
+  campanha não foi desenhado para isso — ofereceria uma defesa em que o atacante pode nascer
+  dentro de uma floresta ou colado na muralha.
+- **Trocar de mapa zera as posições.** Uma coordenada de um mapa não significa nada em outro;
+  carregá-la adiante poria unidade fora do grid ou dentro de alvenaria.
+- **`savedDefense` e `defenseDraft` são estados separados.** Um é o que o servidor tem, o outro
+  é o que o jogador está montando. Sem a separação, a tela mostraria como persistido um
+  rascunho que nunca subiu — e o jogador iria dormir achando que trocou a defesa.
+- **A defesa é lida no login**, junto de `me`/`roster`: quem vai atacar precisa ver o que está
+  defendendo por ele antes de decidir.
+- **Os cinco arquétipos vêm TRADUZIDOS, com o que cada um faz** — "essa escolha é o conteúdo
+  tático da tela" (briefing §2), não detalhe de formulário: é a única coisa que o defensor
+  decide sobre uma batalha que ele não vai jogar. Mesma disciplina do editor de táticas de M6
+  5/N, que traduz `Condition` em vez de mostrar o nome do campo.
+
+**O mapa parou de mentir (a pendência que 2/N deixou registrada).** `MapCanvas` pintava o tile
+pelo TERRENO e mais nada, então a muralha do capítulo 6 aparecia como planície pisável — uma
+mentira visual sobre uma regra que já valia no motor desde 1/N. Agora:
+
+- **muro** é bloco maciço; **portão** são batentes dos dois lados, com uma **tranca
+  atravessada** quando fechado e só os batentes quando aberto. **A distinção é de FORMA, não de
+  cor** — é o que mantém a garantia de M13 4/N valendo com um objeto novo no mapa, e o que faz
+  muro, portão fechado e portão aberto continuarem distinguíveis em preto e branco. Uma única
+  cor entrou na paleta (`structure`), e ela **passou pelo teste de simulação de dicromacia** que
+  M13 4/N construiu, na paleta segura.
+- **tile de controle** (`fort`/`camp`) ganhou moldura na cor de objetivo, com um quadrado cheio
+  no canto quando já capturado. Sem isso o "+2 Valor ao capturar" de 1/N seria uma regra
+  invisível: o jogador não teria como saber que aquele tile paga, nem que já pagou.
+- **Dois pontos onde o cliente calculava alcance ignoravam os portões** e foram corrigidos: o
+  alcance de movimento (o cliente desenharia um tile que o `move` do core recusa) e o overlay de
+  ameaça (o jogador se acharia em perigo atrás de uma parede que o inimigo não pode cruzar).
+  Regra 3 na prática: o desenho tem de ser a MESMA conta que a validação.
+
+**A verificação é o ciclo de aceite inteiro, por CLIQUES no navegador** (Vite + servidor de dev
+em memória + Chromium, método de M9 3/4). O defensor conecta, **lê do servidor** a defesa que
+tinha, **tira os dois heróis e reposiciona os dois por clique** em (11,5) e (11,9), troca o
+arquétipo de um deles para "Guarda o tile", salva — a tela passa de "há mudanças não salvas"
+para "igual ao rascunho". **Recarrega a página**, reconecta, e posições e arquétipo voltam do
+servidor. Então o **segundo jogador** conecta, acha esse oponente, inicia a batalha — e a lista
+de iniciativa traz exatamente os dois heróis que o cliente do defensor posicionou —, joga até o
+desfecho, **submete, e o servidor decide**: derrota em 9 rounds, ELO 1200→1184 (defensor 1216),
+3 marcas. Por fim o **replay vem do servidor** e abre no passo 0 de 12. **Nenhum `curl` em
+nenhum momento.** Erros de console: **um só, provocado de propósito** — o 404 de
+`GET /me/defense` do atacante, que nunca montou defesa (o navegador registra todo fetch com
+status de erro). Mesma disciplina de M14 5/N: o roteiro afirma qual é o erro esperado em vez de
+exigir zero e fingir que não existe.
+
+**Números:** 16 testes novos (12 no cliente, travando as recusas do rascunho que o roteiro de
+navegador não prova de forma barata; 4 no servidor, para `GET /me/defense` — 401, 404 de quem
+nunca montou, devolve o que o PUT salvou, e cada jogador lê a própria). Suíte: **95 arquivos,
+1227 testes** (era 94/1211). `RULES_VERSION` **não subiu** (segue `0.16.0`): esta fatia não tem
+uma linha de regra — é tela, rede e desenho. `packages/core` só ganhou os exports que o cliente
+consome.
+
+**Pendência para 4/N:** `pnpm balance` reexecutado e o fechamento do milestone. O ciclo de aceite
+já foi medido aqui; falta consolidar os quatro critérios com a saída de cada comando.
+
+### M15 — sub-sessão 4/N: balanceamento e aceite (fecha M15)
+
+**O briefing (§5.4) avisava que "`lifesteal` e invocação mudam winrate, então os dois critérios
+de M8 precisam ser reconfirmados, não assumidos".** Reconfirmados: `pnpm balance -- --runs
+10000` devolve **42,5%–59,9%** com `spd` em **20,0%** das builds vencedoras — nenhuma
+composição acima de 65%, e a concentração de `spd` bem abaixo do teto de 60% de §6.7.
+
+**A matriz saiu idêntica ao baseline de M12 2/N, e a medição mostra POR QUE — que é mais
+importante do que o número:**
+
+- **Nenhum item, set, classe, comp ou tabela de substat do catálogo concede `lifesteal`.**
+  Verificado por varredura, não presumido: `grep -rn "lifesteal" items/ item-sets/ classes/
+  comps/ substat-weights/ mainstat-weights/` não devolve **nenhuma** ocorrência. O set
+  "Vampiro" que §7.4 especifica (`+20% lifesteal`, 4 peças) **nunca foi autorado** — os seis
+  sets do catálogo são Duelista, Força, Guardião, Imunidade, Reserva e Sentinela. Como o stat é
+  zero em todo stat sheet do torneio, o vampirismo é matematicamente incapaz de mover a matriz.
+- **O torneio não emite `useValor`.** O Modo 2/Coliseu resolve com `commands: []` e os dois
+  lados 100% IA (`runTournament.ts`), então nenhuma invocação acontece — e `buildBattleSetupFromHeroes`
+  no torneio nem recebe `valorSkills`, o que já era verdade desde M12.
+
+**Consequência registrada como pendência, não corrigida aqui:** `lifesteal` está **vivo no
+motor e ausente do conteúdo**. Autorar o set Vampiro fecharia o vão, e seria a mesma jogada que
+2/N fez por `wall`/`gate`/invocação — mas o **§7 do briefing proíbe explicitamente**: "nenhuma
+expansão de conteúdo além do mínimo que D2 e D3 exigem", e D1 (lifesteal) não pede conteúdo.
+Autorar por conta própria seria decidir escopo no lugar de quem escreveu o briefing. Fica
+declarado: quem for autorar equipamento a seguir tem um stat implementado, testado e sem
+consumidor esperando.
+
+**Os quatro critérios de aceite, um a um, com o que prova cada um:**
+
+1. **"Um jogador monta a defesa pelo cliente, ela persiste, e um segundo jogador a enfrenta e vê
+   o replay — sem nenhum `curl`."** Roteiro de navegador de 3/N (Vite + servidor de dev em
+   memória + Chromium): defesa lida do servidor, refeita por cliques em (11,5)/(11,9) com
+   arquétipo "Guarda o tile", salva, **página recarregada**, tudo de volta do servidor; segundo
+   jogador acha o oponente, a lista de iniciativa traz exatamente aqueles dois heróis, joga,
+   submete, servidor decide (derrota em 9 rounds, ELO 1200→1184, 3 marcas), replay buscado do
+   servidor. Testes de apoio: `apps/client/tests/arenaDefense.test.ts` (12) e o bloco
+   `GET /me/defense` em `apps/server/tests/battles.test.ts` (4).
+2. **"`lifesteal` altera HP em teste determinístico."**
+   `packages/core/tests/duel/lifesteal.test.ts`, 7 testes — entre eles a prova de que a cura é
+   fração do dano **efetivamente aplicado** (alvo com 1 HP e golpe de milhares cura 1) e a de
+   que o dano recebido pelo alvo **não muda** com o vampirismo ligado, o que também prova que
+   nenhum stream de RNG foi deslocado.
+3. **"Nenhum `kind` de valor-skill rejeita por falta de implementação."** Provado nas três
+   camadas: motor (`summon.test.ts` → "`summonReinforcement` não devolve mais 'sem
+   resolução'"), dado (`validate.test.ts` → "o catálogo real cobre os quatro kinds de §5.6,
+   todos com resolução" — não basta o motor resolver, tem de existir conteúdo exercendo cada
+   um) e conteúdo real (`m15Conteudo.test.ts` → invocar de verdade a partir do catálogo põe uma
+   unidade jogável no mapa, com perfil de combate resolvido e lugar na iniciativa).
+4. **"`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm validate:data` verdes; `pnpm balance`
+   com os dois critérios de M8."** 95 arquivos / 1227 testes, 7 pacotes limpos, 23 schemas /
+   124 arquivos, e a matriz acima.
+
+**Correção de registro, exigida pelo §3 do briefing** ("corrija a linha de `PROGRESS.md` sobre
+`Tile.object` ao fim do milestone — ela está errada hoje e vai enganar a próxima sessão"): a
+linha de M14 que listava `Tile.object` sem leitor, `lifesteal` inerte, `summonReinforcement` sem
+resolução, "+2 Valor" sem onde acontecer e `PUT /me/defense` sem tela foi marcada como
+**histórica**, com a nota de que as cinco caíram em M15 e de que a de `Tile.object` já estava
+mal descrita quando foi escrita.
+
+**Um artefato visual pré-existente que a fortaleza tornou visível, registrado para M16:** o
+padrão de hachura do overlay de ameaça (M13 4/N) desenha linhas diagonais que **transbordam o
+tile**, e em cima de uma parede de 7 tiles isso mancha a alvenaria vizinha. Não é regressão de
+M15 — é o desenho da hachura, que existe desde M13 e só não incomodava sem estrutura no mapa.
+Candidato natural à milestone que trata apresentação como sistema.
+
+**Um flake achado ao fechar o milestone, e ele nasceu em M14, não aqui.** A execução final de
+`pnpm test` falhou em `apps/server/tests/economy.test.ts` depois de três execuções verdes.
+Medido antes de concluir qualquer coisa: **1 em 8 execuções**. A causa não é regressão de M15 —
+nenhuma masmorra usa `map-campanha-6`, o único mapa que 2/N alterou — e sim que o nonce do
+ticket vira a **seed da batalha** (`deriveSeed`) e `generateNonce` é `crypto.randomUUID`: um
+teste que afirma "este time vence esta masmorra" jogava uma partida diferente a cada execução,
+e a elite é dura de propósito (§10).
+
+A correção usa a costura que o próprio arquivo já tinha para o relógio: `newNonce?: () =>
+string` injetável em `EconomyRoutesOptions`/`BuildAppDeps`, com default `generateNonce` — em
+produção continua aleatório, no teste vira contador. **Consertar a aleatoriedade expôs a
+pergunta que ela escondia:** com a primeira seed fixa o time de referência PERDE a elite. O
+prefixo do nonce é, portanto, **fixture escolhida e declarada no código**, não sorteada: estes
+testes são sobre o fluxo de recompensa, não sobre dificuldade, e a elite é marginal por
+desenho. Fica escrito lá que trocar o prefixo troca a partida, e que um teste voltando a falhar
+pede investigação do motor antes de troca de string. Depois da correção: **5 execuções seguidas
+do arquivo e 3 da suíte inteira, todas verdes**.
+
+Vale o registro de processo: um portão de aceite que falha 1 em 8 é pior que um bug conhecido,
+porque corrói a confiança em toda afirmação de "suíte verde" — inclusive as dos milestones
+anteriores que rodaram com ele.
+
+`RULES_VERSION` **não subiu** nesta fatia (segue `0.16.0`): não há uma linha de regra aqui — a
+costura do nonce é injeção de teste, com o comportamento de produção intacto.
+
+### Auditoria 2026-08-15 — aceite do M15 e briefing do M16
+
+Sessão de auditoria, sem código. Mesmo papel dividido: a auditoria verifica e requisita, um
+agente separado implementa.
+
+**M15 auditado contra o briefing, no código e não no relato — os 4 critérios batem.**
+`ArenaDefensePanel.tsx` existe e consome o endpoint (mais `GET /me/defense`, rota nova que o
+implementador acrescentou com razão: o `PUT` de M7 nunca teve par de leitura, e sem ele "a
+defesa persiste" não seria demonstrável pela tela); `lifesteal` tem consumidor em
+`resolveDuel.ts:303-315`, no ponto único por onde dano vira HP e sobre o dano efetivamente
+aplicado (D1 respeitada); `summonReinforcement` resolve a partir de `payload.blueprintId` com
+conteúdo em `packages/data/summon-blueprints/` (D2 respeitada); `chest` saiu do tipo,
+`TILE_OBJECTS` fechou em 4, `wall`/`gate` são lidos no pathfinding **e usados em conteúdo real**
+(23 muros e 1 portão no capítulo 6) — D3 cumprida além do pedido, com o requisito de portão que
+o usuário acrescentou. Suíte **95 arquivos / 1227 testes** verde, `RULES_VERSION` em `0.16.0`,
+`pnpm balance` idêntico ao baseline (42,5%–59,9%, `spd` 20,0%). A correção de registro que o §3
+do briefing exigia foi feita, inclusive reconhecendo que a nota do `Tile.object` já estava
+errada quando foi escrita.
+
+**Briefing do M16 escrito** (`docs/milestones/M16-linguagem-visual-programatica.md`), seguindo
+o método de 2026-08-07 — detalhe só quando o milestone vira o próximo. A direção de arte não
+foi reaberta; ela está decidida na Auditoria 2026-08-14 e o briefing só a operacionaliza.
+
+**Estado gráfico auditado:** `MapCanvas.tsx` tem 414 linhas de `g.rect()` e `g.circle()`, zero
+arquivos de imagem no repositório, e **uma unidade é um círculo com rótulo de texto** — 10
+classes, 5 tipos de unidade e 7 tipos de arma não aparecem na tela. Essa é a deficiência
+central que M16 ataca.
+
+**Achado que barateia M16, mesmo padrão de M9 e da correção de M13 4/N:** metade da fundação já
+existe e uma frente nova a refaria. `overlayTheme.ts` já é sistema de tokens maduro (duas
+paletas trocáveis, `TilePatternKind`, `UnitShape`, rampa de luminância, Okabe–Ito);
+`meaningfulColors()` já é um **registro auditado por teste de dicromacia**, com a trava
+declarada no próprio arquivo ("se um overlay novo entrar no mapa sem entrar aqui, ele escapa da
+verificação"), o que dá a M16 um critério de acessibilidade executável de graça; e
+`drawUnitShape` (`MapCanvas.tsx:111`) **já é a costura trocável em forma embrionária** — o
+aceite pede a generalização dela, não uma abstração paralela.
+
+**D4 registrada como regra de processo, e é a mais importante do briefing:** o agente não julga
+estética. Vem da limitação de fonte primária levantada em 2026-08-14 (o LLM não avalia o
+próprio resultado visual). Loop obrigatório: implementa → roda o cliente → screenshot → corrige
+o objetivamente errado → **o usuário julga o gosto**. M16 é o único milestone do projeto cujo
+aceite não é demonstrável por texto, então screenshot é parte da prova, não ilustração.
+
+**Risco de processo reaberto e agravado.** A auditoria de 2026-08-07 levantou o repositório sem
+histórico; a reconstrução aconteceu (24 commits). Desde então voltou a acumular: `git log`
+parado em `6100fd0`, **102 caminhos não-commitados, M13 + M14 + M15 os três fora do histórico,
+e `git remote -v` ainda vazio**. Era 1 milestone em risco em agosto; são 3 agora. Registrado
+como Parte 0 do briefing de M16.
+
+Nenhuma mudança de código nesta sessão — só a auditoria de aceite, o briefing de M16 e a
+atualização de `PROGRESS.md`.
+
+## M16 — Linguagem visual programática
+
+### M16 — sub-sessão 1/N: a costura e o teste que trava a direção de arte
+
+**Briefing escrito antes de uma linha de código**: `docs/milestones/M16-linguagem-visual-programatica.md`,
+seguindo o método de 2026-08-07 (briefing quando o milestone vira o próximo). Ele registra as
+cinco decisões que as fatias seguintes não devem reabrir — D1 glifo no cliente, D2 costura que
+descreve em vez de desenhar, D3 segunda implementação como renderer alternativo de verdade, D4
+nenhuma regra muda, D5 escopo é o tabuleiro e não os 13 painéis de HTML — e a **regra de
+processo** que a auditoria fixou: o agente gera, tira screenshot e corrige o que é objetivamente
+ilegível; **o gosto é do usuário, e o agente nunca autocertifica estética**.
+
+**Esta fatia não muda um pixel — e isso foi MEDIDO, não afirmado.** Screenshot do capítulo 6 nas
+duas paletas antes e depois da refatoração: **idênticos byte a byte** (`md5` igual nos dois
+arquivos). É a evidência que uma extração de costura deveria sempre trazer e quase nunca traz.
+
+**O que entrou:**
+
+- **`data/unitRenderer.ts` — a costura.** Um `UnitRenderer` recebe estado + geometria + tokens e
+  devolve uma **lista de primitivas** (`circle`/`rect`/`text`), dado puro e serializável, sem uma
+  referência a Pixi. Quem traduz primitiva em `Graphics` é o `MapCanvas`, num ponto só
+  (`paintUnitPrimitives`). Três coisas saem dessa inversão e nenhuma sairia com o desenho
+  embutido no componente: a representação vira testável **sem browser e sem Pixi**; dá para
+  AFIRMAR propriedades sobre o desenho em vez de olhar um screenshot e torcer; e uma camada de
+  sprite pode entrar por cima trocando a implementação — o hedge que a auditoria exigiu.
+- **`shapeUnitRenderer`**: o desenho de M6–M15 extraído tal como estava, número por número.
+- **`minimalUnitRenderer`**: a segunda implementação (D3), só retângulos e texto, **sem círculo
+  nenhum**, distinguindo os dois lados por forma (o inimigo leva um entalhe) e não por cor.
+- **O teste de contrato roda os DOIS pelo mesmo conjunto de asserções**, e é aí que o critério de
+  aceite 4 vira verificável: ambos desenham algo, ambos põem o rótulo de AP/PP no tile (§11 —
+  "legíveis sem hover"), **nada transborda o tile** (uma unidade não invade o vizinho, senão a
+  leitura do tabuleiro passaria a depender da ordem de desenho), os dois lados se distinguem sem
+  depender de cor sob a paleta segura, **cada estado tem marca própria** (neutro, selecionada,
+  engajável e "já agiu" produzem quatro saídas distintas entre si, não só distintas do neutro), a
+  função é pura, e o rótulo acompanha a escala de UI de M13 4/N.
+- **`semAssetsRaster.test.ts` — o critério de aceite 1 vira regra.** Hoje o repositório tem zero
+  arquivos de imagem, medido antes de começar. O valor do teste não é constatar isso: é
+  transformar "está zero" em "continua zero", porque a forma provável de a direção de arte se
+  perder não é uma decisão explícita de mudar de rumo, é um `.png` entrando junto de um commit
+  que fazia outra coisa. **Base64 embutido em código conta como asset** e é varrido também — é o
+  mesmo arquivo com outro nome, e escaparia de uma busca por extensão. O terceiro teste do
+  arquivo existe para o segundo não ser vacuamente verdadeiro: ele afirma que a varredura de
+  fato enxerga os arquivos do cliente.
+
+**Uma coisa do meu plano ficou de fora, de propósito, e é melhor dizer do que deixar passar:**
+generalizar `overlayTheme.ts` em tokens. Ela estava na lista aprovada, mas fazê-la agora seria
+inventar estrutura sem consumidor — exatamente o antipadrão que M10, M11 e M15 passaram o
+projeto inteiro corrigindo ("campo declarado sem quem leia"). Os tokens que 2/N vai precisar
+(métrica de glifo, espessura de traço, raio) só ficam definidos quando existir um glifo. Fica
+para 2/N, junto de quem os use.
+
+**17 testes novos** (14 de contrato — 7 asserções × 2 renderers — e 3 de assets) mais 3 no
+arquivo de assets. Suíte: **97 arquivos, 1247 testes** (era 95/1227). `RULES_VERSION` **não
+subiu** e não sobe em M16 (D4): `packages/core` e `packages/data` não têm uma linha alterada.
+
+### M16 — sub-sessão 2/N: a linguagem visual
+
+O que o briefing (§5.2) reservou para esta fatia: **glifo por classe, terreno e legibilidade de
+estado**. Tudo em `apps/client`; `packages/core` e `packages/data` não têm uma linha alterada
+(D4), e `RULES_VERSION` não subiu.
+
+**Uma decisão de resolução que a fatia teve de tomar, porque D1 sozinho não a cobria.** D1 diz
+que o glifo mora no cliente, mas não diz de onde o cliente tira a classe — e `BattleUnit` (core)
+**não carrega `classId`**, com D4 proibindo acrescentá-lo. Resolução adotada, em três níveis:
+
+1. **por `classId`**, quando quem monta a batalha sabe a classe (a campanha sabe, via
+   `heroesByUnitId`). É o único nível capaz de separar **Espadachim de Mestre-Espadachim** — os
+   dois são `infantry`/`sword`, nenhum campo de `BattleUnit` os distingue, e os dois aparecem no
+   capítulo 6 ao mesmo tempo. Sem este nível, a promoção seria invisível no tabuleiro;
+2. **por PERFIL** (`unitType`, depois `weaponType`), campos que TODO `BattleUnit` carrega. É o
+   que impede que PvP, masmorra e replay — cujo `BattleSetup` vem pronto do servidor, sem classe
+   — virem um tabuleiro inteiro do mesmo boneco genérico. `unitType` vem antes porque o que faz
+   um Couraçado ser Couraçado é a armadura, não o machado;
+3. **o fallback declarado**, para o que escapar dos dois.
+
+O nível 1 é aplicado **só em `mode === 'campaign'`**: fora dela um `unitId` que por acaso
+coincidisse daria a classe ERRADA, que é pior que cair no perfil.
+
+**HP no tile entrou por decisão do usuário**, perguntada porque o briefing enumera a
+legibilidade de estado como "AP/PP, efeitos ativos, quem já agiu, ameaça, objetivo" e HP não
+está na lista. O argumento aceito: §1.1 põe "o jogador DEVE conseguir prever o resultado antes
+de confirmar" entre os pilares, e a decisão de engajar acontece olhando o tabuleiro — uma
+unidade a 5% de HP desenhada igual a uma cheia esconde exatamente o dado que decide.
+
+**O que entrou:**
+
+- **`data/shapes.ts` — o vocabulário.** Duas camadas: `NormShape` (forma em espaço normalizado
+  0..1, o que um glifo ou uma marca DECLARA) e `Primitive` (a mesma forma já posicionada em
+  pixels, com tinta, o que os renderers DEVOLVEM). `placeShapes` é o único ponto do cliente que
+  converte um no outro, então "o desenho escala com a UI" virou propriedade de uma função em vez
+  de promessa espalhada. `Primitive` ganhou `poly` — sem polilinha não há arco de arco nem asa.
+- **`data/classGlyphs.ts` — os 10 glifos** (espada, espadas cruzadas, machado, escudo, lança,
+  asa, arco, estrela, cruz, folha), mais os de perfil e o fallback. Completude no estilo de M9
+  contra o catálogo real, **nos dois sentidos**: nenhuma classe sem glifo e nenhum glifo órfão —
+  um glifo órfão é sinal de classe renomeada, e classe renomeada perde o desenho em silêncio.
+- **`data/terrainMarks.ts` — a marca de terreno.** Terreno é REGRA (floresta dá +100 de def e
+  bloqueia visão; montanha é intransponível a pé), e cor chapada obrigava o jogador a ter
+  decorado a paleta. **As marcas vivem nas bordas do tile**, com o miolo (0.3–0.7 nos dois
+  eixos) declarado faixa proibida por teste: o miolo é onde a unidade é desenhada, e textura por
+  baixo dela não some — vira sujeira em volta do glifo.
+- **`data/tilePatterns.ts` — os padrões extraídos, e a correção do transbordo.** A pendência
+  registrada no fecho de M15 ("a hachura de ameaça transborda o tile e mancha a alvenaria
+  vizinha") virou uma asserção de uma linha assim que a geometria saiu de dentro de uma chamada
+  de Pixi. As diagonais são **recortadas** (Liang–Barsky) contra o tile **encolhido de meia
+  espessura de traço** — traço é centrado na linha, e foi essa meia espessura que vazava.
+  Recorte na fonte e não `mask` de Pixi, porque máscara conserta o pixel e deixa o teste cego.
+  **A trava pegou o meu próprio desenho na primeira execução** (grid e frame vazavam nas escalas
+  maiores), que é o melhor argumento a favor de tê-la escrito antes.
+- **Os tokens em `overlayTheme.ts`** — a peça que 1/N deixou de fora por falta de consumidor,
+  agora junto de quem a usa. Tudo que é medida em fração do tile, nunca em pixel, porque §11 vai
+  de 100% a 175%. **`terrainMarkInkFor` escolhe a tinta da marca pela luminância do terreno**:
+  os três terrenos ocupam uma rampa de luminância de propósito (foi assim que M13 4/N os separou
+  sob dicromacia) e a consequência é que **nenhuma tinta única contrasta com os três** — escura
+  some na floresta, clara some na planície. Cor por terreno voltaria a pôr significado na matiz,
+  que é o que a paleta segura evita.
+- **`unitRenderer.ts`** — corpo + glifo + pips de efeito + faixa de HP + rótulo. Buff e debuff se
+  separam por **forma** (triângulo para cima contra para baixo) e **posição** (canto superior
+  direito contra inferior esquerdo); HP crítico ganha **entalhe próprio** encostado na barra,
+  porque em deuteranopia a barra vermelha e a verde podem virar o mesmo tom e sobraria só o
+  comprimento — que sozinho não avisa que a unidade morre no próximo golpe.
+- **O "fantasma" da animação passa pela mesma costura.** Antes ele desenhava o disco cru; com
+  glifo, a unidade perderia a identidade justamente enquanto anda, que é quando o jogador está
+  olhando para ela. A montagem da entrada do renderer virou uma função só, usada pelos dois
+  pontos.
+
+**A regra de processo (§3 do briefing) produziu uma correção de verdade, e é o registro mais
+importante desta entrada.** O primeiro screenshot mostrou o número de AP/PP **caindo em cima do
+glifo**: os dois viravam um borrão, e branco sobre o azul claro do jogador já tinha pouco
+contraste desde M6. Correção: **plaqueta opaca** atrás do rótulo, `glyphBoxRatio` de 0.46 para
+0.40 e `glyphOffsetY` de 0.06 para 0.085, de modo que o glifo **comece abaixo da plaqueta** em
+vez de passar por baixo dela. Os dois invariantes viraram teste (um de paleta, nas duas escalas
+extremas de §11, e um de contrato) — foi um defeito **visto**, não previsto, e travá-lo é o que
+impede que um ajuste futuro de token o traga de volta em silêncio.
+
+**O contrato de `UnitRenderer` cresceu, e os dois renderers continuam passando pelo mesmo.** As
+asserções novas exigem o RESULTADO e não a técnica: "dá para saber a classe olhando", "buff e
+debuff têm marca própria", "cheia e quase morta não se desenham igual". O de produção resolve
+identidade por **glifo vetorial**; o alternativo (D3), por **rótulo em texto**, sem um `poly` e
+sem um círculo. Os dois passam — e é exatamente essa folga que faz a costura valer alguma coisa.
+Um contrato amarrado a glifo teria tornado o renderer alternativo impossível, e "trocável" seria
+só uma palavra.
+
+**Verificação em navegador** (o que o agente pode afirmar sozinho, §3): glifos distinguíveis
+entre si nas duas paletas com as 10 classes do capítulo 6; plaqueta legível; marca de terreno
+visível sem competir com a peça; **hachura de ameaça parando na borda do tile, com a alvenaria
+limpa** (a pendência de M15, resolvida); barra de HP encurtando e trocando de cor numa unidade
+ferida em jogo, com pip de debuff aparecendo. **O critério de aceite 2 continua aberto: quem
+julga o gosto é o usuário.**
+
+**62 testes novos** (3 arquivos novos — `classGlyphs` 14, `terrainMarks` 9, `tilePatterns` 16 —
+mais o contrato de unidade de 14 para 34 e a paleta de 11 para 15). A simulação de dicromacia de
+M13 4/N saiu para `tests/support/dicromacia.ts` **sem uma conta mudar**, porque o critério 3
+exige que a tinta NOVA (glifo sobre o corpo, marca sobre o terreno) seja medida pelo MESMO
+método — três cópias das matrizes seriam três cópias divergindo em silêncio. Suíte: **100
+arquivos, 1309 testes** (era 97/1247).
+
+### M16 — sub-sessão 3/N: animação com peso
+
+O que o briefing (§5.3) reservou para esta fatia: **animação com peso** e o fechamento —
+reverificação da garantia de daltonismo e validação no browser. Tudo em `apps/client`;
+`packages/core` e `packages/data` **não têm uma linha alterada** (D4) e `RULES_VERSION` segue
+`0.16.0`.
+
+**A decisão estrutural: a mesma inversão do D2, aplicada ao TEMPO.** `data/motion.ts` **descreve**
+o movimento e não anima — uma `Motion` é função pura de tempo decorrido para deslocamento, escala e
+opacidade, e quem tem relógio (o `Ticker` do Pixi) é o `MapCanvas`, num ponto só. O motivo não é
+simetria arquitetural: é que **movimento é a coisa que menos se deixa julgar por screenshot**. Um
+quadro parado mostra a peça em algum lugar; ele não mostra se ela acelerou, se recuou antes de bater
+ou se parou seca no destino. Com a descrição separada do relógio, "com peso" vira asserção:
+
+- **a velocidade tem pico no meio do percurso** — medida por diferença finita, mais que o dobro da
+  largada e da chegada. Com interpolação linear (o que o cliente fazia desde M6) as três seriam
+  iguais, e é exatamente essa a diferença que o milestone pede;
+- **o golpe recua antes de avançar**, e a antecipação é uma quantidade com sinal, não um adjetivo;
+- **toda animação termina exatamente onde o core diz** — uma deriva de meio pixel entre o último
+  quadro e o commit produz um salto no quadro em que o jogador está olhando;
+- **o pesado é pesado:** o couraçado demora mais, recua mais fundo, assenta mais forte e **treme
+  menos** ao apanhar que o grifeiro. Se os cinco perfis fossem o mesmo número com nomes diferentes,
+  a fatia teria animação sem peso. A tabela cobre os 5 `UnitType` com completude nos dois sentidos
+  (estilo M9), incluindo `cavalry`, que não tem classe no catálogo de hoje: sem a entrada, a
+  primeira classe montada andaria com o peso do fallback em silêncio.
+
+**Duas decisões do usuário, perguntadas antes de codar** (o briefing não cobre nenhuma das duas):
+
+1. **Número de dano flutuante entra.** §11 não o pede e o preview de duelo já narra troca a troca,
+   mas sem ele a batida diz que doeu e não diz quanto — e a decisão de engajar de novo acontece
+   olhando o tabuleiro. Entrou **sem gastar uma cor nova**: branco com contorno na tinta da plaqueta
+   de AP/PP. A matiz do mapa está toda ocupada com significado desde M13 4/N (ameaça, movimento,
+   mira, objetivo, os dois lados), e pintar o dano de vermelho colidiria com a ameaça sob
+   deuteranopia — num número que voa por cima de qualquer tile. O que o número precisa dizer está
+   escrito nele; o que o separa do rótulo fixo é posição e movimento.
+2. **Os turnos da IA inimiga ficam de fora**, registrados como pendência. `applyCommandAndAdvance`
+   resolve o turno inteiro por dentro e os inimigos teletransportam — é a maior lacuna de leitura
+   que sobra no tabuleiro, e animá-la exige diffar dois estados e reconstruir os caminhos que a IA
+   andou. É fatia própria; enfiá-la aqui seria o alargamento que o briefing evita.
+
+**A morte entrou junto, e não é enfeite:** até esta fatia a unidade morta simplesmente desaparecia
+no quadro em que o duelo era commitado, e o jogador via o tabuleiro com uma peça a menos e tinha de
+deduzir qual. §1.1 põe legibilidade tática entre os pilares, e quem caiu é a informação que decide o
+turno seguinte.
+
+**A coreografia LÊ o log, não decide nada.** O duelo já aconteceu inteiro no core antes do primeiro
+quadro (§6: até 3 trocas resolvidas de uma vez). `duelBeats` transforma o `DuelResult` em batidas na
+ordem cronológica, com a reação vindo **depois** do golpe que a disparou e **no sentido inverso**
+(§6.4 — desenhá-la no mesmo sentido faria o contra-ataque parecer parte do ataque). Ação que não
+causou dano não vira batida: sacudir a peça num golpe que a evasão de `spd` fez errar seria a
+animação afirmando o contrário do que o core decidiu.
+
+**§11 — "modo resultado instantâneo (pula animações)" virou propriedade do módulo puro.** `instantly`
+devolve a mesma animação com duração zero e já no estado final, o que dá ao teste como afirmar que
+**pular e assistir até o fim terminam no mesmo lugar**. Um `if` espalhado pelo componente não teria
+como provar isso. Medido também em navegador: do "Confirmar" ao "Vitória!" em **3225 ms** com
+animação e **392 ms** com o modo ligado.
+
+**A regra de processo (§3 do briefing) pegou TRÊS defeitos, e os três são do tipo que nenhum
+teste desta fatia pegaria — dois vivem na costura entre a descrição pura e o relógio, e o terceiro
+só existe no encontro entre duas coisas que, separadas, passam em todos os testes:**
+
+- **o overlay de "Vitória!" cobria o golpe que venceu a batalha.** O estado é commitado no primeiro
+  quadro da animação (é dele que a animação sai), então o desfecho aparecia imediatamente e a
+  sequência inteira rodava atrás de um modal. Verificado matando o último inimigo do capítulo 1.
+  Correção: `boardAnimating` no store, escrito só por quem desenha e com **um consumidor só** — o
+  overlay espera o tabuleiro terminar de contar. Não vai para o save (não é progresso);
+- **a peça sumia por alguns quadros no fim de todo movimento.** O fim da sequência apagava a camada
+  de FX, mas o `redraw()` do tabuleiro só acontece no efeito que reage ao commit — e no meio disso o
+  tabuleiro estava desenhado *sem* a unidade (ela seguia escondida) e a camada de FX já vazia.
+  Correção: o último quadro **fica** na tela até o `redraw()` seguinte apagá-lo, o que é seguro
+  justamente porque a animação termina exatamente no destino (propriedade já travada em teste);
+- **o número de dano subia atravessando a plaqueta de AP/PP.** Ele nascia no centro do tile e
+  subia quase uma altura de tile — passando exatamente por cima da plaqueta opaca do canto
+  superior esquerdo, e os dois viravam um borrão. É **o mesmo defeito que 2/N corrigiu entre o
+  número e o glifo**, reaparecendo entre duas peças que, isoladas, passam em todos os testes: a
+  plaqueta tem teste de posição, o número tem teste de curva, e nenhum dos dois sabe do outro.
+  Correção: o número nasce **acima** do tile do alvo (o espaço livre mais próximo da pancada, e
+  onde todo jogo de tática o põe) com a subida encurtada de 0.9 para 0.55 do tile, de modo que a
+  excursão total continue a mesma. A lição que 2/N já tinha dado e esta fatia repetiu: **num tile
+  de 36 px, tudo que é desenhado disputa espaço com tudo, e o encontro só aparece rodando.**
+
+**Verificação em navegador** (o que o agente pode afirmar sozinho, §3): as três sequências gravadas
+do cliente em execução, quadro a quadro, nas duas paletas, com os tempos originais — movimento,
+duelo com números de dano e contra-ataque, e a morte desabando antes do desfecho. Zero erro de
+console em todas as execuções. Mais a passagem para julgamento do **critério 2**, montada a pedido
+do usuário: capítulo 6 nas duas paletas em 100% (o tamanho real de leitura) e em 175% (a maior
+escala que §11 oferece), com as sete classes em tela, a alvenaria, o portão trancado e o alcance de
+movimento sobre o véu de ameaça; o estado de batalha durante um duelo (plaqueta, barra de HP
+encurtando, número, véu de "já agiu", a peça morta desabando); e as animações em velocidade real.
+**O critério de aceite 2 continua aberto: quem julga o gosto é o usuário.**
+
+**49 testes novos** (`motion.test.ts` com 31, mais 3 de reverificação de dicromacia levando a paleta
+de 15 para 18). O critério 3 foi reverificado do jeito que o texto dele exige — "reverificada, não
+assumida" — e a pergunta certa não era "mudei a paleta?" e sim **"entrou tinta nova sem passar pela
+medição?"**: o registro de `meaningfulColors` está **congelado por teste**, e o contorno do número de
+dano é medido contra todo terreno, contra a estrutura e contra os dois lados, sob deuteranopia e
+protanopia. Suíte: **101 arquivos, 1343 testes** (era 100/1309).
+
+
+### M16 — sub-sessão 4/N: os turnos da IA parando de teletransportar
+
+O que o briefing (§5) NÃO reservou para nenhuma fatia, e 3/N registrou como pendência própria:
+os turnos da IA inimiga não eram animados. `applyCommandAndAdvance` drenava o turno inteiro por
+dentro e devolvia só o estado final, então o jogador confirmava a jogada dele, o tabuleiro
+piscava, e os inimigos estavam noutros tiles — sem percurso, sem duelo na tela, às vezes com uma
+peça a menos e sem dizer qual. Medido no capítulo 4 ao fechar esta fatia: **um turno de IA que
+agora leva 9,3 s acontecia em UM quadro**, e nele quatro inimigos andaram, quatro duelos
+resolveram, dois heróis morreram e um inimigo caiu. §1.1 põe legibilidade tática entre os
+pilares, e a ameaça do round seguinte se decide olhando exatamente por onde o inimigo veio.
+
+**A decisão da fatia, perguntada antes de codar: D4 foi aberto para uma adição SEM regra.** O
+cliente não tinha como saber o que a IA fez — o relato era descartado dentro de
+`resolveAiTurns`. As três saídas foram postas na mesa com o custo de cada uma, e o usuário
+escolheu a primeira:
+
+1. **`resolveAiTurnsLogged` (escolhida).** A função passa a devolver, junto do estado, os passos
+   que aplicou: o comando, o estado imediatamente ANTES dele e o `DuelResult` quando o comando
+   foi um `engage`. `resolveAiTurns` vira essa função com o relato jogado fora, e as duas
+   devolvem exatamente o mesmo estado (travado por teste). **Nenhuma regra muda e
+   `RULES_VERSION` fica em `0.16.0`** — o texto de D4 é "nenhuma regra muda em M16", e relatar
+   não é decidir. Quem não quer o relato chama `resolveAiTurns` e não paga por ele.
+2. **Diffar dois estados no cliente.** Zero linhas no core, e o motivo de ter sido recusada não
+   é elegância: a animação passaria a **inferir**. O caminho teria de ser reconstruído por
+   pathfinding e pode não ser o que a IA andou (dois caminhos mínimos empatados dão o mesmo
+   destino por esquinas diferentes), e um duelo de IA viraria indistinguível de qualquer outra
+   perda de HP. É a animação afirmando o que não sabe — o oposto do §3 do briefing.
+3. **Reexecutar o laço da IA no cliente.** Exato e sem inferência, mas duplicaria lá a lógica
+   que M7 6/N centralizou no core justamente para cliente e servidor não divergirem ("§9.1:
+   divergência = bug crítico"), e rodaria a IA duas vezes por turno.
+
+**`data/aiNarration.ts` é a mesma inversão de 1/N e 3/N aplicada à SEQUÊNCIA.** 1/N inverteu a
+forma (o renderer descreve, não desenha), 3/N inverteu o tempo (a `Motion` descreve, não anima);
+aqui o módulo converte o relato numa lista ordenada de CENAS e não toca no relógio. O ganho é o
+mesmo dos outros dois — **a propriedade que dá nome à fatia vira asserção**: *toda peça que
+mudou de tile tem uma cena que a leva até lá, começando onde ela estava e terminando onde o core
+diz que ela ficou; e quem não saiu do lugar não ganha cena nenhuma* (o recíproco importa tanto
+quanto — uma cena para quem não andou faria a peça ir e voltar, mentindo sobre o core). Provada
+com um, com dois inimigos e com o caso "anda e engaja", sem browser e sem Pixi. Um `wait` não
+vira cena: parar o tabuleiro sem nada na tela é o tabuleiro travando, não uma jogada.
+
+**A cadeia inteira roda num `runFx` só, e isso é uma correção e não uma economia.** Um `runFx`
+por cena seria mais simples de escrever e traria de volta o defeito que 3/N corrigiu:
+`boardAnimating` desceria na fresta entre duas cenas e o desfecho caberia ali. Duas mudanças
+sustentam a cadeia:
+
+- **origem e retrato passaram da faixa para o TRECHO** (`FxSegment`). Numa cadeia a mesma peça
+  anda numa cena, apanha na seguinte e cai na terceira, cada uma partindo de um tile diferente e
+  com o HP daquele instante. Presos à faixa, a peça saltaria de volta ao tile inicial no começo
+  de cada cena e a barra de HP mostraria o turno inteiro o valor de antes da primeira pancada;
+- **`boardAnimating` passa a subir no STORE**, no mesmo `set()` que commita o estado, e a descer
+  sempre no canvas. Se o turno da IA acaba de matar o último herói, levantar a trava só quando o
+  canvas reage já seria tarde: o "Derrota!" apareceria no quadro do commit e a sequência rodaria
+  atrás do modal — o defeito de 3/N reaparecendo pela porta da IA. Os dois lados usam o **mesmo
+  predicado** (`narrateAiTurns(steps).length > 0`), senão a trava poderia subir sem que ninguém
+  a baixasse e o desfecho nunca apareceria.
+
+**O relato pendente guarda o ESTADO junto, e é isso que o torna seguro.** `aiTurnReport` só é
+consumido quando `state === battleState`. Trocar de capítulo, entrar numa masmorra ou abrir um
+replay troca o `battleState`, e um relato velho deixa de casar **sozinho** — sem um `reset` em
+cada um dos nove pontos do store que começam batalha, que é exatamente o tipo de lista que se
+esquece de atualizar. A outra metade ("já contei este") é uma ref no canvas, porque o efeito
+também roda quando só a seleção muda.
+
+**A regra de processo (§3) pegou um defeito, e de novo do tipo que nenhum teste desta fatia
+pegaria.** O número de dano nascia sempre ACIMA do tile do alvo (a correção de 3/N), e num corpo
+a corpo as duas peças são **verticalmente adjacentes**: no capítulo 1 o bandido bate no herói
+logo abaixo dele, e o número do golpe nasceu exatamente sobre a plaqueta de AP/PP e o glifo do
+próprio bandido — os três viraram um borrão. **É o mesmo defeito de 2/N e 3/N pela terceira vez,
+com uma causa nova cada vez** (lá o número disputava espaço com o glifo do alvo e depois com a
+plaqueta dele; aqui, com a peça do VIZINHO). É pré-existente, não nasceu em 4/N — um duelo do
+jogador entre peças verticalmente adjacentes sempre o produziu; o que mudou foi passar a haver
+verificação de um turno inteiro de IA para vê-lo. Correção: `damageAnchorDirection` escolhe a
+saída entre cima e as duas diagonais de cima, pela distância à pancada, descartando tile ocupado
+e tile fora do tabuleiro — com a saída declarada (a de cima) quando nenhuma serve, porque um
+número sobreposto ainda é lido e um número fora do tabuleiro não. **A lição de 2/N e 3/N,
+repetida: num tile de 36 px tudo que é desenhado disputa espaço com tudo, e o encontro só
+aparece rodando.**
+
+**Verificação em navegador** (o que o agente pode afirmar sozinho, §3): capítulo 1 nas duas
+paletas com a cadeia completa (o bandido anda 3 tiles, golpeia, leva o contra-ataque e desaba),
+capítulo 4 com os quatro inimigos em sequência, e a passagem do critério 2 refeita — capítulo 6
+nas duas paletas e nas duas escalas de §11. **Zero erro de console em todas as execuções**, e a
+timeline de `boardAnimating` com **uma única transição** por cadeia, inclusive na de 9,3 s. Uma
+medição para o usuário julgar, não para o agente: **quatro inimigos custam 9,3 s de turno**, e
+se isso é lento é decisão dele — §11 já oferece o modo resultado instantâneo, que continua
+pulando tudo.
+
+**Fora de escopo, registrado:** o primeiro turno de IA, o que `buildInitialState` drena antes do
+primeiro clique, não é relatado nem animado. Ali não há "antes" que o jogador tenha visto, então
+não existe teletransporte a corrigir; e a tela de replay continua sem animação nenhuma, como
+desde M13 1/N.
+
+**25 testes novos** (12 em `packages/core/tests/battle/aiTurnLog.test.ts`, 13 em
+`apps/client/tests/aiNarration.test.ts`) mais 6 em `motion.test.ts` para a saída do número.
+Suíte: **103 arquivos, 1374 testes** (era 101/1343).
+
+
+### P1.1 (handoff de 2026-08-28) — a assimetria de alcance ligada, medida e revertida
+
+**O que foi feito:** `packages/data/weapon-duel-ranges/tabela-arena.json` declarava `1` para as
+sete armas, o que desligava a assimetria de duelo ranged (§6.1) no torneio inteiro. Os valores
+reais não precisaram ser inventados: a fixture `test-fixtures/weapon-duel-ranges/valid/
+tabela-teste.json`, autorada em M7 4/N, já declara `sword/axe/spear = 1` e
+`bow/arcane/nature/holy = 2` — o catálogo real é que ficou com o placeholder.
+
+**A medição (regra 10), 10.000 partidas por pareamento, 72 pareamentos:**
+
+| | antes (tudo 1) | depois (ranged 2) |
+| --- | --- | --- |
+| Faixa de winrate global | 42,5% – 59,9% | **26,5% – 79,6%** |
+| Comps acima de 65% | 0 | **4** (Arqueiro 79,6, Clérigo 74,6, Druida 74,0, Arcanista 71,9) |
+| Comps abaixo de 40% | 0 | **5** (Couraçado 36,2, Espadachim 31,8, Guerreiro 28,1, Grifeiro 27,2, Lanceiro 26,5) |
+| Counters absolutos | 10 de 72 (13,9%) | **16 de 72 (22,2%)** |
+| `spd` acima da mediana nas vencedoras | 20,0% | 22,0% |
+
+**A causa não é fórmula, e isso foi separado por medição em vez de suposto.** Quebrando a matriz
+por eixo: **ranged vence melee em 20 de 20 pareamentos** (67,3% a 99,7%), enquanto ranged-vs-ranged
+(21,8%–99,6%) e melee-vs-melee mantêm a mesma dispersão de antes — a dispersão do triângulo de
+armas, que é o comportamento esperado. O empilhamento de multiplicadores que o relatório sugere
+investigar não é o problema.
+
+**O problema é que as 9 composições são MONOCLASSE.** O handoff pedia "3 heróis cada" e foi
+entregue como 3 heróis da *mesma* classe. §6.1 diz que a resposta tática ao alcance é "fechar
+distância" — e três arqueiros contra três espadachins é justamente o tabuleiro onde essa resposta
+não existe. Com o alcance uniforme em 1 a distorção era invisível; ligar o alcance real a
+detonou.
+
+**Medido, não afirmado:** uma composição MISTA de experimento (espadachim + couraçado na frente,
+arqueiro atrás), rodada com `ranged = 2`, fica em **50,3% de winrate global — a única das dez
+dentro da faixa de 40–60%**, enquanto as nove monoclasse ficam todas fora. Ela também aguenta o
+arqueiro muito melhor que a linha melee pura (65,3% para o atacante, contra 82,8%–90,2% das
+monoclasse). A comp de experimento foi apagada depois da medição; o relatório está em
+`balance-experimento-mista.txt`.
+
+**Decisão: o valor foi REVERTIDO para 1, e P1.1 NÃO fecha.** Manter `ranged = 2` deixaria o
+`pnpm test` vermelho e violaria os dois lados do critério de aceite do M8 que a spec acabou de
+ganhar (P1.2, faixa 40–60%). O número certo é 2 — é o que §6.1 manda e o que a fixture já dizia —,
+mas ele só pode entrar junto de três coisas que são fatia própria de conteúdo:
+
+1. **as 9 comps da arena viram mistas** (é o que a medição acima mostra ser a correção);
+2. **`encounter-campanha-4` reposicionado** — `unit-cerco-3` é arqueiro e nasce em (11,8), a dois
+   tiles do `ally-arcanista` em (9,8). Com alcance 2 ele abre duelo **antes do primeiro comando do
+   jogador** (arcanista a 167/640, o próprio arqueiro a 60/580 no contra-ataque). O teste
+   `packages/content/tests/encounters.test.ts` já dizia o que isso é: "erro de posicionamento no
+   encounter, não do motor";
+3. **`dungeon-campo-de-treino` rebalanceada** — o time de referência deixa de vencer o piso da
+   dificuldade na seed 2 (`packages/content/tests/dungeons.test.ts`).
+
+**O aceite do P1.1 dizia:** "se os counters persistirem acima de 10%, aí sim é problema de regra —
+investigar antes de mexer em números". Investigado: não é regra, é composição. Fica registrado
+para a fatia que fizer o conteúdo.
+
+### P1.1 (parcial, FECHADO) — a contagem de assistências no relatório
+
+O outro lado do P1.1 fechou. `tools/balance` não tinha como afirmar que a janela de assistências
+(§6.5) dispara: no Coliseu (§9.2) os dois lados são IA, então a batalha inteira resolve dentro de
+`buildInitialState` e o laço de `simulate` nunca roda — não havia um único `DuelResult` observável
+de fora do core.
+
+**Decisão do usuário: `buildInitialStateLogged`**, mesma adesão aditiva de `resolveAiTurnsLogged`
+(M16 4/N). `buildInitialState` passa a ser essa função com os passos jogados fora; nenhuma regra
+muda e `RULES_VERSION` segue `0.16.0`. Em M16 4/N esta variante ficou de fora de propósito por não
+haver consumidor — agora há, e o consumidor não é animação, é medição.
+
+**A instrumentação não mexeu na medição, e isso foi verificado e não assumido:** a rodada de
+`--runs 20` depois da troca de `simulate` por `buildInitialStateLogged` devolve os nove winrates,
+a mediana de `spd` e a concentração **número por número idênticos** aos de antes.
+
+**O resultado:** com as comps de 3 heróis, **88,5% das batalhas têm ao menos uma assistência,
+média de 2,44 por batalha**. A mecânica que substituiu o esquadrão do Unicorn Overlord está viva
+no torneio pela primeira vez. O relatório passa a trazer os três números e ALERTA quando o total
+é zero — que era o estado silencioso de todas as rodadas até M8.
+
+### P1.2 (FECHADO) — o piso de 40% na spec
+
+`tools/balance/src/report.ts` media teto (65%) e piso (40%) desde a revisão do M8, mas
+`docs/spec/09-roadmap.md` só tinha o teto: uma composição em 31% passava no aceite e mesmo assim
+ninguém a levaria para a arena. O critério do M8 passou a ser a faixa **40–60%**. A ferramenta não
+mudou; a spec alcançou a ferramenta.

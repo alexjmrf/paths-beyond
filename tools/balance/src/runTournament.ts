@@ -1,9 +1,8 @@
 import {
-  RULES_VERSION,
   buildBattleSetupFromHeroes,
+  buildInitialStateLogged,
   nextUint32,
   seedRng,
-  simulate,
   type BattleUnit,
   type Hero,
   type HeroPlacement,
@@ -36,6 +35,12 @@ export interface BattleOutcomeRecord {
   readonly winningCompId: Id | null;
   readonly winningUnitsSpd: readonly number[];
   readonly allUnitsSpd: readonly number[];
+  // §6.5 — quantas assistências foram APLICADAS nesta batalha, somando os dois lados de cada
+  // duelo. A assistência é a mecânica que substituiu o esquadrão do Unicorn Overlord quando o
+  // design trocou para heróis individuais; enquanto as comps tinham 1 unidade cada, ela não
+  // podia disparar em partida nenhuma, e o torneio media um jogo mais simples que o real.
+  // Contar é o que transforma "agora deve disparar" em número.
+  readonly assists: number;
 }
 
 // M8, sub-sessão 3/N: `hero.equipment` (6 slots, ids ou null) passa a ser resolvido de
@@ -79,9 +84,16 @@ function applyDefenderBonus(units: readonly BattleUnit[]): readonly BattleUnit[]
   return units.map((unit) => (unit.side === 'enemy' ? { ...unit, ap: unit.ap + DEFENDER_AP_BONUS } : unit));
 }
 
-// Modo 2/Coliseu (§9.2): os dois lados são 100% IA — `simulate()` com `commands: []`
-// já resolve a batalha inteira sozinho, via `resolveAiTurns` (M7, sub-sessão 6),
-// conectado dentro de `buildInitialState`. Nenhum comando precisa ser submetido.
+// Modo 2/Coliseu (§9.2): os dois lados são 100% IA — a batalha inteira resolve dentro de
+// `buildInitialState`, via `resolveAiTurns` (M7, sub-sessão 6). Nenhum comando precisa ser
+// submetido, e é por isso que `simulate()` com `commands: []` fazia o trabalho até aqui.
+//
+// A variante COM RELATO (`buildInitialStateLogged`) é usada em vez de `simulate` por um motivo
+// só: contar assistências. Como tudo acontece dentro da construção do estado inicial, o laço de
+// `simulate` nunca roda e não há um único `DuelResult` observável do lado de fora. O estado
+// devolvido é o mesmo — `simulate` com `commands: []` é literalmente `buildInitialState` mais a
+// montagem do `BattleResult`, e os campos usados aqui (`outcome`, unidades finais) saem
+// igualmente do estado. Travado por teste em `packages/core`.
 function runOneBattle(attacker: Composition, defender: Composition, content: ContentCatalog, seed: number): BattleOutcomeRecord {
   const attackerPlacements = toPlacements(attacker, content, 'player', 0);
   const defenderPlacements = toPlacements(defender, content, 'enemy', DEFENDER_POSITION_OFFSET_X);
@@ -104,19 +116,27 @@ function runOneBattle(attacker: Composition, defender: Composition, content: Con
 
   const buffedSetup = { ...setup, units: applyDefenderBonus(setup.units) };
 
-  const result = simulate({ rulesVersion: RULES_VERSION, seed, initialState: buffedSetup, commands: [] });
+  const { state, steps } = buildInitialStateLogged(buffedSetup, seed);
 
-  const winningSide = result.outcome === 'victory' ? 'player' : result.outcome === 'defeat' ? 'enemy' : null;
+  let assists = 0;
+  for (const step of steps) {
+    const duel = step.duelResult;
+    if (!duel) continue;
+    assists += duel.attackerAssists.length + duel.defenderAssists.length;
+  }
+
+  const winningSide = state.outcome === 'victory' ? 'player' : state.outcome === 'defeat' ? 'enemy' : null;
   const winningCompId = winningSide === 'player' ? attacker.id : winningSide === 'enemy' ? defender.id : null;
 
   return {
     attackerCompId: attacker.id,
     defenderCompId: defender.id,
     seed,
-    outcome: result.outcome,
+    outcome: state.outcome,
     winningCompId,
-    winningUnitsSpd: winningSide ? result.finalUnits.filter((u) => u.side === winningSide).map((u) => u.stats.spd) : [],
-    allUnitsSpd: result.finalUnits.map((u) => u.stats.spd),
+    winningUnitsSpd: winningSide ? state.units.filter((u) => u.side === winningSide).map((u) => u.stats.spd) : [],
+    allUnitsSpd: state.units.map((u) => u.stats.spd),
+    assists,
   };
 }
 

@@ -11,6 +11,7 @@ function record(overrides: Partial<BattleOutcomeRecord> = {}): BattleOutcomeReco
     winningCompId: 'comp-a',
     winningUnitsSpd: [100],
     allUnitsSpd: [100, 80],
+    assists: 0,
     ...overrides,
   };
 }
@@ -172,5 +173,34 @@ describe('formatReport — as seções novas aparecem no texto', () => {
     );
     expect(text).toContain('ABAIXO DE 40%');
     expect(text).toContain('Counters absolutos');
+  });
+});
+
+describe('buildReport — assistências (§6.5)', () => {
+  it('soma as assistências das batalhas e mede em quantas delas ao menos uma disparou', () => {
+    const report = buildReport([record({ assists: 3 }), record({ assists: 0 }), record({ assists: 1 })]);
+
+    expect(report.totalAssists).toBe(4);
+    expect(report.battlesWithAssistPct).toBeCloseTo((2 / 3) * 100, 5);
+    expect(report.assistsPerBattle).toBeCloseTo(4 / 3, 5);
+  });
+
+  it('torneio sem nenhuma assistência é ALERTA, não silêncio: era o estado com comps de 1 unidade', () => {
+    const report = buildReport([record({ assists: 0 }), record({ assists: 0 })]);
+
+    expect(report.totalAssists).toBe(0);
+    expect(report.battlesWithAssistPct).toBe(0);
+    expect(formatReport(report, {})).toContain('ALERTA: nenhuma assistência disparou');
+  });
+
+  it('com assistências, o relatório diz que a janela está sendo exercitada', () => {
+    expect(formatReport(buildReport([record({ assists: 2 })]), {})).toContain('OK: a janela de assistências está sendo exercitada');
+  });
+
+  it('sem nenhuma batalha, as três medidas são zero em vez de NaN', () => {
+    const report = buildReport([]);
+    expect(report.totalAssists).toBe(0);
+    expect(report.battlesWithAssistPct).toBe(0);
+    expect(report.assistsPerBattle).toBe(0);
   });
 });
