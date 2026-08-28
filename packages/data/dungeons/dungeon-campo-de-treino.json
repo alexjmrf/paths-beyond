@@ -1,0 +1,16 @@
+{
+  "id": "dungeon-campo-de-treino",
+  "name": "Campo de Treino",
+  "focus": "exp",
+  "difficulty": "normal",
+  "encounterId": "encounter-campo-de-treino",
+  "energyCost": 10,
+  "exp": {
+    "min": 400,
+    "max": 600
+  },
+  "gold": {
+    "min": 5,
+    "max": 10
+  }
+}

@@ -27,14 +27,18 @@ import skillSchema from '../schemas/skills.schema.js';
 // - `terrain-planicie`  custo 1, sem bônus — o chão de sempre;
 // - `terrain-floresta`  custo 2 (foot) / 3 (cavalry, heavy), +100 def e +50 eva a quem
 //                       DEFENDE nela (`commands.ts`, `defenderTerrainDefBonus`);
-// - `terrain-montanha`  `impassable` para tudo que não voa. É a única parede que o motor
-//                       de fato respeita: `Tile.object` ('wall' | 'fort' | 'gate' | ...)
-//                       existe no schema desde M3 e NINGUÉM lê — nem o core, nem o
-//                       cliente. Autorar um 'wall' aqui seria cenário decorativo se
-//                       fazendo passar por regra, então os chokepoints são montanha
-//                       (ver DECISIONS.md).
+// - `terrain-montanha`  `impassable` para tudo que não voa.
+//
+// M15 (D3) mudou o parágrafo que estava aqui. Até M14, `Tile.object` ('wall' | 'gate' | ...)
+// existia no schema e NINGUÉM lia, então autorar um muro seria cenário decorativo se fazendo
+// passar por regra, e todo chokepoint desta campanha virou montanha. Agora `wall` e `gate`
+// bloqueiam de verdade (`grid/pathfinding.ts`), e a diferença entre os dois tipos de parede
+// passou a importar: **montanha custa 1 para quem voa** (§5.1), alvenaria não deixa passar
+// ninguém. Muralha de fortaleza é alvenaria — ver `map-campanha-6`.
+//
 // A altura é do TILE e vale por si: `move` copia a altura do destino para a unidade
-// (`commands.ts`) e `positional.ts` converte diferença de altura em dano e acerto.
+// (`commands.ts`) e `positional.ts` converte diferença de altura em dano e acerto. Tile com
+// objeto que bloqueia não é pisável, então a altura dele não é lida por ninguém.
 const GLYPHS = {
   '.': { terrain: 'terrain-planicie', height: 0 },
   ':': { terrain: 'terrain-planicie', height: 1 },
@@ -43,7 +47,29 @@ const GLYPHS = {
   F: { terrain: 'terrain-floresta', height: 1 },
   '^': { terrain: 'terrain-montanha', height: 2 },
   M: { terrain: 'terrain-montanha', height: 3 },
-} as const satisfies Record<string, { terrain: string; height: 0 | 1 | 2 | 3 }>;
+  // §5.1 (M15 D3) — alvenaria. Intransponível para TODO `moveType`, inclusive `flying`.
+  W: { terrain: 'terrain-planicie', height: 0, object: 'wall' },
+  // Portão TRANCADO: a guarnição barrou a porta, ninguém tem a chave, e os dois lados só
+  // passam arrombando — 3 turnos-unidade de pancada.
+  //
+  // Foi medido, não escolhido no gosto: com o portão abrindo para a guarnição, a IA de mapa
+  // caminhava até ele e o `wait` do mesmo turno o destrancava, então a fortaleza amanhecia
+  // aberta no round 1 e a durabilidade era decoração (M15 2/N, ver DECISIONS.md).
+  G: {
+    terrain: 'terrain-planicie',
+    height: 0,
+    object: 'gate',
+    gate: { opensFor: 'none', durability: 3 },
+  },
+} as const satisfies Record<
+  string,
+  {
+    terrain: string;
+    height: 0 | 1 | 2 | 3;
+    object?: string;
+    gate?: { opensFor: string; durability: number };
+  }
+>;
 
 type Glyph = keyof typeof GLYPHS;
 
@@ -197,20 +223,34 @@ const MAPS: readonly MapSpec[] = [
   },
   {
     // Capítulo 6 — `rout` outra vez, e de propósito: o capítulo final é o único em que
-    // matar todo mundo é o ponto. A muralha só tem o portão (9,8); o Mestre-Espadachim
-    // espera no planalto de altura 2 lá dentro, e quem sobe pela frente luta de baixo.
+    // matar todo mundo é o ponto. O Mestre-Espadachim espera no planalto de altura 2 lá
+    // dentro, e quem sobe pela frente luta de baixo.
+    //
+    // M15 (D3, decisão do usuário na sub-sessão 2/N): a muralha era montanha e o portão era
+    // um VÃO — os dois só de nome. Agora é **alvenaria** (`W`) com um **portão** (`G`) em
+    // (9,8), e as duas coisas mudaram o mapa de verdade:
+    //   - a muralha barra a Sentinela Alada, que até M14 sobrevoava a fortaleza porque
+    //     montanha custa 1 para `flying`. Isto SUBSTITUI a leitura de M12 3/N ("este é o
+    //     mapa onde o voo significa alguma coisa"): o voo dela agora significa mobilidade
+    //     dentro do campo, não atravessar a fortaleza;
+    //   - o portão está TRANCADO (`opensFor: 'none'`): a guarnição barrou a porta sob
+    //     assalto e nem ela tem a chave. Quem quiser passar arromba — 3 turnos-unidade de
+    //     pancada, valendo para os dois lados. Foi assim depois de MEDIR: com o portão
+    //     abrindo para a guarnição, a IA de mapa andava até ele e o `wait` do mesmo turno o
+    //     destrancava, então a fortaleza amanhecia aberta no round 1 e a durabilidade era
+    //     decoração (ver DECISIONS.md, M15 2/N).
     id: 'map-campanha-6',
     name: 'Fortaleza do Mestre',
     rows: [
       '..................',
       '.f..............f.',
-      '......MMMMMMM.....',
-      '......M:::::M.....',
-      '......M:+++:M.....',
-      '......M:+++:M.....',
-      '......M:::::M.....',
-      '......M:::::M.....',
-      '......MMM.MMM.....',
+      '......WWWWWWW.....',
+      '......W:::::W.....',
+      '......W:+++:W.....',
+      '......W:+++:W.....',
+      '......W:::::W.....',
+      '......W:::::W.....',
+      '......WWWGWWW.....',
       '..................',
       '..f............f..',
       '..ff..........ff..',
@@ -249,7 +289,7 @@ const CLASS_KITS: Readonly<Record<string, ClassKit>> = {
   'class-mestre-espadachim': { weapon: 'item-arma-espadachim', weaponType: 'sword' },
 };
 
-function slugOf(classId: string): string {
+export function slugOf(classId: string): string {
   return classId.replace(/^class-/, '');
 }
 
@@ -308,7 +348,7 @@ interface TacticsLine {
   readonly conditions: readonly unknown[];
 }
 
-interface UnitSpec {
+export interface UnitSpec {
   readonly unitId: string;
   readonly classId: string;
   readonly side: 'player' | 'enemy';
@@ -504,20 +544,28 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
         pos: [8, 13],
         necklace: 'item-colar-guardiao',
       },
-      // O portão (9,8) é a única brecha da muralha; o Couraçado o TAMPA (começa em cima
-      // dele) com trela curta, e carrega o gatilho de morte de M10
+      // O portão (9,8) é a única brecha da muralha. Até M14 o Couraçado o TAMPAVA, nascendo
+      // em cima dele; com o vão virando portão de verdade (M15 D3) o tile deixou de ser
+      // pisável, e o guarda espera DENTRO, em (9,6).
+      //
+      // Um tile atrás do portão, e não colado nele, de propósito: `guard-tile` cai em `wait`
+      // quando não alcança ninguém (§9.1), e `wait` ao lado do portão o ABRE para o lado da
+      // guarnição — colado, ele destrancaria a fortaleza no round 1 e a durabilidade nunca
+      // seria exercida. De (9,6) ele só avança para (9,7) quando a party chega perto, e é
+      // então que a decisão aparece: arrombar (3 turnos-unidade) antes de a guarnição abrir,
+      // ou esperar e lutar em campo aberto. Mantém a trela curta e o gatilho de morte de M10
       // (`skill-ultimo-suspiro`, `perBattle`).
       {
         unitId: 'unit-guarda-portao',
         classId: 'class-couracado',
         side: 'enemy',
-        pos: [9, 8],
+        pos: [9, 6],
         ai: 'guard-tile',
         extraDuelSkills: ['skill-ultimo-suspiro'],
       },
-      // Nasce DENTRO da fortaleza e sai voando por cima da muralha: é o único
-      // `moveType:'flying'` do roster, e este é o mapa onde isso significa alguma coisa —
-      // a party não pode tratar a muralha como segurança.
+      // Nasce DENTRO da fortaleza. Até M14 saía voando por cima da muralha (montanha custa 1
+      // para `flying`); com a muralha virando alvenaria ela sai pelo portão como todo mundo,
+      // e o voo dela passa a valer pelo terreno do campo aberto lá fora.
       { unitId: 'unit-sentinela-alada', classId: 'class-grifeiro', side: 'enemy', pos: [11, 3], ai: 'flank' },
       // Fica na retaguarda, dentro do alcance de assistência de quem está apanhando.
       {
@@ -549,7 +597,7 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
 // Geração
 // ---------------------------------------------------------------------------
 
-const DEFAULT_LEVEL = 10;
+export const DEFAULT_LEVEL = 10;
 
 function buildMap(spec: MapSpec): unknown {
   const height = spec.rows.length;
@@ -562,7 +610,14 @@ function buildMap(spec: MapSpec): unknown {
     return [...row].map((glyph, x) => {
       const tile = GLYPHS[glyph as Glyph];
       if (!tile) throw new Error(`${spec.id}: glifo desconhecido '${glyph}' em (${x},${y})`);
-      return { terrain: tile.terrain, height: tile.height };
+      // `object`/`gate` (M15 D3) só existem em alguns glifos; escrever as chaves como
+      // `undefined` deixaria `"object": null` no JSON e o schema recusaria.
+      return {
+        terrain: tile.terrain,
+        height: tile.height,
+        ...('object' in tile ? { object: tile.object } : {}),
+        ...('gate' in tile ? { gate: tile.gate } : {}),
+      };
     });
   });
 
@@ -591,7 +646,7 @@ function heightAt(mapSpec: MapSpec, x: number, y: number): 0 | 1 | 2 | 3 {
   return tile.height;
 }
 
-function buildHero(spec: UnitSpec): unknown {
+export function buildHero(spec: UnitSpec): unknown {
   const kit = CLASS_KITS[spec.classId];
   if (!kit) throw new Error(`classe sem kit declarado: ${spec.classId}`);
   const slug = slugOf(spec.classId);
@@ -638,11 +693,11 @@ function buildEncounter(spec: EncounterSpec, mapSpec: MapSpec): unknown {
   };
 }
 
-function packageRoot(): string {
+export function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), '..');
 }
 
-function writeJson(dir: string, id: string, content: unknown): void {
+export function writeJson(dir: string, id: string, content: unknown): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${id}.json`), `${JSON.stringify(content, null, 2)}\n`, 'utf8');
 }

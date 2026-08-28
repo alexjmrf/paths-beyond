@@ -9,9 +9,15 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import type { Player, StoredHero } from '../src/repository/types.js';
 import { loadShopCatalog, type ShopCatalog } from '../src/shop/catalog.js';
+import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
+
+// Segredo fixo do HMAC que deriva a seed do nonce (M13, sub-sessão 2/N): teste precisa
+// de seed reprodutível.
+const TICKET_SECRET = 'segredo-de-teste';
 
 const emptyCatalog: ContentCatalog = {
   classes: {},
@@ -20,10 +26,18 @@ const emptyCatalog: ContentCatalog = {
   itemSets: {},
   effects: {},
   valorSkills: {},
+  summonBlueprints: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: {},
   comps: [],
   encounters: [],
+  dungeons: {},
+  dungeonEncounters: {},
+  materials: {},
+  economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
+  substatWeights: [],
+  mainstatWeights: [],
+  enhanceRates: { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 },
   baselineReactionSkillIds: [],
 };
 
@@ -98,6 +112,7 @@ function buildTestApp(players: readonly Player[], heroes: readonly StoredHero[],
   const repository = createMemoryPlayerRepository(players);
   const heroRepository = createMemoryHeroRepository(heroes);
   return { app: buildApp({
+    economyRepository: createMemoryEconomyRepository(),
     repository,
     heroRepository,
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
@@ -105,6 +120,7 @@ function buildTestApp(players: readonly Player[], heroes: readonly StoredHero[],
     seasonRepository: createMemorySeasonRepository(),
     catalog: emptyCatalog,
     shopCatalog,
+    ticketSecret: TICKET_SECRET,
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
   }), heroRepository };
 }
@@ -117,7 +133,7 @@ describe('GET /shop/catalog', () => {
   });
 
   it('lista as ofertas com item e preço', async () => {
-    const buyer: Player = { id: 'player-comprador', token: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100 };
+    const buyer: Player = { id: 'player-comprador', token: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100, ...DEFAULT_PVE_ACCOUNT };
     const { app } = buildTestApp([buyer], []);
     const response = await app.inject({ method: 'GET', url: '/shop/catalog', headers: { 'x-player-token': TOKEN } });
     expect(response.statusCode).toBe(200);
@@ -129,7 +145,7 @@ describe('GET /shop/catalog', () => {
 });
 
 describe('POST /shop/purchase', () => {
-  const buyer: Player = { id: 'player-comprador', token: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100 };
+  const buyer: Player = { id: 'player-comprador', token: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100, ...DEFAULT_PVE_ACCOUNT };
   const hero: StoredHero = { ownerPlayerId: 'player-comprador', hero: buildHero(), equippedItems: [oldWeapon] };
 
   it('rejeita sem autenticação', async () => {
@@ -158,7 +174,7 @@ describe('POST /shop/purchase', () => {
   });
 
   it('rejeita quando o jogador não tem marcas suficientes', async () => {
-    const pobre: Player = { id: 'player-pobre', token: 'token-pobre', displayName: 'Pobre', elo: 1200, arenaMarks: 10 };
+    const pobre: Player = { id: 'player-pobre', token: 'token-pobre', displayName: 'Pobre', elo: 1200, arenaMarks: 10, ...DEFAULT_PVE_ACCOUNT };
     const heroDoPobre: StoredHero = { ownerPlayerId: 'player-pobre', hero: buildHero({ id: 'heroi-pobre' }), equippedItems: [] };
     const { app } = buildTestApp([pobre], [heroDoPobre]);
     const response = await app.inject({

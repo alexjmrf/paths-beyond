@@ -178,106 +178,39 @@
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
-      }
-    ],
-    [
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 0
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -326,8 +259,9 @@
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -335,23 +269,24 @@
       },
       {
         "terrain": "terrain-planicie",
-        "height": 2
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 2
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 2
+        "height": 1
       },
       {
         "terrain": "terrain-planicie",
         "height": 1
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -400,8 +335,9 @@
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -424,8 +360,9 @@
         "height": 1
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -474,8 +411,9 @@
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -483,7 +421,15 @@
       },
       {
         "terrain": "terrain-planicie",
-        "height": 1
+        "height": 2
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 2
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 2
       },
       {
         "terrain": "terrain-planicie",
@@ -491,15 +437,8 @@
       },
       {
         "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-planicie",
-        "height": 1
-      },
-      {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -548,8 +487,9 @@
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -572,8 +512,9 @@
         "height": 1
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
@@ -622,32 +563,119 @@
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 1
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 1
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",
         "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0
       },
       {
-        "terrain": "terrain-montanha",
-        "height": 3
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      }
+    ],
+    [
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "gate",
+        "gate": {
+          "opensFor": "none",
+          "durability": 3
+        }
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
+      },
+      {
+        "terrain": "terrain-planicie",
+        "height": 0,
+        "object": "wall"
       },
       {
         "terrain": "terrain-planicie",

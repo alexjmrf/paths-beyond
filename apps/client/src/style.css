@@ -43,6 +43,56 @@ header .campaign-progress {
   cursor: pointer;
 }
 
+/* §11 (acessibilidade) — o `margin-left: auto` do modo instantâneo é que empurra este
+   grupo todo para a direita do cabeçalho; os controles abaixo seguem na mesma linha. */
+.accessibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.ui-scale-select {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.ui-scale-select select {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.8rem;
+}
+
+/* O cabeçalho é uma linha só; em escala grande (175%) os controles precisam poder quebrar
+   em vez de empurrar o título para fora da tela. */
+header {
+  flex-wrap: wrap;
+}
+
+.clear-progress {
+  margin-left: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.clear-progress:hover {
+  border-color: #b91c1c;
+  color: #fca5a5;
+}
+
 .duel-preview-revealing {
   margin-top: 0.75rem;
   color: #9ca3af;
@@ -866,4 +916,380 @@ button.targeting {
   margin: 0;
   font-size: 0.75rem;
   color: #6b7280;
+}
+
+/* M13, sub-sessão 1/N — tela de replay (§11). z-index acima do overlay de fim de mapa
+   (20), que é de onde ela é aberta e que continua visível por trás. */
+.replay-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.replay-panel {
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  min-width: 520px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.replay-panel h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.replay-meta {
+  margin: 0 0 0.75rem;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.replay-step {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.replay-command {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #facc15;
+}
+
+.replay-next {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.replay-units {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin: 0.5rem 0;
+}
+
+.replay-units th {
+  text-align: left;
+  color: #9ca3af;
+  font-weight: normal;
+}
+
+.replay-units td {
+  padding: 0.2rem 0.4rem 0.2rem 0;
+  border-top: 1px solid #1f2937;
+}
+
+.replay-units tr.player td:first-child {
+  color: #60a5fa;
+}
+
+.replay-units tr.enemy td:first-child {
+  color: #f87171;
+}
+
+.replay-units tr.dead td {
+  color: #4b5563;
+  text-decoration: line-through;
+}
+
+.replay-controls,
+.replay-speed,
+.replay-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.replay-speed button.active {
+  outline: 2px solid #60a5fa;
+}
+
+.tactics-locked {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: #f59e0b;
+}
+
+/* M13, sub-sessão 2/N — tela de PvP. */
+.pvp-panel {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-left: 3px solid #a855f7;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.pvp-panel h2 {
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+
+.pvp-panel h3 {
+  font-size: 0.78rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.pvp-login {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pvp-login label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pvp-login input {
+  width: 100%;
+}
+
+.pvp-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pvp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.pvp-me,
+.pvp-opponent,
+.pvp-battle,
+.pvp-battle-over,
+.pvp-status,
+.pvp-result p {
+  margin: 0.25rem 0 0;
+}
+
+.pvp-status {
+  color: #a855f7;
+}
+
+.pvp-battle-over {
+  color: #facc15;
+}
+
+.pvp-result {
+  margin-top: 0.5rem;
+  border-top: 1px solid #1f2937;
+  padding-top: 0.35rem;
+}
+
+/* §10 (M14, 5/N) — painel de masmorras e conta. Mesma linguagem visual do painel de PvP. */
+.dungeon-panel {
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.dungeon-panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.dungeon-panel h3 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.pve-economy {
+  margin: 0.35rem 0;
+  color: #d1d5db;
+}
+
+.pve-roster,
+.pve-dungeons,
+.pve-inventory {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pve-dungeons li,
+.pve-inventory li,
+.pve-roster li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #111827;
+}
+
+.pve-dungeons li.locked {
+  opacity: 0.6;
+}
+
+.pve-dungeon-name {
+  flex: 1 1 auto;
+}
+
+.pve-locked {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.pve-actions,
+.pve-hero-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.dungeon-panel button {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.dungeon-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pve-status {
+  color: #9ca3af;
+  margin: 0.4rem 0 0;
+}
+
+.pve-result {
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #1f2937;
+}
+
+/* §9.1 (M15, sub-sessão 3/N) — a tela de montar a defesa de arena. Reusa a caixa e a
+   tipografia dos painéis existentes (D4 do briefing: nenhuma linguagem visual nova aqui —
+   isso é M16); o que há de próprio é a grade de tiles, que é um controle de formulário, e
+   as cores dela vêm de `overlayTheme` para o mapa da defesa ser lido com a mesma paleta do
+   mapa de batalha, inclusive no modo daltônico. */
+.defense-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #1f2937;
+  /* O tile acompanha a escala de UI de M13 4/N pelo mesmo motivo do mapa: a grade tem de
+     crescer junto, senão ela vira o único ponto ilegível da tela em 175%. */
+  --defense-tile: 0.85rem;
+}
+
+.defense-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-end;
+  margin-bottom: 0.4rem;
+}
+
+.defense-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.72rem;
+}
+
+.defense-state {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+}
+
+.defense-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.defense-roster {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.defense-roster li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+  font-size: 0.72rem;
+}
+
+.defense-roster li.placed .defense-hero {
+  color: #f8fafc;
+}
+
+.defense-roster button.arming {
+  outline: 2px solid #facc15;
+}
+
+.defense-pos {
+  font-variant-numeric: tabular-nums;
+  color: #94a3b8;
+}
+
+.defense-archetype-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  max-width: 26rem;
+}
+
+.defense-grid {
+  display: grid;
+  gap: 1px;
+  /* A grade rola dentro da própria caixa: um mapa 20 colunas em 175% de escala não pode
+     empurrar o painel inteiro para fora da tela. */
+  max-width: 100%;
+  overflow: auto;
+}
+
+.defense-tile {
+  width: var(--defense-tile);
+  height: var(--defense-tile);
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.defense-tile.occupied {
+  cursor: default;
+}
+
+.defense-marker {
+  width: 62%;
+  height: 62%;
+  display: block;
 }

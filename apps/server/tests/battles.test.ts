@@ -10,8 +10,14 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import type { ArenaDefense, StoredHero } from '../src/repository/types.js';
+import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
+
+// Segredo fixo do HMAC que deriva a seed do nonce (M13, sub-sessão 2/N): teste precisa
+// de seed reprodutível.
+const TICKET_SECRET = 'segredo-de-teste';
 
 const plain: Terrain = { id: 'plain', moveCost: { foot: 1, cavalry: 1, flying: 1, heavy: 1, aquatic: 2 }, defBonus: 0, evaBonus: 0, blocksSight: false };
 
@@ -75,10 +81,18 @@ const catalog: ContentCatalog = {
   itemSets: {},
   effects: {},
   valorSkills: {},
+  summonBlueprints: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: { 'mapa-teste': arenaMap },
   comps: [],
   encounters: [],
+  dungeons: {},
+  dungeonEncounters: {},
+  materials: {},
+  economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
+  substatWeights: [],
+  mainstatWeights: [],
+  enhanceRates: { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 },
   baselineReactionSkillIds: [],
 };
 
@@ -87,8 +101,8 @@ const DEFENDER_TOKEN = 'token-defensor';
 
 function buildTestApp(rateLimiter: RateLimiter = createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 })) {
   const repository = createMemoryPlayerRepository([
-    { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0 },
-    { id: 'player-defensor', token: DEFENDER_TOKEN, displayName: 'Defensor', elo: 1200, arenaMarks: 0 },
+    { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+    { id: 'player-defensor', token: DEFENDER_TOKEN, displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
   ]);
 
   const attackerHero: StoredHero = {
@@ -113,6 +127,7 @@ function buildTestApp(rateLimiter: RateLimiter = createInMemoryRateLimiter({ max
   const arenaDefenseRepository = createMemoryArenaDefenseRepository([defense]);
 
   return buildApp({
+    economyRepository: createMemoryEconomyRepository(),
     repository,
     heroRepository,
     arenaDefenseRepository,
@@ -121,6 +136,7 @@ function buildTestApp(rateLimiter: RateLimiter = createInMemoryRateLimiter({ max
     catalog,
     shopCatalog: {},
     rateLimiter,
+    ticketSecret: TICKET_SECRET,
   });
 }
 
@@ -152,6 +168,66 @@ describe('PUT /me/defense', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ownerPlayerId: 'player-defensor', mapId: 'mapa-teste' });
+  });
+});
+
+// §9.1 (M15, sub-sessão 3/N) — o lado de LEITURA da defesa, que `PUT` nunca teve. Sem ele
+// a tela do cliente sabe o que acabou de enviar e nada mais, e "a defesa persiste" — metade
+// do critério de aceite de M15 — não seria verificável sem `curl` no banco.
+describe('GET /me/defense', () => {
+  it('rejeita sem autenticação', async () => {
+    const app = buildTestApp();
+    expect((await app.inject({ method: 'GET', url: '/me/defense' })).statusCode).toBe(401);
+  });
+
+  // A fixture semeia defesa só para o defensor; o atacante é quem nunca montou uma.
+  it('404 para quem ainda não montou — estado normal, não erro de servidor', async () => {
+    const app = buildTestApp();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/me/defense',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('devolve exatamente o que o PUT salvou, inclusive posição e arquétipo', async () => {
+    const app = buildTestApp();
+    const units = [{ heroId: 'heroi-defensor', pos: { x: 3, y: 3 }, height: 0, aiArchetype: 'guard-tile' }];
+    await app.inject({
+      method: 'PUT',
+      url: '/me/defense',
+      headers: { 'x-player-token': DEFENDER_TOKEN },
+      payload: { mapId: 'mapa-teste', units },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/me/defense',
+      headers: { 'x-player-token': DEFENDER_TOKEN },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ ownerPlayerId: 'player-defensor', mapId: 'mapa-teste', units });
+  });
+
+  it('cada jogador lê a PRÓPRIA defesa: salvar a minha não faz a do vizinho existir', async () => {
+    const app = buildTestApp();
+    await app.inject({
+      method: 'PUT',
+      url: '/me/defense',
+      headers: { 'x-player-token': DEFENDER_TOKEN },
+      payload: {
+        mapId: 'mapa-teste',
+        units: [{ heroId: 'heroi-defensor', pos: { x: 3, y: 3 }, height: 0, aiArchetype: 'aggressive' }],
+      },
+    });
+
+    const doAtacante = await app.inject({
+      method: 'GET',
+      url: '/me/defense',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+    });
+    expect(doAtacante.statusCode).toBe(404);
   });
 });
 
@@ -359,5 +435,171 @@ describe('GET /battles/:nonce', () => {
       headers: { 'x-player-token': DEFENDER_TOKEN },
     });
     expect(asDefender.statusCode).toBe(200);
+  });
+});
+
+// M13, sub-sessão 2/N — o "ticket de batalha". §9.1 diz que "o atacante joga a camada de
+// grid manualmente contra essa defesa"; sem o setup montado e a seed ANTES da partida, o
+// cliente só conseguiria submeter comandos às cegas. Ver `battle/ticket.ts` e DECISIONS.md.
+describe('POST /battles/ticket', () => {
+  const ticketBody = { attackerHeroIds: ['heroi-atacante'], defenderPlayerId: 'player-defensor' };
+
+  it('rejeita sem autenticação', async () => {
+    const app = buildTestApp();
+    const res = await app.inject({ method: 'POST', url: '/battles/ticket', payload: ticketBody });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('devolve nonce, seed, rulesVersion e o setup montado do confronto', async () => {
+    const app = buildTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: ticketBody,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const ticket = res.json();
+    expect(typeof ticket.nonce).toBe('string');
+    expect(Number.isInteger(ticket.seed)).toBe(true);
+    expect(ticket.rulesVersion).toBe(RULES_VERSION);
+    expect(ticket.defenderPlayerId).toBe('player-defensor');
+    // O setup vem inteiro: é com ele que o cliente monta a batalha localmente.
+    expect(ticket.setup.units.map((u: { unitId: string }) => u.unitId).sort()).toEqual([
+      'heroi-atacante',
+      'heroi-defensor',
+    ]);
+    expect(ticket.setup.units.find((u: { unitId: string }) => u.unitId === 'heroi-atacante').side).toBe('player');
+  });
+
+  it('aplica as mesmas validações de posse e de defesa que POST /battles', async () => {
+    const app = buildTestApp();
+    const alheio = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...ticketBody, attackerHeroIds: ['heroi-defensor'] },
+    });
+    expect(alheio.statusCode).toBe(403);
+
+    const semDefesa = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...ticketBody, defenderPlayerId: 'player-atacante' },
+    });
+    expect(semDefesa.statusCode).toBe(404);
+  });
+
+  it('a seed do ticket é a MESMA que a batalha usa — é o que faz a partida jogada valer', async () => {
+    // Sem isto o cliente jogaria com uma seed e o servidor resolveria com outra: os duelos
+    // que o jogador viu não seriam os que contam. §9.1 chama divergência assim de bug
+    // crítico.
+    const app = buildTestApp();
+    const ticket = (
+      await app.inject({
+        method: 'POST',
+        url: '/battles/ticket',
+        headers: { 'x-player-token': ATTACKER_TOKEN },
+        payload: ticketBody,
+      })
+    ).json();
+
+    const battle = await app.inject({
+      method: 'POST',
+      url: '/battles',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...ticketBody, nonce: ticket.nonce, rulesVersion: RULES_VERSION, commands: [] },
+    });
+
+    expect(battle.statusCode).toBe(200);
+    expect(battle.json().seed).toBe(ticket.seed);
+  });
+
+  it('o setup do ticket é o MESMO que o servidor usa pra simular', async () => {
+    const app = buildTestApp();
+    const ticket = (
+      await app.inject({
+        method: 'POST',
+        url: '/battles/ticket',
+        headers: { 'x-player-token': ATTACKER_TOKEN },
+        payload: ticketBody,
+      })
+    ).json();
+
+    await app.inject({
+      method: 'POST',
+      url: '/battles',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...ticketBody, nonce: ticket.nonce, rulesVersion: RULES_VERSION, commands: [] },
+    });
+
+    const replay = (
+      await app.inject({
+        method: 'GET',
+        url: `/battles/${ticket.nonce}`,
+        headers: { 'x-player-token': ATTACKER_TOKEN },
+      })
+    ).json();
+
+    expect(replay.seed).toBe(ticket.seed);
+    expect(replay.initialState).toEqual(ticket.setup);
+  });
+
+  it('nonces diferentes dão seeds diferentes — o ticket não é um carimbo fixo', async () => {
+    const app = buildTestApp();
+    const pedir = async () =>
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/battles/ticket',
+          headers: { 'x-player-token': ATTACKER_TOKEN },
+          payload: ticketBody,
+        })
+      ).json();
+
+    const a = await pedir();
+    const b = await pedir();
+    expect(a.nonce).not.toBe(b.nonce);
+    expect(a.seed).not.toBe(b.seed);
+  });
+
+  it('consome a mesma cota de rate limit da batalha (§9.4)', async () => {
+    // Pedir ticket em série é exatamente o que um grinder de seed faria; a contenção é o
+    // rate limiter, e por isso a emissão passa por ele.
+    const app = buildTestApp(createInMemoryRateLimiter({ maxRequests: 1, windowMs: 60_000 }));
+    const primeiro = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: ticketBody,
+    });
+    expect(primeiro.statusCode).toBe(200);
+
+    const segundo = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: ticketBody,
+    });
+    expect(segundo.statusCode).toBe(429);
+  });
+});
+
+describe('GET /me/heroes', () => {
+  it('rejeita sem autenticação', async () => {
+    const app = buildTestApp();
+    expect((await app.inject({ method: 'GET', url: '/me/heroes' })).statusCode).toBe(401);
+  });
+
+  it('lista só os heróis do próprio jogador', async () => {
+    const app = buildTestApp();
+    const meus = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-player-token': ATTACKER_TOKEN } });
+    expect(meus.statusCode).toBe(200);
+    expect(meus.json().map((h: { hero: { id: string } }) => h.hero.id)).toEqual(['heroi-atacante']);
+
+    const dele = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-player-token': DEFENDER_TOKEN } });
+    expect(dele.json().map((h: { hero: { id: string } }) => h.hero.id)).toEqual(['heroi-defensor']);
   });
 });

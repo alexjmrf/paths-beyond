@@ -2,8 +2,9 @@ import { fpDiv } from '../math/fixed.js';
 import { rngFor } from '../rng/rngFor.js';
 import { nextUint32 } from '../rng/xoshiro128.js';
 import type { Id } from '../types.js';
-import { manhattanDistance, tileAt, type Coord, type Terrain } from '../grid/types.js';
+import { coordKey, isControlObject, manhattanDistance, tileAt, type Coord, type Terrain } from '../grid/types.js';
 import { validatePath } from '../grid/pathfinding.js';
+import { interactWithAdjacentGate, openGateCoords } from './gates.js';
 import type { ConditionUnitView } from '../tactics/types.js';
 import { FP_SCALE } from '../math/fixed.js';
 import { canAffordAp, spendAp, type DuelEconomyState } from '../duel/economy.js';
@@ -70,7 +71,14 @@ function applyMove(state: BattleState, cmd: Extract<BattleCommand, { t: 'move' }
   const remainingRange = unit.moveRange - (state.distanceMovedThisTurn[unit.unitId] ?? 0);
 
   const validation = validatePath(
-    { map: state.map, moveType: unit.moveType, occupiedByAlly: allies, occupiedByEnemy: enemies },
+    {
+      map: state.map,
+      moveType: unit.moveType,
+      occupiedByAlly: allies,
+      occupiedByEnemy: enemies,
+      // §5.1 (M15 D3) — muro e portão fechado bloqueiam; portão já aberto nesta batalha não.
+      openGates: openGateCoords(state),
+    },
     cmd.path,
     remainingRange,
   );
@@ -112,13 +120,17 @@ function applyRest(state: BattleState, cmd: Extract<BattleCommand, { t: 'rest' }
 }
 
 // §5.4 — "Encerra o turno. Se terminar sobre fort ou camp: +1 AP."
+// §5.1 (M15 D3) — e é aqui também que um portão adjacente é aberto ou golpeado: encerrar o
+// turno ao lado dele é o custo de mexer no portão, sem inventar uma quinta ação que §5.4
+// não lista (ver battle/gates.ts).
 function applyWait(state: BattleState, cmd: Extract<BattleCommand, { t: 'wait' }>): CommandOutcome {
   const unit = findUnit(state, cmd.unitId);
   if (!canAct(unit)) return rejected(state, 'unidade inexistente, morta ou já agiu neste round');
 
   const tile = tileAt(state.map, unit.pos);
-  const bonusAp = tile?.object === 'fort' || tile?.object === 'camp' ? 1 : 0;
-  return accepted(replaceUnit(state, unit.unitId, { ap: unit.ap + bonusAp, hasActedThisRound: true }));
+  const bonusAp = isControlObject(tile?.object) ? 1 : 0;
+  const withGate = interactWithAdjacentGate(state, unit);
+  return accepted(replaceUnit(withGate, unit.unitId, { ap: unit.ap + bonusAp, hasActedThisRound: true }));
 }
 
 // §5.4 (M11, sub-sessão 2/N) — "cura em área, artilharia, buff de zona". Quem a área
@@ -241,11 +253,18 @@ function applyUseValor(state: BattleState, cmd: Extract<BattleCommand, { t: 'use
   if (state.valor < skill.cost) return rejected(state, 'valor insuficiente');
 
   const resolution = resolveValorSkill(state, skill, cmd.target);
-  // Nada é cobrado quando a resolução falha: um `summonReinforcement` (ainda sem
-  // implementação) ou um alvo inválido não podem consumir Valor em silêncio.
+  // Nada é cobrado quando a resolução falha: um alvo inválido não pode consumir Valor em
+  // silêncio. Regra de M11 preservada de propósito por D2, que a cita como design correto.
   if (!resolution.ok) return rejected(state, resolution.reason);
 
-  return accepted({ ...state, units: resolution.units, valor: state.valor - skill.cost });
+  return accepted({
+    ...state,
+    units: resolution.units,
+    // §5.3 — só a invocação traz lista nova (por inserção); os outros kinds mantêm a de
+    // sempre, calculada uma única vez na montagem da batalha.
+    initiativeOrder: resolution.initiativeOrder ?? state.initiativeOrder,
+    valor: state.valor - skill.cost,
+  });
 }
 
 function terrainAt(state: BattleState, pos: Coord): Terrain | undefined {
@@ -485,7 +504,42 @@ function applyEngage(state: BattleState, cmd: Extract<BattleCommand, { t: 'engag
   return accepted({ ...state, units: nextUnits, freeAssistUsedThisRound }, duelResult);
 }
 
+// §5.6 — "Começa em 5, +1 por round, +2 ao capturar objetivo." A spec nomeia "objetivo" e
+// não o define; a leitura decidida com o usuário (M15 1/N) é o TILE DE CONTROLE — `fort` ou
+// `camp` —, capturado quando uma unidade viva do jogador ENCERRA o turno sobre ele.
+//
+// As duas restrições não são decoração: só o jogador, porque §5.6 define Valor como o recurso
+// do exército dele; e uma vez por tile por batalha, senão entrar e sair do mesmo fort seria
+// uma bomba de Valor infinita. Encerrar o turno e não pisar, porque capturar é ficar.
+const OBJECTIVE_CAPTURE_VALOR = 2;
+
+function applyObjectiveCapture(state: BattleState, unitId: Id | undefined): BattleState {
+  if (unitId === undefined) return state;
+  const unit = findUnit(state, unitId);
+  if (!unit || unit.side !== 'player' || unit.hp <= 0 || !unit.hasActedThisRound) return state;
+
+  if (!isControlObject(tileAt(state.map, unit.pos)?.object)) return state;
+
+  const key = coordKey(unit.pos);
+  const captured = state.capturedObjectives ?? [];
+  if (captured.includes(key)) return state;
+
+  return { ...state, valor: state.valor + OBJECTIVE_CAPTURE_VALOR, capturedObjectives: [...captured, key] };
+}
+
 export function applyCommand(state: BattleState, command: BattleCommand): CommandOutcome {
+  const outcome = dispatchCommand(state, command);
+  if (!outcome.applied) return outcome;
+
+  // Um só ponto de checagem para as quatro ações que encerram o turno (`engage`, `mapSkill`,
+  // `rest`, `wait`) — espalhar a captura por cada uma garantiria esquecer alguma. `move` não
+  // encerra o turno, então o guard de `hasActedThisRound` já o descarta sozinho. `useValor`
+  // não tem unidade agindo (§5.6: não consome o turno de ninguém).
+  const unitId = 'unitId' in command ? command.unitId : undefined;
+  return { ...outcome, state: applyObjectiveCapture(outcome.state, unitId) };
+}
+
+function dispatchCommand(state: BattleState, command: BattleCommand): CommandOutcome {
   switch (command.t) {
     case 'move':
       return applyMove(state, command);

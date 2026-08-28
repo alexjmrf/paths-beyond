@@ -18,10 +18,49 @@ export interface Terrain {
   readonly blocksSight: boolean;
 }
 
+// §5.1 declara `object?: 'wall'|'fort'|'gate'|'chest'|'camp'`. M15 D3 (briefing) removeu
+// `chest`: loot em mapa é sistema de exploração que este jogo não tem, e um valor de enum
+// que nada lê e nada escreve é dívida, não recurso. Os quatro restantes têm leitor no motor:
+// `fort`/`camp` dão +1 AP no `wait` (§5.4) e são objetivo de captura (§5.6); `wall` e `gate`
+// bloqueiam movimento (pathfinding.ts).
+export const TILE_OBJECTS = ['wall', 'fort', 'gate', 'camp'] as const;
+
+export type TileObject = (typeof TILE_OBJECTS)[number];
+
+// §5.6 — "+2 ao capturar objetivo". A spec nomeia "objetivo" e não o define; a leitura
+// decidida com o usuário (M15 1/N) é o tile de controle, que é o mesmo par que §5.4 já
+// trata como valioso.
+const CONTROL_OBJECTS: readonly TileObject[] = ['fort', 'camp'];
+
+export function isControlObject(object: TileObject | undefined): boolean {
+  return object !== undefined && CONTROL_OBJECTS.includes(object);
+}
+
+// Quem consegue ABRIR o portão encerrando o turno ao lado dele (§5.4 `wait`). Quem não
+// consegue precisa arrombá-lo, gastando `durability` turnos-unidade — requisito do usuário
+// para as fases de PvE (ver DECISIONS.md, M15 1/N).
+//
+// `'none'` é o portão TRANCADO: ninguém tem a chave e os dois lados só passam arrombando.
+// Ele existe porque a alternativa se mostrou degenerada na prática (M15 2/N): com um lado
+// dono da chave, a IA de mapa daquele lado anda até o portão e o `wait` do mesmo turno o
+// abre — a fortaleza destrancava no round 1 e a durabilidade nunca era exercida.
+export type GateOpensFor = 'player' | 'enemy' | 'any' | 'none';
+
+export interface GateDef {
+  readonly opensFor: GateOpensFor;
+  readonly durability: number; // turnos-unidade para arrombar pelo lado travado
+}
+
+// Portão sem declaração no tile: qualquer um abre, num turno. É o portão simples, e é o que
+// mantém `{ object: 'gate' }` sozinho sendo conteúdo válido.
+export const DEFAULT_GATE: GateDef = { opensFor: 'any', durability: 1 };
+
 export interface Tile {
   readonly terrain: TerrainId;
   readonly height: 0 | 1 | 2 | 3;
-  readonly object?: 'wall' | 'fort' | 'gate' | 'chest' | 'camp';
+  readonly object?: TileObject;
+  // Lido só quando `object === 'gate'`. Ausente = DEFAULT_GATE.
+  readonly gate?: GateDef;
 }
 
 export interface GridMap {

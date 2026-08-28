@@ -52,10 +52,19 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     itemSets: readJsonFiles(typeDir(root, 'item-sets', layout)),
     effects: readJsonFiles(typeDir(root, 'effects', layout)),
     valorSkills: readJsonFiles(typeDir(root, 'valor-skills', layout)),
+    summonBlueprints: readJsonFiles(typeDir(root, 'summon-blueprints', layout)),
     comps: readJsonFiles(typeDir(root, 'comps', layout)),
     encounters: readJsonFiles(typeDir(root, 'encounters', layout)),
     maps: readJsonFiles(typeDir(root, 'maps', layout)),
     terrains: readJsonFiles(typeDir(root, 'terrains', layout)),
     weaponDuelRanges: readFirstJsonFile(typeDir(root, 'weapon-duel-ranges', layout)),
+    // §10 (M14) — economia PvE.
+    dungeons: readJsonFiles(typeDir(root, 'dungeons', layout)),
+    dungeonEncounters: readJsonFiles(typeDir(root, 'dungeon-encounters', layout)),
+    materials: readJsonFiles(typeDir(root, 'materials', layout)),
+    economyRules: readJsonFiles(typeDir(root, 'economy-rules', layout)),
+    substatWeights: readFirstJsonFile(typeDir(root, 'substat-weights', layout)),
+    mainstatWeights: readFirstJsonFile(typeDir(root, 'mainstat-weights', layout)),
+    enhanceRates: readFirstJsonFile(typeDir(root, 'enhance-rates', layout)),
   });
 }

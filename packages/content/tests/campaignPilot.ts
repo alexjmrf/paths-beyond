@@ -6,6 +6,7 @@ import {
   coordKey,
   isInBounds,
   manhattanDistance,
+  openGateCoords,
   orthogonalNeighbors,
   tileAt,
   type BattleCommand,
@@ -20,6 +21,7 @@ import {
   type WinCondition,
 } from '@paths-beyond/core';
 import type { ContentCatalog, Encounter } from '../src/types.js';
+import { toSummonBlueprintPlacements } from '../src/summonPlacements.js';
 
 // M12, sub-sessão 3/N — piloto automático do lado do jogador, usado por
 // `campanha.test.ts` pra provar que os 6 capítulos são JOGÁVEIS (o critério de aceite do
@@ -64,6 +66,13 @@ export function setupFor(catalog: ContentCatalog, encounter: Encounter): BattleS
     skillsCatalog: catalog.skills,
     weaponDuelRanges: catalog.weaponDuelRanges,
     baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+    // Mesmo setup que o cliente monta (M12, sub-sessão 4/N): o replay gravado aqui só
+    // vale como prova se a batalha for montada do mesmo jeito que a de verdade.
+    valorSkills: catalog.valorSkills,
+    // §5.6 (M15 2/N) — o piloto não invoca (ele não gasta Valor), mas a batalha tem de ser
+    // montada do MESMO jeito que a do cliente: o replay gravado aqui só vale como prova se
+    // o `BattleSetup` for idêntico ao real.
+    summonBlueprints: toSummonBlueprintPlacements(catalog),
   });
 }
 
@@ -95,7 +104,14 @@ function reachableFor(state: BattleState, unit: BattleUnit): ReturnType<typeof c
   const enemies = state.units.filter((u) => u.side !== unit.side && u.hp > 0).map((u) => u.pos);
   const remaining = unit.moveRange - (state.distanceMovedThisTurn[unit.unitId] ?? 0);
   return computeReachableTiles(
-    { map: state.map, moveType: unit.moveType, occupiedByAlly: allies, occupiedByEnemy: enemies },
+    {
+      map: state.map,
+      moveType: unit.moveType,
+      occupiedByAlly: allies,
+      occupiedByEnemy: enemies,
+      // §5.1 (M15 D3) — muro e portão fechado bloqueiam; portão já aberto, não.
+      openGates: openGateCoords(state),
+    },
     unit.pos,
     remaining,
   );
@@ -109,6 +125,14 @@ function reachableFor(state: BattleState, unit: BattleUnit): ReturnType<typeof c
 // reta — nunca é escolhida. Andar em volta do obstáculo é a coisa mais básica que um
 // humano faz, então o arnês precisa fazer também, senão o teste mede a burrice do piloto
 // em vez de mediar a jogabilidade do mapa.
+//
+// M15 (D3) acrescentou a segunda metade da mesma ideia: `wall` é parede e sai da rota, mas
+// **portão fechado CONTINUA na rota**. Um portão é caminho — só custa abri-lo. Tratá-lo como
+// parede faria o piloto dar a fortaleza do capítulo 6 por inalcançável e ficar rondando a
+// muralha; deixando-o na rota, o piloto anda até ele, descobre que não consegue passar
+// (`computeReachableTiles`, que conhece o bloqueio de verdade, não devolve o tile), e cai no
+// `wait` — que é exatamente o comando que arromba. Derrubar a porta da frente é o piso do
+// que um humano faz, e não precisou de regra nova no piloto para acontecer.
 function routeDistances(map: GridMap, moveType: MoveType, goal: Coord): ReadonlyMap<string, number> {
   const dist = new Map<string, number>([[coordKey(goal), 0]]);
   let frontier: Coord[] = [goal];
@@ -123,6 +147,7 @@ function routeDistances(map: GridMap, moveType: MoveType, goal: Coord): Readonly
         if (dist.has(key)) continue;
         const tile = tileAt(map, neighbor);
         if (!tile) continue;
+        if (tile.object === 'wall') continue;
         if (map.terrains[tile.terrain]?.moveCost[moveType] === 'impassable') continue;
         dist.set(key, base + 1);
         next.push(neighbor);
@@ -201,6 +226,11 @@ function decidePlayerCommand(state: BattleState, unit: BattleUnit, objectiveUnit
 export interface PlaythroughResult {
   readonly state: BattleState;
   readonly commands: number;
+  // M13, sub-sessão 1/N — a sequência de comandos emitida, na ordem. É o que um `Replay`
+  // guarda (§3.4: `{rulesVersion, seed, initialState, commands}`), e é o que permite
+  // testar reprodução sem depender de UI: o piloto joga, a jogada vira replay, o replay é
+  // reaplicado e tem que dar o mesmo estado final.
+  readonly commandLog: readonly BattleCommand[];
 }
 
 export function playthrough(
@@ -209,6 +239,7 @@ export function playthrough(
   seed: number = CAMPAIGN_SEED,
 ): PlaythroughResult {
   let state = buildInitialState(setupFor(catalog, encounter), seed);
+  const commandLog: BattleCommand[] = [];
   let commands = 0;
 
   while (state.outcome === 'ongoing' && commands < COMMAND_BUDGET) {
@@ -227,8 +258,10 @@ export function playthrough(
       .find((u): u is BattleUnit => !!u && u.side === 'player' && u.hp > 0 && !u.hasActedThisRound);
     if (!next) break; // só sobrou IA pendente ou ninguém — `applyCommandAndAdvance` já drenou
 
-    const outcome = applyCommandAndAdvance(state, decidePlayerCommand(state, next, objectiveUnitId));
+    const command = decidePlayerCommand(state, next, objectiveUnitId);
+    const outcome = applyCommandAndAdvance(state, command);
     commands += 1;
+    commandLog.push(command);
     if (!outcome.applied) {
       // Comando rejeitado seria laço infinito: falha alto com o motivo real.
       throw new Error(`${encounter.id}: comando rejeitado para ${next.unitId}: ${outcome.reason}`);
@@ -236,5 +269,5 @@ export function playthrough(
     state = outcome.state;
   }
 
-  return { state, commands };
+  return { state, commands, commandLog };
 }

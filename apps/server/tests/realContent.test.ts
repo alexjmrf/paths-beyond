@@ -9,7 +9,13 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
+import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
+
+// Segredo fixo do HMAC que deriva a seed do nonce (M13, sub-sessão 2/N): teste precisa
+// de seed reprodutível.
+const TICKET_SECRET = 'segredo-de-teste';
 
 // Fecha o corte de escopo registrado em M7 (`EMPTY_CATALOG`) e o achado 1 da auditoria de
 // 2026-08-07 (docs/milestones/M9-integracao-de-conteudo.md, sub-sessão 2): prova que o
@@ -50,8 +56,8 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
     };
 
     const repository = createMemoryPlayerRepository([
-      { id: 'player-real-atacante', token: 'token-real-atacante', displayName: 'Atacante', elo: 1200, arenaMarks: 0 },
-      { id: 'player-real-defensor', token: 'token-real-defensor', displayName: 'Defensor', elo: 1200, arenaMarks: 0 },
+      { id: 'player-real-atacante', token: 'token-real-atacante', displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+      { id: 'player-real-defensor', token: 'token-real-defensor', displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
     ]);
     const heroRepository = createMemoryHeroRepository([
       { ownerPlayerId: 'player-real-atacante', hero: attackerHero, equippedItems: [] },
@@ -59,6 +65,7 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
     ]);
 
     const app = buildApp({
+    economyRepository: createMemoryEconomyRepository(),
       repository,
       heroRepository,
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
@@ -66,7 +73,8 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
       seasonRepository: createMemorySeasonRepository(),
       catalog,
       shopCatalog: {},
-      rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+      ticketSecret: TICKET_SECRET,
+    rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
     });
 
     const saveDefense = await app.inject({

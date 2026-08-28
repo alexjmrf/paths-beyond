@@ -1,0 +1,169 @@
+{
+  "id": "encounter-campo-de-treino",
+  "name": "Campo de Treino",
+  "mapId": "map-campanha-1",
+  "permadeath": "casual",
+  "winCondition": {
+    "t": "rout"
+  },
+  "units": [
+    {
+      "unitId": "dungeon-campo-de-treino-vaga-1",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-campo-de-treino-vaga-1",
+        "classId": "class-espadachim",
+        "level": 12,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "dungeon-campo-de-treino-vaga-2",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-campo-de-treino-vaga-2",
+        "classId": "class-clerigo",
+        "level": 12,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 6
+      },
+      "height": 0
+    },
+    {
+      "unitId": "treino-alvo-1",
+      "side": "enemy",
+      "hero": {
+        "id": "treino-alvo-1",
+        "classId": "class-espadachim",
+        "level": 8,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 12,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "treino-alvo-2",
+      "side": "enemy",
+      "hero": {
+        "id": "treino-alvo-2",
+        "classId": "class-arqueiro",
+        "level": 8,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 12,
+        "y": 6
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

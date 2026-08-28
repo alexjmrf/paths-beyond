@@ -1,11 +1,14 @@
 import { computeDamage, rollDamageVariance } from '../duel/damage.js';
 import { applyActiveEffectsToStats, sumDamageTakenReductionPct, upsertActiveEffect } from '../duel/effects.js';
-import type { Coord } from '../grid/types.js';
+import { isTilePassable } from '../grid/pathfinding.js';
+import { coordKey, tileAt, type Coord } from '../grid/types.js';
 import { FP_SCALE } from '../math/fixed.js';
 import { rngFor } from '../rng/rngFor.js';
 import { nextUint32 } from '../rng/xoshiro128.js';
 import type { Id } from '../types.js';
 import { unitsInArea } from './area.js';
+import { openGateCoords } from './gates.js';
+import { insertIntoInitiativeOrder, rollInitiative, type InitiativeEntry } from './initiative.js';
 import type { BattleState, BattleUnit } from './types.js';
 
 // §5.6 (M11, sub-sessão 3/N) — "Recurso de exército, tipo Unicorn Overlord [...] Gasto em:
@@ -27,12 +30,20 @@ export type ValorSkillDef =
   | (ValorSkillBase & { readonly kind: 'restoreApPp'; readonly payload: { readonly ap: number; readonly pp: number } })
   | (ValorSkillBase & { readonly kind: 'artillery'; readonly payload: { readonly damage: number; readonly radius: number } })
   | (ValorSkillBase & { readonly kind: 'globalBuff'; readonly payload: { readonly effectId: Id } })
-  // Sem resolução (decisão do usuário — fatia própria). Continua no tipo porque §5.6 o
-  // nomeia e o schema o aceita; `resolveValorSkill` rejeita alto em vez de gastar Valor.
-  | (ValorSkillBase & { readonly kind: 'summonReinforcement'; readonly payload: Readonly<Record<string, unknown>> });
+  // §5.6 (M15 D2) — o payload nomeia um blueprint de `BattleSetup.summonBlueprints`; a
+  // unidade invocada é CONTEÚDO (regra 4), nunca gerada em código. Em M11 este kind
+  // rejeitava alto por falta de resolução.
+  | (ValorSkillBase & { readonly kind: 'summonReinforcement'; readonly payload: { readonly blueprintId: Id } });
 
 export type ValorResolution =
-  | { readonly ok: true; readonly units: readonly BattleUnit[] }
+  | {
+      readonly ok: true;
+      readonly units: readonly BattleUnit[];
+      // §5.3 — só a invocação mexe na lista de iniciativa, e mesmo assim INSERINDO ("unidades
+      // que entram depois são inseridas na posição correspondente ao seu valor de
+      // iniciativa"). Ausente = lista inalterada, que é o caso dos outros três kinds.
+      readonly initiativeOrder?: readonly InitiativeEntry[];
+    }
   | { readonly ok: false; readonly reason: string };
 
 // §5.6 — "buff global de 1 round": duração numérica de 1 round de mapa, que `endRound`
@@ -123,7 +134,50 @@ export function resolveValorSkill(state: BattleState, skill: ValorSkillDef, targ
       };
     }
 
-    case 'summonReinforcement':
-      return { ok: false, reason: 'summonReinforcement ainda não tem resolução (ver DECISIONS.md, M11)' };
+    case 'summonReinforcement': {
+      // Regra 4 — a unidade invocada é conteúdo. Sem blueprint no catálogo não há o que
+      // invocar, e inventar um em código seria exatamente o que a regra proíbe.
+      const blueprint = state.summonBlueprints?.[skill.payload.blueprintId];
+      if (!blueprint) return { ok: false, reason: 'blueprint de reforço não está no catálogo' };
+
+      const tile = tileAt(state.map, target);
+      if (!tile) return { ok: false, reason: 'tile alvo fora do mapa' };
+      if (!isTilePassable(state.map, target, blueprint.moveType, openGateCoords(state))) {
+        return { ok: false, reason: 'o reforço não consegue ocupar o tile alvo' };
+      }
+      if (state.units.some((u) => u.hp > 0 && u.pos.x === target.x && u.pos.y === target.y)) {
+        return { ok: false, reason: 'tile alvo ocupado' };
+      }
+
+      // Id próprio e determinístico: o do blueprint se repetiria a cada invocação, e duas
+      // unidades com o mesmo `unitId` quebrariam iniciativa, duelo e replay de uma vez. Round
+      // + tile são únicos por invocação — o tile fica ocupado logo depois.
+      const unitId = `${skill.payload.blueprintId}@r${state.round}:${coordKey(target)}`;
+
+      const summoned: BattleUnit = {
+        ...blueprint,
+        unitId,
+        // §5.6 — Valor é o recurso do exército do jogador, então o reforço é dele.
+        side: 'player',
+        pos: target,
+        // §5.5 — a vantagem de altura sai do terreno, nunca de número autorado à mão.
+        height: tile.height,
+        // Não age no round em que nasce: dar um turno extra imediato seria uma regra que
+        // §5.6 não menciona, e o preço do Valor já é a decisão.
+        hasActedThisRound: true,
+      };
+
+      return {
+        ok: true,
+        units: [...state.units, summoned],
+        // §5.3 — a rolagem usa o round corrente (a lista inicial usa 0), então o stream da
+        // invocada não colide com o de ninguém, e a mesma seed sempre a coloca no mesmo
+        // lugar. As entradas já existentes não são recalculadas: a lista só recebe mais uma.
+        initiativeOrder: insertIntoInitiativeOrder(state.initiativeOrder, {
+          unitId,
+          initiative: rollInitiative(state.seed, state.round, unitId, summoned.stats.spd),
+        }),
+      };
+    }
   }
 }

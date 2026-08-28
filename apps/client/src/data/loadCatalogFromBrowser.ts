@@ -30,11 +30,25 @@ const itemModules = import.meta.glob('../../../../packages/data/items/*.json', {
 const itemSetModules = import.meta.glob('../../../../packages/data/item-sets/*.json', { eager: true, import: 'default' });
 const effectModules = import.meta.glob('../../../../packages/data/effects/*.json', { eager: true, import: 'default' });
 const valorSkillModules = import.meta.glob('../../../../packages/data/valor-skills/*.json', { eager: true, import: 'default' });
+// §5.6 (M15 D2) — os reforços invocáveis. Sem isto o cliente montaria a campanha com a
+// valor-skill de invocação no catálogo e sem a unidade que ela invoca: o comando existiria
+// no HUD e seria rejeitado no clique.
+const summonBlueprintModules = import.meta.glob('../../../../packages/data/summon-blueprints/*.json', { eager: true, import: 'default' });
 const compModules = import.meta.glob('../../../../packages/data/comps/*.json', { eager: true, import: 'default' });
 const encounterModules = import.meta.glob('../../../../packages/data/encounters/*.json', { eager: true, import: 'default' });
 const mapModules = import.meta.glob('../../../../packages/data/maps/*.json', { eager: true, import: 'default' });
 const terrainModules = import.meta.glob('../../../../packages/data/terrains/*.json', { eager: true, import: 'default' });
 const weaponDuelRangesModules = import.meta.glob('../../../../packages/data/weapon-duel-ranges/*.json', { eager: true, import: 'default' });
+// §10 (M14) — economia PvE. O cliente ainda não tem tela de masmorra (é a fatia 5/N), mas
+// o catálogo é um só: carregar aqui mantém os dois adaptadores em paridade, que é o que
+// impede o cliente de descobrir a diferença tarde, em runtime.
+const dungeonModules = import.meta.glob('../../../../packages/data/dungeons/*.json', { eager: true, import: 'default' });
+const dungeonEncounterModules = import.meta.glob('../../../../packages/data/dungeon-encounters/*.json', { eager: true, import: 'default' });
+const materialModules = import.meta.glob('../../../../packages/data/materials/*.json', { eager: true, import: 'default' });
+const economyRulesModules = import.meta.glob('../../../../packages/data/economy-rules/*.json', { eager: true, import: 'default' });
+const substatWeightsModules = import.meta.glob('../../../../packages/data/substat-weights/*.json', { eager: true, import: 'default' });
+const mainstatWeightsModules = import.meta.glob('../../../../packages/data/mainstat-weights/*.json', { eager: true, import: 'default' });
+const enhanceRatesModules = import.meta.glob('../../../../packages/data/enhance-rates/*.json', { eager: true, import: 'default' });
 
 export function loadCatalogFromBrowser(): ContentCatalog {
   const weaponDuelRangesValues = globJsonValues(weaponDuelRangesModules);
@@ -48,10 +62,18 @@ export function loadCatalogFromBrowser(): ContentCatalog {
     itemSets: globJsonValues(itemSetModules),
     effects: globJsonValues(effectModules),
     valorSkills: globJsonValues(valorSkillModules),
+    summonBlueprints: globJsonValues(summonBlueprintModules),
     comps: globJsonValues(compModules),
     encounters: globJsonValues(encounterModules),
     maps: globJsonValues(mapModules),
     terrains: globJsonValues(terrainModules),
     weaponDuelRanges,
+    dungeons: globJsonValues(dungeonModules),
+    dungeonEncounters: globJsonValues(dungeonEncounterModules),
+    materials: globJsonValues(materialModules),
+    economyRules: globJsonValues(economyRulesModules),
+    substatWeights: globJsonValues(substatWeightsModules)[0],
+    mainstatWeights: globJsonValues(mainstatWeightsModules)[0],
+    enhanceRates: globJsonValues(enhanceRatesModules)[0],
   });
 }

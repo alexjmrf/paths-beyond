@@ -1,0 +1,47 @@
+{
+  "id": "dungeon-covil-do-tirano-elite",
+  "name": "Covil do Tirano (Elite)",
+  "focus": "boss",
+  "difficulty": "elite",
+  "encounterId": "encounter-covil-do-tirano-elite",
+  "energyCost": 30,
+  "manualOnly": true,
+  "requiresClearOf": "dungeon-covil-do-tirano",
+  "entryLimit": {
+    "maxEntries": 2,
+    "resetOn": {
+      "kind": "monthDays",
+      "days": [
+        1,
+        15
+      ]
+    }
+  },
+  "gold": {
+    "min": 200,
+    "max": 320
+  },
+  "stones": {
+    "min": 10,
+    "max": 16
+  },
+  "materialDropCount": 3,
+  "materialDrops": [
+    {
+      "weight": 3,
+      "materialId": "material-nucleo-de-despertar",
+      "amount": {
+        "min": 3,
+        "max": 6
+      }
+    },
+    {
+      "weight": 2,
+      "materialId": "material-fragmento-hero-jogador",
+      "amount": {
+        "min": 1,
+        "max": 2
+      }
+    }
+  ]
+}

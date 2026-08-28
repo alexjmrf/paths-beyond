@@ -1,0 +1,84 @@
+{
+  "id": "economy-padrao",
+  "energy": {
+    "max": 60,
+    "refillIntervalMs": 360000
+  },
+  "awakening": [
+    {
+      "gold": 500,
+      "materials": {
+        "material-nucleo-de-despertar": 2
+      }
+    },
+    {
+      "gold": 1000,
+      "materials": {
+        "material-nucleo-de-despertar": 4
+      }
+    },
+    {
+      "gold": 2000,
+      "materials": {
+        "material-nucleo-de-despertar": 6
+      }
+    },
+    {
+      "gold": 4000,
+      "materials": {
+        "material-nucleo-de-despertar": 10
+      }
+    },
+    {
+      "gold": 8000,
+      "materials": {
+        "material-nucleo-de-despertar": 15
+      }
+    },
+    {
+      "gold": 16000,
+      "materials": {
+        "material-nucleo-de-despertar": 25
+      }
+    }
+  ],
+  "imprint": [
+    {
+      "fragments": 1
+    },
+    {
+      "fragments": 1
+    },
+    {
+      "fragments": 2
+    },
+    {
+      "fragments": 2
+    },
+    {
+      "fragments": 3
+    }
+  ],
+  "enhance": [
+    {
+      "gold": 200,
+      "stones": 1
+    },
+    {
+      "gold": 600,
+      "stones": 3
+    },
+    {
+      "gold": 1500,
+      "stones": 6
+    },
+    {
+      "gold": 3500,
+      "stones": 12
+    },
+    {
+      "gold": 8000,
+      "stones": 24
+    }
+  ]
+}

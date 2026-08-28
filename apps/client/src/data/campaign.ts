@@ -3,6 +3,7 @@ import { buildBattleSetupFromHeroes, type BattleSetup, type Hero, type HeroPlace
 // `loadCatalogFromDisk`, que importa `node:fs` — mesmo motivo já documentado em
 // `loadCatalogFromBrowser.ts`.
 import type { Encounter } from '@paths-beyond/content/src/types.js';
+import { toSummonBlueprintPlacements } from '@paths-beyond/content/src/summonPlacements.js';
 import { catalog } from './catalog.js';
 
 // M12, sub-sessão 1/N: o ELENCO de cada mapa da campanha saiu daqui para
@@ -60,6 +61,10 @@ function buildCampaignMap(encounter: Encounter): CampaignMapContent {
       // havia o que gastar: `applyUseValor` resolve contra `state.valorSkills`, que
       // ninguém preenchia fora de teste.
       valorSkills: catalog.valorSkills,
+      // §5.6 (M15, sub-sessão 2/N) — mesma história do repasse acima, um milestone depois:
+      // sem os blueprints a valor-skill de invocação apareceria no HUD e seria recusada no
+      // clique, porque o motor não teria de onde tirar a unidade.
+      summonBlueprints: toSummonBlueprintPlacements(catalog),
       itemSets: catalog.itemSets,
       skillsCatalog: catalog.skills,
       weaponDuelRanges: catalog.weaponDuelRanges,

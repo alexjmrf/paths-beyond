@@ -1,8 +1,10 @@
-import type { BattleCommand, BattleResult, BattleSetup, Hero, ItemInstance } from '@paths-beyond/core';
+import type { BattleCommand, BattleResult, BattleSetup, EnergyState, EntryLimitState, Hero, ItemInstance } from '@paths-beyond/core';
 import type { Pool } from 'pg';
 import {
   DEFAULT_ARENA_MARKS,
   DEFAULT_ELO,
+  DEFAULT_GOLD,
+  DEFAULT_STONES,
   type ArenaDefense,
   type ArenaDefenseRepository,
   type HeroRepository,
@@ -13,9 +15,12 @@ import {
   type SeasonRepository,
   type StoredHero,
   type StoredReplay,
+  type DungeonRunRecord,
+  type EconomyActionRecord,
+  type EconomyRepository,
 } from './types.js';
 
-const PLAYER_COLUMNS = 'id, token, display_name, elo, arena_marks';
+const PLAYER_COLUMNS = 'id, token, display_name, elo, arena_marks, gold, stones, energy_stored, energy_as_of';
 
 export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
   return {
@@ -31,8 +36,19 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
     },
     async createPlayer(input) {
       const result = await pool.query<PlayerRow>(
-        `INSERT INTO players (id, token, display_name, elo, arena_marks) VALUES ($1, $2, $3, $4, $5) RETURNING ${PLAYER_COLUMNS}`,
-        [input.id, input.token, input.displayName, input.elo ?? DEFAULT_ELO, input.arenaMarks ?? DEFAULT_ARENA_MARKS],
+        `INSERT INTO players (id, token, display_name, elo, arena_marks, gold, stones, energy_stored, energy_as_of)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${PLAYER_COLUMNS}`,
+        [
+          input.id,
+          input.token,
+          input.displayName,
+          input.elo ?? DEFAULT_ELO,
+          input.arenaMarks ?? DEFAULT_ARENA_MARKS,
+          input.gold ?? DEFAULT_GOLD,
+          input.stones ?? DEFAULT_STONES,
+          input.energy?.stored ?? 0,
+          input.energy?.asOfMs ?? 0,
+        ],
       );
       const row = result.rows[0];
       if (!row) {
@@ -49,6 +65,24 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
       if (!row) {
         throw new Error(`player not found: ${id}`);
       }
+      return rowToPlayer(row);
+    },
+    async updateWallet(id, wallet) {
+      const result = await pool.query<PlayerRow>(
+        `UPDATE players SET gold = $2, stones = $3 WHERE id = $1 RETURNING ${PLAYER_COLUMNS}`,
+        [id, wallet.gold, wallet.stones],
+      );
+      const row = result.rows[0];
+      if (!row) throw new Error(`player not found: ${id}`);
+      return rowToPlayer(row);
+    },
+    async updateEnergy(id, energy) {
+      const result = await pool.query<PlayerRow>(
+        `UPDATE players SET energy_stored = $2, energy_as_of = $3 WHERE id = $1 RETURNING ${PLAYER_COLUMNS}`,
+        [id, energy.stored, energy.asOfMs],
+      );
+      const row = result.rows[0];
+      if (!row) throw new Error(`player not found: ${id}`);
       return rowToPlayer(row);
     },
     async updateArenaMarks(id, arenaMarks) {
@@ -82,10 +116,28 @@ interface PlayerRow {
   readonly display_name: string;
   readonly elo: number;
   readonly arena_marks: number;
+  // `gold` e `energy_as_of` são bigint no banco (ouro acumula muito, e um instante em ms
+  // não cabe em integer): o driver `pg` devolve bigint como string para não perder
+  // precisão, então o tipo aqui é a união e a conversão acontece em `rowToPlayer`.
+  readonly gold: number | string;
+  readonly stones: number;
+  readonly energy_stored: number;
+  readonly energy_as_of: number | string;
 }
 
 function rowToPlayer(row: PlayerRow): Player {
-  return { id: row.id, token: row.token, displayName: row.display_name, elo: row.elo, arenaMarks: row.arena_marks };
+  return {
+    id: row.id,
+    token: row.token,
+    displayName: row.display_name,
+    elo: row.elo,
+    arenaMarks: row.arena_marks,
+    gold: Number(row.gold),
+    stones: row.stones,
+    // `energy_as_of` é bigint (instante em ms não cabe em integer): o driver devolve
+    // string, então a conversão acontece aqui, na fronteira.
+    energy: { stored: row.energy_stored, asOfMs: Number(row.energy_as_of) },
+  };
 }
 
 // Herói/inventário são dados profundamente aninhados (talentos, scripts, substats) sem
@@ -119,6 +171,13 @@ export function createPostgresHeroRepository(pool: Pool): HeroRepository {
       const result = await pool.query<HeroRow>(
         'SELECT hero_id, owner_player_id, hero, equipped_items FROM heroes WHERE hero_id = ANY($1)',
         [heroIds],
+      );
+      return result.rows.map(rowToStoredHero);
+    },
+    async listHeroesByOwner(ownerPlayerId) {
+      const result = await pool.query<HeroRow>(
+        'SELECT hero_id, owner_player_id, hero, equipped_items FROM heroes WHERE owner_player_id = $1 ORDER BY hero_id',
+        [ownerPlayerId],
       );
       return result.rows.map(rowToStoredHero);
     },
@@ -258,6 +317,167 @@ export function createPostgresSeasonRepository(pool: Pool): SeasonRepository {
         [season.id, season.seasonNumber, season.startedAt, season.endsAt],
       );
       return season;
+    },
+  };
+}
+
+
+// §10 (M14, sub-sessão 3/N) — o espelho Postgres do estado de conta do PvE. Mesma divisão
+// do resto do arquivo: nenhuma regra aqui, só leitura e escrita — quem decide se pode
+// gastar energia ou se o material dá é `packages/core`.
+export function createPostgresEconomyRepository(pool: Pool): EconomyRepository {
+  return {
+    async getMaterials(playerId) {
+      const result = await pool.query<{ material_id: string; amount: number }>(
+        'SELECT material_id, amount FROM player_materials WHERE player_id = $1',
+        [playerId],
+      );
+      const materials: Record<string, number> = {};
+      for (const row of result.rows) materials[row.material_id] = row.amount;
+      return materials;
+    },
+    async setMaterials(playerId, materials) {
+      // Escrita inteira em transação: um `awaken` debita vários materiais de uma vez, e
+      // meia gravação deixaria a conta com material cobrado sem o rank entregue.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM player_materials WHERE player_id = $1', [playerId]);
+        for (const [materialId, amount] of Object.entries(materials)) {
+          if (amount <= 0) continue; // material zerado não vira linha
+          await client.query(
+            'INSERT INTO player_materials (player_id, material_id, amount) VALUES ($1, $2, $3)',
+            [playerId, materialId, amount],
+          );
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+      return materials;
+    },
+
+    async listItems(playerId) {
+      const result = await pool.query<{ item: ItemInstance }>(
+        'SELECT item FROM player_items WHERE owner_player_id = $1 ORDER BY item_id',
+        [playerId],
+      );
+      return result.rows.map((row) => row.item);
+    },
+    async getItem(playerId, itemId) {
+      const result = await pool.query<{ item: ItemInstance }>(
+        'SELECT item FROM player_items WHERE owner_player_id = $1 AND item_id = $2',
+        [playerId, itemId],
+      );
+      return result.rows[0]?.item ?? null;
+    },
+    async addItems(playerId, items) {
+      for (const item of items) {
+        await pool.query(
+          `INSERT INTO player_items (item_id, owner_player_id, item) VALUES ($1, $2, $3)
+           ON CONFLICT (item_id) DO UPDATE SET item = EXCLUDED.item`,
+          [item.id, playerId, item],
+        );
+      }
+      return items;
+    },
+    async replaceItem(playerId, item) {
+      await pool.query(
+        `INSERT INTO player_items (item_id, owner_player_id, item) VALUES ($1, $2, $3)
+         ON CONFLICT (item_id) DO UPDATE SET item = EXCLUDED.item`,
+        [item.id, playerId, item],
+      );
+      return item;
+    },
+    async removeItem(playerId, itemId) {
+      await pool.query('DELETE FROM player_items WHERE owner_player_id = $1 AND item_id = $2', [playerId, itemId]);
+    },
+
+    async listClears(playerId) {
+      const result = await pool.query<{ dungeon_id: string }>(
+        'SELECT dungeon_id FROM dungeon_clears WHERE player_id = $1',
+        [playerId],
+      );
+      return result.rows.map((row) => row.dungeon_id);
+    },
+    async markCleared(playerId, dungeonId) {
+      await pool.query(
+        'INSERT INTO dungeon_clears (player_id, dungeon_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [playerId, dungeonId],
+      );
+    },
+
+    async getEntryState(playerId, dungeonId) {
+      const result = await pool.query<{ used: number; as_of_ms: string }>(
+        'SELECT used, as_of_ms FROM dungeon_entries WHERE player_id = $1 AND dungeon_id = $2',
+        [playerId, dungeonId],
+      );
+      const row = result.rows[0];
+      // `as_of_ms` é bigint: o driver devolve string, e um instante em ms não cabe em
+      // integer. Converter aqui é o que impede o core de receber `NaN`.
+      return row ? ({ used: row.used, asOfMs: Number(row.as_of_ms) } satisfies EntryLimitState) : null;
+    },
+    async setEntryState(playerId, dungeonId, state) {
+      await pool.query(
+        `INSERT INTO dungeon_entries (player_id, dungeon_id, used, as_of_ms) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (player_id, dungeon_id) DO UPDATE SET used = EXCLUDED.used, as_of_ms = EXCLUDED.as_of_ms`,
+        [playerId, dungeonId, state.used, state.asOfMs],
+      );
+      return state;
+    },
+
+    async getRun(nonce) {
+      const result = await pool.query<{
+        nonce: string;
+        player_id: string;
+        dungeon_id: string;
+        mode: 'manual' | 'auto';
+        outcome: 'victory' | 'defeat';
+        created_at: Date;
+      }>('SELECT nonce, player_id, dungeon_id, mode, outcome, created_at FROM dungeon_runs WHERE nonce = $1', [nonce]);
+      const row = result.rows[0];
+      if (!row) return null;
+      return {
+        nonce: row.nonce,
+        playerId: row.player_id,
+        dungeonId: row.dungeon_id,
+        mode: row.mode,
+        outcome: row.outcome,
+        createdAt: new Date(row.created_at).toISOString(),
+      };
+    },
+    async saveRun(run) {
+      await pool.query(
+        `INSERT INTO dungeon_runs (nonce, player_id, dungeon_id, mode, outcome, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [run.nonce, run.playerId, run.dungeonId, run.mode, run.outcome, run.createdAt],
+      );
+      return run;
+    },
+
+    async getAction(nonce) {
+      const result = await pool.query<{ nonce: string; player_id: string; kind: EconomyActionRecord['kind']; created_at: Date }>(
+        'SELECT nonce, player_id, kind, created_at FROM economy_actions WHERE nonce = $1',
+        [nonce],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      return {
+        nonce: row.nonce,
+        playerId: row.player_id,
+        kind: row.kind,
+        createdAt: new Date(row.created_at).toISOString(),
+      };
+    },
+    async saveAction(action) {
+      await pool.query(
+        'INSERT INTO economy_actions (nonce, player_id, kind, created_at) VALUES ($1, $2, $3, $4)',
+        [action.nonce, action.playerId, action.kind, action.createdAt],
+      );
+      return action;
     },
   };
 }

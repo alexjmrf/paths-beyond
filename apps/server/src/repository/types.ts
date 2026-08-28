@@ -1,4 +1,14 @@
-import type { BattleCommand, BattleResult, BattleSetup, Coord, Hero, ItemInstance, MapAiArchetype } from '@paths-beyond/core';
+import type {
+  BattleCommand,
+  BattleResult,
+  BattleSetup,
+  Coord,
+  EnergyState,
+  EntryLimitState,
+  Hero,
+  ItemInstance,
+  MapAiArchetype,
+} from '@paths-beyond/core';
 
 // §9.1 — "ELO, temporadas de 14 dias." 1200 é o ponto de partida clássico (Elo/xadrez),
 // não um número dado pela spec — decisão registrada em DECISIONS.md (M7, sub-sessão 8).
@@ -6,6 +16,19 @@ export const DEFAULT_ELO = 1200;
 
 // §10 — todo jogador começa sem marcas de arena; só ganha jogando PvP.
 export const DEFAULT_ARENA_MARKS = 0;
+
+// §10 — todo jogador começa sem ouro e sem pedras: as duas moedas de PvE só vêm de farmar.
+export const DEFAULT_GOLD = 0;
+export const DEFAULT_STONES = 0;
+
+// Conta nova de PvE: sem ouro, sem pedras, sem energia apurada. `asOfMs: 0` faz a
+// primeira apuração creditar a regeneração desde a época — quem cria o jogador de
+// verdade passa o instante atual (e o teto, se quiser começar com a barra cheia).
+export const DEFAULT_PVE_ACCOUNT = {
+  gold: DEFAULT_GOLD,
+  stones: DEFAULT_STONES,
+  energy: { stored: 0, asOfMs: 0 },
+} as const;
 
 export interface Player {
   readonly id: string;
@@ -15,14 +38,35 @@ export interface Player {
   // §10 — "marcas de arena" é a moeda da loja de PvP (venda gear de set específico e
   // cosméticos, nunca poder bruto). Ganha em toda batalha concluída (battle/routes.ts).
   readonly arenaMarks: number;
+  // §10 (M14) — as outras duas moedas: `ouro` e `pedras`. Ouro paga awakening e enhance;
+  // pedras pagam enhance (decisão do usuário em M14 2/N — é o sumidouro que faltava).
+  readonly gold: number;
+  readonly stones: number;
+  // §10 — "energia de conta limita o farm diário". Guardada como o par
+  // `{stored, asOfMs}` que `resolveEnergy` (core) consome: a energia atual é DERIVADA do
+  // instante, não um contador que o servidor precisa incrementar em background.
+  readonly energy: EnergyState;
 }
 
 export interface PlayerRepository {
   getPlayerByToken(token: string): Promise<Player | null>;
   getPlayerById(id: string): Promise<Player | null>;
-  createPlayer(input: { id: string; token: string; displayName: string; elo?: number; arenaMarks?: number }): Promise<Player>;
+  createPlayer(input: {
+    id: string;
+    token: string;
+    displayName: string;
+    elo?: number;
+    arenaMarks?: number;
+    gold?: number;
+    stones?: number;
+    energy?: EnergyState;
+  }): Promise<Player>;
   updateElo(id: string, elo: number): Promise<Player>;
   updateArenaMarks(id: string, arenaMarks: number): Promise<Player>;
+  // §10 (M14) — carteira e energia. Separadas de `updateArenaMarks` porque marcas são
+  // PvP e estas são PvE: um fluxo nunca mexe nas duas coisas ao mesmo tempo.
+  updateWallet(id: string, wallet: { gold: number; stones: number }): Promise<Player>;
+  updateEnergy(id: string, energy: EnergyState): Promise<Player>;
   // Candidatos de matchmaking dentro de uma faixa de ELO, excluindo o próprio chamador —
   // "quem tem defesa configurada" é filtrado depois, na rota (cruza com
   // ArenaDefenseRepository); manter esse cruzamento fora do repositório evita acoplar
@@ -62,6 +106,10 @@ export interface StoredHero {
 export interface HeroRepository {
   getHeroById(heroId: string): Promise<StoredHero | null>;
   getHeroesByIds(heroIds: readonly string[]): Promise<readonly StoredHero[]>;
+  // §9.1 (M13, sub-sessão 2/N) — o roster do jogador. `POST /battles` sempre exigiu
+  // `attackerHeroIds`, e até aqui não havia como o cliente DESCOBRIR quais são os seus:
+  // os ids só existiam em fixture de teste e em seed de banco.
+  listHeroesByOwner(ownerPlayerId: string): Promise<readonly StoredHero[]>;
   createHero(input: StoredHero): Promise<StoredHero>;
   // §10 — comprar na loja de arena reequipa um herói já existente (troca o item do slot
   // correspondente); nenhum fluxo precisava atualizar um herói salvo até agora.
@@ -109,4 +157,64 @@ export interface StoredReplay {
 export interface ReplayRepository {
   getByNonce(nonce: string): Promise<StoredReplay | null>;
   save(replay: StoredReplay): Promise<StoredReplay>;
+}
+
+
+// §10 (M14, sub-sessão 3/N) — o estado de conta do PvE. Decisão do usuário na sub-sessão
+// 1/N: ele mora no SERVIDOR, como o PvP de M7/M8, porque §9.4 manda o servidor recalcular
+// tudo a partir do banco e porque partir a economia em duas (marcas no servidor, ouro no
+// cliente) seria pior que não tê-la.
+//
+// Fica em um repositório próprio, e não dentro de `PlayerRepository`, pelo mesmo motivo
+// que `ArenaDefenseRepository` é separado: nenhum fluxo precisa das duas coisas juntas, e
+// juntar acoplaria o cadastro de jogador ao inventário.
+export interface DungeonRunRecord {
+  readonly nonce: string;
+  readonly playerId: string;
+  readonly dungeonId: string;
+  readonly mode: 'manual' | 'auto';
+  readonly outcome: 'victory' | 'defeat';
+  readonly createdAt: string; // ISO 8601
+}
+
+// §10 (M14, 4/N) — as ações de progressão que cobram recurso. Uma chave de idempotência
+// por ação, pelo mesmo motivo do nonce da batalha: reenvio de rede não pode cobrar duas
+// vezes.
+export interface EconomyActionRecord {
+  readonly nonce: string;
+  readonly playerId: string;
+  readonly kind: 'enhance' | 'awaken' | 'imprint' | 'equip';
+  readonly createdAt: string; // ISO 8601
+}
+
+export interface EconomyRepository {
+  // Materiais e fragmentos, por jogador.
+  getMaterials(playerId: string): Promise<Readonly<Record<string, number>>>;
+  setMaterials(playerId: string, materials: Readonly<Record<string, number>>): Promise<Readonly<Record<string, number>>>;
+
+  // Inventário: o que dropou e ainda não foi equipado. Item equipado vive em `heroes`
+  // (StoredHero.equippedItems) desde M7 — um item nunca está nos dois lugares.
+  listItems(playerId: string): Promise<readonly ItemInstance[]>;
+  getItem(playerId: string, itemId: string): Promise<ItemInstance | null>;
+  addItems(playerId: string, items: readonly ItemInstance[]): Promise<readonly ItemInstance[]>;
+  replaceItem(playerId: string, item: ItemInstance): Promise<ItemInstance>;
+  removeItem(playerId: string, itemId: string): Promise<void>;
+
+  // Quais masmorras o jogador já limpou À MÃO — é o que libera a varredura (decisão do
+  // usuário: "dificuldades menores que a pessoa teria que cleanar inicialmente e depois
+  // poderia colocar um time automático").
+  listClears(playerId: string): Promise<readonly string[]>;
+  markCleared(playerId: string, dungeonId: string): Promise<void>;
+
+  // Estado da trava de tempo, por masmorra. `null` = nunca entrou.
+  getEntryState(playerId: string, dungeonId: string): Promise<EntryLimitState | null>;
+  setEntryState(playerId: string, dungeonId: string, state: EntryLimitState): Promise<EntryLimitState>;
+
+  // Idempotência da run, pelo mesmo mecanismo do `nonce` de `POST /battles` (M7): uma run
+  // só é paga e recompensada uma vez, mesmo se a requisição for reenviada.
+  getRun(nonce: string): Promise<DungeonRunRecord | null>;
+  saveRun(run: DungeonRunRecord): Promise<DungeonRunRecord>;
+
+  getAction(nonce: string): Promise<EconomyActionRecord | null>;
+  saveAction(action: EconomyActionRecord): Promise<EconomyActionRecord>;
 }

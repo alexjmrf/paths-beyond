@@ -9,7 +9,7 @@ export { RULES_VERSION } from './rulesVersion.js';
 // conteúdo), então passa a ser exportado de verdade.
 export { canonicalize, fnv1a32, hashState } from './determinism/hash.js';
 
-export { FP_SCALE, fpDiv, fpMul, fpPct } from './math/fixed.js';
+export { FP_SCALE, fpDiv, fpMul, fpPct, intDiv, intMul } from './math/fixed.js';
 
 export { nextUint32, seedRng } from './rng/xoshiro128.js';
 export type { RngResult, RngState } from './rng/xoshiro128.js';
@@ -92,22 +92,34 @@ export type {
 export {
   coordKey,
   coordsEqual,
+  isControlObject,
   isInBounds,
   manhattanDistance,
   orthogonalNeighbors,
   tileAt,
+  DEFAULT_GATE,
+  TILE_OBJECTS,
 } from './grid/types.js';
-export type { Coord, GridMap, MoveType, Terrain, TerrainId, Tile } from './grid/types.js';
-export { computeReachableTiles, validatePath } from './grid/pathfinding.js';
+export type { Coord, GateDef, GateOpensFor, GridMap, MoveType, Terrain, TerrainId, Tile, TileObject } from './grid/types.js';
+export { computeReachableTiles, isBlockedByObject, isTilePassable, validatePath } from './grid/pathfinding.js';
 export type { PathfindingContext, PathValidationResult, ReachableTile } from './grid/pathfinding.js';
 
-export { resolveAiTurns } from './battle/aiTurn.js';
+export { resolveAiTurns, resolveAiTurnsLogged } from './battle/aiTurn.js';
+export type { AiTurnStep, ResolveAiTurnsResult } from './battle/aiTurn.js';
 export { buildBattleSetupFromHeroes, buildBattleUnit } from './battle/assemble.js';
-export type { BuildBattleSetupFromHeroesInput, BuildBattleUnitInput, HeroPlacement } from './battle/assemble.js';
+export type {
+  BuildBattleSetupFromHeroesInput,
+  BuildBattleUnitInput,
+  HeroPlacement,
+  SummonBlueprintPlacement,
+} from './battle/assemble.js';
 export { applyCommand } from './battle/commands.js';
 export type { CommandOutcome } from './battle/commands.js';
-export { computeInitiativeOrder } from './battle/initiative.js';
+export { computeInitiativeOrder, insertIntoInitiativeOrder, rollInitiative } from './battle/initiative.js';
 export type { InitiativeEntry, InitiativeUnit } from './battle/initiative.js';
+// §5.1 (M15 D3) — o cliente precisa dos mesmos portões abertos que o core usa para
+// revalidar, senão desenharia um alcance de movimento que o motor recusa (regra 3).
+export { gateDefAt, isGateOpen, openGateCoords } from './battle/gates.js';
 export { GUARD_LEASH_TILES, decideMapAiCommand } from './battle/mapAi.js';
 export type { DecideMapAiCommandInput, MapAiArchetype } from './battle/mapAi.js';
 export { computePositionalModifiers } from './battle/positional.js';
@@ -118,7 +130,8 @@ export { resolveValorSkill } from './battle/valor.js';
 export type { ValorResolution, ValorSkillDef } from './battle/valor.js';
 export { checkWinCondition } from './battle/winCondition.js';
 export type { BattleOutcome } from './battle/winCondition.js';
-export { applyCommandAndAdvance, buildInitialState, simulate } from './battle/simulate.js';
+export { applyCommandAndAdvance, buildInitialState, buildInitialStateLogged, simulate } from './battle/simulate.js';
+export type { BuildInitialStateResult } from './battle/simulate.js';
 export type { ApplyCommandAndAdvanceResult } from './battle/simulate.js';
 export type {
   BattleCommand,
@@ -126,6 +139,7 @@ export type {
   BattleSetup,
   BattleState,
   BattleUnit,
+  GateProgress,
   PermadeathMode,
   Replay,
   Side,
@@ -183,3 +197,48 @@ export { resetTree } from './talents/reset.js';
 export { resolveTalentEffects } from './talents/resolve.js';
 export type { ApRefundRule, ResolvedTalents } from './talents/resolve.js';
 export type { TalentAllocation, TalentEffect, TalentNode, TalentTree } from './talents/types.js';
+
+// §10 (M14) — economia PvE: energia de conta, recompensa de masmorra, awakening e imprint.
+// Tudo puro e sem relógio: quem sabe que horas são é o servidor, que passa `nowMs`.
+export { resolveEnergy, spendEnergy } from './economy/energy.js';
+export { civilFromDays, daysFromCivil, daysFromEpochMs, lastResetAtMs, weekdayFromDays } from './economy/calendar.js';
+export { consumeEntry, entriesRemaining, resolveEntries } from './economy/entryLimit.js';
+export {
+  AUTO_BATTLE_COMMAND_BUDGET,
+  DEFAULT_AUTO_ARCHETYPE,
+  resolveAutoBattle,
+} from './economy/autoBattle.js';
+export type { AutoBattleResult, ResolveAutoBattleInput } from './economy/autoBattle.js';
+export { rollDungeonRun } from './economy/drops.js';
+export type { RollDungeonRunInput } from './economy/drops.js';
+export { MAX_AWAKENING, awaken } from './economy/awakening.js';
+export type { AwakenInput } from './economy/awakening.js';
+export { MAX_IMPRINT, applyImprint } from './economy/imprint.js';
+export type { ApplyImprintInput } from './economy/imprint.js';
+export type {
+  AwakenResult,
+  AwakeningStep,
+  CivilDate,
+  ConsumeEntryResult,
+  CurrencyKey,
+  DungeonDifficulty,
+  EnhanceCost,
+  EntryLimitRule,
+  EntryLimitState,
+  ResetSchedule,
+  DungeonDef,
+  DungeonFocus,
+  DungeonRunRewards,
+  EconomyRules,
+  EnergyRules,
+  EnergyState,
+  GearDropEntry,
+  ImprintResult,
+  ImprintStep,
+  MaterialBag,
+  MaterialDef,
+  MaterialDropEntry,
+  MaterialKind,
+  SpendEnergyResult,
+  Wallet,
+} from './economy/types.js';

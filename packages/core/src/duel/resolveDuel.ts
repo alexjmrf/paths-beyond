@@ -1,4 +1,4 @@
-import { fpDiv, fpMul, FP_SCALE } from '../math/fixed.js';
+import { fpDiv, fpMul, fpPct, FP_SCALE } from '../math/fixed.js';
 import { rngFor } from '../rng/rngFor.js';
 import { nextUint32 } from '../rng/xoshiro128.js';
 import type { Id } from '../types.js';
@@ -300,6 +300,22 @@ interface LethalDamageOutcome {
 // §6.4 (M10 sub-sessão 8/N) — ÚNICO ponto por onde dano vira HP dentro do duelo. Existiam
 // quatro (`golpe principal`, contra-ataque e as duas assistências); todos passam por aqui
 // pra o gatilho de morte não depender de por qual caminho o dano veio.
+// §4.1 `lifesteal` (M15 D1) — cura de quem BATE, como fração do dano EFETIVAMENTE aplicado a
+// HP: um golpe de 5000 num alvo com 30 de vida vampiriza sobre 30, não sobre 5000. Nunca
+// passa do HP máximo e o excesso é descartado (nada de escudo — sistema que a spec não
+// descreve). Sem rolagem: vampirismo é consequência do dano, não uma segunda chance.
+//
+// Fica aqui, no ponto único por onde dano vira HP dentro do duelo, e não em cada chamador,
+// exatamente pelo motivo que criou este helper em M10 8/N: golpe principal e contra-ataque
+// passam pelos dois caminhos, e duplicar a regra garantiria divergência. Dano de assistência
+// não vampiriza porque quem assiste não é participante do duelo — seu HP não existe aqui
+// (mesma limitação declarada em M12 2/N; ver DECISIONS.md).
+function applyLifesteal(killer: DuelParticipant, killerStats: StatSheet, damageAppliedToHp: number): DuelParticipant {
+  if (damageAppliedToHp <= 0 || killerStats.lifesteal <= 0) return killer;
+  const healed = applyHeal(killer.currentHp, killer.stats.hp, fpPct(damageAppliedToHp, killerStats.lifesteal));
+  return healed === killer.currentHp ? killer : { ...killer, currentHp: healed };
+}
+
 function applyDamageWithLethalTrigger(input: LethalDamageInput): LethalDamageOutcome {
   const { seed, trocaNumber, damage, effectDefs } = input;
   const killerInput = input.killer;
@@ -307,7 +323,12 @@ function applyDamageWithLethalTrigger(input: LethalDamageInput): LethalDamageOut
   const wasAlive = input.victim.currentHp > 0;
   const hpAfterDamage = input.victim.currentHp - damage;
   const victim: DuelParticipant = { ...input.victim, currentHp: Math.max(0, hpAfterDamage) };
-  const killer = killerInput?.participant ?? null;
+
+  // O dano que de fato chegou a HP: o golpe truncado no que a vítima ainda tinha.
+  const damageAppliedToHp = wasAlive ? input.victim.currentHp - victim.currentHp : 0;
+  const killer = killerInput
+    ? applyLifesteal(killerInput.participant, killerInput.stats, damageAppliedToHp)
+    : null;
 
   if (!wasAlive || hpAfterDamage > 0) return { victim, killer, log: null };
 
@@ -346,7 +367,9 @@ function applyDamageWithLethalTrigger(input: LethalDamageInput): LethalDamageOut
 
   const hasDamageComponent = skill.multiplier > 0 || skill.flat > 0;
   let damageToKiller: number | null = null;
-  let struckKiller = killerInput.participant;
+  // O matador já com o vampirismo do próprio golpe aplicado (`killer` não é nulo aqui: o
+  // guard acima garante `killerInput`).
+  let struckKiller = killer ?? killerInput.participant;
 
   if (hasDamageComponent) {
     const critRoll = rollPercent(rngRoll(seed, trocaNumber, victim.id, 'lethal-crit'));

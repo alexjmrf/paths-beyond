@@ -1,0 +1,55 @@
+{
+  "id": "dungeon-forja-abandonada-elite",
+  "name": "Forja Abandonada (Elite)",
+  "focus": "gear",
+  "difficulty": "elite",
+  "encounterId": "encounter-forja-abandonada-elite",
+  "energyCost": 20,
+  "manualOnly": true,
+  "requiresClearOf": "dungeon-forja-abandonada",
+  "entryLimit": {
+    "maxEntries": 3,
+    "resetOn": {
+      "kind": "weekdays",
+      "days": [
+        2,
+        6
+      ]
+    }
+  },
+  "gold": {
+    "min": 60,
+    "max": 100
+  },
+  "gearDropCount": 3,
+  "gearDrops": [
+    {
+      "weight": 3,
+      "setId": "set-forca",
+      "slot": "weapon",
+      "rarity": "heroic",
+      "ilvl": 85
+    },
+    {
+      "weight": 3,
+      "setId": "set-guardiao",
+      "slot": "armor",
+      "rarity": "heroic",
+      "ilvl": 85
+    },
+    {
+      "weight": 2,
+      "setId": "set-duelista",
+      "slot": "boots",
+      "rarity": "epic",
+      "ilvl": 90
+    },
+    {
+      "weight": 2,
+      "setId": "set-imunidade",
+      "slot": "necklace",
+      "rarity": "epic",
+      "ilvl": 90
+    }
+  ]
+}

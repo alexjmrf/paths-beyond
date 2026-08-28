@@ -42,10 +42,11 @@ const valorSkillSchema = z.discriminatedUnion('kind', [
   z.object({
     ...baseFields,
     kind: z.literal('summonReinforcement'),
-    // Único `kind` ainda sem resolução no motor (decisão do usuário, M11 — invocar exige
-    // decidir de onde vem a unidade E inseri-la na lista de iniciativa de §5.3). O payload
-    // segue solto de propósito: dar forma a ele agora seria adivinhar a decisão.
-    payload: z.record(z.string(), z.unknown()).default({}),
+    // M15 D2 — o último `kind` a ganhar resolução. Em M11 o payload era um record solto
+    // porque a decisão de ONDE a unidade invocada mora ainda não existia; agora ela mora em
+    // `summon-blueprints/` e o payload a nomeia. Payload sem forma aqui teria virado a mesma
+    // classe de bug dos outros três: conteúdo que valida e não faz nada.
+    payload: z.object({ blueprintId: idSchema }),
   }),
 ]);
 

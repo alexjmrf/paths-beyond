@@ -1,0 +1,28 @@
+{
+  "id": "dungeon-veio-de-prata-elite",
+  "name": "Veio de Prata (Elite)",
+  "focus": "gold",
+  "difficulty": "elite",
+  "encounterId": "encounter-veio-de-prata-elite",
+  "energyCost": 18,
+  "manualOnly": true,
+  "requiresClearOf": "dungeon-veio-de-prata",
+  "entryLimit": {
+    "maxEntries": 2,
+    "resetOn": {
+      "kind": "weekdays",
+      "days": [
+        1,
+        5
+      ]
+    }
+  },
+  "gold": {
+    "min": 1200,
+    "max": 1800
+  },
+  "stones": {
+    "min": 2,
+    "max": 4
+  }
+}

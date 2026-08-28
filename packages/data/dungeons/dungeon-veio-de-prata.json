@@ -1,0 +1,12 @@
+{
+  "id": "dungeon-veio-de-prata",
+  "name": "Veio de Prata",
+  "focus": "gold",
+  "difficulty": "normal",
+  "encounterId": "encounter-veio-de-prata",
+  "energyCost": 10,
+  "gold": {
+    "min": 300,
+    "max": 500
+  }
+}

@@ -49,8 +49,12 @@ const brado: ValorSkillDef = {
   payload: { effectId: buffId },
 };
 
+// M15 D2 — o payload deixou de ser um record solto e nomeia o blueprint. Este estado não é
+// declarado por `buildState`, então a resolução falha e o Valor não é cobrado, que é o que
+// este arquivo mede.
 const reforco: ValorSkillDef = {
-  id: 'valor-reforco', name: 'Reforço', cost: 5, kind: 'summonReinforcement', payload: {},
+  id: 'valor-reforco', name: 'Reforço', cost: 5, kind: 'summonReinforcement',
+  payload: { blueprintId: 'blueprint-ausente' },
 };
 
 const valorSkills: Readonly<Record<string, ValorSkillDef>> = {
@@ -210,13 +214,17 @@ describe('globalBuff — "buff global de 1 round" (§5.6)', () => {
   });
 });
 
-describe('summonReinforcement — sem resolução, e falhando alto', () => {
-  it('rejeita explicitamente em vez de gastar Valor em silêncio', () => {
+// M11 3/N deixou `summonReinforcement` sem resolução de propósito e este bloco travava a
+// rejeição explícita. M15 D2 implementou o kind (ver tests/battle/summon.test.ts); o que
+// sobrevive aqui é a metade que D2 manda preservar — quando a resolução falha, o Valor não
+// é debitado —, agora medida pelo caminho que ainda pode falhar: sem blueprint no catálogo.
+describe('summonReinforcement — resolução que falha não cobra Valor (M11 → M15 D2)', () => {
+  it('rejeita sem gastar Valor quando o blueprint não está no catálogo', () => {
     const result = applyCommand(buildState([buildUnit()], { valor: 10 }), {
       t: 'useValor', skillId: reforco.id, target,
     });
     expect(result.applied).toBe(false);
-    expect(result.reason).toContain('summonReinforcement');
+    expect(result.reason).toContain('blueprint');
     expect(result.state.valor).toBe(10);
   });
 });

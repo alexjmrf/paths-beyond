@@ -1,10 +1,10 @@
 import { STAT_KEYS, type GearSlot, type ItemInstance, type StatKey } from '@paths-beyond/core';
 import { useState } from 'react';
 import { catalog } from '../data/catalog.js';
+import { GEAR_SLOTS } from '../data/gearSlots.js';
 import { previewEquip } from '../logic/itemPreview.js';
 import { useBattleStore } from '../store/battleStore.js';
 
-const GEAR_SLOTS: readonly GearSlot[] = ['weapon', 'helmet', 'armor', 'necklace', 'ring', 'boots'];
 const itemSets = Object.values(catalog.itemSets);
 
 function setName(setId: string): string {

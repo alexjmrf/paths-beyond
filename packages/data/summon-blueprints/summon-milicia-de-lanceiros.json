@@ -1,0 +1,25 @@
+{
+  "id": "summon-milicia-de-lanceiros",
+  "name": "Miliciano de Lança",
+  "hero": {
+    "id": "hero-miliciano",
+    "classId": "class-lanceiro",
+    "level": 8,
+    "exp": 0,
+    "awakening": 0,
+    "imprint": 0,
+    "talents": {},
+    "equipment": {
+      "weapon": "item-arma-lanceiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": null,
+      "ring": null,
+      "boots": null
+    },
+    "weaponType": "spear",
+    "duelSkills": ["skill-ataque-lanceiro"],
+    "mapSkills": [],
+    "tacticsScript": [{ "enabled": true, "skillId": "skill-ataque-lanceiro", "conditions": [] }]
+  }
+}

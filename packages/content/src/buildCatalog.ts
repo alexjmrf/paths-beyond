@@ -1,22 +1,59 @@
-import type { ClassDef, EffectDef, GridMap, Id, ItemInstance, ItemSet, SkillDef, Terrain, ValorSkillDef, WeaponType, WinCondition } from '@paths-beyond/core';
+import type {
+  ClassDef,
+  DungeonDef,
+  EconomyRules,
+  EffectDef,
+  EnhanceRates,
+  GridMap,
+  Id,
+  ItemInstance,
+  ItemSet,
+  MainstatWeightEntry,
+  MaterialDef,
+  SkillDef,
+  SubstatWeightEntry,
+  Terrain,
+  Tile,
+  ValorSkillDef,
+  WeaponType,
+  WinCondition,
+} from '@paths-beyond/core';
 import classSchema from '@paths-beyond/data/schemas/classes.schema.js';
 import compSchema from '@paths-beyond/data/schemas/comps.schema.js';
 import effectSchema from '@paths-beyond/data/schemas/effects.schema.js';
 import valorSkillSchema from '@paths-beyond/data/schemas/valor-skills.schema.js';
 import encounterSchema from '@paths-beyond/data/schemas/encounters.schema.js';
+import dungeonSchema from '@paths-beyond/data/schemas/dungeons.schema.js';
+import dungeonEncounterSchema from '@paths-beyond/data/schemas/dungeon-encounters.schema.js';
+import materialSchema from '@paths-beyond/data/schemas/materials.schema.js';
+import economyRulesSchema from '@paths-beyond/data/schemas/economy-rules.schema.js';
+import substatWeightsSchema from '@paths-beyond/data/schemas/substat-weights.schema.js';
+import mainstatWeightsSchema from '@paths-beyond/data/schemas/mainstat-weights.schema.js';
+import enhanceRatesSchema from '@paths-beyond/data/schemas/enhance-rates.schema.js';
 import itemSchema from '@paths-beyond/data/schemas/items.schema.js';
 import itemSetSchema from '@paths-beyond/data/schemas/item-sets.schema.js';
 import mapSchema from '@paths-beyond/data/schemas/maps.schema.js';
 import skillSchema from '@paths-beyond/data/schemas/skills.schema.js';
+import summonBlueprintSchema from '@paths-beyond/data/schemas/summon-blueprints.schema.js';
 import terrainSchema from '@paths-beyond/data/schemas/terrains.schema.js';
 import weaponDuelRangesSchema from '@paths-beyond/data/schemas/weapon-duel-ranges.schema.js';
-import type { ArenaMap, Composition, ContentCatalog, Encounter } from './types.js';
+import type {
+  ArenaMap,
+  Composition,
+  ContentCatalog,
+  DungeonEncounter,
+  Encounter,
+  SummonBlueprintContent,
+} from './types.js';
 
 interface MapContent {
   readonly id: Id;
   readonly width: number;
   readonly height: number;
-  readonly tiles: readonly (readonly { readonly terrain: string; readonly height: 0 | 1 | 2 | 3 }[])[];
+  // O `Tile` do core, e não um shape local: desde M15 D3 o tile carrega `object` e a
+  // descrição do portão, e redeclarar só `terrain`/`height` aqui faria o loader parecer
+  // descartar esses campos (ele os repassa, mas o tipo estaria mentindo).
+  readonly tiles: readonly (readonly Tile[])[];
   readonly zocEnabled: boolean;
   readonly winCondition: WinCondition;
   readonly initialValor: number;
@@ -37,12 +74,29 @@ export interface ParsedContentFiles {
   readonly itemSets: readonly unknown[];
   readonly effects: readonly unknown[];
   readonly valorSkills: readonly unknown[];
+  // §5.6 (M15 D2). Opcional pelo mesmo motivo dos campos de economia abaixo: um adapter que
+  // ainda não junta este diretório carrega um catálogo sem invocações, não um erro.
+  readonly summonBlueprints?: readonly unknown[];
   readonly comps: readonly unknown[];
   readonly encounters: readonly unknown[];
   readonly maps: readonly unknown[];
   readonly terrains: readonly unknown[];
   readonly weaponDuelRanges: unknown;
+  // §10 (M14). Opcionais para o adapter que ainda não os junta poder evoluir sozinho —
+  // ausentes viram catálogo sem economia, não erro de carga.
+  readonly dungeons?: readonly unknown[];
+  readonly dungeonEncounters?: readonly unknown[];
+  readonly materials?: readonly unknown[];
+  readonly economyRules?: readonly unknown[];
+  readonly substatWeights?: unknown;
+  readonly mainstatWeights?: unknown;
+  readonly enhanceRates?: unknown;
 }
+
+// Sem tabela de economia carregada, o catálogo ainda é válido — só não dá para farmar.
+// Zeros explícitos em vez de `undefined` evitam que cada consumidor tenha de checar.
+const EMPTY_ECONOMY_RULES: EconomyRules = { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] };
+const EMPTY_ENHANCE_RATES: EnhanceRates = { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 };
 
 function indexById<T extends { id: Id }>(list: readonly T[]): Record<Id, T> {
   const result: Record<Id, T> = {};
@@ -85,6 +139,13 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
   // servidor/cliente/sim-cli precisam do campo pra montar `BattleSetup.valorSkills`.
   const valorSkills = indexById(input.valorSkills.map((raw) => valorSkillSchema.parse(raw) as ValorSkillDef));
 
+  // §5.6 (M15 D2) — o reforço que a invocação traz. Mesma história de `valorSkills` acima,
+  // um milestone depois: até M14 o kind `summonReinforcement` rejeitava alto, então não
+  // havia de onde a unidade vir e ninguém precisava deste catálogo.
+  const summonBlueprints = indexById(
+    (input.summonBlueprints ?? []).map((raw) => summonBlueprintSchema.parse(raw) as unknown as SummonBlueprintContent),
+  );
+
   // Mesmo descompasso, pra variante recursiva `not` de `Condition` (`hero.tacticsScript`
   // dentro de cada unidade de uma composição).
   const comps = input.comps.map((raw) => compSchema.parse(raw) as unknown as Composition);
@@ -112,6 +173,24 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
 
   const weaponDuelRanges = weaponDuelRangesSchema.parse(input.weaponDuelRanges) as Record<WeaponType, number>;
 
+  // §10 (M14) — economia PvE.
+  const dungeons = indexById((input.dungeons ?? []).map((raw) => dungeonSchema.parse(raw) as unknown as DungeonDef));
+  const dungeonEncounters = indexById(
+    (input.dungeonEncounters ?? []).map((raw) => dungeonEncounterSchema.parse(raw) as unknown as DungeonEncounter),
+  );
+  const materials = indexById((input.materials ?? []).map((raw) => materialSchema.parse(raw) as MaterialDef));
+  const economyRulesList = (input.economyRules ?? []).map((raw) => economyRulesSchema.parse(raw) as unknown as EconomyRules);
+  const economyRules = economyRulesList[0] ?? EMPTY_ECONOMY_RULES;
+  const substatWeights = (
+    input.substatWeights === undefined ? [] : substatWeightsSchema.parse(input.substatWeights)
+  ) as SubstatWeightEntry[];
+  const mainstatWeights = (
+    input.mainstatWeights === undefined ? [] : mainstatWeightsSchema.parse(input.mainstatWeights)
+  ) as MainstatWeightEntry[];
+  const enhanceRates = (
+    input.enhanceRates === undefined ? EMPTY_ENHANCE_RATES : enhanceRatesSchema.parse(input.enhanceRates)
+  ) as EnhanceRates;
+
   return {
     classes,
     skills,
@@ -119,10 +198,18 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     itemSets,
     effects,
     valorSkills,
+    summonBlueprints,
     weaponDuelRanges,
     maps,
     comps,
     encounters,
+    dungeons,
+    dungeonEncounters,
+    materials,
+    economyRules,
+    substatWeights,
+    mainstatWeights,
+    enhanceRates,
     baselineReactionSkillIds: deriveBaselineReactionSkillIds(skillList),
   };
 }

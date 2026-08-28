@@ -1,0 +1,12 @@
+[
+  { "stat": "atk", "weight": 18, "valueRange": { "min": 4, "max": 12 }, "reforgeBonusPct": 200 },
+  { "stat": "hp", "weight": 18, "valueRange": { "min": 20, "max": 60 }, "reforgeBonusPct": 200 },
+  { "stat": "def", "weight": 16, "valueRange": { "min": 4, "max": 10 }, "reforgeBonusPct": 200 },
+  { "stat": "spd", "weight": 8, "valueRange": { "min": 2, "max": 5 }, "reforgeBonusPct": 150 },
+  { "stat": "chc", "weight": 10, "valueRange": { "min": 20, "max": 50 }, "reforgeBonusPct": 200 },
+  { "stat": "chd", "weight": 10, "valueRange": { "min": 30, "max": 80 }, "reforgeBonusPct": 200 },
+  { "stat": "eff", "weight": 6, "valueRange": { "min": 20, "max": 60 }, "reforgeBonusPct": 200 },
+  { "stat": "efr", "weight": 6, "valueRange": { "min": 20, "max": 60 }, "reforgeBonusPct": 200 },
+  { "stat": "pen", "weight": 4, "valueRange": { "min": 20, "max": 50 }, "reforgeBonusPct": 200 },
+  { "stat": "heal", "weight": 4, "valueRange": { "min": 20, "max": 50 }, "reforgeBonusPct": 200 }
+]

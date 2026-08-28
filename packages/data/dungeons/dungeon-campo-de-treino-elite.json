@@ -1,0 +1,28 @@
+{
+  "id": "dungeon-campo-de-treino-elite",
+  "name": "Campo de Treino (Elite)",
+  "focus": "exp",
+  "difficulty": "elite",
+  "encounterId": "encounter-campo-de-treino-elite",
+  "energyCost": 18,
+  "manualOnly": true,
+  "requiresClearOf": "dungeon-campo-de-treino",
+  "entryLimit": {
+    "maxEntries": 2,
+    "resetOn": {
+      "kind": "weekdays",
+      "days": [
+        0,
+        3
+      ]
+    }
+  },
+  "exp": {
+    "min": 1400,
+    "max": 1800
+  },
+  "gold": {
+    "min": 20,
+    "max": 40
+  }
+}

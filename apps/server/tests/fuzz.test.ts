@@ -10,8 +10,14 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import type { ArenaDefense, StoredHero } from '../src/repository/types.js';
+import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
+
+// Segredo fixo do HMAC que deriva a seed do nonce (M13, sub-sessão 2/N): teste precisa
+// de seed reprodutível.
+const TICKET_SECRET = 'segredo-de-teste';
 
 // Critério de aceite raiz de M7 (§09-roadmap.md): "resultado do servidor idêntico ao do
 // cliente em 1000 partidas de fuzz; manipulação de stats no cliente é rejeitada."
@@ -103,10 +109,18 @@ const catalog: ContentCatalog = {
   itemSets: {},
   effects: {},
   valorSkills: {},
+  summonBlueprints: {},
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: { 'mapa-fuzz': arenaMap },
   comps: [],
   encounters: [],
+  dungeons: {},
+  dungeonEncounters: {},
+  materials: {},
+  economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
+  substatWeights: [],
+  mainstatWeights: [],
+  enhanceRates: { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 },
   baselineReactionSkillIds: [counter.id, defend.id],
 };
 
@@ -135,8 +149,8 @@ const defenderConfigs: readonly { playerId: string; hero: Hero; defense: ArenaDe
 
 function buildFuzzApp() {
   const repository = createMemoryPlayerRepository([
-    { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0 },
-    ...defenderConfigs.map((d) => ({ id: d.playerId, token: `token-${d.playerId}`, displayName: d.playerId, elo: 1200, arenaMarks: 0 })),
+    { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+    ...defenderConfigs.map((d) => ({ id: d.playerId, token: `token-${d.playerId}`, displayName: d.playerId, elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT })),
   ]);
 
   const heroRepository = createMemoryHeroRepository([
@@ -147,6 +161,7 @@ function buildFuzzApp() {
   const arenaDefenseRepository = createMemoryArenaDefenseRepository(defenderConfigs.map((d) => d.defense));
 
   const app = buildApp({
+    economyRepository: createMemoryEconomyRepository(),
     repository,
     heroRepository,
     arenaDefenseRepository,
@@ -154,6 +169,7 @@ function buildFuzzApp() {
     seasonRepository: createMemorySeasonRepository(),
     catalog,
     shopCatalog: {},
+    ticketSecret: TICKET_SECRET,
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 5000, windowMs: 60_000 }),
   });
 

@@ -1,17 +1,18 @@
-import crypto from 'node:crypto';
 import {
   RULES_VERSION,
   buildBattleSetupFromHeroes,
   simulate,
   type BattleCommand,
   type Coord,
+  type BattleSetup,
   type HeroPlacement,
   type MapAiArchetype,
 } from '@paths-beyond/core';
-import type { ContentCatalog } from '@paths-beyond/content';
+import { toSummonBlueprintPlacements, type ContentCatalog } from '@paths-beyond/content';
 import type { FastifyPluginAsync } from 'fastify';
 import { computeEloUpdate } from '../matchmaking/elo.js';
 import type { RateLimiter } from './rateLimit.js';
+import { deriveSeed, generateNonce } from './ticket.js';
 import type { ArenaDefenseRepository, HeroRepository, PlayerRepository, ReplayRepository } from '../repository/types.js';
 
 // §9.1 — "o defensor monta um time de até 5 heróis."
@@ -24,13 +25,6 @@ const MAX_TEAM_SIZE = 5;
 const ARENA_MARKS_WIN = 10;
 const ARENA_MARKS_LOSS = 3;
 
-function generateSeed(): number {
-  // §9.4 — "zero RNG no cliente: seed vem do servidor." crypto.randomInt (não
-  // Math.random) porque isto é código de infraestrutura em apps/server, não simulação de
-  // regra em packages/core — a proibição de Math.random é escopada a `packages/core`
-  // (regra 1/CLAUDE.md), mas usar o gerador criptográfico do Node aqui é só bom senso.
-  return crypto.randomInt(0, 0xffffffff);
-}
 
 interface SaveDefenseBody {
   readonly mapId?: string;
@@ -59,6 +53,108 @@ export interface BattleRoutesOptions {
   readonly replayRepository: ReplayRepository;
   readonly catalog: ContentCatalog;
   readonly rateLimiter: RateLimiter;
+  // §9.4 (M13, sub-sessão 2/N) — segredo do HMAC que deriva a seed do nonce. Sem ele
+  // o cliente poderia procurar um nonce que produzisse uma seed favorável.
+  readonly ticketSecret: string;
+}
+
+type AssembleResult =
+  | { readonly ok: true; readonly setup: BattleSetup; readonly defenderPlayerId: string }
+  | { readonly ok: false; readonly code: number; readonly error: string };
+
+// A montagem do confronto de arena: valida a posse dos heróis do atacante, carrega a
+// defesa e devolve o `BattleSetup`. Extraída de `POST /battles` (M7) porque o ticket
+// (M13, sub-sessão 2/N) precisa montar EXATAMENTE o mesmo setup — se as duas montagens
+// divergissem, o cliente jogaria contra uma batalha e o servidor resolveria outra, que é
+// o tipo de divergência que §9.1 chama de bug crítico.
+async function assembleArenaBattle(
+  opts: BattleRoutesOptions,
+  attackerPlayerId: string,
+  attackerHeroIds: readonly string[],
+  defenderPlayerId: string | undefined,
+): Promise<AssembleResult> {
+  if (attackerHeroIds.length === 0 || attackerHeroIds.length > MAX_TEAM_SIZE) {
+    return { ok: false, code: 400, error: `time precisa ter entre 1 e ${MAX_TEAM_SIZE} heróis` };
+  }
+
+  // §9.4 — "cliente envia BattleCommand[]; servidor simula." Nunca aceitamos stat/hp do
+  // corpo da requisição — só ids; os heróis reais vêm sempre do HeroRepository.
+  const attackerHeroes = await opts.heroRepository.getHeroesByIds(attackerHeroIds);
+  const attackerOwnsAll = attackerHeroIds.every((id) =>
+    attackerHeroes.some((h) => h.hero.id === id && h.ownerPlayerId === attackerPlayerId),
+  );
+  if (attackerHeroes.length !== attackerHeroIds.length || !attackerOwnsAll) {
+    return { ok: false, code: 403, error: 'algum heroId não pertence a você' };
+  }
+
+  const defense = defenderPlayerId ? await opts.arenaDefenseRepository.getDefenseByOwner(defenderPlayerId) : null;
+  if (!defense) return { ok: false, code: 404, error: 'o defensor não tem uma defesa configurada' };
+
+  const arenaMap = opts.catalog.maps[defense.mapId];
+  if (!arenaMap) return { ok: false, code: 500, error: 'mapa da defesa não existe mais no catálogo' };
+
+  const defenderHeroes = await opts.heroRepository.getHeroesByIds(defense.units.map((u) => u.heroId));
+  if (defenderHeroes.length !== defense.units.length) {
+    return { ok: false, code: 500, error: 'defesa referencia herói inexistente' };
+  }
+
+  const placements: HeroPlacement[] = [];
+  for (const [index, stored] of attackerHeroes.entries()) {
+    const classDef = opts.catalog.classes[stored.hero.classId];
+    if (!classDef) return { ok: false, code: 500, error: `classe desconhecida: ${stored.hero.classId}` };
+    // Posicionamento do atacante: corte de escopo de M7 (ver DECISIONS.md) — mapas ainda
+    // não têm pontos de spawn declarados; time inteiro entra pela borda esquerda, uma
+    // unidade por linha.
+    placements.push({
+      unitId: stored.hero.id,
+      hero: stored.hero,
+      classDef,
+      equippedItems: stored.equippedItems,
+      side: 'player',
+      pos: { x: 0, y: index },
+      height: 0,
+    });
+  }
+
+  for (const defenseUnit of defense.units) {
+    const stored = defenderHeroes.find((h) => h.hero.id === defenseUnit.heroId);
+    if (!stored) return { ok: false, code: 500, error: `defesa referencia herói inexistente: ${defenseUnit.heroId}` };
+    const classDef = opts.catalog.classes[stored.hero.classId];
+    if (!classDef) return { ok: false, code: 500, error: `classe desconhecida: ${stored.hero.classId}` };
+    placements.push({
+      unitId: stored.hero.id,
+      hero: stored.hero,
+      classDef,
+      equippedItems: stored.equippedItems,
+      side: 'enemy',
+      pos: defenseUnit.pos,
+      height: defenseUnit.height,
+      aiArchetype: defenseUnit.aiArchetype,
+    });
+  }
+
+  const arenaMapDef = opts.catalog.maps[defense.mapId]!;
+  return {
+    ok: true,
+    defenderPlayerId: defense.ownerPlayerId,
+    setup: buildBattleSetupFromHeroes({
+      placements,
+      map: arenaMapDef.grid,
+      permadeath: 'classic', // §15 (decisões em aberto) — sugestão de default da própria spec
+      winCondition: arenaMapDef.winCondition,
+      effectDefs: opts.catalog.effects,
+      initialValor: arenaMapDef.initialValor,
+      itemSets: opts.catalog.itemSets,
+      skillsCatalog: opts.catalog.skills,
+      weaponDuelRanges: opts.catalog.weaponDuelRanges,
+      baselineReactionSkillIds: opts.catalog.baselineReactionSkillIds,
+      valorSkills: opts.catalog.valorSkills,
+      // §5.6 (M15 2/N) — o ticket de M13 2/N devolve este `setup` ao atacante, que joga com
+      // ele, e `POST /battles` remonta o mesmo confronto para reexecutar. Os dois lados
+      // precisam dos mesmos blueprints, senão o cliente invoca e o servidor rejeita.
+      summonBlueprints: toSummonBlueprintPlacements(opts.catalog),
+    }),
+  };
 }
 
 // Registrado como filho do MESMO escopo que já carrega `authPlugin` (app.ts) — não chama
@@ -67,6 +163,20 @@ export interface BattleRoutesOptions {
 // dele (encapsulação flui pra baixo livremente; só o vazamento pra CIMA precisa de
 // `fp()`). Ver DECISIONS.md sobre o bug de encapsulação da sub-sessão 3.
 export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fastify, opts) => {
+  // §9.1 (M15, sub-sessão 3/N) — o lado de LEITURA da defesa. `PUT /me/defense` existe
+  // desde M7 e nunca teve par: sem esta rota o cliente sabe o que acabou de enviar e nada
+  // mais, então "a defesa persiste" — metade do critério de aceite deste milestone — não
+  // seria verificável pela tela, só por `curl` no banco.
+  //
+  // 404 quando não há defesa montada, e não um corpo vazio: "ainda não montei" é um estado
+  // diferente de "montei um time sem ninguém", e a tela precisa distinguir os dois.
+  fastify.get('/me/defense', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const defense = await opts.arenaDefenseRepository.getDefenseByOwner(request.player.id);
+    if (!defense) return reply.code(404).send({ error: 'você ainda não montou uma defesa' });
+    return defense;
+  });
+
   fastify.put('/me/defense', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const player = request.player;
@@ -105,6 +215,42 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
     return defense;
   });
 
+  // §9.1 (M13, sub-sessão 2/N) — "o atacante joga a camada de grid manualmente contra
+  // essa defesa". Pra jogar, o cliente precisa do confronto montado e da seed ANTES de
+  // mandar comando nenhum; é isso que o ticket entrega. Consome a mesma cota de rate
+  // limit da batalha, porque pedir ticket é o que um grinder de seed faria em série.
+  // §9.1 (M13, sub-sessão 2/N) — o roster do jogador. Sem esta rota o cliente não tem
+  // como montar `attackerHeroIds`: os ids do jogador só existiam em seed de banco.
+  fastify.get('/me/heroes', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const heroes = await opts.heroRepository.listHeroesByOwner(request.player.id);
+    // Devolve o `Hero` inteiro (é dele mesmo) — o cliente precisa de classe e nome pra
+    // montar o time; stats resolvidos continuam sendo assunto do servidor (§9.4).
+    return heroes.map((stored) => ({ hero: stored.hero, equippedItems: stored.equippedItems }));
+  });
+
+  fastify.post('/battles/ticket', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const attacker = request.player;
+
+    if (!opts.rateLimiter.tryConsume(attacker.id)) {
+      return reply.code(429).send({ error: 'muitas tentativas de batalha em pouco tempo' });
+    }
+
+    const body = request.body as CreateBattleBody;
+    const assembled = await assembleArenaBattle(opts, attacker.id, body.attackerHeroIds ?? [], body.defenderPlayerId);
+    if (!assembled.ok) return reply.code(assembled.code).send({ error: assembled.error });
+
+    const nonce = generateNonce();
+    return {
+      nonce,
+      seed: deriveSeed(opts.ticketSecret, nonce),
+      rulesVersion: RULES_VERSION,
+      setup: assembled.setup,
+      defenderPlayerId: assembled.defenderPlayerId,
+    };
+  });
+
   fastify.post('/battles', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const attacker = request.player;
@@ -132,79 +278,13 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
       return reply.code(409).send({ error: `rulesVersion incompatível (esperado ${RULES_VERSION})` });
     }
 
-    const attackerHeroIds = body.attackerHeroIds ?? [];
-    if (attackerHeroIds.length === 0 || attackerHeroIds.length > MAX_TEAM_SIZE) {
-      return reply.code(400).send({ error: `time precisa ter entre 1 e ${MAX_TEAM_SIZE} heróis` });
-    }
+    const assembled = await assembleArenaBattle(opts, attacker.id, body.attackerHeroIds ?? [], body.defenderPlayerId);
+    if (!assembled.ok) return reply.code(assembled.code).send({ error: assembled.error });
+    const setup = assembled.setup;
 
-    // §9.4 — "cliente envia BattleCommand[]; servidor simula." Nunca aceitamos stat/hp do
-    // corpo da requisição — só ids; os heróis reais vêm sempre do HeroRepository.
-    const attackerHeroes = await opts.heroRepository.getHeroesByIds(attackerHeroIds);
-    const attackerOwnsAll = attackerHeroIds.every((id) => attackerHeroes.some((h) => h.hero.id === id && h.ownerPlayerId === attacker.id));
-    if (attackerHeroes.length !== attackerHeroIds.length || !attackerOwnsAll) {
-      return reply.code(403).send({ error: 'algum heroId não pertence a você' });
-    }
-
-    const defense = body.defenderPlayerId ? await opts.arenaDefenseRepository.getDefenseByOwner(body.defenderPlayerId) : null;
-    if (!defense) return reply.code(404).send({ error: 'o defensor não tem uma defesa configurada' });
-
-    const arenaMap = opts.catalog.maps[defense.mapId];
-    if (!arenaMap) return reply.code(500).send({ error: 'mapa da defesa não existe mais no catálogo' });
-
-    const defenderHeroes = await opts.heroRepository.getHeroesByIds(defense.units.map((u) => u.heroId));
-    if (defenderHeroes.length !== defense.units.length) {
-      return reply.code(500).send({ error: 'defesa referencia herói inexistente' });
-    }
-
-    const placements: HeroPlacement[] = [];
-    for (const [index, stored] of attackerHeroes.entries()) {
-      const classDef = opts.catalog.classes[stored.hero.classId];
-      if (!classDef) return reply.code(500).send({ error: `classe desconhecida: ${stored.hero.classId}` });
-      // Posicionamento do atacante: corte de escopo desta sub-sessão (ver DECISIONS.md)
-      // — mapas ainda não têm pontos de spawn declarados; time inteiro entra pela borda
-      // esquerda, uma unidade por linha.
-      placements.push({
-        unitId: stored.hero.id,
-        hero: stored.hero,
-        classDef,
-        equippedItems: stored.equippedItems,
-        side: 'player',
-        pos: { x: 0, y: index },
-        height: 0,
-      });
-    }
-
-    for (const defenseUnit of defense.units) {
-      const stored = defenderHeroes.find((h) => h.hero.id === defenseUnit.heroId);
-      if (!stored) return reply.code(500).send({ error: `defesa referencia herói inexistente: ${defenseUnit.heroId}` });
-      const classDef = opts.catalog.classes[stored.hero.classId];
-      if (!classDef) return reply.code(500).send({ error: `classe desconhecida: ${stored.hero.classId}` });
-      placements.push({
-        unitId: stored.hero.id,
-        hero: stored.hero,
-        classDef,
-        equippedItems: stored.equippedItems,
-        side: 'enemy',
-        pos: defenseUnit.pos,
-        height: defenseUnit.height,
-        aiArchetype: defenseUnit.aiArchetype,
-      });
-    }
-
-    const setup = buildBattleSetupFromHeroes({
-      placements,
-      map: arenaMap.grid,
-      permadeath: 'classic', // §15 (decisões em aberto) — sugestão de default da própria spec
-      winCondition: arenaMap.winCondition,
-      effectDefs: opts.catalog.effects,
-      initialValor: arenaMap.initialValor,
-      itemSets: opts.catalog.itemSets,
-      skillsCatalog: opts.catalog.skills,
-      weaponDuelRanges: opts.catalog.weaponDuelRanges,
-      baselineReactionSkillIds: opts.catalog.baselineReactionSkillIds,
-    });
-
-    const seed = generateSeed();
+    // A seed é DERIVADA do nonce (ver ticket.ts): o cliente que pediu um ticket jogou com
+    // exatamente esta seed, e quem pula o ticket não tem como escolhê-la.
+    const seed = deriveSeed(opts.ticketSecret, body.nonce);
     const result = simulate({
       rulesVersion: RULES_VERSION,
       seed,
@@ -218,7 +298,7 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
     let elo: { attacker: number; defender: number } | undefined;
     let arenaMarks: { attacker: number; defender: number } | undefined;
     if (result.outcome !== 'ongoing') {
-      const defenderPlayer = await opts.repository.getPlayerById(defense.ownerPlayerId);
+      const defenderPlayer = await opts.repository.getPlayerById(assembled.defenderPlayerId);
       if (defenderPlayer) {
         const winnerIsAttacker = result.outcome === 'victory';
 
@@ -254,7 +334,7 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
       commands: body.commands ?? [],
       result,
       attackerPlayerId: attacker.id,
-      defenderPlayerId: defense.ownerPlayerId,
+      defenderPlayerId: assembled.defenderPlayerId,
       createdAt: new Date().toISOString(),
     });
 

@@ -1,0 +1,7 @@
+{
+  "id": "valor-convocar-milicia",
+  "name": "Convocar Milícia",
+  "cost": 6,
+  "kind": "summonReinforcement",
+  "payload": { "blueprintId": "summon-milicia-de-lanceiros" }
+}

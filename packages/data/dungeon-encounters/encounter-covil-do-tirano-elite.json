@@ -1,0 +1,288 @@
+{
+  "id": "encounter-covil-do-tirano-elite",
+  "name": "Covil do Tirano (Elite)",
+  "mapId": "map-campanha-4",
+  "permadeath": "casual",
+  "winCondition": {
+    "t": "rout"
+  },
+  "units": [
+    {
+      "unitId": "dungeon-covil-do-tirano-elite-vaga-1",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-covil-do-tirano-elite-vaga-1",
+        "classId": "class-espadachim",
+        "level": 26,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 7
+      },
+      "height": 1
+    },
+    {
+      "unitId": "dungeon-covil-do-tirano-elite-vaga-2",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-covil-do-tirano-elite-vaga-2",
+        "classId": "class-clerigo",
+        "level": 26,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 8
+      },
+      "height": 1
+    },
+    {
+      "unitId": "dungeon-covil-do-tirano-elite-vaga-3",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-covil-do-tirano-elite-vaga-3",
+        "classId": "class-arqueiro",
+        "level": 26,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 9,
+        "y": 7
+      },
+      "height": 1
+    },
+    {
+      "unitId": "tirano-elite-guarda-1",
+      "side": "enemy",
+      "hero": {
+        "id": "tirano-elite-guarda-1",
+        "classId": "class-couracado",
+        "level": 22,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-couracado",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-couracado",
+          "skill-especial-couracado"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 7,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "tirano-elite-guarda-2",
+      "side": "enemy",
+      "hero": {
+        "id": "tirano-elite-guarda-2",
+        "classId": "class-couracado",
+        "level": 22,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-couracado",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-couracado",
+          "skill-especial-couracado"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "tirano-elite-clerigo",
+      "side": "enemy",
+      "hero": {
+        "id": "tirano-elite-clerigo",
+        "classId": "class-clerigo",
+        "level": 20,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 15,
+        "y": 8
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "tirano-elite",
+      "side": "enemy",
+      "hero": {
+        "id": "tirano-elite",
+        "classId": "class-mestre-espadachim",
+        "level": 25,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-mestre-espadachim",
+          "skill-especial-mestre-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-mestre-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 8,
+        "y": 15
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

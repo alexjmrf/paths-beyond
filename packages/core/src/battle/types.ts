@@ -87,7 +87,20 @@ export interface BattleSetup {
   // batalhas montadas à mão em M2-M6 e as fixtures de teste não têm catálogo. Ausente =
   // nenhuma skill de Valor resolvível, e todo `useValor` é rejeitado.
   readonly valorSkills?: Readonly<Record<Id, ValorSkillDef>>;
+  // §5.6 (M15 D2) — perfis de combate já resolvidos que `summonReinforcement` pode invocar,
+  // indexados pelo `blueprintId` que a valor-skill nomeia. Chega pronto de fora pelo mesmo
+  // motivo de `valorSkills`: montar um `BattleUnit` a partir de `Hero`+catálogo é trabalho
+  // de `packages/content`, e o core não importa conteúdo (regra 1). O motor sobrescreve
+  // `unitId`, `pos`, `height`, `side` e `hasActedThisRound` no momento da invocação.
+  readonly summonBlueprints?: Readonly<Record<Id, BattleUnit>>;
   readonly initialValor: number; // §5.6 — "Começa em 5"
+}
+
+// §5.1 (M15 D3) — estado de um portão NESTA batalha. `hits` são turnos-unidade de pancada
+// acumulados por quem não consegue abri-lo (ver battle/gates.ts).
+export interface GateProgress {
+  readonly opened: boolean;
+  readonly hits: number;
 }
 
 // §01-fundacoes-tecnicas.md §3.3 — union normativa.
@@ -121,6 +134,13 @@ export interface BattleState {
   readonly winCondition: WinCondition;
   readonly effectDefs: Readonly<Record<Id, EffectDef>>;
   readonly valorSkills?: Readonly<Record<Id, ValorSkillDef>>; // §5.6 — ver BattleSetup
+  readonly summonBlueprints?: Readonly<Record<Id, BattleUnit>>; // §5.6 (M15 D2) — ver BattleSetup
+  // §5.1 (M15 D3) — portões tocados nesta batalha, por `coordKey`. Ausente = nenhum portão
+  // aberto nem golpeado, que é o estado de toda batalha que não tem portão no mapa.
+  readonly gateState?: Readonly<Record<string, GateProgress>>;
+  // §5.6 (M15) — objetivos já capturados, por `coordKey`. É o que faz "+2 ao capturar" ser
+  // uma captura e não uma renda: entrar e sair do mesmo fort não paga duas vezes.
+  readonly capturedObjectives?: readonly string[];
   readonly outcome: 'ongoing' | 'victory' | 'defeat';
   readonly seed: number;
 }

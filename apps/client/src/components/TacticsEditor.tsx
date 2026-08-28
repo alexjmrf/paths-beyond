@@ -20,6 +20,10 @@ export function TacticsEditor() {
   const tacticsEditorUnitId = useBattleStore((s) => s.tacticsEditorUnitId);
   const closeTacticsEditor = useBattleStore((s) => s.closeTacticsEditor);
   const updateUnitTacticsScript = useBattleStore((s) => s.updateUnitTacticsScript);
+  // M13, sub-sessão 1/N — a janela de edição é a preparação do capítulo: depois do
+  // primeiro comando o script está travado, porque ele não é um `BattleCommand` e um
+  // replay não teria como reproduzir a troca (ver DECISIONS.md).
+  const locked = useBattleStore((s) => s.commandLog.length > 0);
 
   const unit = battleState.units.find((u) => u.unitId === tacticsEditorUnitId);
 
@@ -149,9 +153,19 @@ export function TacticsEditor() {
             </li>
           ))}
         </ol>
-        <button type="button" onClick={addLine} disabled={script.length >= MAX_LINES || knownDuelSkills.length === 0}>
+        <button
+          type="button"
+          onClick={addLine}
+          disabled={locked || script.length >= MAX_LINES || knownDuelSkills.length === 0}
+        >
           + linha
         </button>
+        {locked ? (
+          <p className="tactics-locked">
+            A batalha já começou: o script vale como está até o fim do mapa. O botão “Testar contra manequim”
+            continua disponível.
+          </p>
+        ) : null}
 
         <div className="tactics-test">
           <h3>Testar contra manequim</h3>
@@ -212,7 +226,7 @@ export function TacticsEditor() {
         </div>
 
         <div className="tactics-editor-actions">
-          <button type="button" onClick={save}>
+          <button type="button" onClick={save} disabled={locked}>
             Salvar
           </button>
           <button type="button" onClick={closeTacticsEditor}>

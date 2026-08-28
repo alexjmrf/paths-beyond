@@ -5,6 +5,10 @@ export interface ValidateAllocationInput {
   readonly tree: readonly TalentNode[]; // nós das duas árvores (class+spec) do herói
   readonly allocation: TalentAllocation;
   readonly maxPointsPerTree: number; // §8.2 — 8 pontos por árvore
+  // §10 (M14) — "Awakening (0–6): ... libera nós avançados de talento a partir de 5".
+  // Opcional e tratado como 0 quando ausente: todo chamador de M5 a M13 continua válido,
+  // e um herói sem awakening declarado não ganha nó avançado de graça.
+  readonly awakening?: number;
 }
 
 export interface ValidationIssue {
@@ -64,6 +68,15 @@ export function validateAllocation(input: ValidateAllocationInput): ValidationRe
       issues.push({
         nodeId,
         reason: `linha ${node.row} exige ${node.row - 1} pontos já gastos na árvore (há ${pointsInTreeExcludingSelf})`,
+      });
+    }
+
+    // O RANK exigido é do dado, não do motor: §10 nomeia 5 para o caso que descreve, mas
+    // travar o 5 aqui proibiria uma classe futura de exigir outro.
+    if (node.minAwakening !== undefined && (input.awakening ?? 0) < node.minAwakening) {
+      issues.push({
+        nodeId,
+        reason: `exige awakening ${node.minAwakening} (o herói está em ${input.awakening ?? 0})`,
       });
     }
 

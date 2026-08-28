@@ -1,11 +1,30 @@
 import { z } from 'zod';
 import { coordSchema, idSchema } from './shared.js';
 
-const tileSchema = z.object({
-  terrain: idSchema, // referencia um TerrainId de terrains.schema.ts
-  height: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
-  object: z.enum(['wall', 'fort', 'gate', 'chest', 'camp']).optional(),
+// §5.1 (M15 D3) — `chest` saiu do enum junto com o tipo do core: loot em mapa é sistema de
+// exploração que este jogo não tem, e um valor que nada lê e nada escreve é dívida. Os quatro
+// restantes têm leitor: `fort`/`camp` dão +1 AP no `wait` (§5.4) e são objetivo de captura
+// (§5.6); `wall` e `gate` bloqueiam movimento.
+const gateSchema = z.object({
+  // Quem ABRE o portão encerrando o turno ao lado dele. Quem não abre, arromba. `none` é o
+  // portão trancado: ninguém tem a chave e os dois lados só passam arrombando.
+  opensFor: z.enum(['player', 'enemy', 'any', 'none']),
+  // Turnos-unidade de pancada para derrubá-lo pelo lado travado. Positivo: um portão que
+  // cai em zero golpes não é um portão, é um tile vazio com nome bonito.
+  durability: z.number().int().positive(),
 });
+
+const tileSchema = z
+  .object({
+    terrain: idSchema, // referencia um TerrainId de terrains.schema.ts
+    height: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
+    object: z.enum(['wall', 'fort', 'gate', 'camp']).optional(),
+    // Ausente num tile de portão = portão simples: qualquer um abre, num turno.
+    gate: gateSchema.optional(),
+  })
+  .refine((tile) => tile.gate === undefined || tile.object === 'gate', {
+    message: '`gate` só pode ser declarado em um tile com `object: "gate"`.',
+  });
 
 // §5.7 — "Data-driven por mapa: rout, seize, survive N rounds, escort, defend." Só
 // `rout` é resolvido pelo motor em M3 (ver DECISIONS.md); os demais só têm schema.

@@ -253,9 +253,9 @@
       },
       "pos": {
         "x": 9,
-        "y": 8
+        "y": 6
       },
-      "height": 0,
+      "height": 1,
       "aiArchetype": "guard-tile"
     },
     {

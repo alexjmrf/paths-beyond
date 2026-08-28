@@ -1,0 +1,169 @@
+{
+  "id": "encounter-veio-de-prata",
+  "name": "Veio de Prata",
+  "mapId": "map-campanha-3",
+  "permadeath": "casual",
+  "winCondition": {
+    "t": "rout"
+  },
+  "units": [
+    {
+      "unitId": "dungeon-veio-de-prata-vaga-1",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-veio-de-prata-vaga-1",
+        "classId": "class-espadachim",
+        "level": 15,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 7
+      },
+      "height": 1
+    },
+    {
+      "unitId": "dungeon-veio-de-prata-vaga-2",
+      "side": "player",
+      "hero": {
+        "id": "dungeon-veio-de-prata-vaga-2",
+        "classId": "class-clerigo",
+        "level": 15,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 5,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "veio-saqueador-1",
+      "side": "enemy",
+      "hero": {
+        "id": "veio-saqueador-1",
+        "classId": "class-espadachim",
+        "level": 11,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 12,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "veio-saqueador-2",
+      "side": "enemy",
+      "hero": {
+        "id": "veio-saqueador-2",
+        "classId": "class-couracado",
+        "level": 11,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-couracado",
+          "helmet": null,
+          "armor": null,
+          "necklace": null,
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-couracado",
+          "skill-especial-couracado"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 12,
+        "y": 5
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

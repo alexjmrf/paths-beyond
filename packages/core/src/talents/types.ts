@@ -28,6 +28,9 @@ export interface TalentNode {
   readonly requires?: readonly Id[];
   readonly exclusiveWith?: readonly Id[];
   readonly maxRank: 1 | 2 | 3;
+  // §10 (M14) — "Awakening (0–6): ... libera nós avançados de talento a partir de 5."
+  // Qual nó é "avançado" e a partir de qual rank é conteúdo, não motor.
+  readonly minAwakening?: number;
   readonly effects: readonly TalentEffect[];
 }
 

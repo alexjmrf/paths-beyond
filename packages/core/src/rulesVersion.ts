@@ -97,4 +97,48 @@
 // (opcional) e o `payload` do schema virou união discriminada por `kind`. Mudança de regra
 // real; não observável em `pnpm balance` (o torneio nunca emite `useValor`) nem no
 // GOLDEN_HASH (o replay canônico também não).
-export const RULES_VERSION = '0.12.0';
+// M14, sub-sessão 1/N: a economia PvE de §10 entra no motor — energia de conta
+// (regeneração contínua até um teto, derivada de `{stored, asOfMs}` + o instante que o
+// chamador passa, porque core não lê relógio), rolagem de recompensa de masmorra
+// (determinística por seed + id da run, com stream próprio por tipo de drop), aquisição de
+// awakening (materiais + ouro, teto 6) e de imprint (fragmento do próprio herói, teto 5).
+// Mudança de regra real também em `validateAllocation`, que passa a respeitar
+// `TalentNode.minAwakening` (§10 — "libera nós avançados de talento a partir de 5"), o
+// único ponto desta fatia que altera comportamento de código pré-existente: o campo é
+// opcional e nenhum nó do catálogo real o declara ainda, então nenhuma alocação existente
+// muda de resultado. Não observável em `pnpm balance` nem no GOLDEN_HASH — o torneio e o
+// replay canônico não farmam, não despertam e não alocam talento com gate.
+// M14, sub-sessão 2/N: a masmorra vira BATALHA (decisão do usuário). Três regras novas:
+// calendário civil próprio (conversão instante↔data sem `Date`, porque regra 1 proíbe e
+// porque `Date` é sensível ao fuso do processo — cliente, servidor e `sim-cli` precisam
+// concordar byte a byte), trava de entrada por tempo derivada dele (a entrada da
+// dificuldade alta reseta em dias declarados da semana ou do mês) e `resolveAutoBattle`, a
+// varredura: a IA de mapa de §9.1 jogando os DOIS lados até o desfecho, que é o que faz
+// "o time automático ainda tem de ser forte o bastante" sair da própria simulação em vez
+// de um número de dificuldade. Nada de comportamento pré-existente mudou; não observável
+// em `pnpm balance` nem no GOLDEN_HASH.
+// M15, sub-sessão 1/N: as quatro pendências de motor que o briefing de M15
+// (`docs/milestones/M15-fechamento-do-loop-de-pvp.md`) qualificou como regra declarada sem
+// consumidor. (1) `lifesteal` (§4.1) passa a curar quem bate, como fração do dano
+// EFETIVAMENTE aplicado a HP, no ponto único por onde dano vira HP no duelo — o stat existia
+// desde M1 e nada o lia. (2) `summonReinforcement` (§5.6) resolve: o payload nomeia um
+// blueprint de `BattleSetup.summonBlueprints` (a unidade invocada é conteúdo, regra 4) e a
+// invocada é INSERIDA na lista de iniciativa, que é o que §5.3 autoriza explicitamente para
+// reforços — a regra 9 continua valendo, nenhuma entrada existente é re-rolada nem
+// reordenada. (3) "+2 Valor ao capturar objetivo" (§5.6) ganha ponto de aplicação: encerrar
+// o turno sobre `fort`/`camp`, uma vez por tile por batalha, só para o jogador. (4)
+// `Tile.object` (§5.1): `wall` e `gate` passam a bloquear movimento, `chest` sai do tipo, e o
+// portão abre por um lado e quebra pelo outro (`wait` adjacente; requisito do usuário).
+// Não observável em `pnpm balance` nem no GOLDEN_HASH: o torneio e o replay canônico têm
+// `lifesteal: 0` em todo stat sheet, nenhum mapa com `object` e nenhum `useValor`.
+// M15, sub-sessão 2/N: o conteúdo de D2/D3 entrou, e trouxe UMA regra nova junto — o portão
+// TRANCADO (`GateOpensFor: 'none'`), em que ninguém tem a chave e os dois lados só passam
+// arrombando. Não foi preferência: com o portão abrindo para um lado, a IA de mapa daquele
+// lado caminha até ele e o `wait` do mesmo turno o destranca, então a fortaleza do capítulo 6
+// amanhecia aberta no round 1 e a durabilidade era decoração (medido, ver DECISIONS.md).
+// O resto da fatia é aditivo e não muda cálculo nenhum: `BuildBattleSetupFromHeroesInput`
+// ganhou `summonBlueprints` (o repasse que faltava para `summonReinforcement` ser alcançável
+// por cliente/servidor, mesmo padrão de `valorSkills` em M12 4/N). Não observável em
+// `pnpm balance` nem no GOLDEN_HASH: o torneio não usa Valor e o replay canônico não tem
+// portão.
+export const RULES_VERSION = '0.16.0';

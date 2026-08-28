@@ -1,0 +1,21 @@
+[
+  { "slot": "weapon", "stat": "atk", "weight": 1, "valueRange": { "min": 18, "max": 60 } },
+  { "slot": "helmet", "stat": "hp", "weight": 1, "valueRange": { "min": 60, "max": 180 } },
+  { "slot": "armor", "stat": "def", "weight": 1, "valueRange": { "min": 12, "max": 40 } },
+
+  { "slot": "necklace", "stat": "hp", "weight": 30, "valueRange": { "min": 40, "max": 140 } },
+  { "slot": "necklace", "stat": "atk", "weight": 25, "valueRange": { "min": 12, "max": 40 } },
+  { "slot": "necklace", "stat": "chc", "weight": 20, "valueRange": { "min": 40, "max": 90 } },
+  { "slot": "necklace", "stat": "chd", "weight": 15, "valueRange": { "min": 60, "max": 140 } },
+  { "slot": "necklace", "stat": "heal", "weight": 10, "valueRange": { "min": 40, "max": 90 } },
+
+  { "slot": "ring", "stat": "def", "weight": 30, "valueRange": { "min": 10, "max": 32 } },
+  { "slot": "ring", "stat": "hp", "weight": 25, "valueRange": { "min": 40, "max": 140 } },
+  { "slot": "ring", "stat": "eff", "weight": 20, "valueRange": { "min": 40, "max": 100 } },
+  { "slot": "ring", "stat": "efr", "weight": 20, "valueRange": { "min": 40, "max": 100 } },
+  { "slot": "ring", "stat": "pen", "weight": 5, "valueRange": { "min": 40, "max": 80 } },
+
+  { "slot": "boots", "stat": "spd", "weight": 40, "valueRange": { "min": 4, "max": 9 } },
+  { "slot": "boots", "stat": "hp", "weight": 30, "valueRange": { "min": 40, "max": 140 } },
+  { "slot": "boots", "stat": "def", "weight": 30, "valueRange": { "min": 10, "max": 32 } }
+]

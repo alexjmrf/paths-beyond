@@ -25,9 +25,9 @@ import { findJsonFiles, validateDataset, validateFiles } from '../validate.js';
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('validateDataset() against real packages/data content', () => {
-  it('finds the 18 schemas (5 de M1 + 2 de M2 + 3 de M3 + 3 de M4 + 1 de M5: builds + 1 de M7: weapon-duel-ranges + 1 de M8: comps + 1 de M8: arena-shop + 1 de M12: encounters) e valida o conteúdo real de M8+M9+M10+M11+M12 (10 classes [9 base + 1 promovida] + 28 skills [26 + as 2 skills de mapa em área de M12 sub-sessão 3] + 12 efeitos + 1 tabela de alcance + 9 comps + 7 mapas [1 arena + os 6 da campanha real de M12 sub-sessão 3, que aposentaram os 3 provisórios de M9] + 3 terrenos + 11 itens + 6 sets + 4 ofertas de loja + 3 valor-skills + 6 encounters [os 6 capítulos de M12 sub-sessão 3] = 100 arquivos)', async () => {
+  it('finds the 23 schemas (5 de M1 + 2 de M2 + 3 de M3 + 3 de M4 + 1 de M5: builds + 1 de M7: weapon-duel-ranges + 1 de M8: comps + 1 de M8: arena-shop + 1 de M12: encounters + 4 de M14: dungeons, dungeon-encounters, materials, economy-rules + 1 de M15: summon-blueprints) e valida o conteúdo real de M8+M9+M10+M11+M12+M14+M15 (10 classes [9 base + 1 promovida] + 28 skills [26 + as 2 skills de mapa em área de M12 sub-sessão 3] + 12 efeitos + 1 tabela de alcance + 9 comps + 7 mapas [1 arena + os 6 da campanha real de M12 sub-sessão 3, que aposentaram os 3 provisórios de M9] + 3 terrenos + 11 itens + 6 sets + 4 ofertas de loja + 4 valor-skills [3 + a invocação de M15 2/N] + 6 encounters [os 6 capítulos de M12 sub-sessão 3] + 8 masmorras + 8 encounters de masmorra + 2 materiais + 1 tabela de economia + 3 tabelas de item [M14 sub-sessoes 1 e 2] + 1 blueprint de invocação [M15 2/N] = 124 arquivos)', async () => {
     const report = await validateDataset(packageRoot);
-    expect(report).toMatchObject({ ok: true, schemasFound: 18, filesChecked: 100 });
+    expect(report).toMatchObject({ ok: true, schemasFound: 23, filesChecked: 124 });
   });
 });
 
@@ -164,6 +164,80 @@ describe('maps.schema.ts — condições de vitória (§5.7)', () => {
   });
 });
 
+// §5.1 (M15 D3) — `Tile.object` declarava 5 valores desde M3 com leitor para 2. O motor
+// agora lê 4 e `chest` saiu (loot em mapa é sistema que não existe). O schema tem de andar
+// junto: se ele continuasse aceitando `chest`, `packages/data` poderia autorar conteúdo que
+// o tipo do core rejeita — que é exatamente o desalinhamento que a regra 4 existe para
+// impedir. `gate` ganhou descrição opcional, porque o portão abre por um lado e quebra pelo
+// outro (requisito do usuário, M15 1/N).
+describe('maps.schema.ts — Tile.object depois de D3 (§5.1)', () => {
+  function mapWithTile(tile: unknown): unknown {
+    const tiles = Array.from({ length: 15 }, (_unused, y) =>
+      Array.from({ length: 15 }, (_unused2, x) => (x === 7 && y === 7 ? tile : { terrain: 'plain', height: 0 })),
+    );
+    return {
+      id: 'map-fixture-objetos',
+      name: 'Fixture',
+      width: 15,
+      height: 15,
+      tiles,
+      terrains: {
+        plain: {
+          id: 'plain',
+          moveCost: { foot: 1, cavalry: 1, flying: 1, heavy: 1, aquatic: 2 },
+          defBonus: 0,
+          evaBonus: 0,
+          blocksSight: false,
+        },
+      },
+      zocEnabled: true,
+      winCondition: { t: 'rout' },
+      initialValor: 5,
+    };
+  }
+
+  it('aceita os quatro objetos que o motor lê', () => {
+    for (const object of ['wall', 'fort', 'gate', 'camp']) {
+      expect(() => mapSchema.parse(mapWithTile({ terrain: 'plain', height: 0, object }))).not.toThrow();
+    }
+  });
+
+  it('rejeita `chest`: o valor saiu do tipo do core', () => {
+    expect(() => mapSchema.parse(mapWithTile({ terrain: 'plain', height: 0, object: 'chest' }))).toThrow();
+  });
+
+  it('aceita portão com lado e durabilidade declarados', () => {
+    expect(() =>
+      mapSchema.parse(
+        mapWithTile({ terrain: 'plain', height: 0, object: 'gate', gate: { opensFor: 'player', durability: 3 } }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejeita durabilidade não-positiva — um portão que cai em zero golpes não é portão', () => {
+    expect(() =>
+      mapSchema.parse(
+        mapWithTile({ terrain: 'plain', height: 0, object: 'gate', gate: { opensFor: 'any', durability: 0 } }),
+      ),
+    ).toThrow();
+  });
+
+  it('rejeita `gate` declarado num tile que não é portão', () => {
+    expect(() =>
+      mapSchema.parse(
+        mapWithTile({ terrain: 'plain', height: 0, object: 'fort', gate: { opensFor: 'any', durability: 1 } }),
+      ),
+    ).toThrow();
+  });
+
+  it('nenhum mapa do catálogo real usa `chest`', () => {
+    const files = findJsonFiles(join(packageRoot, 'maps'));
+    for (const file of files) {
+      expect(readFileSync(file, 'utf8')).not.toContain('"chest"');
+    }
+  });
+});
+
 // §5.6 (M11, sub-sessão 3/N) — o `payload` das valor-skills era um record solto desde M3,
 // quando nenhum `kind` tinha resolução no motor. Com três resolvidos, um payload sem forma
 // passou a ser a mesma classe de bug do `defend` sem `target`: valida e não faz nada.
@@ -187,8 +261,10 @@ describe('valor-skills.schema.ts — payload tipado por kind (§5.6)', () => {
     expect(() => valorSkillSchema.parse({ ...base, kind: 'artillery', payload: { damage: 400, radius: -1 } })).toThrow();
   });
 
-  it('`summonReinforcement` continua com payload solto — não tem resolução para dar forma', () => {
-    expect(() => valorSkillSchema.parse({ ...base, kind: 'summonReinforcement', payload: {} })).not.toThrow();
+  // M15 D2 — o payload deixou de ser solto: o kind ganhou resolução e nomeia um blueprint.
+  // A forma nova e as referências cruzadas são medidas em `m15Content.test.ts`.
+  it('`summonReinforcement` exige `blueprintId` desde que ganhou resolução', () => {
+    expect(() => valorSkillSchema.parse({ ...base, kind: 'summonReinforcement', payload: {} })).toThrow();
   });
 
   it('rejeita custo zero ou negativo — uma skill de Valor grátis não é um recurso', () => {
@@ -197,10 +273,18 @@ describe('valor-skills.schema.ts — payload tipado por kind (§5.6)', () => {
 
   // O catálogo real: o roadmap de M11 pede "catálogo real de valor-skills resolvido de
   // verdade por useValor", então autorar aqui é escopo (ao contrário das skills de área).
-  it('o catálogo real cobre os três kinds resolvidos e nenhum sem resolução', () => {
+  // M15 D2 fechou o quarto kind, e o catálogo passou a cobrir os QUATRO — que é o critério
+  // de aceite 3 do milestone ("nenhum kind rejeita por falta de implementação") medido pelo
+  // lado do dado: não basta o motor resolver, tem de existir conteúdo exercendo cada um.
+  it('o catálogo real cobre os quatro kinds de §5.6, todos com resolução', () => {
     const files = findJsonFiles(join(packageRoot, 'valor-skills'));
     const parsed = files.map((file) => valorSkillSchema.parse(JSON.parse(readFileSync(file, 'utf8'))));
-    expect(parsed.map((s) => s.kind).sort()).toEqual(['artillery', 'globalBuff', 'restoreApPp']);
+    expect(parsed.map((s) => s.kind).sort()).toEqual([
+      'artillery',
+      'globalBuff',
+      'restoreApPp',
+      'summonReinforcement',
+    ]);
   });
 
   it('todo effectId referenciado por valor-skill existe no catálogo de efeitos', () => {

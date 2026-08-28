@@ -1,6 +1,7 @@
 import { fpDiv } from '../math/fixed.js';
 import { computeReachableTiles, type ReachableTile } from '../grid/pathfinding.js';
 import { manhattanDistance, type Coord } from '../grid/types.js';
+import { openGateCoords } from './gates.js';
 import type { Id } from '../types.js';
 import type { BattleCommand, BattleState, BattleUnit, MapAiArchetype } from './types.js';
 
@@ -79,7 +80,15 @@ function reachableTilesFor(state: BattleState, unit: BattleUnit, moveRange: numb
   const allies = livingAllies(state, unit).map((u) => u.pos);
   const enemies = livingEnemies(state, unit).map((u) => u.pos);
   return computeReachableTiles(
-    { map: state.map, moveType: unit.moveType, occupiedByAlly: allies, occupiedByEnemy: enemies },
+    {
+      map: state.map,
+      moveType: unit.moveType,
+      occupiedByAlly: allies,
+      occupiedByEnemy: enemies,
+      // §5.1 (M15 D3) — a IA enxerga muro e portão exatamente como o jogador: o alcance vem
+      // da mesma função. Nada de arquétipo novo nem de heurística de porta (regra 6).
+      openGates: openGateCoords(state),
+    },
     unit.pos,
     remaining,
   );

@@ -15,6 +15,11 @@ export interface PathfindingContext {
   readonly moveType: MoveType;
   readonly occupiedByAlly: readonly Coord[];
   readonly occupiedByEnemy: readonly Coord[];
+  // §5.1 (M15 D3) — portões já abertos NESTA batalha. O estado do portão é da partida, não
+  // da fase, então não mora no `GridMap`: quem o carrega é o `BattleState`
+  // (`battle/gates.ts`). Ausente = nenhum portão aberto, que é o certo para quem calcula
+  // alcance sem batalha (autoria de mapa, validação de conteúdo).
+  readonly openGates?: readonly Coord[];
 }
 
 export interface ReachableTile {
@@ -41,6 +46,31 @@ function terrainMoveCost(map: GridMap, coord: Coord, moveType: MoveType): number
 
 function isOccupied(coord: Coord, occupants: readonly Coord[]): boolean {
   return occupants.some((occupant) => coordsEqual(occupant, coord));
+}
+
+// §5.1 (M15 D3) — bloqueio por OBJETO, independente do terreno embaixo. É o que o
+// `moveCost: 'impassable'` do terreno não consegue expressar: voador ignora custo de terreno
+// (§5.1: "voadores custam 1 em tudo exceto impassable"), mas ninguém atravessa parede.
+export function isBlockedByObject(map: GridMap, coord: Coord, openGates: readonly Coord[] = []): boolean {
+  const object = tileAt(map, coord)?.object;
+  if (object === 'wall') return true;
+  if (object === 'gate') return !openGates.some((gate) => coordsEqual(gate, coord));
+  return false;
+}
+
+// Um tile aceita uma unidade deste `moveType`? Terreno passável E sem objeto bloqueando.
+// Usado pelo pathfinding e por `summonReinforcement` (§5.6), que precisa da mesma pergunta
+// sem ter caminho nenhum a percorrer.
+export function isTilePassable(
+  map: GridMap,
+  coord: Coord,
+  moveType: MoveType,
+  openGates: readonly Coord[] = [],
+): boolean {
+  if (!isInBounds(map, coord)) return false;
+  const cost = terrainMoveCost(map, coord, moveType);
+  if (cost === undefined || cost === 'impassable') return false;
+  return !isBlockedByObject(map, coord, openGates);
 }
 
 // §5.2 — Zone of Control: tiles ortogonalmente adjacentes a inimigo encerram o movimento.
@@ -82,6 +112,7 @@ export function computeReachableTiles(ctx: PathfindingContext, start: Coord, mov
     for (const neighbor of orthogonalNeighbors(current)) {
       if (!isInBounds(ctx.map, neighbor)) continue;
       if (isOccupied(neighbor, ctx.occupiedByEnemy)) continue;
+      if (isBlockedByObject(ctx.map, neighbor, ctx.openGates)) continue;
 
       const moveCost = terrainMoveCost(ctx.map, neighbor, ctx.moveType);
       if (moveCost === undefined || moveCost === 'impassable') continue;
@@ -144,6 +175,9 @@ export function validatePath(ctx: PathfindingContext, path: readonly Coord[], mo
     }
     if (haltedByZoc) return { valid: false, cost, reason: 'continuou andando depois de entrar em ZoC' };
     if (isOccupied(step, ctx.occupiedByEnemy)) return { valid: false, cost, reason: 'tile ocupado por inimigo' };
+    if (isBlockedByObject(ctx.map, step, ctx.openGates)) {
+      return { valid: false, cost, reason: 'objeto bloqueia o tile (muro ou portão fechado)' };
+    }
 
     const moveCost = terrainMoveCost(ctx.map, step, ctx.moveType);
     if (moveCost === undefined || moveCost === 'impassable') {

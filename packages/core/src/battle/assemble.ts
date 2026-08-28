@@ -82,6 +82,22 @@ export interface BuildBattleSetupFromHeroesInput {
   // heróis — ou seja, por cliente, servidor e `tools/balance` — e Valor só existia em
   // teste, com o saldo aparecendo no HUD sem nada que o gastasse.
   readonly valorSkills?: Readonly<Record<Id, ValorSkillDef>>;
+  // §5.6 (M15 D2) — os reforços invocáveis, declarados como herói + classe + equipamento,
+  // exatamente como as `placements`. Mesma razão de `valorSkills` acima: sem este repasse o
+  // campo `BattleSetup.summonBlueprints` seria inalcançável por quem monta batalha a partir
+  // de heróis — cliente, servidor e `tools/balance` —, e `summonReinforcement` voltaria a ser
+  // um kind que resolve em teste e nunca em jogo.
+  readonly summonBlueprints?: readonly SummonBlueprintPlacement[];
+}
+
+// O que uma invocação precisa declarar, e nada além: quem é o reforço. Onde ele nasce, de
+// que lado e com que id são decididos no instante da invocação (`battle/valor.ts`), não na
+// autoria — por isso `pos`/`height`/`side`/`unitId` não estão aqui.
+export interface SummonBlueprintPlacement {
+  readonly blueprintId: Id;
+  readonly hero: Hero;
+  readonly classDef: ClassDef;
+  readonly equippedItems: readonly ItemInstance[];
 }
 
 // Compõe as duas etapas anteriores (resolveHeroCombatProfile, sub-sessão 4;
@@ -115,6 +131,30 @@ export function buildBattleSetupFromHeroes(input: BuildBattleSetupFromHeroesInpu
     return placement.aiArchetype ? { ...unit, aiArchetype: placement.aiArchetype } : unit;
   });
 
+  // §5.6 (M15 D2) — cada blueprint vira um `BattleUnit` completo pela MESMA cadeia das
+  // unidades do mapa (resolveHeroCombatProfile → buildBattleUnit). Os campos que só a
+  // invocação conhece entram como marcador e são sobrescritos por `resolveValorSkill`: id do
+  // blueprint, tile (0,0), altura 0 e lado do jogador.
+  const summonBlueprints: Record<Id, BattleUnit> = {};
+  for (const blueprint of input.summonBlueprints ?? []) {
+    summonBlueprints[blueprint.blueprintId] = buildBattleUnit({
+      unitId: blueprint.blueprintId,
+      heroId: blueprint.hero.id,
+      side: 'player',
+      pos: { x: 0, y: 0 },
+      height: 0,
+      profile: resolveHeroCombatProfile({
+        hero: blueprint.hero,
+        classDef: blueprint.classDef,
+        equippedItems: blueprint.equippedItems,
+        itemSets: input.itemSets,
+        skillsCatalog: input.skillsCatalog,
+        weaponDuelRanges: input.weaponDuelRanges,
+        baselineReactionSkillIds: input.baselineReactionSkillIds,
+      }),
+    });
+  }
+
   return {
     map: input.map,
     units,
@@ -123,5 +163,6 @@ export function buildBattleSetupFromHeroes(input: BuildBattleSetupFromHeroesInpu
     effectDefs: input.effectDefs,
     initialValor: input.initialValor,
     ...(input.valorSkills ? { valorSkills: input.valorSkills } : {}),
+    ...(Object.keys(summonBlueprints).length > 0 ? { summonBlueprints } : {}),
   };
 }
