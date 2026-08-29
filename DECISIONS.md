@@ -36,7 +36,7 @@ nenhuma camada de personagem toca nisso. É exatamente a metade do critério 2 q
 como regra permanente ou passa a valer só até a fatia de arte começar; e se o critério 2 é
 perseguido agora no desenho programático ou congelado até a arte entrar.
 
-### Personagens no lugar de classes, e a árvore de talentos em duas colunas
+### Personagens no lugar de classes, e a árvore em duas colunas — RESOLVIDA em 2026-08-28, ver "M17 definido" no fim deste arquivo
 
 Proposta do usuário, ainda não resolvida em spec. O jogo passa a se basear em **personagens**;
 a classe continua existindo, mas como **indicação do rumo** do que o personagem faz, não como a
@@ -3813,3 +3813,44 @@ por `PREEMPT_THRESHOLD_PCT` ou pelo cap de evasão — os dois que a §6.7 nomei
 alavancas —, então esses dois viram tuning de verdade e devem migrar para `packages/data`. Hoje
 não é o caso: a concentração de `spd` nas builds vencedoras está em **15,5%**, contra um limiar de
 alerta de 60%, e caiu (era 20,0%) sem ninguém mexer nessas constantes.
+
+
+### M17 definido — personagens no lugar de classes, e a árvore de duas colunas
+
+A proposta registrada em "Em aberto" foi resolvida com o usuário em 2026-08-28. As quatro
+perguntas que faltavam foram respondidas, e com elas a spec §8 foi reescrita, o M17 entrou no
+roadmap e o briefing de implementação foi escrito. **Nenhuma linha de código nesta fatia.**
+
+**As respostas, e o que cada uma decidiu:**
+
+1. **A classe guia status e parte do que o personagem faz** — não vira rótulo. Curva de stat,
+   `moveType`, `moveRange`, armas permitidas, pools de AP/PP e skills de partida continuam vindo
+   dela. O que ela perde é ser a unidade de progressão.
+2. **A árvore é por personagem.**
+3. **A coluna amarra a linha seguinte**, e o nó da coluna do meio **libera** a linha seguinte para
+   qualquer coluna — a coluna escolhida ali volta a amarrar. A convergência é uma porta que custa
+   um ponto para abrir; trocar de lado não é livre nem impossível.
+4. **Orçamento = profundidade da árvore** (5 a 9 linhas, um nó por linha). Com nós de rank
+   múltiplo, profundidade + 1 ou + 2, e os pontos extras só aprofundam nós já alocados.
+
+**Uma quinta decisão saiu da conversa e vale tanto quanto as quatro: inimigo de fase não é
+personagem.** Perguntei o que as 27 unidades geradas da arena e as vagas de masmorra usariam, e a
+resposta reposicionou a pergunta: personagem é o que o **jogador usa** para montar time, em PvE e
+PvP; inimigo de fase é autorado **direto**, com status e skills escolhidos para a dificuldade,
+"uma maneira mais direta e tranquila de fazer". Hoje todo inimigo é um `Hero` completo resolvido
+por `resolveHeroCombatProfile` — o autor precisa dizer "arqueiro nível 8 com estes talentos"
+quando quer dizer "este inimigo tem esta força".
+
+**O custo foi levantado no código, não estimado.** Dez arquivos mudam de forma (schema da classe,
+as 10 árvores autoradas, `validateAllocation`, o gate de `minAwakening` de M14, os build codes, o
+painel e o layout de árvore no cliente, `combatProfile`, os dois schemas de encounter e os dois
+geradores de conteúdo). `TalentEffect` **não muda** — os 12 efeitos seguem idênticos, e não é a
+lista de efeitos que está sendo redesenhada.
+
+**É mudança de regra:** `RULES_VERSION` sobe e replays gravados antes deixam de validar (§7,
+anti-cheat, 409). Sem caminho de migração — o formato de alocação muda.
+
+**Três decisões ficaram explicitamente em aberto no briefing (§5), para não serem inventadas na
+hora:** quantos personagens jogáveis existem e se o gerador de comps passa a gerar personagens com
+árvore; se a profundidade é por personagem (e portanto poder) ou fixa; e o que fazer com saves de
+campanha que carregam `talentAllocationByUnit`.

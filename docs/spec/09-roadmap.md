@@ -139,6 +139,25 @@ implementação de teste provando que é trocável.
 
 ---
 
+> **M17 foi definido pelo usuário em 2026-08-28**, ao reposicionar o design depois de fechar o M16.
+> Briefing: `docs/milestones/M17-personagens-e-talentos.md`. Forma normativa da árvore em §8.2.
+
+### M17 — Personagens e a árvore de duas colunas
+O jogo passa a se basear em **personagens**, não em classes. A classe continua guiando status e
+parte do que o personagem faz (curva de stat, `moveType`, armas, pools, skills de partida) mas
+deixa de ser a unidade de progressão: a **árvore de talentos passa a ser do personagem**, com duas
+colunas de 5 a 9 linhas, um nó por linha, a coluna amarrando a linha seguinte, e uma coluna do
+meio ocasional cujo nó é a porta que libera trocar de lado. Orçamento de pontos = profundidade.
+Junto entra a simplificação que a mudança revelou: **inimigo de fase deixa de ser um `Hero` com
+classe, nível, equipamento e talentos** e passa a ser autorado direto, com status e skills
+escolhidos para a dificuldade pretendida.
+**Aceite:** um personagem aloca a árvore de duas colunas ponta a ponta pelo cliente, com a
+amarração impedindo escolha ilegal e a convergência liberando a troca; nenhum inimigo de campanha
+ou masmorra passa por `Hero`/classe; `pnpm balance` reexecutado com os dois critérios do M8 de pé;
+`RULES_VERSION` sobe e o servidor rejeita replay de versão anterior com 409.
+
+---
+
 ---
 
 ## 15. Decisões em aberto (registrar em `DECISIONS.md` ao resolver)

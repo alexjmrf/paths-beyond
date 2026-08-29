@@ -1,30 +1,94 @@
 <!-- Classes, promoção, árvores, skills -->
 ## 8. Classes e talentos (World of Warcraft)
 
-### 8.1 Estrutura
+### 8.1 Personagens, classes e inimigos
+
+> Revisado em 2026-08-28. A versão anterior tratava toda unidade como um `Hero` com classe,
+> nível, equipamento e duas árvores de talento. Esta seção separa o que o jogador **usa** do que
+> ele **enfrenta**, porque as duas coisas nunca precisaram do mesmo modelo.
+
+**Personagem jogável.** É a unidade que o jogador possui e leva para o time — a mesma em PvE e em
+PvP (arena assíncrona hoje; PvP em tempo real, se existir, usa os mesmos personagens controlados
+ao vivo). Tem **classe**, **equipamento**, **nível** e **árvore de talentos própria**. É o objeto
+de progressão do jogo.
+
+**Classe.** Continua existindo e continua sendo normativa, mas o papel dela mudou: ela **guia os
+status e parte do que o personagem faz** — curva de stat base, `moveType`, `moveRange`, armas
+permitidas, pools base de AP/PP e o conjunto de skills de partida. Ela **não é mais a unidade de
+progressão**: a árvore não pertence mais à classe.
 
 ```
 Classe Base (nv 1-20)  →  Especialização (nv 20-40)  →  Mestria (nv 40-60)
    Soldado             →   Cavaleiro | Berserker      →  Paladino | Senhor da Guerra ...
 ```
 
-Promoção exige item + nível mínimo, e é irreversível sem item raro de reset. Cada classe define: curva de stat base, `moveType`, `moveRange`, armas permitidas, **pools base de AP/PP**, e a árvore de talentos.
+Promoção segue exigindo item + nível mínimo e segue irreversível sem item raro de reset.
 
-### 8.2 Árvores
+**Inimigo de fase NÃO é personagem.** Inimigo de campanha, de masmorra e qualquer unidade que só
+exista para ser enfrentada é autorado **direto**: status e skills escolhidos para a dificuldade
+pretendida, sem classe a resolver, sem nível a interpolar, sem árvore e sem alocação de talento.
+É o caminho mais direto e é o que o conteúdo quer dizer — "este inimigo tem esta força" — em vez
+de derivá-lo de uma ficha de personagem que ninguém joga.
 
-Duas árvores por herói: **Classe** (8 pontos, compartilhada entre specs) e **Especialização** (8 pontos). 1 ponto por nível a partir do 5, alternando. ~16 pontos no nível 60.
+### 8.2 A árvore de talentos
+
+**Uma árvore por personagem.** Duas árvores por classe deixaram de existir; o que existe é a
+árvore daquele personagem, e ela é parte de quem ele é.
+
+**Forma: duas colunas, e uma terceira ocasional.**
+
+```
+        A          (meio)          B
+row 1   ●                          ●
+row 2   ●                          ●
+row 3   ●            ◆             ●        <- linha de convergência
+row 4   ●                          ●
+row 5   ●                          ●
+row 6   ●            ◆             ●        <- linha de convergência
+row 7   ●                          ●
+```
+
+- **Duas colunas principais**, A e B, presentes em **todas** as linhas.
+- **Profundidade de 5 a 9 linhas**, declarada por personagem.
+- **Uma coluna do meio ocasional**: existe só em algumas linhas. Nas linhas em que existe, o
+  jogador escolhe entre **três** nós — A, meio ou B; as duas colunas principais continuam
+  oferecendo o nó delas.
+- **Um nó por linha.** A escolha não é *quantos*, é *qual*.
+
+**A regra que dá forma à build — a coluna amarra:**
+
+- escolher um nó da coluna A na linha N **obriga** a linha N+1 a vir da coluna A;
+- escolher o nó do **meio** na linha N **libera** a linha N+1 a vir de qualquer coluna — e a
+  coluna escolhida ali volta a amarrar dali em diante.
+
+A convergência é, portanto, **uma porta que custa um ponto para abrir**. Trocar de lado não é
+livre e não é impossível: é uma decisão que se paga com a linha em que ela acontece.
+
+**Orçamento de pontos = profundidade da árvore.** Com um nó por linha e um ponto por nó, o
+personagem que chega ao fim gastou exatamente a profundidade. Se a árvore tiver nós de rank
+múltiplo (`maxRank > 1`), o orçamento sobe para **profundidade + 1 ou + 2**, e os pontos extras
+só podem aprofundar nós já alocados — nunca comprar uma linha a mais.
 
 ```ts
 interface TalentNode {
   id: Id;
-  tree: 'class'|'spec';
-  row: number;              // 1..8; gate por pontos gastos na árvore
-  requires?: Id[];
-  exclusiveWith?: Id[];     // choice nodes
+  column: 'a' | 'b' | 'middle';
+  row: number;              // 1..profundidade
   maxRank: 1|2|3;
   effects: TalentEffect[];
 }
 
+interface TalentTree {
+  characterId: Id;
+  depth: number;            // 5..9
+  budget: number;           // depth, ou depth+1/+2 se houver maxRank > 1
+  nodes: TalentNode[];
+}
+```
+
+`TalentEffect` **não muda** — a lista abaixo continua valendo integralmente:
+
+```ts
 type TalentEffect =
   | { t: 'stat'; stat: StatKey; flat?: number; pct?: number }
   | { t: 'grantSkill'; skillId: Id }
@@ -35,16 +99,21 @@ type TalentEffect =
   | { t: 'maxAp'; n: number }
   | { t: 'maxPp'; n: number }
   | { t: 'apRefund'; on: 'kill'|'duelWon'|'assist'; n: number }
-  | { t: 'duelApCap'; n: number }         // eleva o teto de 2 AP por duelo
+  | { t: 'duelApCap'; n: number }
   | { t: 'assistRangeBonus'; n: number }
   | { t: 'passive'; passiveId: Id };
 ```
 
-**Regras de design das árvores:**
-- Cada árvore DEVE ter no mínimo **3 choice nodes** que mudem o papel do herói de verdade. Ex.: "contra-atacar custa 0 PP, mas você perde 1 AP máximo" vs "seu ataque básico aplica sangramento".
+**Regras de design das árvores** (mantidas da versão anterior, adaptadas à forma nova):
+- As duas colunas DEVEM ser papéis diferentes de verdade, não a mesma build com números
+  distintos. Se A e B levam ao mesmo jeito de jogar, a árvore tem uma coluna só.
 - No máximo **30%** dos nós podem ser preenchimento de `+2% stat`.
-- Ao menos **2 nós por árvore** DEVEM tocar a economia de AP/PP ou o sistema de assistência. Talento que só dá número é talento fraco neste jogo.
-- **Reset barato** (ouro). Experimentar build é conteúdo, não punição. Bloqueado durante batalha e durante partida de PvP em andamento.
+- Ao menos **2 nós por árvore** DEVEM tocar a economia de AP/PP ou o sistema de assistência.
+  Talento que só dá número é talento fraco neste jogo.
+- O nó de convergência DEVE valer a pena pelo efeito dele, e não só pela porta que abre —
+  senão trocar de coluna custa um ponto morto.
+- **Reset barato** (ouro). Experimentar build é conteúdo, não punição. Bloqueado durante batalha e
+  durante partida de PvP em andamento.
 
 ### 8.3 Skills
 
