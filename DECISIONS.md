@@ -3784,3 +3784,32 @@ mesmo `atk` serve os dois, e o −33% que equilibra a arena deixa o arqueiro do 
 sensivelmente mais fraco na campanha. O conteúdo foi retunado para compensar. Se um dia isso
 incomodar na mão, o botão por modo continua sendo a saída estrutural — e o registro acima já
 mostra que ela custa encanamento em `loadCatalogFromDisk`, `ContentCatalog`, servidor e cliente.
+
+
+### P2.1 RESOLVIDO — as constantes de balanceamento ficam em `packages/core`
+
+Pergunta herdada do `HANDOFF.md`: a regra 4 do `CLAUDE.md` manda todo número de balanceamento
+viver em `packages/data`, e sete constantes vivem em `packages/core/src`
+(`ASSIST_DAMAGE_MULTIPLIER`, `PEN_CAP`, `VARIANCE_MIN/MAX`, `SPD_EVASION_BASELINE`,
+`PREEMPT_THRESHOLD_PCT`, `DEFEND_DAMAGE_REDUCTION_PCT` e as quatro de `battle/positional.ts`).
+
+**Decisão: ficam onde estão.** E o que decide não é a opinião que o handoff já registrava
+("isto é defensável como está") — é a evidência que o P1.1 acabou de produzir.
+
+**O argumento:** o P1.1 rebalanceou o jogo INTEIRO. A faixa de winrate saiu de 26,5–79,6% e
+chegou a 43,9–60,8%, os counters absolutos foram de 16 a zero, e um sistema de combate inteiro
+(§6.1) passou de desligado a ligado. Foram seis configurações medidas a 10.000 partidas por
+pareamento e três correções de conteúdo. **Nenhuma dessas sete constantes precisou ser tocada.**
+O que moveu o balanceamento foi `weapon-duel-ranges` (dado), o `atk` das classes (dado, via
+gerador), a composição das comps (dado) e o posicionamento dos encounters (dado).
+
+Isso é o teste empírico que a pergunta pedia. A regra 4 existe para que quem ajusta balanceamento
+não precise mexer em código; um rebalanceamento de escala máxima acabou de acontecer sem tocar em
+código de regra. As sete são constantes de **regra** citadas nominalmente na prosa da spec, não
+números de tuning — e a distinção, que antes era uma afirmação, agora tem medição atrás.
+
+**A condição que reabre isto**, mantida do handoff: se um dia `spd` dominar e a correção passar
+por `PREEMPT_THRESHOLD_PCT` ou pelo cap de evasão — os dois que a §6.7 nomeia como as primeiras
+alavancas —, então esses dois viram tuning de verdade e devem migrar para `packages/data`. Hoje
+não é o caso: a concentração de `spd` nas builds vencedoras está em **15,5%**, contra um limiar de
+alerta de 60%, e caiu (era 20,0%) sem ninguém mexer nessas constantes.
