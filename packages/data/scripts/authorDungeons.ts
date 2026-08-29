@@ -124,7 +124,13 @@ const DUNGEONS: readonly DungeonSpec[] = [
     energyCost: 10,
     playerSlotCount: 2,
     referenceLevel: 12,
-    enemies: [enemy('treino-alvo-1', 'class-espadachim', 8), enemy('treino-alvo-2', 'class-arqueiro', 8)],
+    // Passe do HANDOFF, 2026-08-28 — o alvo 2 era `class-arqueiro`, e passou a ser corpo a
+    // corpo quando `bow` voltou a valer 2 (§6.1). Não é fuga do problema: é o padrão que o
+    // resto do conteúdo já seguia e que só o campo de treino violava. Time de jogador de DUAS
+    // vagas enfrenta só corpo a corpo (`veio-de-prata`); o arqueiro inimigo aparece a partir de
+    // `forja-abandonada`, onde a party tem três vagas e uma delas é um arqueiro. Com alcance 1
+    // a violação era inofensiva; com 2, o piso da dificuldade deixou de ser vencível na seed 2.
+    enemies: [enemy('treino-alvo-1', 'class-espadachim', 8), enemy('treino-alvo-2', 'class-guerreiro', 8)],
     rewards: { exp: { min: 400, max: 600 }, gold: { min: 5, max: 10 } },
   },
   {
@@ -187,9 +193,12 @@ const DUNGEONS: readonly DungeonSpec[] = [
     playerSlotCount: 3,
     referenceLevel: 20,
     enemies: [
-      enemy('tirano-guarda-1', 'class-couracado', 14),
-      enemy('tirano-guarda-2', 'class-couracado', 14),
-      enemy('tirano', 'class-mestre-espadachim', 16),
+      // Um nível abaixo do que eram (14/14/16). A party de referência desta masmorra tem três
+      // vagas e DUAS delas são de alcance (clérigo e arqueiro), então a redução de 33% no `atk`
+      // dessas classes pesou mais no jogador do que nos guardas, todos corpo a corpo.
+      enemy('tirano-guarda-1', 'class-couracado', 13),
+      enemy('tirano-guarda-2', 'class-couracado', 13),
+      enemy('tirano', 'class-mestre-espadachim', 15),
     ],
     rewards: {
       gold: { min: 60, max: 120 },

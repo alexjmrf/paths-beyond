@@ -84,33 +84,34 @@
     },
     {
       "hero": {
-        "id": "heroi-grifeiro-3",
-        "classId": "class-grifeiro",
+        "id": "heroi-grifeiro-apoio",
+        "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-grifeiro-foco-em-equipe": 1
+          "talent-arqueiro-foco-em-equipe": 1,
+          "talent-arqueiro-reacao-propria": 1
         },
         "equipment": {
-          "weapon": "item-arma-grifeiro",
+          "weapon": "item-arma-arqueiro",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "spear",
+        "weaponType": "bow",
         "duelSkills": [
-          "skill-ataque-grifeiro",
-          "skill-especial-grifeiro"
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-grifeiro",
+            "skillId": "skill-especial-arqueiro",
             "conditions": []
           }
         ]

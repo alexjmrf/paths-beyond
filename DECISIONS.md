@@ -3625,3 +3625,162 @@ plaqueta (3/N) e depois nascendo em cima da peça do vizinho num corpo a corpo (
 do usuário e não do agente — os elementos do mapa —, e é a razão de o critério 2 não ser
 autocertificável: **o agente mediu contraste, dicromacia, tamanho de fonte e caber-no-tile, e
 mesmo assim o tabuleiro não estava legível.** O que faltava era alguém olhar.
+
+
+### Comps mistas, e a medição que mostra o preço de ligar a assimetria de alcance
+
+Continuação do P1.1 do HANDOFF, com a forma das comps decidida pelo usuário: **temáticas por
+classe, com apoio** — duas unidades da própria classe (a matriz segue legível por classe) e uma
+terceira cobrindo o lado que falta. Classe de alcance recebe o Couraçado à frente; classe de
+corpo a corpo recebe o Arqueiro atrás. Os dois foram escolhidos por serem os mais "lisos" do
+catálogo: nenhum tem cura, invocação ou área que contaminasse a leitura do eixo medido.
+
+**As quatro medições, 10.000 partidas por pareamento, 72 pareamentos:**
+
+| Configuração | Faixa de winrate | Amplitude | Fora de 40–60 | Assist./batalha |
+| --- | --- | --- | --- | --- |
+| monoclasse, `ranged 1` (o baseline histórico) | 42,5 – 59,9% | 17 pts | 0 de 9 | 2,44 |
+| monoclasse, `ranged 2` | 26,5 – 79,6% | 53 pts | 9 de 9 | 3,16 |
+| **mistas, `ranged 2`** | 32,6 – 70,0% | 37 pts | 8 de 9 | 2,77 |
+| **mistas, `ranged 2`, `atk` de alcance −33%** | **43,9 – 60,8%** | **17 pts** | **0 de 9** | 2,91 |
+
+**As comps mistas cortaram a distorção pela metade** (53 → 37 pontos de amplitude) e são ganho
+puro: entram e ficam. Mas não bastam, e a razão é aritmética — uma comp de alcance tem DUAS peças
+que golpeiam sem resposta, uma comp de corpo a corpo tem UMA. Um apoio não iguala um 2:1.
+
+**O `signatureMultiplier` foi o botão errado, e a medição disse por quê.** −20% nele moveu a
+amplitude de 37 para 31 apenas: a especial é só parte do dano, o ataque básico (multiplicador
+1000) fica intacto, e boa parte da vantagem de alcance é **estrutural** (o golpe sem resposta) e
+não de magnitude. O botão que funciona é o `atk` da classe, que atinge todo o dano dela.
+
+**A configuração que fecha o critério do M8 existe e está medida: `atk` das quatro classes de
+alcance −33% no nível 10** (90 → 60, com `atkPerLevel` mantido inteiro em 3 porque o schema exige).
+Zero alertas, `spd` em 15,5%, assistências em 94,7% das batalhas.
+
+**E ela NÃO foi aplicada, porque o preço apareceu na hora e é o argumento central deste registro.**
+Rodar a suíte com o nerf quebrou duas peças de conteúdo: o piloto automático perde o **capítulo 2**
+e o time de referência perde o **covil do tirano (normal)**. O motivo é que a redução atinge o
+**jogador** tanto quanto o inimigo — a party do capítulo 2 tem duas unidades e uma é o Clérigo; a
+do covil tem três vagas e duas são de alcance. Baixei um nível dos guardas do covil e resolveu;
+baixei um nível do arqueiro do capítulo 2 e **não** resolveu.
+
+**A tensão de fundo, que é o achado que sobrevive a qualquer número escolhido:** a arena é IA
+contra IA (Modo 2/Coliseu, §9.2), e a IA **sempre** engaja no alcance máximo — ela explora a
+assimetria ao limite em toda partida. A campanha tem um humano que escolhe posicionamento e pode
+fechar distância, que é a resposta tática que §6.1 nomeia. O mesmo `atk` serve os dois modos, e o
+projeto não tem botão por modo. Tunar para a arena deixa o arqueiro do jogador fraco na campanha,
+e compensar baixando o nível dos inimigos é **circular**: enfraquece-se o arqueiro do jogador e
+depois enfraquece-se quem ele enfrenta para ele ainda vencer. Parei nesse ponto em vez de seguir
+baixando níveis um a um.
+
+**Estado deixado na árvore:** comps mistas + `ranged 2` + as duas correções de posicionamento que
+o alcance real exigiu (`encounter-campanha-4` e o campo de treino). **Suíte verde, 1397 testes**,
+mas o critério de balanceamento do M8 **falha** (4 comps acima de 65%, 4 abaixo de 40%). O nerf de
+`atk` foi revertido e não está aplicado. A decisão de qual saída tomar é do usuário, e as opções
+medidas estão na tabela acima.
+
+
+### A opção do "botão por modo" foi medida e descartada, e a escolha ficou binária
+
+Sequência do registro acima. Antes de construir o encanamento de duas tabelas de
+`weaponDuelRanges` (uma para a arena, outra para a campanha), duas hipóteses foram testadas.
+As duas caíram, e é por isso que elas viram registro em vez de código.
+
+**Hipótese 1 — "o confundimento é a proporção da comp, não a regra".** Se uma comp de alcance é
+2 ranged + 1 melee e uma de corpo a corpo é 2 melee + 1 ranged, a proporção varia junto com a
+classe e a matriz mede as duas coisas ao mesmo tempo. Testei comps de proporção IGUAL (1 da
+classe + 1 corpo a corpo + 1 de alcance): **27,1 – 68,3%, amplitude 41** — pior que os 37 das
+comps temáticas. Diluir a classe para 1 de 3 não isola a variável, afoga o sinal.
+
+**Hipótese 2 — "a arena usa uma tabela de alcance própria" (a recomendação que eu mesmo tinha
+feito).** Antes de mexer em `loadCatalogFromDisk`, no `ContentCatalog`, no servidor e no cliente,
+medi o DESTINO: comps mistas com `ranged 1`, que é o que a arena passaria a usar. Resultado:
+**32,4 – 65,7%, amplitude 33** — também reprova. O encanamento inteiro levaria a uma arena tão
+quebrada quanto a atual.
+
+**O achado que isso revela:** as comps mistas ajudam muito com `ranged 2` (amplitude 53 → 37) e
+**atrapalham** com `ranged 1` (17 → 33). Elas não são uma melhoria incondicional do harness: elas
+são a companhia certa de um alcance real, e a companhia errada de um alcance desligado.
+
+**As seis configurações medidas, e só duas fecham:**
+
+| Configuração | Faixa | Amplitude | Fecha? |
+| --- | --- | --- | --- |
+| monoclasse, `ranged 1` | 42,5 – 59,9% | 17 | **sim** |
+| monoclasse, `ranged 2` | 26,5 – 79,6% | 53 | não |
+| mistas, `ranged 2` | 32,6 – 70,0% | 37 | não |
+| mistas, `ranged 1` | 32,4 – 65,7% | 33 | não |
+| proporção igual, `ranged 2` | 27,1 – 68,3% | 41 | não |
+| **mistas, `ranged 2`, `atk` de alcance −33%** | **43,9 – 60,8%** | **17** | **sim** |
+
+**A decisão é binária, e é do usuário:**
+
+- **(A) `ranged 1` e comps monoclasse** — volta ao baseline histórico. Arena saudável, tudo verde,
+  e o sistema-assinatura de §6.1 continua **desligado**. É o estado de antes desta sessão.
+- **(B) `ranged 2` + comps mistas + `atk` de alcance −33%** — o sistema de §6.1 **ligado**, arena
+  em 43,9–60,8. Custo: uma passada de conteúdo em capítulos e masmorras (o capítulo 2 e o covil
+  do tirano já falharam e precisam de re-tune), e o arqueiro do jogador fica sensivelmente mais
+  fraco na campanha, porque o mesmo `atk` serve os dois modos.
+
+Não há terceira saída medida. As duas que pareciam existir — proporção de comp e tabela por modo —
+foram testadas e não existem.
+
+
+### P1.1 FECHADO — a assimetria de alcance de §6.1 ligada, e o preço pago
+
+Decisão do usuário: opção **(B)** da tabela acima. `weaponDuelRanges` volta aos valores reais
+(`bow`/`arcane`/`nature`/`holy` = 2), as comps da arena são mistas, e o `atk` das quatro classes
+de alcance cai 33% no nível 10 (90 → 60; `atkBase` 33 com `atkPerLevel` mantido em 3, porque o
+schema exige inteiro).
+
+**O resultado, 10.000 partidas por pareamento:**
+
+| | baseline histórico | agora |
+| --- | --- | --- |
+| Faixa de winrate | 42,5 – 59,9% | **43,9 – 60,8%** |
+| Alertas do relatório | 0 | **0** |
+| **Counters absolutos** | **10 de 72 (13,9%)** | **0 de 72 (0%)** |
+| `spd` acima da mediana nas vencedoras | 20,0% | **15,5%** |
+| Batalhas com assistência | (não medido) | **94,7%**, 2,91 por batalha |
+| Assimetria de §6.1 | **desligada** | **ligada** |
+
+O aceite do P1.1 dizia: "se os counters caírem para menos de 10% dos confrontos, o balanceamento
+está saudável e o item fecha". Caíram para **zero**. O torneio deixou de ter um único par decidido
+antes da primeira jogada — e agora mede um jogo com o sistema-assinatura de §6.1 vivo, comps de
+3 heróis mistas e a janela de assistência disparando em 94,7% das batalhas.
+
+**As três correções de conteúdo que o alcance real exigiu, e o padrão comum entre elas.** Nenhuma
+foi ajuste de número às cegas; as três são a mesma classe de defeito — **uma posição escolhida
+quando `bow` valia 1 e que passou a significar outra coisa com 2**:
+
+1. **`encounter-campanha-4`**, o arqueiro do cerco: (15,8) → (15,10). "Fora de alcance no round 1"
+   é `moveRange + duelRange < distância`, e o lado direito da conta mudou — 4+2=6 contra uma
+   distância de exatamente 6. Ele abria duelo antes do primeiro comando do jogador, deixando o
+   arcanista em 167 de 640.
+2. **`encounter-campanha-2`**, o arqueiro `hold-position`: (12,6) → (12,4). Este foi o mais
+   instrutivo, porque **baixar o nível dos três inimigos para 7 não resolveu** e o diagnóstico
+   mostrou por quê: o objetivo de `seize` é (12,7), e um arqueiro que NUNCA se move tem um disco
+   de ameaça permanente. Com alcance 1 o disco não tocava o objetivo; com 2 ele cobria o objetivo
+   e a aproximação, sem poder ser revidado. Os dois heróis morriam entrando (medido: ambos a 0 de
+   HP no round 6, o herói caído em (12,5), a dois tiles do alvo). A três tiles ele ainda pune quem
+   vem pelo norte sem sentar em cima do objetivo. **Lição registrada: `hold-position` + alcance é
+   negação de área permanente, e o disco não pode conter o objetivo.**
+3. **`dungeon-covil-do-tirano`** (normal): guardas de 14/14/16 para 13/13/15. Aqui o nível ERA o
+   botão certo, porque a causa é outra: a party de referência tem três vagas e duas são de
+   alcance, então o nerf pesou mais no jogador que nos guardas, todos corpo a corpo.
+
+**E o campo de treino, corrigido antes por outro motivo:** o alvo 2 deixou de ser arqueiro. Não
+foi fuga — foi o padrão que o resto do conteúdo já seguia e que só ele violava: party de duas
+vagas enfrenta só corpo a corpo (`veio-de-prata`), e o arqueiro inimigo aparece a partir de
+`forja-abandonada`, onde a party tem três vagas e uma delas é um arqueiro.
+
+**O que NÃO mudou:** `packages/core` não recebeu uma linha e `RULES_VERSION` segue `0.16.0`. Toda
+a fatia é conteúdo e harness — a regra de §6.1 sempre esteve implementada, o que faltava era o
+dado que a liga e o conteúdo que a suporta.
+
+**A tensão registrada acima continua verdadeira e não foi resolvida, só aceita:** a arena é IA
+contra IA e explora a assimetria ao limite; a campanha tem um humano que pode fechar distância. O
+mesmo `atk` serve os dois, e o −33% que equilibra a arena deixa o arqueiro do jogador
+sensivelmente mais fraco na campanha. O conteúdo foi retunado para compensar. Se um dia isso
+incomodar na mão, o botão por modo continua sendo a saída estrutural — e o registro acima já
+mostra que ela custa encanamento em `loadCatalogFromDisk`, `ContentCatalog`, servidor e cliente.

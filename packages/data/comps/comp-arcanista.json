@@ -84,33 +84,34 @@
     },
     {
       "hero": {
-        "id": "heroi-arcanista-3",
-        "classId": "class-arcanista",
+        "id": "heroi-arcanista-apoio",
+        "classId": "class-couracado",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arcanista-foco-em-equipe": 1
+          "talent-couracado-foco-em-equipe": 1
         },
         "equipment": {
-          "weapon": "item-arma-arcanista",
+          "weapon": "item-arma-couracado",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-guardiao",
+          "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "arcane",
+        "weaponType": "axe",
         "duelSkills": [
-          "skill-ataque-arcanista",
-          "skill-especial-arcanista"
+          "skill-ataque-couracado",
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-arcanista",
+            "skillId": "skill-especial-couracado",
             "conditions": []
           }
         ]

@@ -130,30 +130,30 @@
       "side": "enemy",
       "hero": {
         "id": "treino-alvo-2",
-        "classId": "class-arqueiro",
+        "classId": "class-guerreiro",
         "level": 8,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {},
         "equipment": {
-          "weapon": "item-arma-arqueiro",
+          "weapon": "item-arma-guerreiro",
           "helmet": null,
           "armor": null,
           "necklace": null,
           "ring": null,
           "boots": null
         },
-        "weaponType": "bow",
+        "weaponType": "axe",
         "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-arqueiro",
+            "skillId": "skill-especial-guerreiro",
             "conditions": []
           }
         ]

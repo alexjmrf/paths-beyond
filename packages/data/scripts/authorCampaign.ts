@@ -454,7 +454,14 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // vez): sair caçando o jogador seria abrir o objetivo.
       { unitId: 'unit-patrulheiro-1', classId: 'class-lanceiro', side: 'enemy', pos: [11, 7], ai: 'guard-tile', level: 8 },
       { unitId: 'unit-patrulheiro-2', classId: 'class-guerreiro', side: 'enemy', pos: [9, 3], ai: 'aggressive', level: 8 },
-      { unitId: 'unit-patrulheiro-3', classId: 'class-arqueiro', side: 'enemy', pos: [12, 6], ai: 'hold-position', level: 8 },
+      // (12,6) -> (12,4). O objetivo de `seize` é (12,7), e este arqueiro é `hold-position`: ele
+      // NUNCA se move, então o alcance dele é um disco permanente. Com `bow` valendo 1 o disco
+      // não alcançava o objetivo; com 2 ele passou a cobrir o objetivo E a aproximação, sem
+      // poder ser revidado — a party inteira morria entrando (medido: os dois heróis a 0 de HP
+      // no round 6, o herói caído em (12,5)). A três tiles ele ainda pune quem vem pelo norte e
+      // deixa de sentar em cima do objetivo. Mesmo defeito do capítulo 4, mesma correção:
+      // posicionamento, não número.
+      { unitId: 'unit-patrulheiro-3', classId: 'class-arqueiro', side: 'enemy', pos: [12, 4], ai: 'hold-position', level: 8 },
     ],
   },
   {
@@ -489,9 +496,17 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       at(PLAYER_ARCANISTA, 9, 8),
       // Nas quatro bordas, fora do alcance de qualquer um deles no round 1: um cerco que
       // já começa em cima da party tira o turno do jogador antes do primeiro comando dele.
+      //
+      // "Fora de alcance" é `moveRange + duelRange < distância`, e o passe do HANDOFF de
+      // 2026-08-28 mudou o lado direito dessa conta: com `bow` valendo 2 em vez de 1, o
+      // arqueiro passou a somar 6 (4 de movimento + 2 de alcance) e (15,8) ficava a exatamente
+      // 6 do arcanista em (9,8) — ele abria duelo ANTES do primeiro comando do jogador, e o
+      // arcanista chegava ao turno 1 com 167 de 640 de HP. Foi (15,8) -> (15,10): 8 de
+      // distância do herói mais próximo, dois de folga. Erro de posicionamento no encounter,
+      // não do motor, como `packages/content/tests/encounters.test.ts` já dizia.
       { unitId: 'unit-cerco-1', classId: 'class-guerreiro', side: 'enemy', pos: [7, 0], ai: 'aggressive', level: 9 },
       { unitId: 'unit-cerco-2', classId: 'class-lanceiro', side: 'enemy', pos: [0, 7], ai: 'aggressive', level: 9 },
-      { unitId: 'unit-cerco-3', classId: 'class-arqueiro', side: 'enemy', pos: [15, 8], ai: 'flank', level: 9 },
+      { unitId: 'unit-cerco-3', classId: 'class-arqueiro', side: 'enemy', pos: [15, 10], ai: 'flank', level: 9 },
       { unitId: 'unit-cerco-4', classId: 'class-grifeiro', side: 'enemy', pos: [8, 15], ai: 'flank', level: 9 },
     ],
   },

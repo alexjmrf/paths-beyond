@@ -528,14 +528,57 @@ const COMP_UNIT_POSITIONS = [
   { x: 1, y: 0 },
 ] as const;
 
+// Passe do HANDOFF, 2026-08-28 — o apoio que torna a comp MISTA.
+//
+// Enquanto as 9 comps eram monoclasse, ligar o `duelRange` real das armas de alcance (§6.1)
+// produzia ranged vencendo melee em 20 de 20 pareamentos: três arqueiros contra três espadachins
+// é exatamente o tabuleiro em que "fechar distância", a resposta tática que a spec nomeia, não
+// existe. A correção não é mexer em número — é a comp ter as duas coisas.
+//
+// A forma, decidida com o usuário: **temática por classe, com apoio**. Duas unidades continuam
+// sendo a classe do comp (a matriz segue legível por classe) e a terceira cobre o lado que falta.
+// Uma classe de alcance recebe o Couraçado à frente; uma de corpo a corpo recebe o Arqueiro atrás.
+// Os dois foram escolhidos por serem os mais "lisos" do catálogo — nenhum tem cura, invocação ou
+// efeito de área que contaminaria a leitura do eixo que a matriz mede.
+const MELEE_WEAPONS = new Set(['sword', 'axe', 'spear']);
+
+function isMelee(profile: ClassProfile): boolean {
+  return MELEE_WEAPONS.has(profile.weaponType);
+}
+
+const SUPPORT_FOR_MELEE_SLUG = 'arqueiro';
+const SUPPORT_FOR_RANGED_SLUG = 'couracado';
+
+function supportProfileFor(profile: ClassProfile): ClassProfile {
+  const slug = isMelee(profile) ? SUPPORT_FOR_MELEE_SLUG : SUPPORT_FOR_RANGED_SLUG;
+  const found = CLASS_PROFILES.find((p) => p.slug === slug);
+  // Falha alto em vez de cair num fallback: uma comp sem apoio volta a ser monoclasse e o
+  // torneio volta a medir o jogo mais simples, em silêncio — que é o defeito que esta mudança
+  // existe para corrigir.
+  if (!found) throw new Error(`perfil de apoio ausente: ${slug}`);
+  return found;
+}
+
 export function generateComp(profile: ClassProfile) {
+  const support = supportProfileFor(profile);
+
   return {
     id: `comp-${profile.slug}`,
     name: profile.name,
-    units: COMP_UNIT_POSITIONS.map((pos, index) => ({
+    units: COMP_UNIT_POSITIONS.map((pos, index) => {
+      // A última posição é o apoio. As duas primeiras seguram a identidade do comp.
+      const ehApoio = index === COMP_UNIT_POSITIONS.length - 1;
+      const dono = ehApoio ? support : profile;
+      // O id carrega a slug do COMP, não a da classe do apoio: sem isso o arqueiro de apoio do
+      // comp-espadachim se chamaria `heroi-arqueiro-3` e colidiria com o herói do comp-arqueiro
+      // quando as duas composições se enfrentassem — `runTournament` usa `hero.id` como `unitId`,
+      // e dois `unitId` iguais na mesma batalha são a mesma unidade para o motor.
+      const heroId = ehApoio ? `heroi-${profile.slug}-apoio` : `heroi-${profile.slug}-${index + 1}`;
+
+      return {
       hero: {
-        id: `heroi-${profile.slug}-${index + 1}`,
-        classId: `class-${profile.slug}`,
+        id: heroId,
+        classId: `class-${dono.slug}`,
         level: 10,
         exp: 0,
         awakening: 0,
@@ -545,40 +588,41 @@ export function generateComp(profile: ClassProfile) {
         // papel e continuaria medindo duelos isolados, que é exatamente o que a auditoria
         // de 2026-08-07 apontou como o buraco da matriz de M8.
         talents: {
-          [`talent-${profile.slug}-foco-em-equipe`]: 1,
+          [`talent-${dono.slug}-foco-em-equipe`]: 1,
           // M12 — a reação própria da classe só existe se o comp alocar o talento; sem
           // isto o gatilho `onDamaged` continuaria sem consumidor no torneio.
-          ...(profile.grantedReactionId ? { [`talent-${profile.slug}-reacao-propria`]: 1 } : {}),
+          ...(dono.grantedReactionId ? { [`talent-${dono.slug}-reacao-propria`]: 1 } : {}),
         },
         equipment: {
-          weapon: weaponItemId(profile),
+          weapon: weaponItemId(dono),
           helmet: null,
           armor: null,
-          necklace: necklaceIdFor(profile),
+          necklace: necklaceIdFor(dono),
           ring: null,
           boots: null,
         },
-        weaponType: profile.weaponType,
+        weaponType: dono.weaponType,
         duelSkills: [
-          basicSkillId(profile),
-          signatureSkillId(profile),
-          ...(profile.extraDuelSkillId ? [profile.extraDuelSkillId] : []),
+          basicSkillId(dono),
+          signatureSkillId(dono),
+          ...(dono.extraDuelSkillId ? [dono.extraDuelSkillId] : []),
         ],
         mapSkills: [],
         // §6.3 — o script é lido de cima para baixo, primeira linha que passa vence. A
         // cura do Clérigo entra ACIMA da especial e com condição: "curar ou bater" vira
         // decisão de script, que é o produto do jogo, em vez de trocar dano por cura sempre.
         tacticsScript: [
-          ...(profile.extraDuelSkillId === SKILL_CURA_CLERIGO.id
+          ...(dono.extraDuelSkillId === SKILL_CURA_CLERIGO.id
             ? [{ enabled: true, skillId: SKILL_CURA_CLERIGO.id, conditions: [{ t: 'selfHpBelow' as const, pct: 250 }] }]
             : []),
-          { enabled: true, skillId: signatureSkillId(profile), conditions: [] },
+          { enabled: true, skillId: signatureSkillId(dono), conditions: [] },
         ],
       },
       pos: { x: pos.x, y: pos.y },
       height: 0,
-      aiArchetype: 'aggressive',
-    })),
+      aiArchetype: 'aggressive' as const,
+      };
+    }),
   };
 }
 
@@ -711,26 +755,26 @@ export const CLASS_PROFILES: readonly ClassProfile[] = [
   },
   {
     slug: 'arqueiro', name: 'Arqueiro', weaponType: 'bow', unitType: 'infantry', moveType: 'foot', moveRange: 4, tag: 'physical',
-    basePools: { ap: 4, pp: 1 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 28, spdBase: 80,
+    basePools: { ap: 4, pp: 1 }, hpBase: BASE_HP, atkBase: 33, defBase: 28, spdBase: 80,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1350,
     signatureEffectId: 'effect-marca-do-cacador', signatureEffectChance: 700, signatureEffectTarget: 'target' as const,
     grantedReactionId: 'skill-folego-de-combate',
   },
   {
     slug: 'arcanista', name: 'Arcanista', weaponType: 'arcane', unitType: 'caster', moveType: 'foot', moveRange: 4, tag: 'magic',
-    basePools: { ap: 4, pp: 1 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 30, spdBase: 82,
+    basePools: { ap: 4, pp: 1 }, hpBase: BASE_HP, atkBase: 33, defBase: 30, spdBase: 82,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1500,
     signatureEffectId: 'effect-queimadura', signatureEffectChance: 650, signatureEffectTarget: 'target' as const,
   },
   {
     slug: 'druida', name: 'Druida', weaponType: 'nature', unitType: 'caster', moveType: 'foot', moveRange: 4, tag: 'magic',
-    basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 36, spdBase: 80,
+    basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: 33, defBase: 36, spdBase: 80,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 2, signatureMultiplier: 1350,
     signatureEffectId: 'effect-regeneracao', signatureEffectChance: 1000, signatureEffectTarget: 'self' as const,
   },
   {
     slug: 'clerigo', name: 'Clérigo', weaponType: 'holy', unitType: 'caster', moveType: 'foot', moveRange: 4, tag: 'magic',
-    basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: BASE_ATK, defBase: 33, spdBase: 78,
+    basePools: { ap: 3, pp: 2 }, hpBase: BASE_HP, atkBase: 33, defBase: 33, spdBase: 78,
     hpPerLevel: HP_PER_LEVEL, atkPerLevel: ATK_PER_LEVEL, defPerLevel: 1, signatureMultiplier: 1450,
     signatureEffectId: 'effect-bencao', signatureEffectChance: 1000, signatureEffectTarget: 'self' as const,
     extraDuelSkillId: 'skill-cura-clerigo',

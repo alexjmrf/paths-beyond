@@ -190,10 +190,12 @@ describe('comps multi-unidade com assistência real (M10, sub-sessão 4/N)', () 
   });
 
   it('toda unidade aloca o talento que concede skill-assistir — sem isso nenhuma assistiria', () => {
+    // O talento é o da classe DA UNIDADE, não o da classe do comp: a unidade de apoio é de
+    // outra classe (ver o bloco de comps mistas abaixo) e o talento dela tem outra slug.
     for (const profile of CLASS_PROFILES) {
-      const talentId = `talent-${profile.slug}-foco-em-equipe`;
       for (const unit of generateComp(profile).units) {
-        expect(unit.hero.talents[talentId]).toBe(1);
+        const slug = unit.hero.classId.replace('class-', '');
+        expect(unit.hero.talents[`talent-${slug}-foco-em-equipe`], unit.hero.id).toBe(1);
       }
     }
   });
@@ -562,5 +564,67 @@ describe('as mecânicas de M10 ganham consumidor real (M12, sub-sessão 2/N)', (
   it('só o Arqueiro tem reação própria — §6.4 fecha as universais em duas', () => {
     const comReacao = CLASS_PROFILES.filter((p) => p.grantedReactionId !== undefined);
     expect(comReacao.map((p) => p.slug)).toEqual(['arqueiro']);
+  });
+});
+
+// Passe do HANDOFF, 2026-08-28 — as comps mistas.
+//
+// A medição do torneio com `weaponDuelRanges` real (bow/arcane/nature/holy = 2) mostrou ranged
+// vencendo melee em **20 de 20 pareamentos**, com 4 comps acima de 65% e 5 abaixo de 40%. A causa
+// não era fórmula: as 9 comps eram MONOCLASSE, e três arqueiros contra três espadachins é
+// exatamente o tabuleiro em que "fechar distância" — a resposta tática que §6.1 nomeia — não
+// existe. Uma comp mista de experimento ficou em 50,3%, a única na faixa de 40–60%.
+//
+// A forma escolhida com o usuário: **temática por classe, com apoio**. Cada comp mantém o nome e
+// duas unidades da própria classe (a matriz continua legível por classe: "Arqueiro vence
+// Lanceiro" segue significando algo sobre arqueiros) e ganha uma terceira que cobre o que falta.
+describe('comps mistas: cada composição tem resposta em corpo a corpo E em alcance', () => {
+  const MELEE = new Set(['sword', 'axe', 'spear']);
+
+  it('toda comp tem ao menos uma arma de alcance e ao menos uma de corpo a corpo', () => {
+    // É a propriedade que faz a assimetria de §6.1 ser JOGÁVEL no torneio em vez de decidida na
+    // seleção: quem apanha de longe tem com quem fechar distância, e quem é alcançado tem com
+    // quem revidar de longe.
+    for (const profile of CLASS_PROFILES) {
+      const armas = generateComp(profile).units.map((u) => u.hero.weaponType);
+      expect(armas.some((w) => MELEE.has(w)), `${profile.slug}: nenhuma arma corpo a corpo`).toBe(true);
+      expect(armas.some((w) => !MELEE.has(w)), `${profile.slug}: nenhuma arma de alcance`).toBe(true);
+    }
+  });
+
+  it('a maioria da comp continua sendo a classe do comp — a matriz não perde a leitura por classe', () => {
+    for (const profile of CLASS_PROFILES) {
+      const units = generateComp(profile).units;
+      const daClasse = units.filter((u) => u.hero.classId === `class-${profile.slug}`);
+      expect(daClasse.length, profile.slug).toBeGreaterThan(units.length - daClasse.length);
+    }
+  });
+
+  it('nenhum heroId se repete ENTRE comps — duas comps num mesmo torneio compartilham o tabuleiro', () => {
+    // Modo de falha que só nasce com comps mistas: o arqueiro de apoio do comp-espadachim
+    // colidindo com um herói do comp-arqueiro. `runTournament` usa `hero.id` como `unitId`, e
+    // dois `unitId` iguais na mesma batalha são a mesma unidade para o motor.
+    const todos = CLASS_PROFILES.flatMap((p) => generateComp(p).units.map((u) => u.hero.id));
+    const repetidos = todos.filter((id, i) => todos.indexOf(id) !== i);
+    expect([...new Set(repetidos)]).toEqual([]);
+  });
+
+  it('a unidade de apoio é de uma classe que existe no catálogo', () => {
+    const conhecidas = new Set(CLASS_PROFILES.map((p) => `class-${p.slug}`));
+    for (const profile of CLASS_PROFILES) {
+      for (const unit of generateComp(profile).units) {
+        expect(conhecidas.has(unit.hero.classId), `${profile.slug}: ${unit.hero.classId}`).toBe(true);
+      }
+    }
+  });
+
+  it('a comp de uma classe de alcance ganha apoio corpo a corpo, e vice-versa', () => {
+    for (const profile of CLASS_PROFILES) {
+      const units = generateComp(profile).units;
+      const apoio = units.find((u) => u.hero.classId !== `class-${profile.slug}`);
+      expect(apoio, `${profile.slug}: sem unidade de apoio`).toBeDefined();
+      // O apoio cobre o lado que falta: classe de alcance recebe corpo a corpo, e o contrário.
+      expect(MELEE.has(apoio!.hero.weaponType), profile.slug).toBe(MELEE.has(profile.weaponType) === false);
+    }
   });
 });

@@ -84,33 +84,34 @@
     },
     {
       "hero": {
-        "id": "heroi-guerreiro-3",
-        "classId": "class-guerreiro",
+        "id": "heroi-guerreiro-apoio",
+        "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-guerreiro-foco-em-equipe": 1
+          "talent-arqueiro-foco-em-equipe": 1,
+          "talent-arqueiro-reacao-propria": 1
         },
         "equipment": {
-          "weapon": "item-arma-guerreiro",
+          "weapon": "item-arma-arqueiro",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "axe",
+        "weaponType": "bow",
         "duelSkills": [
-          "skill-ataque-guerreiro",
-          "skill-especial-guerreiro"
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-guerreiro",
+            "skillId": "skill-especial-arqueiro",
             "conditions": []
           }
         ]

@@ -2,8 +2,8 @@
   "sword": 1,
   "axe": 1,
   "spear": 1,
-  "bow": 1,
-  "arcane": 1,
-  "nature": 1,
-  "holy": 1
+  "bow": 2,
+  "arcane": 2,
+  "nature": 2,
+  "holy": 2
 }

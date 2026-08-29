@@ -106,44 +106,34 @@
     },
     {
       "hero": {
-        "id": "heroi-clerigo-3",
-        "classId": "class-clerigo",
+        "id": "heroi-clerigo-apoio",
+        "classId": "class-couracado",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-clerigo-foco-em-equipe": 1
+          "talent-couracado-foco-em-equipe": 1
         },
         "equipment": {
-          "weapon": "item-arma-clerigo",
+          "weapon": "item-arma-couracado",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-guardiao",
+          "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "holy",
+        "weaponType": "axe",
         "duelSkills": [
-          "skill-ataque-clerigo",
-          "skill-especial-clerigo",
-          "skill-cura-clerigo"
+          "skill-ataque-couracado",
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-cura-clerigo",
-            "conditions": [
-              {
-                "t": "selfHpBelow",
-                "pct": 250
-              }
-            ]
-          },
-          {
-            "enabled": true,
-            "skillId": "skill-especial-clerigo",
+            "skillId": "skill-especial-couracado",
             "conditions": []
           }
         ]

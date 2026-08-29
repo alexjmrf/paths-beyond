@@ -130,7 +130,7 @@
       "hero": {
         "id": "tirano-guarda-1",
         "classId": "class-couracado",
-        "level": 14,
+        "level": 13,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
@@ -170,7 +170,7 @@
       "hero": {
         "id": "tirano-guarda-2",
         "classId": "class-couracado",
-        "level": 14,
+        "level": 13,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
@@ -210,7 +210,7 @@
       "hero": {
         "id": "tirano",
         "classId": "class-mestre-espadachim",
-        "level": 16,
+        "level": 15,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
@@ -239,7 +239,7 @@
       },
       "pos": {
         "x": 15,
-        "y": 8
+        "y": 10
       },
       "height": 0,
       "aiArchetype": "aggressive"

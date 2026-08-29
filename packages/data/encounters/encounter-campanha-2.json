@@ -213,9 +213,9 @@
       },
       "pos": {
         "x": 12,
-        "y": 6
+        "y": 4
       },
-      "height": 1,
+      "height": 0,
       "aiArchetype": "hold-position"
     }
   ]

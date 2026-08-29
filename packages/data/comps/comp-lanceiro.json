@@ -84,33 +84,34 @@
     },
     {
       "hero": {
-        "id": "heroi-lanceiro-3",
-        "classId": "class-lanceiro",
+        "id": "heroi-lanceiro-apoio",
+        "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-lanceiro-foco-em-equipe": 1
+          "talent-arqueiro-foco-em-equipe": 1,
+          "talent-arqueiro-reacao-propria": 1
         },
         "equipment": {
-          "weapon": "item-arma-lanceiro",
+          "weapon": "item-arma-arqueiro",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "spear",
+        "weaponType": "bow",
         "duelSkills": [
-          "skill-ataque-lanceiro",
-          "skill-especial-lanceiro"
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-lanceiro",
+            "skillId": "skill-especial-arqueiro",
             "conditions": []
           }
         ]

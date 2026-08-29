@@ -86,34 +86,34 @@
     },
     {
       "hero": {
-        "id": "heroi-arqueiro-3",
-        "classId": "class-arqueiro",
+        "id": "heroi-arqueiro-apoio",
+        "classId": "class-couracado",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1,
-          "talent-arqueiro-reacao-propria": 1
+          "talent-couracado-foco-em-equipe": 1
         },
         "equipment": {
-          "weapon": "item-arma-arqueiro",
+          "weapon": "item-arma-couracado",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "bow",
+        "weaponType": "axe",
         "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
+          "skill-ataque-couracado",
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-arqueiro",
+            "skillId": "skill-especial-couracado",
             "conditions": []
           }
         ]
