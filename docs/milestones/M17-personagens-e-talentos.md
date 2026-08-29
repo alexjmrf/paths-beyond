@@ -102,6 +102,18 @@ para todos. A profundidade (5 a 9) vira troca de forma — uma árvore de 9 linh
 descendo, uma de 5 tem 4 pontos para aprofundar ranks no caminho. Mesmo poder total nos dois
 extremos, e o balanceamento consegue separar desenho de tamanho.
 
+**D10 — o elenco se divide em NÚCLEO e ADQUIRÍVEL.** Rumo declarado pelo usuário em 2026-08-28 e
+registrado em `DECISIONS.md` ("o rumo de aquisição de personagens: gacha com núcleo de história").
+De 2 a 4 personagens são garantidos pela história; o resto é adquirido por evento ou summon. Para
+o M17 isto **não muda o trabalho** — os 9 continuam precisando de classe, árvore e autoria —, mas
+muda duas coisas do enquadramento:
+
+- a campanha deixa de poder fixar a party nominalmente e passa ao padrão de **vagas** que as
+  masmorras já usam, afinada contra o núcleo garantido. Isso é fatia de conteúdo posterior, não do
+  M17;
+- **posse vira estado de conta**, e o servidor precisa dela pelo mesmo motivo que precisa da árvore
+  do personagem. A aquisição em si é milestone própria e, por §15, vive fora de `packages/core`.
+
 ### Ainda em aberto
 
 - **O que fazer com saves** que carregam `talentAllocationByUnit` no formato antigo: devolver os

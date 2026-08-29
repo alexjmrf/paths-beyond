@@ -3959,3 +3959,58 @@ motor recusa o impossível, e quanto um caminho absorve é desenho de quem autor
 **Ainda em aberto:** o que fazer com saves que carregam `talentAllocationByUnit` no formato antigo
 (só morde na fatia do cliente), e quem são os três personagens novos — nome, árvore e onde entram
 numa campanha que hoje apresenta seis. É a primeira coisa da 2/N, e é autoria.
+
+
+### Em aberto — o rumo de aquisição de personagens: gacha com núcleo de história
+
+Registrado em 2026-08-28, a pedido do usuário, como **rumo** e não como decisão implementável: nada
+disto entra em código até virar milestone com briefing próprio.
+
+**O que o usuário disse:** os personagens não são necessariamente liberados pela história.
+São "personagens marcantes encontrados durante a história" com uma forma de adquiri-los — eventos,
+summon. Nas palavras dele: "sim acho que seremos um gacha". Com uma ressalva importante: **parte
+do elenco continua vindo da história** — começa com 2 ou 3 e chega a cerca de 4 garantidos.
+
+**Isto não é uma virada de direção: é nomear o que o projeto já é.** Verificado no código antes de
+registrar, e a economia de M14 já tem a forma inteira de um gacha:
+
+- **`imprint` 0–5**, alimentado por `material-fragmento-hero-jogador` — "fragmento do próprio
+  herói". É o sistema de **duplicata**, com custo em `economy-rules`;
+- **`awakening` 0–6**, um segundo eixo de progressão por personagem;
+- **três moedas**, incluindo `pedras`, que dropavam desde M14 1/N e ganharam sumidouro em 2/N;
+- **energia** limitando o farm diário.
+
+A economia foi construída com a forma de um gacha antes de alguém decidir que era um. A peça que
+falta é só a **aquisição**.
+
+**A restrição já está na spec e continua valendo (§15):** "Monetização: fora do escopo. Se houver
+gacha, ele **NÃO** toca em `packages/core`." A rolagem de banner é servidor ou pacote próprio;
+`packages/core` continua sendo simulação determinística e nada mais.
+
+**As consequências, e uma delas resolve um problema que o elenco fechado tinha criado:**
+
+1. **O núcleo de história salva a afinação da campanha.** Sem ele, um capítulo não teria como ser
+   afinado — a party seria desconhecida. Com 2 a 4 personagens garantidos a todo jogador, a
+   campanha é afinada contra **eles**, e o que vier de gacha é poder opcional por cima. É
+   exatamente o conceito de "time de referência" que as masmorras de M14 já usam, e o padrão de
+   **vagas** (`dungeon-covil-do-tirano-vaga-1`) é o que a campanha vira: o encounter declara
+   inimigos, objetivo e quantas vagas, e o jogador leva quem tem. Hoje a campanha fixa a party
+   (`capítulo 3` declara `hero-jogador`, `ally-clerigo`, `ally-arqueiro` nominalmente).
+2. **O elenco fechado (D6) sobrevive e fica MAIS forte.** Um pool de gacha é conteúdo autorado —
+   fechado em qualquer instante. E o servidor, que já precisava conhecer a árvore de cada
+   personagem para resolver a alocação, passa a precisar saber também **quem o jogador possui**:
+   sem isso, um cliente adulterado joga com um personagem que nunca puxou. Posse vira estado de
+   conta, e hoje o save não tem conceito de roster.
+3. **O torneio de balanceamento vira alvo móvel.** D6 decidiu que ele mede o elenco real. Com 9
+   personagens isso é computável; com 40 depois de dez banners, "toda composição entre 40 e 60%"
+   deixa de ser — são 9.880 combinações de três. O núcleo garantido é a base estável; como medir o
+   pool adquirível fica **em aberto**.
+
+**Uma observação de autoria, para quando o elenco for definido:** `ally-mensageira` aparece só no
+capítulo 5 e `ally-couracado` só no 6. Os dois já têm a forma de "encontrado, não dado" — são os
+candidatos naturais a adquiríveis, e os que aparecem cedo e em todos os capítulos
+(`hero-jogador`, `ally-clerigo`, `ally-arqueiro`) a núcleo de história.
+
+**O que fica em aberto:** quais personagens são núcleo e quais são adquiríveis; como o save passa a
+carregar posse; como o balanceamento mede um pool que cresce; e em que milestone a aquisição entra
+(provavelmente depois do M17, já que ela depende do elenco existir).
