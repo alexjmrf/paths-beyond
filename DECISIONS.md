@@ -3909,3 +3909,53 @@ descrição do próprio teste.
 **32 testes novos** (25 no motor, 7 no schema). Suíte: **106 arquivos, 1429 testes** (era
 104/1397). `RULES_VERSION` **ainda não sobe**: nenhum consumidor mudou de comportamento, e o bump
 é da fatia que trocar a topologia de verdade.
+
+
+### M17 — o elenco fechado, e o orçamento que deixou de ser a profundidade
+
+Quatro decisões tomadas com o usuário ao detalhar a pergunta "quem tem árvore", e uma correção de
+spec que saiu delas. Todas registradas no §5 do briefing como D6 a D9.
+
+**D6 — o elenco é FECHADO, e o torneio de balanceamento passa a medi-lo.** Personagem é o que o
+jogador usa; o roster de balanceamento deixa de ser sintético. Duas consequências foram postas na
+mesa antes da decisão e aceitas junto:
+
+- **o balanceamento fechado horas antes REABRE.** Os 43,9–60,8% foram medidos sobre 9 comps
+  sintéticas por classe, e essas comps deixam de existir. Os números não se transferem;
+- **o servidor passa a precisar conhecer o elenco.** Isto só apareceu porque fui olhar: hoje o PvP
+  **não valida alocação de talento** — `resolveTalentEffects` ignora em silêncio nó que não existe
+  na árvore da classe, e isso funciona justamente porque a árvore é compartilhada. Com árvore por
+  personagem, resolver a alocação exige a árvore *daquele* personagem. Ou seja: **árvore por
+  personagem implica elenco fechado e autorado** — o jogador escolhe de um elenco, não monta
+  heróis genéricos. É afirmação de design grande, e estava implícita na escolha.
+
+**D7 — o elenco cresce de 6 para 9.** Medido ao perguntar: das 10 classes do catálogo, apenas 6
+tinham personagem. Grifeiro, guerreiro e lanceiro ficariam sem ninguém para jogá-las — três
+classes com skills, itens e árvore autorados sem consumidor, que é o antipadrão que M10, M11 e M15
+passaram o projeto corrigindo. `mestre-espadachim` é caso à parte: é a promoção do espadachim.
+
+**D8 — `ally-mensageira` e `ally-couracado` são elenco**, não NPC de missão, apesar de aparecerem
+hoje em um capítulo só cada.
+
+**D9 — a profundidade é por personagem, o ORÇAMENTO é fixo — e isso corrigiu a §8.2 que eu tinha
+acabado de escrever.** A resposta do usuário ("profundidade varia, orçamento fixo") não fecha
+sozinha: com orçamento menor que a profundidade máxima, uma árvore de 9 linhas teria linhas que
+ninguém alcança. A leitura que fecha, e que foi implementada, é **orçamento = profundidade
+máxima = 9**:
+
+- árvore de **9 linhas** gasta os 9 descendo, um por linha, e não sobra para rank;
+- árvore de **5 linhas** gasta 5 descendo e tem **4** para aprofundar `maxRank > 1` no caminho.
+
+A profundidade virou **troca de forma, não de poder** — mais alcance contra mais profundidade, com
+o mesmo total nos dois extremos —, e o balanceamento consegue separar "mal desenhado" de "tem menos
+pontos". `budget` **saiu do dado**: é constante do jogo (`TALENT_POINT_BUDGET`), e o schema
+`.strict()` recusa o campo para que ninguém autore um personagem com mais pontos que os outros.
+
+A trava nova que isso exigiu: **a árvore precisa ter onde absorver os 9 pontos.** Uma árvore rasa
+sem nenhum nó de rank múltiplo deixaria o jogador com saldo e nada para comprar, e `validateColumnTree`
+a recusa. O teto é generoso de propósito (soma o extra de todos os nós, não os de um caminho): o
+motor recusa o impossível, e quanto um caminho absorve é desenho de quem autora.
+
+**Ainda em aberto:** o que fazer com saves que carregam `talentAllocationByUnit` no formato antigo
+(só morde na fatia do cliente), e quem são os três personagens novos — nome, árvore e onde entram
+numa campanha que hoje apresenta seis. É a primeira coisa da 2/N, e é autoria.

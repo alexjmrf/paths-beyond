@@ -199,8 +199,8 @@ export {
   validateColumnAllocation,
   validateColumnTree,
   MAX_DEPTH,
-  MAX_EXTRA_BUDGET,
   MIN_DEPTH,
+  TALENT_POINT_BUDGET,
 } from './talents/columnTree.js';
 export type { ColumnTalentNode, ColumnTalentTree, TalentColumn } from './talents/columnTree.js';
 export { resolveTalentEffects } from './talents/resolve.js';

@@ -30,9 +30,9 @@ continuam vindo dela. A árvore, não.
 
 **D3 — Uma árvore por personagem, com duas colunas e uma terceira ocasional.** Profundidade de 5 a
 9 linhas; um nó por linha; a coluna amarra a linha seguinte; o nó do meio libera a linha seguinte
-para qualquer coluna, e a coluna escolhida ali volta a amarrar. Orçamento = profundidade, ou
-profundidade + 1/+2 se houver `maxRank > 1`, com os pontos extras só aprofundando nós já
-alocados. A forma completa está em §8.2 e é normativa.
+para qualquer coluna, e a coluna escolhida ali volta a amarrar. **O orçamento foi corrigido pelo
+D9 abaixo:** é fixo em 9 para todo personagem, não sai da profundidade. A forma completa está em
+§8.2 e é normativa.
 
 **D4 — Inimigo de fase é autorado direto**, com status e skills escolhidos para a dificuldade.
 Sem classe a resolver, sem nível a interpolar, sem árvore, sem alocação.
@@ -72,17 +72,42 @@ duelo, o grid, a economia de AP/PP, e a promoção de classe.
 5. **Fechamento:** `pnpm balance` reexecutado (a mudança mexe em talento, e talento mexe em
    winrate — regra 10), `RULES_VERSION` subindo, e o registro.
 
-## 5. Decisões AINDA em aberto — perguntar antes de codar a fatia que as precisa
+## 5. Decisões resolvidas com o usuário em 2026-08-28
 
-- **Quantos personagens jogáveis existem, e de onde saem?** Hoje a campanha tem 6 nomeados e a
-  arena tem 27 heróis gerados que representam builds de jogador. Se a árvore é por personagem, ou
-  o gerador de comps passa a gerar personagens com árvore, ou o roster de balanceamento passa a
-  ser o roster real do jogo. As duas respostas são defensáveis e mudam bastante o trabalho.
-- **A profundidade é por personagem ou fixa no jogo?** §8.2 diz 5 a 9; se cada personagem escolhe a
-  sua, personagens com árvore mais funda têm mais pontos, e isso é poder.
-- **O que acontece com as builds e replays salvos.** D5 diz que replays quebram. Saves de campanha
-  com `talentAllocationByUnit` também: descartar a alocação e devolver os pontos, ou recusar o
-  save antigo?
+As três perguntas que este briefing deixou em aberto foram respondidas, e uma quarta apareceu no
+caminho. Ficam aqui porque cada uma muda o trabalho:
+
+**D6 — O elenco é FECHADO, e o torneio de balanceamento passa a medi-lo.** Personagem é o que o
+jogador usa; o roster deixa de ser sintético. Duas consequências que o usuário aceitou junto:
+
+- **o balanceamento fechado em 2026-08-28 REABRE.** Os 43,9–60,8% foram medidos sobre 9 comps
+  sintéticas por classe (`authorContent.ts`), e essas comps deixam de existir. Os números não se
+  transferem, e a fatia de balanceamento do M17 terá de refazer a medição sobre o roster real;
+- **o servidor passa a precisar conhecer o elenco.** Hoje o PvP não valida alocação — nó
+  desconhecido é ignorado em silêncio por `resolveTalentEffects`, e isso funciona porque a árvore
+  da classe é compartilhada. Com árvore por personagem, resolver a alocação exige a árvore
+  daquele personagem, o que só é possível com elenco autorado e fechado.
+
+**D7 — O elenco cresce de 6 para 9.** Grifeiro, guerreiro e lanceiro não tinham personagem, e com
+elenco fechado ninguém as jogaria — três classes com skills, itens e árvore autorados ficariam sem
+consumidor, que é o antipadrão que M10, M11 e M15 passaram o projeto corrigindo. Entram três
+personagens novos. `mestre-espadachim` é caso à parte: é a promoção do espadachim e chega por
+`hero-jogador`, não por personagem próprio.
+
+**D8 — `ally-mensageira` e `ally-couracado` são elenco**, não NPC de missão, mesmo aparecendo hoje
+em um capítulo só. O jogador os mantém.
+
+**D9 — A profundidade é por personagem; o ORÇAMENTO é fixo.** §8.2 foi corrigida junto: 9 pontos
+para todos. A profundidade (5 a 9) vira troca de forma — uma árvore de 9 linhas gasta tudo
+descendo, uma de 5 tem 4 pontos para aprofundar ranks no caminho. Mesmo poder total nos dois
+extremos, e o balanceamento consegue separar desenho de tamanho.
+
+### Ainda em aberto
+
+- **O que fazer com saves** que carregam `talentAllocationByUnit` no formato antigo: devolver os
+  pontos ou recusar o save. Só morde na fatia do cliente (4/N).
+- **Quem são os três personagens novos** — nome, árvore e onde entram na campanha, que hoje só
+  apresenta seis. É autoria, e é a primeira coisa da 2/N.
 
 ## 6. Critério de aceite (proposto — confirmar com o usuário ao abrir o milestone)
 

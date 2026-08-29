@@ -31,7 +31,6 @@ const characterTalentTreeSchema = z
   .object({
     characterId: idSchema,
     depth: z.number().int().min(5).max(9),
-    budget: z.number().int().min(5),
     nodes: z.array(columnTalentNodeSchema),
   })
   .strict();

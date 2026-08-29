@@ -64,10 +64,23 @@ row 7   ●                          ●
 A convergência é, portanto, **uma porta que custa um ponto para abrir**. Trocar de lado não é
 livre e não é impossível: é uma decisão que se paga com a linha em que ela acontece.
 
-**Orçamento de pontos = profundidade da árvore.** Com um nó por linha e um ponto por nó, o
-personagem que chega ao fim gastou exatamente a profundidade. Se a árvore tiver nós de rank
-múltiplo (`maxRank > 1`), o orçamento sobe para **profundidade + 1 ou + 2**, e os pontos extras
-só podem aprofundar nós já alocados — nunca comprar uma linha a mais.
+**Orçamento de pontos: FIXO em 9, igual para todo personagem.** A profundidade varia (5 a 9); o
+orçamento não. Se profundidade fosse orçamento, um personagem de 9 linhas teria quase o dobro dos
+pontos de um de 5, e o balanceamento não teria como separar "tem mais pontos" de "está mais bem
+desenhado".
+
+Com o orçamento fixo, **a profundidade vira uma troca de forma e não de poder**:
+
+- uma árvore de **9 linhas** gasta os 9 pontos descendo, um por linha, e não sobra nada para rank;
+- uma árvore de **5 linhas** gasta 5 descendo e tem **4 pontos** para aprofundar nós de
+  `maxRank > 1` no próprio caminho.
+
+Mais alcance contra mais profundidade, com o mesmo total nos dois extremos. Os pontos que sobram
+**só podem aprofundar nós já alocados** — nunca comprar uma linha a mais.
+
+Consequência normativa para quem autora: **a árvore precisa ter onde absorver os 9 pontos.** Uma
+árvore rasa sem nenhum `maxRank > 1` deixaria o jogador com saldo e nada para comprar, e é
+recusada pelo validador.
 
 ```ts
 interface TalentNode {
@@ -80,10 +93,12 @@ interface TalentNode {
 
 interface TalentTree {
   characterId: Id;
-  depth: number;            // 5..9
-  budget: number;           // depth, ou depth+1/+2 se houver maxRank > 1
+  depth: number;            // 5..9 — FORMA, não poder
   nodes: TalentNode[];
 }
+
+// O orçamento não é campo da árvore: é constante do jogo.
+const TALENT_POINT_BUDGET = 9;
 ```
 
 `TalentEffect` **não muda** — a lista abaixo continua valendo integralmente:

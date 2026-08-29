@@ -3,6 +3,7 @@ import {
   allocatedPath,
   validateColumnAllocation,
   validateColumnTree,
+  TALENT_POINT_BUDGET,
   type ColumnTalentNode,
   type ColumnTalentTree,
 } from '../../src/talents/columnTree.js';
@@ -32,7 +33,10 @@ function arvore(overrides: Partial<ColumnTalentTree> = {}): ColumnTalentTree {
     nodes.push(node(`b${row}`, 'b', row));
   }
   nodes.push(node('m3', 'middle', 3));
-  return { characterId: 'personagem-teste', depth: 5, budget: 5, nodes, ...overrides };
+  // Profundidade 5 com orçamento fixo de 9: sobram 4 pontos, e a árvore precisa ter onde
+  // absorvê-los. É a troca que a profundidade virou — menos linhas, ranks mais fundos.
+  const comRank = nodes.map((n) => (n.column === 'a' ? { ...n, maxRank: 3 as const } : n));
+  return { characterId: 'personagem-teste', depth: 5, nodes: comRank, ...overrides };
 }
 
 function aloc(...ids: string[]): TalentAllocation {
@@ -74,21 +78,32 @@ describe('M17 1/N — a forma da árvore (`validateColumnTree`)', () => {
     expect(validateColumnTree(repetido).valid).toBe(false);
   });
 
-  it('orçamento acima da profundidade só é permitido se houver nó de rank múltiplo', () => {
-    // §8.2 — "com nós de rank múltiplo, profundidade +1 ou +2, e os pontos extras só podem
-    // aprofundar nós já alocados". Sem nenhum `maxRank > 1` não há onde gastar o extra: o ponto
-    // seria inalcançável, e um orçamento inalcançável é erro de autoria, não sabor.
-    expect(validateColumnTree({ ...arvore(), budget: 6 }).valid).toBe(false);
-
-    const comRank = arvore();
-    const nodes = comRank.nodes.map((n) => (n.id === 'a2' ? { ...n, maxRank: 2 as const } : n));
-    expect(validateColumnTree({ ...comRank, nodes, budget: 6 }).valid).toBe(true);
-    expect(validateColumnTree({ ...comRank, nodes, budget: 8 }).valid).toBe(false); // +3 excede §8.2
+  it(`o orçamento é FIXO em ${TALENT_POINT_BUDGET} pontos para todo personagem`, () => {
+    // Decisão do usuário: a profundidade varia por personagem, o orçamento não. O que muda entre
+    // um personagem e outro é a FORMA da árvore — mais linhas contra ranks mais fundos —, nunca
+    // quanto poder ela entrega. Sem isso, profundidade viraria orçamento e o torneio mediria
+    // "tem mais pontos" como se fosse "está mais bem desenhado".
+    expect(TALENT_POINT_BUDGET).toBe(9);
   });
 
-  it('orçamento menor que a profundidade é recusado — a árvore não teria como ser terminada', () => {
-    expect(validateColumnTree({ ...arvore(), budget: 4 }).valid).toBe(false);
+  it('a árvore PRECISA ter onde absorver o orçamento inteiro', () => {
+    // Profundidade 5 e nenhum nó de rank múltiplo: 5 linhas para 9 pontos. Quatro pontos ficariam
+    // sem onde ser gastos, e o jogador terminaria com saldo e nada para comprar — erro de autoria.
+    const semRank = arvore({ nodes: arvore().nodes.map((n) => ({ ...n, maxRank: 1 as const })) });
+    const r = validateColumnTree(semRank);
+    expect(r.valid).toBe(false);
+    expect(r.issues.map((i) => i.reason).join(' ')).toContain('absorver');
   });
+
+  it('uma árvore da profundidade máxima dispensa rank múltiplo — ela já gasta os 9 em linhas', () => {
+    const nodes: ColumnTalentNode[] = [];
+    for (let row = 1; row <= 9; row++) {
+      nodes.push(node(`a${row}`, 'a', row));
+      nodes.push(node(`b${row}`, 'b', row));
+    }
+    expect(validateColumnTree({ characterId: 'fundo', depth: 9, nodes }).valid).toBe(true);
+  });
+
 });
 
 describe('M17 1/N — a coluna amarra (`validateColumnAllocation`)', () => {
@@ -141,25 +156,22 @@ describe('M17 1/N — a coluna amarra (`validateColumnAllocation`)', () => {
 describe('M17 1/N — orçamento, rank e awakening', () => {
   it('gastar mais que o orçamento é recusado', () => {
     const t = arvore();
-    const nodes = t.nodes.map((n) => (n.id === 'a1' ? { ...n, maxRank: 3 as const } : n));
     const r = validateColumnAllocation({
-      tree: { ...t, nodes, budget: 5 },
-      allocation: { a1: 3, a2: 1, a3: 1, a4: 1 }, // 6 pontos num orçamento de 5
+      tree: t,
+      allocation: { a1: 3, a2: 3, a3: 3, a4: 1 }, // 10 pontos num orçamento de 9
     });
     expect(r.valid).toBe(false);
     expect(r.issues.map((i) => i.reason).join(' ')).toContain('orçamento');
   });
 
   it('rank acima do maxRank do nó é recusado', () => {
-    expect(validateColumnAllocation({ tree: arvore(), allocation: { a1: 2 } }).valid).toBe(false);
+    expect(validateColumnAllocation({ tree: arvore(), allocation: { b1: 2 } }).valid).toBe(false);
   });
 
   it('o ponto extra do orçamento aprofunda um nó do caminho, e isso é válido', () => {
-    const t = arvore();
-    const nodes = t.nodes.map((n) => (n.id === 'a2' ? { ...n, maxRank: 2 as const } : n));
     const r = validateColumnAllocation({
-      tree: { ...t, nodes, budget: 6 },
-      allocation: { a1: 1, a2: 2, a3: 1, a4: 1, a5: 1 }, // 6 pontos, 5 linhas
+      tree: arvore(),
+      allocation: { a1: 3, a2: 3, a3: 1, a4: 1, a5: 1 }, // 9 pontos em 5 linhas
     });
     expect(r.valid).toBe(true);
   });

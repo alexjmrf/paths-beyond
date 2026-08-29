@@ -12,7 +12,6 @@ function arvore(overrides: Record<string, unknown> = {}) {
   return {
     characterId: 'personagem-teste',
     depth: 5,
-    budget: 5,
     nodes: [
       { id: 'a1', column: 'a', row: 1, maxRank: 1, effects: [{ t: 'stat', stat: 'atk', pct: 50 }] },
       { id: 'b1', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'maxPp', n: 1 }] },
@@ -37,16 +36,22 @@ describe('schema da árvore de talentos por personagem', () => {
   it('a profundidade é limitada a 5..9 já no schema — é faixa normativa, não sabor', () => {
     expect(() => characterTalentTreeSchema.parse(arvore({ depth: 4 }))).toThrow();
     expect(() => characterTalentTreeSchema.parse(arvore({ depth: 10 }))).toThrow();
-    expect(() => characterTalentTreeSchema.parse(arvore({ depth: 9, budget: 9 }))).not.toThrow();
+    expect(() => characterTalentTreeSchema.parse(arvore({ depth: 9 }))).not.toThrow();
   });
 
   it('maxRank fora de 1..3 é recusado', () => {
     expect(() => characterTalentTreeSchema.parse(arvore({ nodes: [{ id: 'x', column: 'a', row: 1, maxRank: 4, effects: [] }] }))).toThrow();
   });
 
-  it('linha e orçamento precisam ser inteiros positivos', () => {
+  it('linha precisa ser inteiro positivo', () => {
     expect(() => characterTalentTreeSchema.parse(arvore({ nodes: [{ id: 'x', column: 'a', row: 0, maxRank: 1, effects: [] }] }))).toThrow();
-    expect(() => characterTalentTreeSchema.parse(arvore({ budget: 5.5 }))).toThrow();
+  });
+
+  it('`budget` na árvore é recusado — o orçamento é constante do jogo, não campo do dado', () => {
+    // Decisão de 2026-08-28: a profundidade varia por personagem, o orçamento não (9 para todos).
+    // Deixar o campo passar convidaria alguém a autorar um personagem com mais pontos que os
+    // outros, que é exatamente o que a decisão existe para impedir.
+    expect(() => characterTalentTreeSchema.parse(arvore({ budget: 9 }))).toThrow();
   });
 
   it('`tree`, `requires` e `exclusiveWith` da forma ANTIGA são recusados', () => {

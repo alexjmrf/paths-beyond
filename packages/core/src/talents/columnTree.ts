@@ -36,8 +36,7 @@ export interface ColumnTalentNode {
 
 export interface ColumnTalentTree {
   readonly characterId: Id;
-  readonly depth: number; // §8.2 — 5..9
-  readonly budget: number; // depth, ou depth+1/+2 quando houver maxRank > 1
+  readonly depth: number; // §8.2 — 5..9, e é FORMA, não poder
   readonly nodes: readonly ColumnTalentNode[];
 }
 
@@ -53,9 +52,18 @@ export interface ValidationResult {
 
 export const MIN_DEPTH = 5;
 export const MAX_DEPTH = 9;
-// §8.2 — "profundidade + 1 ou + 2". O teto existe porque cada ponto extra é poder que não passa
-// por uma escolha de coluna: ele só aprofunda o que já foi escolhido.
-export const MAX_EXTRA_BUDGET = 2;
+
+// §8.2 — o orçamento é FIXO e igual para todo personagem, e não sai da profundidade da árvore.
+//
+// Decisão do usuário: a profundidade varia por personagem, o orçamento não. Se profundidade
+// fosse orçamento, um personagem de 9 linhas teria quase o dobro dos pontos de um de 5 — e o
+// torneio de balanceamento mediria "tem mais pontos" sem conseguir separar isso de "está mais
+// bem desenhado". Com o orçamento fixo, a profundidade vira uma TROCA de forma: mais linhas
+// contra ranks mais fundos, e o mesmo poder total nos dois extremos.
+//
+// O valor é a profundidade máxima: assim a árvore mais funda ainda é terminável (9 linhas, 9
+// pontos, um por linha) e a mais rasa precisa de ranks múltiplos para absorver a sobra.
+export const TALENT_POINT_BUDGET = MAX_DEPTH;
 
 // ---------------------------------------------------------------------------
 // A forma da árvore
@@ -96,15 +104,20 @@ export function validateColumnTree(tree: ColumnTalentTree): ValidationResult {
     if (meios > 1) issues.push({ nodeId: `${tree.characterId}#${row}`, reason: `linha ${row} com ${meios} nós no meio` });
   }
 
-  const extra = tree.budget - tree.depth;
-  if (extra < 0) {
-    issues.push({ nodeId: tree.characterId, reason: `orçamento ${tree.budget} menor que a profundidade ${tree.depth}` });
-  } else if (extra > MAX_EXTRA_BUDGET) {
-    issues.push({ nodeId: tree.characterId, reason: `orçamento excede profundidade + ${MAX_EXTRA_BUDGET} (§8.2)` });
-  } else if (extra > 0 && !tree.nodes.some((n) => n.maxRank > 1)) {
-    // Ponto extra sem nó de rank múltiplo é ponto que não tem onde ser gasto: o jogador
-    // terminaria a árvore com saldo e sem nada para comprar.
-    issues.push({ nodeId: tree.characterId, reason: 'orçamento acima da profundidade sem nenhum nó de maxRank > 1' });
+  // A árvore precisa ter onde ABSORVER o orçamento inteiro. Um caminho gasta um ponto por linha
+  // (`depth`) mais os ranks extras dos nós que ele atravessa; se o melhor caminho possível não
+  // chega ao orçamento, sobram pontos sem onde ser gastos e o jogador termina com saldo e nada
+  // para comprar. É erro de autoria, e é o preço de a profundidade ser livre.
+  //
+  // O teto é generoso de propósito (soma o extra de TODOS os nós, não só os de um caminho): o
+  // motor recusa o impossível, e quanto o caminho realmente absorve é decisão de desenho de quem
+  // autora a árvore, não invariante que o motor deva impor.
+  const extraDisponivel = tree.nodes.reduce((acc, n) => acc + (n.maxRank - 1), 0);
+  if (tree.depth + extraDisponivel < TALENT_POINT_BUDGET) {
+    issues.push({
+      nodeId: tree.characterId,
+      reason: `a árvore não tem onde absorver os ${TALENT_POINT_BUDGET} pontos (profundidade ${tree.depth} + ${extraDisponivel} de rank)`,
+    });
   }
 
   return { valid: issues.length === 0, issues };
@@ -153,8 +166,8 @@ export function validateColumnAllocation(input: ValidateColumnAllocationInput): 
     total += rank;
   }
 
-  if (total > tree.budget) {
-    issues.push({ nodeId: tree.characterId, reason: `orçamento de ${tree.budget} pontos excedido (${total} gastos)` });
+  if (total > TALENT_POINT_BUDGET) {
+    issues.push({ nodeId: tree.characterId, reason: `orçamento de ${TALENT_POINT_BUDGET} pontos excedido (${total} gastos)` });
   }
 
   // Um nó por linha.
