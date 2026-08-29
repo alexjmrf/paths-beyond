@@ -27,6 +27,7 @@ import {
 } from '../data/motion.js';
 import { terrainMarkInkFor, themeFor, type OverlayTheme } from '../data/overlayTheme.js';
 import { placeShapes, type Primitive } from '../data/shapes.js';
+import { structureMarkFor } from '../data/structureMarks.js';
 import { terrainMarkFor } from '../data/terrainMarks.js';
 import { patternPrimitives } from '../data/tilePatterns.js';
 import { activeUnitRenderer, type UnitRenderInput, type UnitRenderState } from '../data/unitRenderer.js';
@@ -732,23 +733,31 @@ export function MapCanvas() {
         // Até esta fatia o cliente pintava o tile pelo TERRENO e mais nada, então a muralha
         // do capítulo 6 aparecia como planície pisável — uma mentira visual sobre uma regra
         // que já valia no motor.
-        if (tile?.object === 'wall') {
-          // Muro: bloco maciço, sem vão nenhum.
+        // M16 5/N — a construção passou a ter FORMA, e não só tinta. O muro era a única coisa
+        // do tabuleiro desenhada apenas com cor, e com a alvenaria antiga (0x6b4f3a) ele estava
+        // a 1,03 de contraste da floresta: um bosque e uma muralha liam-se como o mesmo tile.
+        // Reafinar a tinta resolve metade; a fiada de blocos resolve a outra, porque forma é o
+        // que sobrevive quando um véu semitransparente empurra toda a tinta para a mesma
+        // direção. As marcas vêm de `data/structureMarks.ts`, declaradas e testadas sem Pixi —
+        // mesma costura do glifo de classe e da marca de terreno.
+        const objeto = tile?.object;
+        if (objeto === 'wall' || objeto === 'gate') {
+          const aberto = objeto === 'gate' && openGateSet.has(tileKey({ x, y }));
+          // O tile inteiro é a pedra. Muro e portão são intransponíveis, então nenhuma unidade
+          // é desenhada aqui e a textura pode ocupar o miolo — ao contrário da marca de terreno.
           g.rect(px, py, tileSize - 1, tileSize - 1).fill(theme.structure);
-        }
-        if (tile?.object === 'gate') {
-          // Portão: batentes dos dois lados SEMPRE (é o que o mantém legível como porta
-          // depois de aberto) e, fechado, a TRANCA atravessada. A forma é o que separa
-          // muro de portão e portão de portão aberto — nenhuma cor nova, e a distinção
-          // sobrevive a qualquer dicromacia (garantia de M13 4/N).
-          const open = openGateSet.has(tileKey({ x, y }));
-          const post = Math.max(2, Math.round(tileSize / 5));
-          const bar = Math.max(2, Math.round(tileSize / 4));
-
-          g.rect(px, py, post, tileSize - 1).fill(theme.structure);
-          g.rect(px + tileSize - 1 - post, py, post, tileSize - 1).fill(theme.structure);
-          if (!open) {
-            g.rect(px, py + (tileSize - 1 - bar) / 2, tileSize - 1, bar).fill(theme.structure);
+          const marca = structureMarkFor(aberto ? 'gate-open' : objeto);
+          if (marca) {
+            applyPrimitives(
+              g,
+              placeShapes(marca, { x: px, y: py, size: tileSize - 1 }, {
+                // Tinta escolhida pela luminância da pedra, o mesmo critério da marca de
+                // terreno: sobre a alvenaria escura as juntas saem claras e a fiada aparece.
+                ink: terrainMarkInkFor(theme, theme.structure),
+                alpha: theme.tokens.terrainMarkAlpha,
+                strokeWidth: Math.max(1, Math.round(tileSize * 0.045)),
+              }),
+            );
           }
         }
         // §5.6 (M15) — tile de controle: encerrar o turno aqui rende +2 Valor, uma vez por

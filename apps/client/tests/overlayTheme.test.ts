@@ -108,8 +108,20 @@ describe('paleta do modo daltônico', () => {
     expect(DEFAULT_THEME.sides.player.shape).toBe(DEFAULT_THEME.sides.enemy.shape);
   });
 
-  it('a paleta padrão fica byte a byte como era antes desta fatia', () => {
-    // Quem não liga o modo não pode ver diferença nenhuma: o mapa de M6–M12 continua igual.
+  it('a paleta padrão só muda por decisão, e o que mudou está aqui', () => {
+    // Este teste nasceu em M13 4/N como "byte a byte como era antes desta fatia": quem não liga o
+    // modo daltônico não podia ver diferença nenhuma. Ele fez o trabalho dele em M16 5/N —
+    // reprovou a mudança de paleta e obrigou a atualização a ser consciente, que é o ponto de um
+    // congelamento.
+    //
+    // O que mudou, e por quê: o usuário reprovou o critério de aceite 2 dizendo que não distinguia
+    // os elementos do mapa, e a medição achou o culpado — floresta e alvenaria a **1,03 de
+    // contraste**, a mesma luminância. Os três terrenos foram para uma rampa de luminância
+    // (matizes preservadas) e a alvenaria para o extremo escuro. Os limiares agora são travados
+    // por `mapElements.test.ts`, então esta lista deixou de ser a única defesa.
+    //
+    // O que NÃO mudou continua congelado abaixo: overlays, objetivo e os dois lados. A mudança
+    // foi cirúrgica no chão do tabuleiro, não uma reestilização.
     expect(DEFAULT_THEME.threat).toEqual({ color: 0xef4444, alpha: 0.22, pattern: 'none' });
     expect(DEFAULT_THEME.move).toEqual({ color: 0x60a5fa, alpha: 0.4, pattern: 'none' });
     expect(DEFAULT_THEME.targeting).toEqual({ color: 0xa855f7, alpha: 0.3, pattern: 'none' });
@@ -117,10 +129,11 @@ describe('paleta do modo daltônico', () => {
     expect(DEFAULT_THEME.sides.player.color).toBe(0x3b82f6);
     expect(DEFAULT_THEME.sides.enemy.color).toBe(0xdc2626);
     expect(DEFAULT_THEME.terrain).toEqual({
-      'terrain-planicie': 0x8fbc5a,
-      'terrain-floresta': 0x2f5d34,
-      'terrain-montanha': 0x8a8a86,
+      'terrain-planicie': 0xaed07a,
+      'terrain-floresta': 0x27502c,
+      'terrain-montanha': 0x8b8781,
     });
+    expect(DEFAULT_THEME.structure).toBe(0x040406);
   });
 
   it('`themeFor` devolve a paleta certa', () => {

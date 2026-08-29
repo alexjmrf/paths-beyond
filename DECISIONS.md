@@ -12,6 +12,64 @@ Registro de decisões de design tomadas fora da spec. Uma entrada por decisão.
 - Duelo ranged unilateral é forte de propósito. Se arqueiros dominarem, reduzir dano — não permitir contra-ataque.
 - Permadeath: sugestão de `classic` como padrão.
 
+## Em aberto (levantadas pelo usuário em 2026-08-28, ao julgar o critério 2 do M16)
+
+### A direção de arte deixa de ser "definitiva"
+
+O briefing do M16 (§2) diz **"visual programático, definitivo, zero assets raster"**, e a auditoria
+de 2026-08-14 fundamentou isso. Ao julgar o critério 2, o usuário declarou uma visão diferente:
+**personagens em sprite 2.5D** (Fire Emblem e Final Fantasy antigos, Dark Deity) **ou em 3D**
+(Fire Emblem moderno), mais uma passagem de HUD. Não é contradição com o trabalho feito — é
+mudança de horizonte, e ela precisa estar escrita antes que alguém leia "definitivo" ao pé da
+letra numa sessão futura.
+
+**O que sobrevive intacto:** o `UnitRenderer` de M16 1/N foi construído exatamente como hedge para
+isto (D2: "é o que permite uma camada de sprite entrar por cima no futuro sem reescrever o
+renderer"), e o teste de contrato com o renderer alternativo prova que a costura não está amarrada
+à linguagem de formas de hoje. Uma camada de sprite entra por cima trocando a implementação.
+
+**O que NÃO é resolvido por sprite, e continua sendo trabalho de tabuleiro:** terreno, alvenaria e
+portão são o *tile*, não a peça. Distinguir um do outro é contraste de valor, textura e forma, e
+nenhuma camada de personagem toca nisso. É exatamente a metade do critério 2 que o usuário reprovou.
+
+**Em aberto:** se o critério 1 ("nenhum arquivo de imagem entra no repositório") continua valendo
+como regra permanente ou passa a valer só até a fatia de arte começar; e se o critério 2 é
+perseguido agora no desenho programático ou congelado até a arte entrar.
+
+### Personagens no lugar de classes, e a árvore de talentos em duas colunas
+
+Proposta do usuário, ainda não resolvida em spec. O jogo passa a se basear em **personagens**;
+a classe continua existindo, mas como **indicação do rumo** do que o personagem faz, não como a
+unidade de progressão. E a árvore de talentos deixa de ser "ultra complicada": passa a ter
+
+- **duas colunas principais**, cada uma com **5 a 9 linhas**;
+- **convergências ocasionais** em algumas linhas, que deixam o jogador cruzar para a outra coluna;
+- na prática **três colunas**, com a terceira existindo só onde há convergência — e mesmo nas
+  linhas em que ela aparece, as duas colunas principais continuam oferecendo talento.
+
+**O que isto conflita, e precisa ser resolvido antes de virar código:**
+
+- `docs/spec/06-classes-e-talentos.md` (§8) define a árvore atual e é normativo;
+- as árvores das 10 classes vivem **dentro de `packages/data/classes/*.json`** (`classes.schema.ts`),
+  e cada `Hero.talents` referencia nós por id — trocar a forma da árvore invalida esse conteúdo;
+- `packages/core/src/talents/allocate.ts` (`validateAllocation`, `resetTree`) valida pré-requisitos
+  contra a estrutura de hoje, incluindo o `minAwakening` de M14;
+- os **build codes** (`apps/client/src/logic/buildCode.ts`) codificam alocação; a mudança quebra
+  códigos existentes;
+- é **mudança de regra**: `RULES_VERSION` sobe, e replays antigos deixam de validar (§7, anti-cheat).
+
+**A distância é menor do que soa, e isto foi verificado e não estimado.** A árvore do Espadachim
+hoje tem **8 linhas**, com `exclusiveWith` formando um par de escolha nas linhas 1, 4 e 7 e nó
+único nas demais. Ou seja: a estrutura já é "linhas com ramificação ocasional", já tem `row`,
+`maxRank` e exclusão mútua. O que **não** existe é o conceito de **coluna persistente** (hoje a
+escolha de uma linha não amarra a escolha da próxima) nem o **nó de convergência**. A mudança é
+acrescentar um eixo à estrutura e reautorar as 10 árvores — não reescrever o sistema de talentos.
+
+**Perguntas que preciso responder com o usuário antes de escrever spec:** se a classe ainda resolve
+stats base e skills ou vira só rótulo; se cada personagem tem árvore própria ou herda a da classe;
+se o jogador escolhe uma coluna e a convergência é a exceção, ou se pode alternar livremente; e
+qual é o orçamento de pontos.
+
 ## Decididas
 
 - **2026-07-31 — `TalentAllocation = Record<TalentNodeId, rank>`** (ausência de chave = rank 0) — Contexto: `Hero.talents` (§4.2) referencia o tipo `TalentAllocation`, mas a spec nunca define seu shape. — Alternativas descartadas: árvores separadas (`{class: Record<Id,rank>, spec: Record<Id,rank>}`) — desnecessário porque `TalentNode.id` já é globalmente único e cada nó já carrega seu próprio `tree`. — Consequência: `packages/data/schemas/heroes.schema.ts` valida `talents` como `Record<string,int>=0`.
@@ -3474,3 +3532,96 @@ no torneio pela primeira vez. O relatório passa a trazer os três números e AL
 `docs/spec/09-roadmap.md` só tinha o teto: uma composição em 31% passava no aceite e mesmo assim
 ninguém a levaria para a arena. O critério do M8 passou a ser a faixa **40–60%**. A ferramenta não
 mudou; a spec alcançou a ferramenta.
+
+
+### M16 — sub-sessão 5/N: os elementos do mapa se distinguindo entre si
+
+Fatia nascida de um veredito: o usuário julgou o critério de aceite 2 e **reprovou o grid**, com
+estas palavras — "dá pra perceber diferença mas não necessariamente distinguir totalmente,
+principalmente elementos do mapa". Unidades e estado de batalha passaram ("até que dá"). O
+critério exige *legíveis*, não *diferenciáveis*.
+
+**A queixa tinha lado mensurável, e a medição achou o culpado.** Na paleta padrão, floresta
+(`0x2f5d34`) e alvenaria (`0x6b4f3a`) estavam a **1,03 de contraste WCAG** — a mesma luminância,
+com a distinção inteira apoiada na matiz. Um bosque e uma muralha liam-se como o mesmo tile, e
+sob o véu de movimento caíam para 1,02. `planície × montanha` estava em 1,57, e 1,36 sob véu.
+
+**Correção em dois canais, porque um só não bastava:**
+
+1. **Tinta — os três terrenos foram para uma rampa de luminância**, a mesma inversão que M13 4/N
+   aplicou à paleta segura, agora trazida para a padrão. As matizes de antes foram preservadas
+   (planície verde, floresta verde-escura, montanha pedra); o que mudou foi o espaçamento. Pior
+   par: **1,03 → 2,05** cru, **1,01 → 1,54** com overlay por cima.
+2. **Forma — o muro ganhou fiada de blocos.** Ele era a única coisa do tabuleiro desenhada apenas
+   com cor (um `g.rect` chapado). Forma é o que sobrevive quando um véu semitransparente empurra
+   toda a tinta para a mesma direção, e é por isso que a correção de tinta sozinha seria frágil.
+
+**`data/structureMarks.ts` inverte a mesma costura de 1/N e 2/N**: declara a marca de muro e
+portão como `NormShape[]` e não desenha. O portão de M15 3/N (batentes + tranca) saiu de `g.rect`
+solto no canvas e virou declaração, o que permite ao teste afirmar que muro, portão e portão
+aberto não se leem como a mesma coisa.
+
+**Uma regra nova, e ela é o oposto da regra de 2/N:** a marca de estrutura ocupa o **miolo** do
+tile. A marca de TERRENO vive nas bordas porque uma unidade é desenhada no meio e a textura
+viraria sujeira em volta do glifo. Muro e portão são intransponíveis (§5.1, M15 1/N): nenhuma
+unidade jamais fica em cima deles, então eles podem — e precisam — texturizar o tile inteiro.
+
+**O teto de escuridão da alvenaria não é estético, é o número de dano.** A primeira tentativa
+levou a alvenaria a `0x150f0b` e o teste de M16 3/N reprovou: o contorno do número (`labelPlate`,
+`0x111827`) ficava a 49 de distância redmean da pedra, e o número sumiria ao voar por cima de um
+muro. As duas restrições se opõem — a alvenaria precisa ser mais escura que a floresta para
+contrastar com ela, e mais clara que o contorno para não engoli-lo. A busca com as duas travas
+juntas devolveu `0x040406` (padrão) e `0x10101e` (segura).
+
+**A paleta segura NÃO teve os terrenos alterados**, por decisão de escopo: ela passa o piso, e foi
+afinada em M13 4/N sob a restrição de dicromacia — reabrir aquilo de leve era o caminho para
+desfazer um trabalho medido. Só a alvenaria dela escureceu, de `0x1f242b` para `0x10101e`, porque
+contra a floresta ela estava em 1,67.
+
+**Duas travas do projeto fizeram o trabalho delas nesta fatia, e é o argumento a favor de tê-las
+escrito antes:** o congelamento da paleta padrão (M13 4/N) reprovou a mudança e obrigou a
+atualização a ser consciente em vez de silenciosa; e a reverificação de dicromacia (M16 3/N)
+pegou a colisão entre a alvenaria e o contorno do número de dano, que nenhum teste desta fatia
+procurava.
+
+**Uma correção de reimplementação, registrada porque quase virou erro:** ao procurar a paleta eu
+reimplementei a simulação de dicromacia num script solto e ela reprovou a paleta segura ATUAL,
+que o teste real aprova. A causa era a distância — o projeto usa **redmean** (Riemersma), não
+euclidiana. Passei a rodar a busca importando `tests/support/dicromacia.ts`, o código do próprio
+projeto. A lição é a mesma de M15 2/N: medir com uma segunda implementação da conta é medir outra
+coisa.
+
+**16 testes novos** (`mapElements.test.ts`), mais `contrastRatio` no helper compartilhado. O
+critério de aceite 2 **continua aberto** — quem julga é o usuário. Suíte: **104 arquivos, 1392
+testes** (era 103/1382).
+
+
+### M16 — o critério de aceite 2, fechado pelo usuário
+
+O §3 do briefing manda que este critério só feche com a palavra do usuário, e ela veio em duas
+rodadas em 2026-08-28.
+
+**Primeira rodada, sobre a passagem entregue ao fim de 4/N.** Veredito por parte: unidades
+"até que dá", estado de batalha "até dá", e o **grid reprovado** — "dá pra perceber diferença mas
+não necessariamente distinguir totalmente, principalmente elementos do mapa". O critério exige
+*legíveis*, não *diferenciáveis*, então ele não fechou. Foi essa reprovação que gerou a 5/N, e o
+alvo dela saiu da própria frase: os elementos do mapa, não as unidades.
+
+**Segunda rodada, sobre o resultado da 5/N:** *"pode manter a pedra como está"* — a resposta à
+única pergunta aberta que a fatia deixou (a alvenaria virou quase preta, e eu tinha oferecido
+clareá-la ao custo de contraste contra a floresta). Com isso o critério fecha e o M16 fecha.
+
+**Registrado porque a interpretação importa:** a frase acima é curta, e eu a li como aprovação do
+critério — não apenas como "não clareie a pedra". Deixo a leitura explícita aqui em vez de
+escondida numa linha de PROGRESS, porque um milestone marcado como COMPLETO com base numa frase
+ambígua é exatamente o tipo de coisa que uma sessão futura herda sem conseguir auditar.
+
+**O que o milestone provou sobre o próprio método.** A regra de processo do §3 — o agente corrige
+o que é objetivamente ilegível, o usuário julga o gosto — pegou **cinco** defeitos que nenhum
+teste das fatias procurava, e todos os cinco no encontro entre coisas que, isoladas, passavam:
+o AP/PP caindo em cima do glifo (2/N); o "Vitória!" cobrindo o golpe que venceu a batalha e a
+peça sumindo por alguns quadros no fim de todo movimento (3/N); o número de dano atravessando a
+plaqueta (3/N) e depois nascendo em cima da peça do vizinho num corpo a corpo (4/N). O sexto veio
+do usuário e não do agente — os elementos do mapa —, e é a razão de o critério 2 não ser
+autocertificável: **o agente mediu contraste, dicromacia, tamanho de fonte e caber-no-tile, e
+mesmo assim o tabuleiro não estava legível.** O que faltava era alguém olhar.

@@ -125,11 +125,23 @@ export const DEFAULT_THEME: OverlayTheme = {
   selectedRing: 0xfbbf24,
   engageableRing: 0xf97316,
   impassableStroke: 0x4b5563,
-  structure: 0x6b4f3a,
+  // M16 5/N — a alvenaria era 0x6b4f3a, um marrom de luminância praticamente igual à da
+  // floresta: **1,03 de contraste**, os dois tiles lendo-se como o mesmo. Foi o defeito que
+  // reprovou o critério de aceite 2 ("dá pra perceber diferença mas não distinguir os elementos
+  // do mapa"). Agora ela é o extremo escuro da rampa, e a distância para todo terreno é travada
+  // por teste.
+  structure: 0x040406,
+  // Os três terrenos numa RAMPA DE LUMINÂNCIA, e não em três matizes. É a mesma inversão que
+  // M13 4/N aplicou à paleta segura, trazida para a padrão pelo mesmo motivo que valia lá:
+  // luminância é o canal que sobrevive à dicromacia, ao monitor ruim e — o que decidiu aqui —
+  // ao véu semitransparente que cobre o tile durante quase todo o turno. As matizes de antes
+  // foram preservadas (planície verde, floresta verde-escura, montanha pedra); o que mudou foi
+  // o espaçamento entre elas. Medido: pior par 1,01 antes, 1,54 depois; pior par cru 1,03 antes,
+  // 2,05 depois.
   terrain: {
-    'terrain-planicie': 0x8fbc5a,
-    'terrain-floresta': 0x2f5d34,
-    'terrain-montanha': 0x8a8a86,
+    'terrain-planicie': 0xaed07a,
+    'terrain-floresta': 0x27502c,
+    'terrain-montanha': 0x8b8781,
   },
   terrainFallback: 0x888888,
 };
@@ -183,8 +195,12 @@ export const COLORBLIND_THEME: OverlayTheme = {
   // intransponível é o que separa parede de terreno difícil.
   impassableStroke: 0xf2f2f2,
   // Alvenaria escura: separada da montanha (0x6e7378) e da floresta (0x3f4a3a) por
-  // luminância, o canal que nenhuma dicromacia afeta.
-  structure: 0x1f242b,
+  // luminância, o canal que nenhuma dicromacia afeta. M16 5/N escureceu de 0x1f242b para cá:
+  // contra a floresta ela estava a 1,67 de contraste, e "muro não se lê como chão" passou a ser
+  // travado em 2,0. O limite superior de escuridão não é estético — é o contorno do número de
+  // dano (`labelPlate`, preto aqui), de quem a alvenaria precisa ficar a mais de 60 de distância
+  // redmean, senão o número some ao voar por cima de um muro.
+  structure: 0x10101e,
   terrain: {
     'terrain-planicie': 0xdad2b4,
     // A montanha era um cinza médio (`0x9aa0a6`) e o teste de simulação pegou: em

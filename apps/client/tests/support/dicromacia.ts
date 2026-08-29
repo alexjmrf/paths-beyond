@@ -85,3 +85,13 @@ export function blendOver(ink: number, background: number, alpha: number): numbe
   const mix = (i: number, b: number) => Math.round(i * alpha + b * (1 - alpha));
   return (mix(ir, br) << 16) | (mix(ig, bg) << 8) | mix(ib, bb);
 }
+
+// Contraste WCAG entre duas tintas. É o canal que NENHUMA dicromacia afeta — por isso M13 4/N
+// pôs os terrenos numa rampa de luminância — e é o que decide se dois tiles vizinhos se leem
+// como coisas diferentes quando a matiz falha, quando o monitor é ruim, ou quando um overlay
+// semitransparente cobre os dois.
+export function contrastRatio(a: number, b: number): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
