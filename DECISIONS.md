@@ -3854,3 +3854,58 @@ anti-cheat, 409). Sem caminho de migração — o formato de alocação muda.
 hora:** quantos personagens jogáveis existem e se o gerador de comps passa a gerar personagens com
 árvore; se a profundidade é por personagem (e portanto poder) ou fixa; e o que fazer com saves de
 campanha que carregam `talentAllocationByUnit`.
+
+
+### M17 — sub-sessão 1/N: o motor da árvore de duas colunas
+
+Primeira fatia do M17, e a única que não depende de nenhuma das três perguntas que o briefing
+(§5) deixou em aberto. Motor e schema; **nenhum conteúdo**.
+
+**`packages/core/src/talents/columnTree.ts`** traz a topologia nova de §8.2 e faz valer a regra
+que dá forma à build, escrita numa função de três linhas (`permiteSeguir`): do meio sai-se para
+qualquer lado; de uma coluna principal continua-se nela ou entra-se no meio. Tudo o mais é
+consequência disso.
+
+**Duas validações separadas, porque os dois erros são de autores diferentes.**
+`validateColumnTree` valida a ÁRVORE — erro de quem escreveu o conteúdo (linha sem uma das
+colunas principais, dois nós do meio na mesma linha, profundidade fora de 5..9, orçamento
+inalcançável). `validateColumnAllocation` valida a ALOCAÇÃO — tentativa de quem joga, ou de um
+cliente adulterado (§9.2): um nó por linha, linhas contíguas a partir de 1, a amarração de
+coluna, o teto de rank, o orçamento e o `minAwakening` herdado de M14.
+
+**Duas decisões de motor que o briefing não ditava:**
+
+1. **A árvore é um CAMINHO, não uma sacola.** As linhas alocadas têm de ser contíguas a partir da
+   1. §8.2 diz "um nó por linha" e "orçamento = profundidade", e as duas juntas só fazem sentido
+   se não se pode comprar a linha 9 sem descer até ela. É o análogo do gate por pontos gastos da
+   árvore antiga, na topologia nova.
+2. **O meio é OPCIONAL.** Uma árvore sem nenhuma convergência é válida: vira duas colunas
+   estanques em que escolher a linha 1 escolhe a build inteira. É decisão de quem autora, e o
+   motor não tem por que proibi-la.
+
+**Orçamento acima da profundidade exige nó de rank múltiplo.** §8.2 diz que os pontos extras "só
+podem aprofundar nós já alocados"; sem nenhum `maxRank > 1` na árvore, o ponto extra não teria
+onde ser gasto e o jogador terminaria com saldo e nada para comprar. Isso é erro de autoria, e o
+validador de árvore o recusa.
+
+**O schema entrou em `packages/data/schemas/character-talent-trees.schema.ts` e é `.strict()` de
+propósito:** `tree`, `requires` e `exclusiveWith` da topologia antiga não podem passar
+despercebidos. Um arquivo autorado no formato velho tem que falhar alto em vez de validar e não
+fazer nada. O schema trava só a FORMA — a coerência é do motor, e duplicar aquelas regras em Zod
+seria a segunda implementação que diverge em silêncio (o precedente é `weapon-duel-ranges`).
+
+**`talentEffectSchema` mudou de casa**, de dentro de `classes.schema.ts` para `shared.ts`. Ele
+**sobrevive** à mudança de forma da árvore — §8.2 é explícito de que os 12 efeitos não mudam — e
+agora tem dois consumidores: a árvore antiga, enquanto existir, e a nova.
+
+**O `allocate.ts` antigo continua de pé, e isso é ordem e não compatibilidade.** O §7 do briefing
+proíbe manter os dois formatos convivendo no produto; a 2/N troca os consumidores de uma vez. O
+que esta fatia evita é deixar o repositório vermelho no meio da troca.
+
+**Uma trava do projeto fez o trabalho dela:** o teste que conta os schemas de `packages/data`
+(23 para 24) reprovou a adição e obrigou a atualização a ser consciente, com o motivo escrito na
+descrição do próprio teste.
+
+**32 testes novos** (25 no motor, 7 no schema). Suíte: **106 arquivos, 1429 testes** (era
+104/1397). `RULES_VERSION` **ainda não sobe**: nenhum consumidor mudou de comportamento, e o bump
+é da fatia que trocar a topologia de verdade.

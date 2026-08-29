@@ -194,6 +194,15 @@ export type {
   PromotionRequirement,
 } from './talents/promotion.js';
 export { resetTree } from './talents/reset.js';
+export {
+  allocatedPath,
+  validateColumnAllocation,
+  validateColumnTree,
+  MAX_DEPTH,
+  MAX_EXTRA_BUDGET,
+  MIN_DEPTH,
+} from './talents/columnTree.js';
+export type { ColumnTalentNode, ColumnTalentTree, TalentColumn } from './talents/columnTree.js';
 export { resolveTalentEffects } from './talents/resolve.js';
 export type { ApRefundRule, ResolvedTalents } from './talents/resolve.js';
 export type { TalentAllocation, TalentEffect, TalentNode, TalentTree } from './talents/types.js';

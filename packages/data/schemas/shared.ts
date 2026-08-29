@@ -153,3 +153,24 @@ export const reactionLineSchema = z.object({
   skillId: idSchema,
   conditions: z.array(conditionSchema),
 });
+
+// §8.2 — TalentEffect, união literal completa dada pela spec. Mora aqui, e não dentro do schema
+// de classe, porque ele SOBREVIVE à mudança de forma da árvore: o M17 troca a topologia (duas
+// colunas por personagem no lugar de duas árvores por classe) e a lista de 12 efeitos segue
+// idêntica. Dois consumidores a usam — a árvore antiga, enquanto existir, e a nova.
+export const talentEffectSchema = z.discriminatedUnion('t', [
+  z.object({ t: z.literal('stat'), stat: statKeySchema, flat: z.number().int().optional(), pct: z.number().int().optional() }),
+  z.object({ t: z.literal('grantSkill'), skillId: idSchema }),
+  z.object({ t: z.literal('grantReaction'), reactionId: idSchema }),
+  // patch: Partial<SkillDef> — permissivo de propósito, SkillDef pertence a skills.schema.ts
+  // e um patch parcial não tem forma fixa própria.
+  z.object({ t: z.literal('modifySkill'), skillId: idSchema, patch: z.record(z.string(), z.unknown()) }),
+  z.object({ t: z.literal('extraTacticsSlot') }),
+  z.object({ t: z.literal('extraTacticsCondition') }),
+  z.object({ t: z.literal('maxAp'), n: z.number().int() }),
+  z.object({ t: z.literal('maxPp'), n: z.number().int() }),
+  z.object({ t: z.literal('apRefund'), on: z.enum(['kill', 'duelWon', 'assist']), n: z.number().int() }),
+  z.object({ t: z.literal('duelApCap'), n: z.number().int() }),
+  z.object({ t: z.literal('assistRangeBonus'), n: z.number().int() }),
+  z.object({ t: z.literal('passive'), passiveId: idSchema }),
+]);

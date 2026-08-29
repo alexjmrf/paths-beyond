@@ -1,23 +1,13 @@
 import { z } from 'zod';
-import { idSchema, moveTypeSchema, partialStatSheetSchema, statKeySchema, unitTypeSchema, weaponTypeSchema } from './shared.js';
-
-// §8.2 — TalentEffect, união literal completa dada pela spec.
-const talentEffectSchema = z.discriminatedUnion('t', [
-  z.object({ t: z.literal('stat'), stat: statKeySchema, flat: z.number().int().optional(), pct: z.number().int().optional() }),
-  z.object({ t: z.literal('grantSkill'), skillId: idSchema }),
-  z.object({ t: z.literal('grantReaction'), reactionId: idSchema }),
-  // patch: Partial<SkillDef> — permissivo de propósito, SkillDef pertence a skills.schema.ts
-  // e um patch parcial não tem forma fixa própria.
-  z.object({ t: z.literal('modifySkill'), skillId: idSchema, patch: z.record(z.string(), z.unknown()) }),
-  z.object({ t: z.literal('extraTacticsSlot') }),
-  z.object({ t: z.literal('extraTacticsCondition') }),
-  z.object({ t: z.literal('maxAp'), n: z.number().int() }),
-  z.object({ t: z.literal('maxPp'), n: z.number().int() }),
-  z.object({ t: z.literal('apRefund'), on: z.enum(['kill', 'duelWon', 'assist']), n: z.number().int() }),
-  z.object({ t: z.literal('duelApCap'), n: z.number().int() }),
-  z.object({ t: z.literal('assistRangeBonus'), n: z.number().int() }),
-  z.object({ t: z.literal('passive'), passiveId: idSchema }),
-]);
+import {
+  idSchema,
+  moveTypeSchema,
+  partialStatSheetSchema,
+  statKeySchema,
+  talentEffectSchema,
+  unitTypeSchema,
+  weaponTypeSchema,
+} from './shared.js';
 
 // §8.2 — TalentNode.
 const talentNodeSchema = z.object({
