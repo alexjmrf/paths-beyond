@@ -4430,3 +4430,61 @@ enquanto "avanço de história" e "primeira completude" são fontes de moeda, qu
 são 9.880 combinações de três; com 9 ainda é computável e a 6/N mede como hoje); as taxas por
 raridade, o N do pity e o custo do summon, todos a decidir com o usuário ao autorar o banner na
 sub-sessão 2/N.
+
+
+### M18 — sub-sessão 1/N: o motor da rolagem
+
+Motor e nada mais — **zero conteúdo**, que é o que o briefing (§4) previu ao pôr esta fatia
+primeiro: é a única que não depende de nenhuma das perguntas ainda abertas (taxas, N do pity,
+custo do summon). `packages/core` e `packages/data` **sem uma linha alterada**, e `RULES_VERSION`
+segue em **`0.17.0`** — D15 diz que o gacha não toca no core, e isso é verificável no diff, não
+declarado.
+
+**`packages/gacha` é o oitavo pacote do workspace.** Puro, determinístico, sem estado. Importa
+`@paths-beyond/core` para RNG (`rngFor`/`nextUint32`) e ponto fixo (`fpDiv`); o core continua não
+importando nada além de si mesmo, e a seta aponta para dentro (regra 1 intacta).
+
+**Três decisões de forma que o briefing não ditava:**
+
+**O fragmento é DECLARADO na entrada do banner, não derivado do id do personagem.** O material
+de duplicata de hoje se chama `material-fragmento-hero-jogador`, e derivar
+`material-fragmento-${characterId}` teria funcionado para todos os nove. Foi recusado: derivar é
+o motor inventando um id de conteúdo, que é o que a regra 4 proíbe, e a convenção quebraria em
+silêncio no dia em que um personagem tivesse fragmento com outro nome. Quem autora declara.
+
+**O peso é INTEIRO, e não uma taxa em ponto fixo.** A escolha vem do precedente do próprio
+projeto — `items/generate.ts` e `economy/drops.ts` sorteiam por peso acumulado sobre um uint32 — e
+tem uma consequência melhor que a conformidade com a regra 2: com peso inteiro e `valor % total`,
+**não existe uma única divisão no caminho do sorteio**, então não há o que arredondar. A taxa em
+escala 1000 existe só para a tela mostrar (`rateOf`), fora do caminho da decisão.
+
+**Duas validações separadas, pelo mesmo argumento de M17 1/N:** `validateBanner` pega erro de quem
+AUTORA (pool vazio, peso não inteiro, personagem repetido, personagem de núcleo de história dentro
+do pool, pity inválido, fragmento ausente). O que valida quem JOGA — "tem premium suficiente?",
+"este personagem é dele?" — é pergunta do servidor com o banco na mão, e não mora aqui.
+
+**A leitura que a spec não cobre e que ficou registrada: pool esgotado CONGELA o contador de
+pity.** Quando o jogador já possui o pool inteiro não há o que garantir. Avançar o contador
+acumularia uma garantia sem destino; consumi-la seria pior — o jogador perderia uma garantia que
+nada pagou. Congelado, se um personagem novo entrar no banner amanhã, a garantia que ele já tinha
+continua de pé. As duas alternativas estão descartadas com esse argumento, e a propriedade tem
+teste próprio nos dois estados (contador no limiar e contador no meio do caminho).
+
+**A trava de `Math.random` passou a alcançar o pacote novo, e isso não é higiene:** `pnpm lint`
+varria só `packages/core/src`. D15 põe `packages/gacha` sob as mesmas regras do core — se a trava
+não o alcançasse, a regra 2 valeria lá **só por disciplina**, que é exatamente aquilo de que ela
+existe para não depender. `scripts/check-no-random.mjs` passou a aceitar N diretórios e a varrer
+os dois por padrão, e **o alvo virou asserção**: um teste afirma que rodar sem argumento cobre
+`packages/core/src` E `packages/gacha/src`. Sem ele, apagar o alvo do padrão deixaria o pacote de
+regra sem guarda sem nada ficar vermelho.
+
+**Um teste nasceu vacuamente verde e foi pego na mesma sessão, e vale registrar porque é a mesma
+classe de defeito que a 4/N e a 5/N do M17 encontraram.** "O contador avança em duplicata" foi
+escrito com um `if` sobre o desfecho — `if (duplicata) espera 2; else espera 0` — e passava pelo
+ramo ERRADO: a semente escolhida no chute dava personagem, não duplicata. Medi as sementes, fixei
+uma que cai em duplicata e passei a **afirmar o desfecho antes de medir o contador**. Um `if`
+dentro de um teste é um teste que não sabe o que está medindo.
+
+**Suíte: 113 arquivos, 1650 testes** (era 110/1619) — 29 testes novos em `packages/gacha` e 2 na
+trava de lint. `pnpm validate:data`: 26 schemas, 183 arquivos, inalterado, porque esta fatia não
+autorou dado nenhum.
