@@ -68,9 +68,13 @@ describe('os objetivos são alcançáveis pelo terreno, não só pelo schema', (
     for (const encounter of catalog.encounters) {
       const arenaMap = catalog.maps[encounter.mapId]!;
       for (const unit of encounter.units) {
-        const classDef = catalog.classes[unit.hero.classId]!;
+        // §8.1 (M17, 3/N) — o `moveType` sai da classe do herói ou da ficha do inimigo. A
+        // pergunta é a mesma para os dois (esta unidade cabe no tile em que nasce?), só a
+        // fonte muda — e o inimigo autorado declara o dele por extenso.
+        const moveType =
+          unit.side === 'enemy' ? catalog.enemies[unit.enemyId]!.moveType : catalog.classes[unit.hero.classId]!.moveType;
         const tile = tileAt(arenaMap.grid, unit.pos)!;
-        const cost = arenaMap.grid.terrains[tile.terrain]!.moveCost[classDef.moveType];
+        const cost = arenaMap.grid.terrains[tile.terrain]!.moveCost[moveType];
         expect(cost, `${encounter.id}/${unit.unitId}`).not.toBe('impassable');
       }
     }
@@ -117,7 +121,11 @@ describe('a IA de mapa está ligada na campanha (§9.1)', () => {
 
 describe('as skills de mapa em área (§5.4) têm consumidor real', () => {
   it('a campanha equipa as duas, e nenhuma é só um número de dano', () => {
-    const equipped = new Set(catalog.encounters.flatMap((e) => e.units.flatMap((u) => u.hero.mapSkills)));
+    const equipped = new Set(
+      catalog.encounters.flatMap((e) =>
+        e.units.flatMap((u) => (u.side === 'enemy' ? catalog.enemies[u.enemyId]!.mapSkills : u.hero.mapSkills)),
+      ),
+    );
     expect([...equipped].sort()).toEqual(['skill-luz-do-alvorecer', 'skill-salva-arcana']);
 
     for (const skillId of equipped) {

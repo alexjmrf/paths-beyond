@@ -55,9 +55,10 @@ export interface SaveEnvironment {
   readonly rulesVersion: string;
   readonly chapterCount: number;
   readonly itemExists: (itemId: Id) => boolean;
-  // `true` se a alocação continua válida para a unidade (árvore da classe + gates de
-  // linha). O store passa `validateAllocation` do core; unidades de outros capítulos, cuja
-  // árvore não dá pra resolver daqui, devem devolver `true` (não sabemos, não mexemos).
+  // `true` se a alocação continua válida para a unidade. O store passa
+  // `validateColumnAllocation` do core contra a árvore do PERSONAGEM (§8.2, M17 4/N);
+  // unidades de outros capítulos, cuja árvore não dá pra resolver daqui, devem devolver
+  // `true` (não sabemos, não mexemos).
   readonly allocationIsValid: (unitId: string, allocation: TalentAllocation) => boolean;
 }
 
@@ -291,6 +292,14 @@ export function reconcileSave(save: SaveGame, env: SaveEnvironment): SaveGame {
 
   // Alocação que a árvore atual não aceita mais é zerada: mantê-la travaria toda edição
   // seguinte, já que o cliente revalida a árvore INTEIRA a cada +1/-1 (M6, sub-sessão 7).
+  //
+  // §8.2 (M17, 4/N) — é por aqui que passa o SAVE ANTIGO, e a decisão do usuário foi
+  // **devolver os pontos**. Um save gravado antes deste milestone carrega nós da árvore de
+  // classe, que não existem mais; `validateColumnAllocation` os recusa como desconhecidos, e
+  // a máquina que já estava aqui zera a alocação daquela unidade e deixa o resto do save de
+  // pé. D5 do briefing diz que não há caminho de migração — o que ele não diz é que o
+  // jogador tenha de perder o capítulo, o equipamento e as preferências junto com a build.
+  // Ele reescolhe a árvore, que é justamente a tela que este milestone entrega.
   const talentAllocationByUnit: Record<string, TalentAllocation> = {};
   for (const [unitId, allocation] of Object.entries(save.talentAllocationByUnit)) {
     talentAllocationByUnit[unitId] = env.allocationIsValid(unitId, allocation) ? allocation : {};

@@ -2,7 +2,7 @@ import type { GearSlot } from '../items/types.js';
 import type { StatModifier, StatSheet } from '../stats/types.js';
 import type { TacticsScript } from '../tactics/types.js';
 import type { PromotionRequirement } from '../talents/promotion.js';
-import type { TalentAllocation, TalentNode } from '../talents/types.js';
+import type { TalentAllocation } from '../talents/types.js';
 import type { UnitType, WeaponType } from '../tactics/types.js';
 import type { MoveType } from '../grid/types.js';
 import type { Id } from '../types.js';
@@ -15,6 +15,15 @@ import type { Id } from '../types.js';
 // um `BattleUnit` real a partir de um Hero (allowedWeapons é lista, o duelo precisa de 1).
 export interface Hero {
   readonly id: Id;
+  // §8.1 (M17) — QUEM ele é. A árvore de talentos deixou de pertencer à classe e passou a
+  // pertencer ao personagem, então resolver `talents` exige saber de qual árvore aquela
+  // alocação veio — e só o elenco fechado (D6) responde isso.
+  //
+  // OPCIONAL, e a razão é datada: até a 3/N, inimigo de fase ainda é um `Hero` completo, e
+  // inimigo não é personagem (§8.1). Quem não tem `characterId` não tem árvore, e resolve
+  // com zero talentos — que é exatamente o que os inimigos de hoje já fazem (`talents: {}`).
+  // Quando a 3/N tirar o inimigo do caminho do `Hero`, este campo passa a obrigatório.
+  readonly characterId?: Id;
   readonly classId: Id;
   readonly level: number; // 1..60
   readonly exp: number;
@@ -49,5 +58,7 @@ export interface ClassDef {
   readonly awakeningMultipliers: readonly number[];
   readonly promotionFlat: readonly StatModifier[];
   readonly imprintFlat: readonly (readonly StatModifier[])[];
-  readonly talentTree: readonly TalentNode[];
+  // §8.1 (M17) — `talentTree` SAIU daqui. "A classe guia os status e parte do que o
+  // personagem faz... ela não é mais a unidade de progressão: a árvore não pertence mais
+  // à classe." O que sobrou acima é exatamente o que D2 lista como papel dela.
 }

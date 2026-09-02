@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import dungeonSchema from '../schemas/dungeons.schema.js';
 import dungeonEncounterSchema from '../schemas/dungeon-encounters.schema.js';
+import enemySchema from '../schemas/enemies.schema.js';
 import mainstatWeightsSchema from '../schemas/mainstat-weights.schema.js';
 import substatWeightsSchema from '../schemas/substat-weights.schema.js';
 import enhanceRatesSchema from '../schemas/enhance-rates.schema.js';
@@ -38,6 +39,7 @@ const materials = loadAll(materialSchema, 'materials');
 const economyRules = loadAll(economyRulesSchema, 'economy-rules');
 const setIds = loadJsonIds('item-sets');
 const dungeonEncounters = loadAll(dungeonEncounterSchema, 'dungeon-encounters');
+const enemies = loadAll(enemySchema, 'enemies');
 const encounterIds = new Set(dungeonEncounters.map((e) => e.id));
 const substatWeights = loadAll(substatWeightsSchema, 'substat-weights')[0]!;
 const mainstatWeights = loadAll(mainstatWeightsSchema, 'mainstat-weights')[0]!;
@@ -67,14 +69,17 @@ const impassableTerrains = new Set(
     .map((t) => t.id),
 );
 
+// §8.1 (M17, 3/N) — só o lado do JOGADOR, e agora isso é explícito. Um fragmento de herói
+// existe para despertar alguém do elenco (§10); apontar para um inimigo nunca fez sentido,
+// e antes desta fatia o conjunto os incluía por acidente — inimigo também era um `Hero`.
 const heroIds = new Set(
   readdirSync(join(dataRoot, 'encounters'))
     .filter((f) => f.endsWith('.json'))
     .flatMap((f) => {
       const encounter = JSON.parse(readFileSync(join(dataRoot, 'encounters', f), 'utf8')) as {
-        units: { hero: { id: string } }[];
+        units: { side: string; hero?: { id: string } }[];
       };
-      return encounter.units.map((u) => u.hero.id);
+      return encounter.units.filter((u) => u.side === 'player').map((u) => u.hero!.id);
     }),
 );
 
@@ -222,15 +227,31 @@ describe('encounters de masmorra', () => {
     }
   });
 
+  // §8.1 (M17, 3/N) — este teste MEDIA NÍVEL, e nível deixou de existir do lado inimigo.
+  // A troca é ganho, não remendo: "a elite é mais forte" sempre foi a afirmação, e o nível
+  // era um proxy dela — um proxy que mentia, porque duas classes no mesmo nível têm forças
+  // diferentes. Agora a força está escrita, e o teste pergunta pela força.
   it('a elite tem elenco mais forte que a normal do mesmo foco', () => {
     const porId = new Map(dungeonEncounters.map((e) => [e.id, e]));
+    const porInimigo = new Map(enemies.map((e) => [e.id, e]));
+
+    const maiorStat = (encounterId: string, stat: 'hp' | 'atk' | 'def'): number =>
+      Math.max(
+        ...porId
+          .get(encounterId)!
+          .units.filter((u) => u.side === 'enemy')
+          .map((u) => porInimigo.get(u.enemyId)!.stats[stat]),
+      );
+
     for (const elite of dungeons.filter((d) => d.difficulty === 'elite')) {
       const normal = dungeons.find((d) => d.id === elite.requiresClearOf)!;
-      const inimigosElite = porId.get(elite.encounterId)!.units.filter((u) => u.side === 'enemy');
-      const inimigosNormal = porId.get(normal.encounterId)!.units.filter((u) => u.side === 'enemy');
-      const nivelElite = Math.max(...inimigosElite.map((u) => u.hero.level));
-      const nivelNormal = Math.max(...inimigosNormal.map((u) => u.hero.level));
-      expect(nivelElite, elite.id).toBeGreaterThan(nivelNormal);
+      // Os três, e não um: um inimigo com mais HP e menos ataque não é uma elite, é um
+      // saco de pancada maior.
+      for (const stat of ['hp', 'atk', 'def'] as const) {
+        expect(maiorStat(elite.encounterId, stat), `${elite.id}/${stat}`).toBeGreaterThan(
+          maiorStat(normal.encounterId, stat),
+        );
+      }
     }
   });
 });

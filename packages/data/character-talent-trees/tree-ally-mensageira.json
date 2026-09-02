@@ -1,0 +1,197 @@
+{
+  "characterId": "ally-mensageira",
+  "depth": 5,
+  "nodes": [
+    {
+      "id": "talent-wren-raizes-profundas",
+      "column": "a",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 40
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 3
+        },
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": -1
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-presas",
+      "column": "b",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-seiva",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-druida",
+          "patch": {
+            "multiplier": 1400
+          }
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-vento-do-bosque",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 4
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-instinto",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-mao-estendida",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-investida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-abrigo",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        },
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-metamorfose",
+      "column": "middle",
+      "row": 4,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-fereza",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-druida",
+          "patch": {
+            "multiplier": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-maestria-do-bosque",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-druida-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-wren-alcateia",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
-import { buildBattleSetupFromHeroes, buildInitialState, type HeroPlacement, type Id } from '@paths-beyond/core';
+import { buildBattleSetupFromHeroes, buildInitialState, validateColumnAllocation } from '@paths-beyond/core';
+import { toEncounterPlacements } from '../src/encounterPlacements.js';
 import { describe, expect, it } from 'vitest';
 import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
 
@@ -52,6 +53,21 @@ describe('integridade cruzada com o resto do catálogo', () => {
   it('toda classe, skill e item referenciados pelo elenco existem', () => {
     for (const encounter of catalog.encounters) {
       for (const unit of encounter.units) {
+        // §8.1 (M17, 3/N) — os dois lados referenciam conteúdo, mas conteúdo DIFERENTE. O
+        // inimigo não tem classe nem equipamento a resolver; o que ele tem de ter é ficha
+        // no catálogo, e as skills dela precisam existir do mesmo jeito.
+        if (unit.side === 'enemy') {
+          const enemy = catalog.enemies[unit.enemyId];
+          expect(enemy, `${encounter.id}/${unit.unitId}: ${unit.enemyId}`).toBeDefined();
+          for (const skillId of [...enemy!.duelSkills, ...enemy!.mapSkills]) {
+            expect(catalog.skills[skillId]).toBeDefined();
+          }
+          for (const line of enemy!.tacticsScript) {
+            expect(catalog.skills[line.skillId]).toBeDefined();
+          }
+          continue;
+        }
+
         expect(catalog.classes[unit.hero.classId]).toBeDefined();
         for (const skillId of [...unit.hero.duelSkills, ...unit.hero.mapSkills]) {
           expect(catalog.skills[skillId]).toBeDefined();
@@ -67,9 +83,67 @@ describe('integridade cruzada com o resto do catálogo', () => {
     }
   });
 
-  it('a arma equipada bate com o `weaponType` declarado do herói', () => {
+  // §8.1/§8.2 (M17, 4/N) — o lado do jogador é o ELENCO, e isso passou a ter consequência
+  // mecânica. Enquanto a árvore era da classe, `classId` bastava para resolver o talento de
+  // qualquer herói; com a árvore sendo do PERSONAGEM (D6), resolvê-la exige saber QUEM ele
+  // é. Um herói de campanha sem `characterId` não é um herói sem talento: é um herói cuja
+  // alocação inteira some em silêncio, porque `resolveTalentEffects` ignora nó desconhecido
+  // sem reclamar (§8.2). É o mesmo modo de falha que a 2/N pegou nas rotas do servidor.
+  it('todo herói do lado do jogador é um personagem do elenco', () => {
     for (const encounter of catalog.encounters) {
       for (const unit of encounter.units) {
+        if (unit.side === 'enemy') continue;
+        const personagem = catalog.characters[unit.hero.characterId!];
+        expect(personagem, `${encounter.id}/${unit.unitId}: ${unit.hero.characterId}`).toBeDefined();
+      }
+    }
+  });
+
+  it('a classe declarada pelo herói é a classe do personagem que ele é', () => {
+    // Duas fontes para o mesmo fato, e por isso elas podem divergir: o encontro escreve a
+    // `classId` e o elenco também. Divergir não quebraria nada visível — a batalha usaria a
+    // classe do encontro e a árvore do personagem —, e seria um herói jogando com a curva
+    // de status de uma classe e os talentos de outra.
+    for (const encounter of catalog.encounters) {
+      for (const unit of encounter.units) {
+        if (unit.side === 'enemy') continue;
+        const personagem = catalog.characters[unit.hero.characterId!]!;
+        expect(unit.hero.classId, `${encounter.id}/${unit.unitId}`).toBe(personagem.classId);
+      }
+    }
+  });
+
+  it('toda alocação escrita na campanha é válida na árvore de quem a joga', () => {
+    // O recíproco do teste acima, e o que ele sozinho não pegaria. A 2/N escreveu este
+    // teste para as comps da arena e ninguém o escreveu para a campanha, que é onde o
+    // jogador de verdade entra: uma slug de nó errada não quebra o carregamento, só apaga o
+    // talento — a party joga o capítulo mais fraca do que o autor escreveu, sem aviso.
+    //
+    // A checagem é `validateColumnAllocation` e não "o id existe": a árvore de §8.2 é um
+    // CAMINHO, então uma alocação pode ter só ids reais e ainda ser impossível de alcançar
+    // jogando (linha 5 sem as linhas 1..4, ou uma troca de coluna sem passar pelo meio).
+    for (const encounter of catalog.encounters) {
+      for (const unit of encounter.units) {
+        if (unit.side === 'enemy') continue;
+        const arvore = catalog.characterTalentTrees[unit.hero.characterId!];
+        expect(arvore, `${encounter.id}/${unit.unitId}: sem árvore`).toBeDefined();
+        const resultado = validateColumnAllocation({
+          tree: arvore!,
+          allocation: unit.hero.talents,
+          awakening: unit.hero.awakening,
+        });
+        expect(resultado.issues, `${encounter.id}/${unit.unitId}`).toEqual([]);
+      }
+    }
+  });
+
+  it('a arma equipada bate com o `weaponType` declarado do herói', () => {
+    for (const encounter of catalog.encounters) {
+      // Só o lado do jogador: `allowedWeapons` é da CLASSE, e inimigo autorado não tem
+      // classe. A arma dele é validada pelo enum do schema, que é o que resta a validar
+      // quando não há uma lista de permissões por trás.
+      for (const unit of encounter.units) {
+        if (unit.side === 'enemy') continue;
         const classDef = catalog.classes[unit.hero.classId]!;
         expect(classDef.allowedWeapons).toContain(unit.hero.weaponType);
       }
@@ -93,18 +167,7 @@ describe('cada encounter monta uma batalha de verdade', () => {
   it('vira um BattleSetup jogável, com a condição de vitória resolvida', () => {
     for (const encounter of catalog.encounters) {
       const arenaMap = catalog.maps[encounter.mapId]!;
-      const placements: HeroPlacement[] = encounter.units.map((unit) => ({
-        unitId: unit.unitId,
-        hero: unit.hero,
-        classDef: catalog.classes[unit.hero.classId]!,
-        equippedItems: Object.values(unit.hero.equipment)
-          .filter((id): id is Id => id !== null)
-          .map((id) => catalog.items[id]!),
-        side: unit.side,
-        pos: unit.pos,
-        height: unit.height,
-        ...(unit.aiArchetype ? { aiArchetype: unit.aiArchetype } : {}),
-      }));
+      const placements = toEncounterPlacements(encounter.units, catalog);
 
       const setup = buildBattleSetupFromHeroes({
         placements,
@@ -117,6 +180,7 @@ describe('cada encounter monta uma batalha de verdade', () => {
         skillsCatalog: catalog.skills,
         weaponDuelRanges: catalog.weaponDuelRanges,
         baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+    characterTalentTrees: catalog.characterTalentTrees,
       });
 
       const state = buildInitialState(setup, 42);
@@ -136,17 +200,7 @@ describe('cada encounter monta uma batalha de verdade', () => {
       const encounter = catalog.encounters[0]!;
       const arenaMap = catalog.maps[encounter.mapId]!;
       const setup = buildBattleSetupFromHeroes({
-        placements: encounter.units.map((unit) => ({
-          unitId: unit.unitId,
-          hero: unit.hero,
-          classDef: catalog.classes[unit.hero.classId]!,
-          equippedItems: Object.values(unit.hero.equipment)
-            .filter((id): id is Id => id !== null)
-            .map((id) => catalog.items[id]!),
-          side: unit.side,
-          pos: unit.pos,
-          height: unit.height,
-        })),
+        placements: toEncounterPlacements(encounter.units, catalog),
         map: arenaMap.grid,
         permadeath: encounter.permadeath,
         winCondition: encounter.winCondition ?? arenaMap.winCondition,
@@ -156,6 +210,7 @@ describe('cada encounter monta uma batalha de verdade', () => {
         skillsCatalog: catalog.skills,
         weaponDuelRanges: catalog.weaponDuelRanges,
         baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+    characterTalentTrees: catalog.characterTalentTrees,
       });
       return JSON.stringify(buildInitialState(setup, 42));
     };

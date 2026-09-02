@@ -17,22 +17,16 @@ export type TalentEffect =
   | { readonly t: 'assistRangeBonus'; readonly n: number }
   | { readonly t: 'passive'; readonly passiveId: Id };
 
-export type TalentTree = 'class' | 'spec';
-
-// §8.2 — TalentNode, cópia própria do core (regra 1). O schema completo já existe em
-// packages/data/schemas/classes.schema.ts (M1); core nunca tinha seu próprio tipo até M5.
-export interface TalentNode {
-  readonly id: Id;
-  readonly tree: TalentTree;
-  readonly row: number; // 1..8
-  readonly requires?: readonly Id[];
-  readonly exclusiveWith?: readonly Id[];
-  readonly maxRank: 1 | 2 | 3;
-  // §10 (M14) — "Awakening (0–6): ... libera nós avançados de talento a partir de 5."
-  // Qual nó é "avançado" e a partir de qual rank é conteúdo, não motor.
-  readonly minAwakening?: number;
-  readonly effects: readonly TalentEffect[];
-}
+// M17, sub-sessão 2/N — `TalentTree` ('class' | 'spec') e `TalentNode` (com `tree`,
+// `requires` e `exclusiveWith`) FORAM REMOVIDOS daqui. A topologia de duas árvores por
+// classe deixou de existir com §8.1: a árvore é do personagem, tem duas colunas, e mora
+// em `columnTree.ts` como `ColumnTalentTree`/`ColumnTalentNode`.
+//
+// O §7 do briefing do M17 é explícito em não manter os dois modelos convivendo "por
+// compatibilidade" — o formato antigo sai, e alocação salva nele não é migrada (D5).
+//
+// `TalentEffect` fica: a lista de 12 efeitos SOBREVIVEU à mudança de forma sem uma
+// alteração, e é por isso que ela nunca esteve em jogo neste milestone.
 
 // Decisão registrada em DECISIONS.md (M1): Record<TalentNodeId, rank>; ausência = rank 0.
 export type TalentAllocation = Readonly<Record<Id, number>>;

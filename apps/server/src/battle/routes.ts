@@ -148,6 +148,12 @@ async function assembleArenaBattle(
       skillsCatalog: opts.catalog.skills,
       weaponDuelRanges: opts.catalog.weaponDuelRanges,
       baselineReactionSkillIds: opts.catalog.baselineReactionSkillIds,
+      // §8.1 (M17, 2/N) e D6 — "o servidor passa a precisar conhecer o elenco". Enquanto a
+      // árvore era da classe, o `classDef` de cada placement bastava para resolver talento;
+      // agora ela é do personagem, e sem este repasse a defesa da arena seria remontada com
+      // zero talento — a mesma build valendo coisas diferentes nos dois lados, que é §9.1
+      // ("divergência = bug crítico") acontecendo em silêncio.
+      characterTalentTrees: opts.catalog.characterTalentTrees,
       valorSkills: opts.catalog.valorSkills,
       // §5.6 (M15 2/N) — o ticket de M13 2/N devolve este `setup` ao atacante, que joga com
       // ele, e `POST /battles` remonta o mesmo confronto para reexecutar. Os dois lados

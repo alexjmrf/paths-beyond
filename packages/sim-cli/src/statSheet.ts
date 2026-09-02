@@ -1,5 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { STAT_KEYS, hashState, resolveHeroStatSheet, type Hero, type ItemInstance } from '@paths-beyond/core';
+import {
+  STAT_KEYS,
+  hashState,
+  resolveHeroStatSheet,
+  type ColumnTalentNode,
+  type Hero,
+  type ItemInstance,
+} from '@paths-beyond/core';
 import { loadCatalogFromDisk, type ContentLayout } from '@paths-beyond/content';
 import heroSchema from '@paths-beyond/data/schemas/heroes.schema.js';
 
@@ -44,7 +51,19 @@ export function runStatSheetCommand(
     equippedItems.push(item);
   }
 
-  const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets: catalog.itemSets });
+  // §8.1 (M17, 2/N) — a árvore é do PERSONAGEM, não da classe. `characterId` ausente é
+  // legítimo e resolve com zero talento (inimigo de fase ainda é `Hero` até a 3/N), mas
+  // `characterId` que o catálogo não conhece é o mesmo defeito de arquivo que uma classe
+  // ou um item desconhecido logo acima — e falha do mesmo jeito, alto, em vez de devolver
+  // uma folha de status silenciosamente sem talento nenhum.
+  let talentTree: readonly ColumnTalentNode[] = [];
+  if (hero.characterId !== undefined) {
+    const tree = catalog.characterTalentTrees[hero.characterId];
+    if (!tree) throw new Error(`personagem desconhecido no catálogo: ${hero.characterId}`);
+    talentTree = tree.nodes;
+  }
+
+  const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets: catalog.itemSets, talentTree });
 
   const lines = [`Herói: ${hero.id} (${hero.classId})`];
   for (const key of STAT_KEYS) lines.push(`  ${key}: ${stats[key]}`);

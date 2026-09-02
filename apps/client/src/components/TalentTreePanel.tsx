@@ -1,22 +1,28 @@
-import { STAT_KEYS, type StatKey, type TalentEffect, type TalentTree } from '@paths-beyond/core';
+import { STAT_KEYS, type StatKey, type TalentEffect } from '@paths-beyond/core';
 import { useState } from 'react';
+import { catalog } from '../data/catalog.js';
 import { encodeBuildCode } from '../logic/buildCode.js';
-import { layoutTalentTree, MAX_POINTS_PER_TREE, type PositionedTalentNode } from '../logic/talentLayout.js';
+import {
+  availabilityByNode,
+  layoutColumnTree,
+  pointsSpent,
+  TALENT_POINT_BUDGET,
+  type PositionedTalentNode,
+} from '../logic/talentLayout.js';
 import { previewTalents } from '../logic/talentPreview.js';
-import { classDefForUnit, useBattleStore } from '../store/battleStore.js';
+import { characterTreeForUnit, useBattleStore } from '../store/battleStore.js';
 
-const ROW_HEIGHT = 90;
-const COL_WIDTH = 150;
-const NODE_W = 120;
-const NODE_H = 56;
-const MARGIN = 20;
+const ROW_HEIGHT = 88;
+const COL_WIDTH = 168;
+const NODE_W = 138;
+const NODE_H = 54;
+const MARGIN = 24;
 const COLS = 3;
-const ROWS = 8;
 
 function nodeCenter(p: PositionedTalentNode): { x: number; y: number } {
   return {
     x: MARGIN + p.col * COL_WIDTH + NODE_W / 2,
-    y: MARGIN + (p.node.row - 1) * ROW_HEIGHT + NODE_H / 2,
+    y: MARGIN + (p.row - 1) * ROW_HEIGHT + NODE_H / 2,
   };
 }
 
@@ -53,17 +59,14 @@ function describeEffect(effect: TalentEffect): string {
   }
 }
 
-// Rótulo curto do nó no grafo — remove o prefixo `talent-<slug-da-classe>-`/`t-classe-`/
-// `t-spec-` (demonstração) pra caber no retângulo do nó. `classId` vem da classe real da
-// unidade (M9); sem ele (nó de demonstração legado ou classe desconhecida), cai pro id
-// inteiro em vez de tentar adivinhar o prefixo.
-function shortNodeLabel(nodeId: string, classId: string | undefined): string {
-  const withoutDemoPrefix = nodeId.replace(/^t-(classe|spec)-/, '');
-  if (withoutDemoPrefix !== nodeId) return withoutDemoPrefix;
-  if (!classId) return nodeId;
-  const slug = classId.replace(/^class-/, '');
-  return nodeId.replace(new RegExp(`^talent-${slug}-`), '');
+// Rótulo curto do nó — remove o prefixo `talent-<primeiro-nome-do-personagem>-` pra caber no
+// retângulo. §8.2 (M17): as árvores passaram a ser nomeadas pela PESSOA (`talent-miron-…`,
+// `talent-sylla-…`) e não pela classe, então o prefixo é sempre um segmento só.
+function shortNodeLabel(nodeId: string): string {
+  return nodeId.replace(/^talent-[^-]+-/, '');
 }
+
+const COLUMN_TITLE = ['Coluna A', 'Convergência', 'Coluna B'] as const;
 
 function statDeltaRow(stat: StatKey, before: number, after: number) {
   const delta = after - before;
@@ -76,10 +79,15 @@ function statDeltaRow(stat: StatKey, before: number, after: number) {
   );
 }
 
-// §11 — "Talentos: Grafo, preview do efeito, string de build compartilhável." Grafo é um
-// grid linha/coluna (row 1..8 no eixo Y, 3 colunas fixas no eixo X — posição vem de
-// `PositionedTalentNode.col`, dado só pelo cliente, `TalentNode` do core não tem noção de
-// layout visual) com um SVG desenhando as arestas de `requires` por baixo dos nós.
+// §11 — "Talentos: Grafo, preview do efeito, string de build compartilhável."
+//
+// §8.2 (M17, sub-sessão 4/N) — o grafo passou a ser a forma de §8.2: duas colunas presentes
+// em todas as linhas, uma coluna do meio ocasional, UM nó por linha, e a coluna amarrando a
+// linha seguinte. As abas Classe/Especialização saíram junto com as duas árvores por classe.
+//
+// A tela não decide nada: quais nós podem ser clicados vem de `availabilityByNode`, que
+// pergunta ao core (regra 3). O que a tela decide é o que é DESENHADO — a trilha do caminho,
+// o nó apagado, e o motivo em português vindo do core sem reescrita.
 export function TalentTreePanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const campaignMapIndex = useBattleStore((s) => s.campaignMapIndex);
@@ -92,93 +100,129 @@ export function TalentTreePanel() {
   const resetTalentTree = useBattleStore((s) => s.resetTalentTree);
   const loadBuildCode = useBattleStore((s) => s.loadBuildCode);
 
-  const [activeTree, setActiveTree] = useState<TalentTree>('class');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [buildCodeInput, setBuildCodeInput] = useState('');
 
   const unit = battleState.units.find((u) => u.unitId === talentEditorUnitId);
   if (!talentEditorUnitId || !unit) return null;
 
-  // Árvore real da classe do herói (M9) — não existe mais uma árvore de demonstração
-  // fixa pra toda unidade; cada classe autorada em M8 tem a sua (só `tree:'class'` ou só
-  // `tree:'spec'`, nunca as duas ao mesmo tempo — uma classe base não tem árvore de
-  // especialização até promover, ver `docs/spec/06-classes-e-talentos.md`). A aba sem
-  // conteúdo pra esta classe simplesmente mostra o grafo vazio, sem quebrar.
-  const classDef = classDefForUnit(campaignMapIndex, unit.unitId);
-  const allPositioned = layoutTalentTree(classDef?.talentTree ?? []);
+  // §8.1 — a árvore é do PERSONAGEM. Uma unidade sem personagem (inimigo de fase, reforço
+  // invocado) não tem árvore para abrir, e a tela diz isso em vez de mostrar um grafo vazio
+  // que pareceria uma árvore sem talentos.
+  const tree = characterTreeForUnit(campaignMapIndex, talentEditorUnitId);
+  if (!tree) {
+    return (
+      <div className="talent-tree-overlay">
+        <div className="talent-tree-panel">
+          <h2>Talentos — {unit.unitId}</h2>
+          <p className="talent-hint">Esta unidade não é um personagem do elenco e não tem árvore de talentos.</p>
+          <div className="talent-editor-actions">
+            <button type="button" onClick={closeTalentEditor}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  const personagem = catalog.characters[tree.characterId];
   const allocation = talentAllocationByUnit[unit.unitId] ?? {};
-  const layout = allPositioned.filter((p) => p.node.tree === activeTree);
+  const layout = layoutColumnTree(tree);
+  const availability = availabilityByNode({ tree, allocation });
 
-  const pointsSpent = layout.reduce((sum, p) => sum + (allocation[p.node.id] ?? 0), 0);
+  const gastos = pointsSpent(allocation);
   const selectedPositioned = selectedNodeId ? layout.find((p) => p.node.id === selectedNodeId) : undefined;
   const selectedNode = selectedPositioned?.node;
+  const selectedAvailability = selectedNode ? availability.get(selectedNode.id) : undefined;
 
-  const preview = previewTalents(unit.stats, classDef?.talentTree ?? [], allocation);
+  const preview = previewTalents(unit.stats, tree.nodes, allocation);
 
   const svgWidth = MARGIN * 2 + COLS * COL_WIDTH;
-  const svgHeight = MARGIN * 2 + ROWS * ROW_HEIGHT;
+  const svgHeight = MARGIN * 2 + tree.depth * ROW_HEIGHT;
 
-  const currentCode = encodeBuildCode({ classId: classDef?.id ?? 'classe-desconhecida', talents: allocation });
+  // A trilha do caminho: o segmento que liga a linha N à linha N+1, desenhado só entre nós
+  // efetivamente alocados. É o que faz a build se ler como uma descida e não como nós soltos
+  // acesos — a leitura que §8.2 quer, já que a árvore é literalmente um caminho.
+  const alocadosPorLinha = new Map<number, PositionedTalentNode>();
+  for (const p of layout) {
+    if ((allocation[p.node.id] ?? 0) > 0) alocadosPorLinha.set(p.row, p);
+  }
+
+  const currentCode = encodeBuildCode({ characterId: tree.characterId, talents: allocation });
 
   return (
     <div className="talent-tree-overlay">
       <div className="talent-tree-panel">
-        <h2>Talentos — {unit.unitId}</h2>
+        <h2>
+          Talentos — {personagem?.name ?? tree.characterId}
+          <span className="talent-subtitle"> ({unit.unitId})</span>
+        </h2>
 
         <div className="talent-tabs">
-          <button type="button" disabled={activeTree === 'class'} onClick={() => setActiveTree('class')}>
-            Classe
-          </button>
-          <button type="button" disabled={activeTree === 'spec'} onClick={() => setActiveTree('spec')}>
-            Especialização
-          </button>
           <span className="talent-points">
-            {pointsSpent} / {MAX_POINTS_PER_TREE} pontos
+            {gastos} / {TALENT_POINT_BUDGET} pontos
           </span>
-          <button type="button" onClick={() => resetTalentTree(unit.unitId, activeTree)}>
+          <span className="talent-depth">{tree.depth} linhas</span>
+          <button type="button" onClick={() => resetTalentTree(unit.unitId, 1)} disabled={gastos === 0}>
             Resetar árvore
           </button>
         </div>
 
         <svg className="talent-graph" width={svgWidth} height={svgHeight}>
-          {layout.flatMap((p) =>
-            (p.node.requires ?? []).map((reqId) => {
-              const reqPositioned = layout.find((other) => other.node.id === reqId);
-              if (!reqPositioned) return null;
-              const from = nodeCenter(reqPositioned);
-              const to = nodeCenter(p);
+          <g className="talent-column-titles">
+            {COLUMN_TITLE.map((titulo, col) => (
+              <text key={titulo} x={MARGIN + col * COL_WIDTH + NODE_W / 2} y={14} textAnchor="middle">
+                {titulo}
+              </text>
+            ))}
+          </g>
+
+          {[...alocadosPorLinha.keys()]
+            .filter((row) => alocadosPorLinha.has(row + 1))
+            .map((row) => {
+              const from = nodeCenter(alocadosPorLinha.get(row)!);
+              const to = nodeCenter(alocadosPorLinha.get(row + 1)!);
               return (
                 <line
-                  key={`${reqId}->${p.node.id}`}
+                  key={`trilha-${row}`}
+                  className="talent-path"
                   x1={from.x}
                   y1={from.y}
                   x2={to.x}
                   y2={to.y}
-                  stroke="#374151"
-                  strokeWidth={2}
+                  strokeWidth={4}
                 />
               );
-            }),
-          )}
+            })}
 
           {layout.map((p) => {
             const center = nodeCenter(p);
             const rank = allocation[p.node.id] ?? 0;
+            const disponivel = availability.get(p.node.id)?.canAllocate ?? false;
             const isSelected = p.node.id === selectedNodeId;
+            const classes = [
+              'talent-node',
+              `col-${p.node.column}`,
+              rank > 0 ? 'allocated' : '',
+              !disponivel && rank === 0 ? 'locked' : '',
+              isSelected ? 'selected' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             return (
               <g
                 key={p.node.id}
                 transform={`translate(${center.x - NODE_W / 2}, ${center.y - NODE_H / 2})`}
-                className={`talent-node${rank > 0 ? ' allocated' : ''}${isSelected ? ' selected' : ''}`}
+                className={classes}
                 onClick={() => setSelectedNodeId(p.node.id)}
               >
-                <rect width={NODE_W} height={NODE_H} rx={8} />
+                <rect width={NODE_W} height={NODE_H} rx={p.node.column === 'middle' ? 26 : 8} />
                 <text x={NODE_W / 2} y={22} textAnchor="middle">
-                  {shortNodeLabel(p.node.id, classDef?.id)}
+                  {shortNodeLabel(p.node.id)}
                 </text>
                 <text x={NODE_W / 2} y={40} textAnchor="middle" className="rank">
-                  {rank}/{p.node.maxRank}
+                  L{p.node.row} · {rank}/{p.node.maxRank}
                 </text>
               </g>
             );
@@ -187,25 +231,46 @@ export function TalentTreePanel() {
 
         {selectedNode ? (
           <div className="talent-node-details">
-            <h3>{selectedNode.id}</h3>
+            <h3>{shortNodeLabel(selectedNode.id)}</h3>
             <p>
-              Linha {selectedNode.row} · rank {allocation[selectedNode.id] ?? 0}/{selectedNode.maxRank}
+              Linha {selectedNode.row} ·{' '}
+              {selectedNode.column === 'middle' ? 'convergência' : `coluna ${selectedNode.column.toUpperCase()}`} · rank{' '}
+              {allocation[selectedNode.id] ?? 0}/{selectedNode.maxRank}
             </p>
             <ul>
               {selectedNode.effects.map((effect, i) => (
                 <li key={i}>{describeEffect(effect)}</li>
               ))}
             </ul>
-            {selectedNode.requires ? <p className="requires">requer: {selectedNode.requires.join(', ')}</p> : null}
-            {selectedNode.exclusiveWith ? (
-              <p className="requires">exclusivo com: {selectedNode.exclusiveWith.join(', ')}</p>
+            {selectedNode.minAwakening !== undefined ? (
+              <p className="requires">exige despertar {selectedNode.minAwakening}</p>
+            ) : null}
+            {selectedAvailability?.blockedReason ? (
+              // O motivo é o do core, sem reescrita: se a tela explicasse por conta própria,
+              // a explicação e a regra divergiriam, e a da tela é a que o jogador lê.
+              <p className="requires">{selectedAvailability.blockedReason}</p>
             ) : null}
             <div className="talent-node-actions">
-              <button type="button" onClick={() => allocateTalent(unit.unitId, selectedNode.id)}>
+              <button
+                type="button"
+                disabled={!selectedAvailability?.canAllocate}
+                onClick={() => allocateTalent(unit.unitId, selectedNode.id)}
+              >
                 +1
               </button>
-              <button type="button" onClick={() => deallocateTalent(unit.unitId, selectedNode.id)}>
+              <button
+                type="button"
+                disabled={!selectedAvailability?.canDeallocate}
+                onClick={() => deallocateTalent(unit.unitId, selectedNode.id)}
+              >
                 -1
+              </button>
+              {/* Desfazer um caminho é desfazê-lo da ponta para trás (§8.2): tirar o ponto de
+                  uma linha do meio deixaria as de baixo penduradas, e o core recusa. Este
+                  botão é a saída, e é por isso que ele existe ao lado do -1 e não escondido
+                  num menu. */}
+              <button type="button" onClick={() => resetTalentTree(unit.unitId, selectedNode.row)}>
+                Resetar da linha {selectedNode.row} para baixo
               </button>
             </div>
           </div>

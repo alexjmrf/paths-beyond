@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import dungeonEncounterSchema from '../schemas/dungeon-encounters.schema.js';
 import dungeonSchema from '../schemas/dungeons.schema.js';
-import { buildHero, packageRoot, writeJson, type UnitSpec } from './authorCampaign.js';
+import { buildHero, packageRoot, writeJson, type EnemyUnitSpec, type UnitSpec } from './authorCampaign.js';
+import { enemyIdOrThrow } from './authorEnemies.js';
 
 // M14, sub-sessão 2/N — as masmorras de farm de §10, autoradas por gerador pelo mesmo
 // motivo que os mapas de campanha (M12, 3/N): um encounter é centenas de linhas de JSON, e
@@ -24,10 +25,14 @@ import { buildHero, packageRoot, writeJson, type UnitSpec } from './authorCampai
 // jogador e os inimigos são derivados do próprio layout: os tiles passáveis mais próximos
 // de cada canto oposto, em ordem determinística.
 
+// §8.1 (M17, 3/N) — o inimigo de masmorra deixou de ser "classe + nível" e virou uma
+// REFERÊNCIA ao catálogo autorado. É a mesma mudança da campanha, e aqui ela morde mais:
+// as oito masmorras vêm em pares base/elite, e o par era antes "as mesmas classes com
+// nível maior". Agora cada tier nomeia os inimigos dele, e a diferença entre a Forja e a
+// Forja de elite é conteúdo escrito, não uma subtração de níveis.
 interface EnemySpec {
   readonly unitId: string;
-  readonly classId: string;
-  readonly level: number;
+  readonly enemyId: string;
 }
 
 interface DungeonSpec {
@@ -55,8 +60,8 @@ interface DungeonSpec {
 // si só — é o que permite testar a masmorra sem servidor, como o piloto testa a campanha.
 const REFERENCE_PLAYER_CLASSES = ['class-espadachim', 'class-clerigo', 'class-arqueiro', 'class-couracado'];
 
-function enemy(unitId: string, classId: string, level: number): EnemySpec {
-  return { unitId, classId, level };
+function enemy(unitId: string, enemyId: string): EnemySpec {
+  return { unitId, enemyId: enemyIdOrThrow(enemyId) };
 }
 
 const DUNGEONS: readonly DungeonSpec[] = [
@@ -70,9 +75,9 @@ const DUNGEONS: readonly DungeonSpec[] = [
     playerSlotCount: 3,
     referenceLevel: 14,
     enemies: [
-      enemy('forja-guarda-1', 'class-couracado', 10),
-      enemy('forja-guarda-2', 'class-espadachim', 10),
-      enemy('forja-arqueiro', 'class-arqueiro', 9),
+      enemy('forja-guarda-1', 'enemy-forja-guarda-couracado'),
+      enemy('forja-guarda-2', 'enemy-forja-guarda-espadachim'),
+      enemy('forja-arqueiro', 'enemy-forja-arqueiro'),
     ],
     rewards: {
       gold: { min: 20, max: 40 },
@@ -99,10 +104,10 @@ const DUNGEONS: readonly DungeonSpec[] = [
     playerSlotCount: 3,
     referenceLevel: 17,
     enemies: [
-      enemy('forja-elite-guarda-1', 'class-couracado', 16),
-      enemy('forja-elite-guarda-2', 'class-espadachim', 16),
-      enemy('forja-elite-arqueiro', 'class-arqueiro', 15),
-      enemy('forja-elite-arcanista', 'class-arcanista', 15),
+      enemy('forja-elite-guarda-1', 'enemy-forja-elite-guarda-couracado'),
+      enemy('forja-elite-guarda-2', 'enemy-forja-elite-guarda-espadachim'),
+      enemy('forja-elite-arqueiro', 'enemy-forja-elite-arqueiro'),
+      enemy('forja-elite-arcanista', 'enemy-forja-elite-arcanista'),
     ],
     rewards: {
       gold: { min: 60, max: 100 },
@@ -130,7 +135,7 @@ const DUNGEONS: readonly DungeonSpec[] = [
     // vagas enfrenta só corpo a corpo (`veio-de-prata`); o arqueiro inimigo aparece a partir de
     // `forja-abandonada`, onde a party tem três vagas e uma delas é um arqueiro. Com alcance 1
     // a violação era inofensiva; com 2, o piso da dificuldade deixou de ser vencível na seed 2.
-    enemies: [enemy('treino-alvo-1', 'class-espadachim', 8), enemy('treino-alvo-2', 'class-guerreiro', 8)],
+    enemies: [enemy('treino-alvo-1', 'enemy-treino-alvo-espadachim'), enemy('treino-alvo-2', 'enemy-treino-alvo-guerreiro')],
     rewards: { exp: { min: 400, max: 600 }, gold: { min: 5, max: 10 } },
   },
   {
@@ -146,9 +151,9 @@ const DUNGEONS: readonly DungeonSpec[] = [
     playerSlotCount: 2,
     referenceLevel: 19,
     enemies: [
-      enemy('treino-elite-1', 'class-espadachim', 18),
-      enemy('treino-elite-2', 'class-arqueiro', 18),
-      enemy('treino-elite-3', 'class-clerigo', 17),
+      enemy('treino-elite-1', 'enemy-treino-elite-espadachim'),
+      enemy('treino-elite-2', 'enemy-treino-elite-arqueiro'),
+      enemy('treino-elite-3', 'enemy-treino-elite-clerigo'),
     ],
     rewards: { exp: { min: 1400, max: 1800 }, gold: { min: 20, max: 40 } },
   },
@@ -161,7 +166,7 @@ const DUNGEONS: readonly DungeonSpec[] = [
     energyCost: 10,
     playerSlotCount: 2,
     referenceLevel: 15,
-    enemies: [enemy('veio-saqueador-1', 'class-espadachim', 11), enemy('veio-saqueador-2', 'class-couracado', 11)],
+    enemies: [enemy('veio-saqueador-1', 'enemy-veio-saqueador-espadachim'), enemy('veio-saqueador-2', 'enemy-veio-saqueador-couracado')],
     rewards: { gold: { min: 300, max: 500 } },
   },
   {
@@ -177,9 +182,9 @@ const DUNGEONS: readonly DungeonSpec[] = [
     playerSlotCount: 2,
     referenceLevel: 20,
     enemies: [
-      enemy('veio-elite-1', 'class-espadachim', 19),
-      enemy('veio-elite-2', 'class-couracado', 19),
-      enemy('veio-elite-3', 'class-grifeiro', 18),
+      enemy('veio-elite-1', 'enemy-veio-elite-espadachim'),
+      enemy('veio-elite-2', 'enemy-veio-elite-couracado'),
+      enemy('veio-elite-3', 'enemy-veio-elite-grifeiro'),
     ],
     rewards: { gold: { min: 1200, max: 1800 }, stones: { min: 2, max: 4 } },
   },
@@ -196,9 +201,9 @@ const DUNGEONS: readonly DungeonSpec[] = [
       // Um nível abaixo do que eram (14/14/16). A party de referência desta masmorra tem três
       // vagas e DUAS delas são de alcance (clérigo e arqueiro), então a redução de 33% no `atk`
       // dessas classes pesou mais no jogador do que nos guardas, todos corpo a corpo.
-      enemy('tirano-guarda-1', 'class-couracado', 13),
-      enemy('tirano-guarda-2', 'class-couracado', 13),
-      enemy('tirano', 'class-mestre-espadachim', 15),
+      enemy('tirano-guarda-1', 'enemy-tirano-guarda'),
+      enemy('tirano-guarda-2', 'enemy-tirano-guarda'),
+      enemy('tirano', 'enemy-tirano'),
     ],
     rewards: {
       gold: { min: 60, max: 120 },
@@ -225,10 +230,10 @@ const DUNGEONS: readonly DungeonSpec[] = [
     playerSlotCount: 3,
     referenceLevel: 26,
     enemies: [
-      enemy('tirano-elite-guarda-1', 'class-couracado', 22),
-      enemy('tirano-elite-guarda-2', 'class-couracado', 22),
-      enemy('tirano-elite-clerigo', 'class-clerigo', 20),
-      enemy('tirano-elite', 'class-mestre-espadachim', 25),
+      enemy('tirano-elite-guarda-1', 'enemy-tirano-elite-guarda'),
+      enemy('tirano-elite-guarda-2', 'enemy-tirano-elite-guarda'),
+      enemy('tirano-elite-clerigo', 'enemy-tirano-elite-clerigo'),
+      enemy('tirano-elite', 'enemy-tirano-elite'),
     ],
     rewards: {
       gold: { min: 200, max: 320 },
@@ -371,13 +376,12 @@ function buildEncounter(spec: DungeonSpec, map: MapJson, terrains: TerrainTable)
     level: spec.referenceLevel,
   }));
 
-  const enemies: UnitSpec[] = spec.enemies.map((e, index) => ({
+  const enemies: EnemyUnitSpec[] = spec.enemies.map((e, index) => ({
     unitId: e.unitId,
-    classId: e.classId,
+    enemyId: e.enemyId,
     side: 'enemy',
     pos: [enemyTiles[index]!.x, enemyTiles[index]!.y],
     ai: 'aggressive',
-    level: e.level,
   }));
 
   return {
@@ -391,7 +395,10 @@ function buildEncounter(spec: DungeonSpec, map: MapJson, terrains: TerrainTable)
     units: [...players, ...enemies].map((unit) => ({
       unitId: unit.unitId,
       side: unit.side,
-      hero: buildHero(unit),
+      // Mesma bifurcação da campanha, pelo mesmo motivo: a vaga do jogador é preenchida
+      // por uma ficha de referência (para a masmorra ser jogável sem servidor), o inimigo
+      // é uma referência ao catálogo.
+      ...(unit.side === 'enemy' ? { enemyId: unit.enemyId } : { hero: buildHero(unit) }),
       pos: { x: unit.pos[0], y: unit.pos[1] },
       height: heightAt(map, unit.pos[0], unit.pos[1]),
       ...(unit.ai ? { aiArchetype: unit.ai } : {}),

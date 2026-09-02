@@ -35,6 +35,14 @@ const equipmentSchema = z.object({
 // schema — validação cruzada com a classe é responsabilidade de quem resolve o herói).
 const heroSchema = z.object({
   id: idSchema,
+  // §8.1 (M17) — QUAL PERSONAGEM do elenco este herói é. A árvore de talentos deixou de
+  // pertencer à classe, então `talents` só tem sentido contra a árvore daquele personagem,
+  // e só o elenco fechado (D6) diz qual é.
+  //
+  // Opcional até a 3/N: inimigo de fase ainda é autorado como `Hero` completo, e inimigo
+  // não é personagem (§8.1). Quem não declara `characterId` não tem árvore e resolve com
+  // zero talentos — que é o que os inimigos de hoje já fazem, com `talents: {}`.
+  characterId: idSchema.optional(),
   classId: idSchema,
   level: z.number().int().min(1).max(60),
   exp: z.number().int().min(0),

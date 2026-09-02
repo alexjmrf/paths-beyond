@@ -88,36 +88,7 @@
     {
       "unitId": "treino-alvo-1",
       "side": "enemy",
-      "hero": {
-        "id": "treino-alvo-1",
-        "classId": "class-espadachim",
-        "level": 8,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-espadachim",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "sword",
-        "duelSkills": [
-          "skill-ataque-espadachim",
-          "skill-especial-espadachim"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-espadachim",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-treino-alvo-espadachim",
       "pos": {
         "x": 12,
         "y": 7
@@ -128,36 +99,7 @@
     {
       "unitId": "treino-alvo-2",
       "side": "enemy",
-      "hero": {
-        "id": "treino-alvo-2",
-        "classId": "class-guerreiro",
-        "level": 8,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-guerreiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "axe",
-        "duelSkills": [
-          "skill-ataque-guerreiro",
-          "skill-especial-guerreiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-guerreiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-treino-alvo-guerreiro",
       "pos": {
         "x": 12,
         "y": 6

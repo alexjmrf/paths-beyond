@@ -29,6 +29,10 @@ function powerOf(heroId: string, roster: ReturnType<typeof useBattleStore.getSta
     classDef,
     equippedItems: entry.equippedItems,
     itemSets: catalog.itemSets,
+    // §8.1 (M17, 2/N) — a árvore é do personagem. O poder mostrado aqui precisa incluir o
+    // talento pelo mesmo motivo que o comentário acima dá para ele existir: é o número que
+    // sobe no fim do ciclo, e tem de ser o MESMO cálculo da batalha, não um parecido.
+    talentTree: entry.hero.characterId ? (catalog.characterTalentTrees[entry.hero.characterId]?.nodes ?? []) : [],
   });
   return Object.values(sheet).reduce((total, value) => total + value, 0);
 }

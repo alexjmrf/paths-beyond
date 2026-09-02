@@ -47,7 +47,6 @@ function buildClass(overrides: Partial<ClassDef>): ClassDef {
     awakeningMultipliers: [1000, 1000, 1000, 1000, 1000, 1000, 1000],
     promotionFlat: [],
     imprintFlat: [[], [], [], [], [], []],
-    talentTree: [],
     ...overrides,
   };
 }
@@ -104,6 +103,13 @@ const arenaMap: ArenaMap = { grid: buildGrid(), winCondition: { t: 'rout' }, ini
 
 const catalog: ContentCatalog = {
   classes: { [classSword.id]: classSword, [classArcane.id]: classArcane, [classBowFlying.id]: classBowFlying, [classArmored.id]: classArmored },
+  // §8.1 (M17, 2/N) — o elenco entrou no catálogo. Vazio aqui de propósito: os heróis
+  // destes fixtures não declaram `characterId`, e árvore vazia é o que o servidor
+  // resolve para eles.
+  characters: {},
+  characterTalentTrees: {},
+  // §8.1 (M17, 3/N) — vazio: nenhum destes fixtures monta encontro de campanha ou masmorra.
+  enemies: {},
   skills: { [basico.id]: basico, [forte.id]: forte, [counter.id]: counter, [defend.id]: defend },
   items: {},
   itemSets: {},
@@ -297,6 +303,11 @@ describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério 
       skillsCatalog: catalog.skills,
       weaponDuelRanges: catalog.weaponDuelRanges,
       baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+      // §8.1 (M17, 2/N) — o roster forjado deste teste não declara `characterId`, então a
+      // árvore vazia é o que o servidor também resolve para ele. O que está sendo provado
+      // aqui é o anti-cheat ignorar o stat forjado no corpo da requisição, e a árvore
+      // precisa ser a MESMA dos dois lados para o stat esperado bater.
+      talentTree: [],
     });
 
     expect(attackerUnit.stats.hp).toBe(expectedProfile.stats.hp);

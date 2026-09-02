@@ -1,5 +1,7 @@
 import type {
   ClassDef,
+  ColumnTalentTree,
+  EnemyDef,
   Coord,
   DungeonDef,
   EconomyRules,
@@ -58,14 +60,27 @@ export interface Composition {
 // `maps` e é referenciado por `mapId`. Até M11 este conteúdo vivia em
 // `apps/client/src/data/campaign.ts` como TypeScript — último canto de conteúdo hardcoded
 // do projeto, e o que impedia servidor e `sim-cli` de rodarem um mapa de campanha.
-export interface EncounterUnitContent {
+// §8.1 (M17, 3/N) — a unidade de um encontro tem duas formas, e a discriminante é `side`.
+// Espelho da união em `packages/data/schemas/encounters.schema.ts`: o jogador leva uma
+// ficha de progressão, o inimigo é uma referência ao catálogo de `enemies/`.
+interface EncounterUnitCommon {
   readonly unitId: Id;
-  readonly side: 'player' | 'enemy';
-  readonly hero: Hero;
   readonly pos: Coord;
   readonly height: 0 | 1 | 2 | 3;
   readonly aiArchetype?: MapAiArchetype;
 }
+
+export interface PlayerEncounterUnit extends EncounterUnitCommon {
+  readonly side: 'player';
+  readonly hero: Hero;
+}
+
+export interface EnemyEncounterUnit extends EncounterUnitCommon {
+  readonly side: 'enemy';
+  readonly enemyId: Id;
+}
+
+export type EncounterUnitContent = PlayerEncounterUnit | EnemyEncounterUnit;
 
 export interface Encounter {
   readonly id: Id;
@@ -99,8 +114,30 @@ export interface SummonBlueprintContent {
   readonly hero: Hero;
 }
 
+// §8.1 (M17) — um personagem do ELENCO. Espelho de
+// `packages/data/schemas/characters.schema.ts`: identidade e classe, e nada de estado.
+// Não vem do core porque o core não tem noção de elenco — ele resolve a árvore que lhe
+// entregam, e quem é o dono dela é assunto de conteúdo.
+export interface CharacterContent {
+  readonly id: Id;
+  readonly name: string;
+  readonly classId: Id;
+}
+
 export interface ContentCatalog {
   readonly classes: Readonly<Record<Id, ClassDef>>;
+  // §8.1/§8.2 (M17, sub-sessão 2/N) — o ELENCO fechado e as árvores dele.
+  //
+  // D6: "o servidor passa a precisar conhecer o elenco". Enquanto a árvore era da classe,
+  // resolver a alocação de qualquer herói só exigia a classe dele; com a árvore sendo do
+  // personagem, ela exige saber QUEM ele é — e isso só fecha com elenco autorado.
+  readonly characters: Readonly<Record<Id, CharacterContent>>;
+  // Indexadas por `characterId`, que é também a chave de `characters` acima.
+  readonly characterTalentTrees: Readonly<Record<Id, ColumnTalentTree>>;
+  // §8.1 (M17, 3/N) — os INIMIGOS DE FASE autorados. Indexados por id porque o encontro os
+  // referencia: a mesma ficha de "Guarda do Covil" serve os dois tiers da masmorra, e
+  // embutir a ficha em cada encontro repetiria a força em vez de nomeá-la.
+  readonly enemies: Readonly<Record<Id, EnemyDef>>;
   readonly skills: Readonly<Record<Id, SkillDef>>;
   readonly items: Readonly<Record<Id, ItemInstance>>;
   readonly itemSets: Readonly<Record<Id, ItemSet>>;

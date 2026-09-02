@@ -3,7 +3,7 @@ import { resolveHeroStatSheet } from '../../src/hero/resolve.js';
 import type { ClassDef, Hero } from '../../src/hero/types.js';
 import type { ItemInstance, ItemSet } from '../../src/items/types.js';
 import type { StatSheet } from '../../src/stats/types.js';
-import type { TalentNode } from '../../src/talents/types.js';
+import type { ColumnTalentNode } from '../../src/talents/columnTree.js';
 
 // Mesmos números do snapshot de M1 (packages/core/tests/stats/aggregate.test.ts) —
 // montados aqui a partir de Hero+ClassDef+itens+talentos reais em vez de um
@@ -25,10 +25,12 @@ function buildImprintFlat(atTwo: readonly { readonly stat: 'atk' | 'chc'; readon
   return table;
 }
 
-const talentTree: readonly TalentNode[] = [
+// M17 2/N — a árvore saiu da CLASSE e virou parâmetro de quem resolve o herói: os nós
+// abaixo são a árvore do personagem (§8.1), passada por `talentTree` em cada chamada.
+const talentTree: readonly ColumnTalentNode[] = [
   {
     id: 't1',
-    tree: 'class',
+    column: 'a',
     row: 1,
     maxRank: 1,
     effects: [
@@ -55,7 +57,6 @@ const classDef: ClassDef = {
     { stat: 'atk', flat: 50 },
     { stat: 'chc', flat: 50 },
   ]),
-  talentTree,
 };
 
 const itemSets: Readonly<Record<string, ItemSet>> = {
@@ -143,18 +144,18 @@ const expectedSheet: StatSheet = {
 
 describe('resolveHeroStatSheet — Hero→ClassDef→itens→talentos até o stat sheet (§4.1/§4.2)', () => {
   it('bate exatamente com o snapshot esperado', () => {
-    const result = resolveHeroStatSheet({ hero, classDef, equippedItems: [weapon, helmet], itemSets });
+    const result = resolveHeroStatSheet({ hero, classDef, talentTree, equippedItems: [weapon, helmet], itemSets });
     expect(result).toEqual(expectedSheet);
   });
 
   it('é determinística: mesma entrada produz o mesmo hash duas vezes', () => {
-    const a = JSON.stringify(resolveHeroStatSheet({ hero, classDef, equippedItems: [weapon, helmet], itemSets }));
-    const b = JSON.stringify(resolveHeroStatSheet({ hero, classDef, equippedItems: [weapon, helmet], itemSets }));
+    const a = JSON.stringify(resolveHeroStatSheet({ hero, classDef, talentTree, equippedItems: [weapon, helmet], itemSets }));
+    const b = JSON.stringify(resolveHeroStatSheet({ hero, classDef, talentTree, equippedItems: [weapon, helmet], itemSets }));
     expect(a).toBe(b);
   });
 
   it('sem itens equipados, cai pro baseline (classe + talento, sem bônus de set nem de equipamento)', () => {
-    const result = resolveHeroStatSheet({ hero, classDef, equippedItems: [], itemSets });
+    const result = resolveHeroStatSheet({ hero, classDef, talentTree, equippedItems: [], itemSets });
     // base (5000 atk800 def500 spd100) * awakening 1.1 + classAndImprintFlat (hp200 atk50 chc50)
     // + talentFlat/pct (def+80, spd+20, def+5%) — sem equipmentFlat/Pct nem setBonus.
     expect(result.hp).toBe(5700); // 5500 (5000*1.1) + 200
@@ -166,7 +167,7 @@ describe('resolveHeroStatSheet — Hero→ClassDef→itens→talentos até o sta
 
   it('sem talentos alocados (allocation vazia), talentFlat/talentPct não afetam a agregação', () => {
     const noTalentsHero: Hero = { ...hero, talents: {} };
-    const result = resolveHeroStatSheet({ hero: noTalentsHero, classDef, equippedItems: [weapon, helmet], itemSets });
+    const result = resolveHeroStatSheet({ hero: noTalentsHero, classDef, talentTree, equippedItems: [weapon, helmet], itemSets });
     // Mesmo resultado do snapshot, menos def+80 flat e sem o *1.5 de def.
     expect(result.def).toBe(550); // (500*1.1) sem nenhum bônus de talento
     expect(result.spd).toBe(110); // 100*1.1, sem +20 de talento
@@ -174,7 +175,7 @@ describe('resolveHeroStatSheet — Hero→ClassDef→itens→talentos até o sta
 
   it('classe promovida: promotionFlat entra em classAndImprintFlat junto com imprintFlat', () => {
     const noImprintHero: Hero = { ...hero, imprint: 0 };
-    const result = resolveHeroStatSheet({ hero: noImprintHero, classDef, equippedItems: [], itemSets });
+    const result = resolveHeroStatSheet({ hero: noImprintHero, classDef, talentTree, equippedItems: [], itemSets });
     // Só promotionFlat (hp+200) deveria contar — imprintFlat[0] é vazio.
     expect(result.hp).toBe(5700); // 5500 + 200, sem nenhum bônus de imprint
     expect(result.atk).toBe(880); // 800*1.1, sem +50 de imprint
@@ -183,7 +184,7 @@ describe('resolveHeroStatSheet — Hero→ClassDef→itens→talentos até o sta
   it('é pura: não muta hero/classDef/itens recebidos', () => {
     const frozenHero = structuredClone(hero);
     const frozenClass = structuredClone(classDef);
-    resolveHeroStatSheet({ hero, classDef, equippedItems: [weapon, helmet], itemSets });
+    resolveHeroStatSheet({ hero, classDef, talentTree, equippedItems: [weapon, helmet], itemSets });
     expect(hero).toEqual(frozenHero);
     expect(classDef).toEqual(frozenClass);
   });

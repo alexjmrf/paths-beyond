@@ -5,13 +5,18 @@
     {
       "hero": {
         "id": "heroi-druida-1",
+        "characterId": "ally-mensageira",
         "classId": "class-druida",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-druida-foco-em-equipe": 1
+          "talent-wren-raizes-profundas": 3,
+          "talent-wren-seiva": 2,
+          "talent-wren-mao-estendida": 1,
+          "talent-wren-abrigo": 2,
+          "talent-wren-maestria-do-bosque": 1
         },
         "equipment": {
           "weapon": "item-arma-druida",
@@ -45,53 +50,22 @@
     {
       "hero": {
         "id": "heroi-druida-2",
-        "classId": "class-druida",
-        "level": 10,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {
-          "talent-druida-foco-em-equipe": 1
-        },
-        "equipment": {
-          "weapon": "item-arma-druida",
-          "helmet": null,
-          "armor": null,
-          "necklace": "item-colar-guardiao",
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "nature",
-        "duelSkills": [
-          "skill-ataque-druida",
-          "skill-especial-druida"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-druida",
-            "conditions": []
-          }
-        ]
-      },
-      "pos": {
-        "x": 0,
-        "y": 1
-      },
-      "height": 0,
-      "aiArchetype": "aggressive"
-    },
-    {
-      "hero": {
-        "id": "heroi-druida-apoio",
+        "characterId": "ally-couracado",
         "classId": "class-couracado",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-couracado-foco-em-equipe": 1
+          "talent-bardan-aco-pesado": 1,
+          "talent-bardan-respiro-sob-o-elmo": 1,
+          "talent-bardan-mao-estendida": 1,
+          "talent-bardan-guarda-firmada": 1,
+          "talent-bardan-couraca-viva": 1,
+          "talent-bardan-alcance-de-apoio": 1,
+          "talent-bardan-contra-simples": 1,
+          "talent-bardan-resistencia": 1,
+          "talent-bardan-maestria-da-muralha": 1
         },
         "equipment": {
           "weapon": "item-arma-couracado",
@@ -112,6 +86,64 @@
           {
             "enabled": true,
             "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-druida-3",
+        "characterId": "ally-clerigo",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-miron-imposicao-de-maos": 1,
+          "talent-miron-oracao-constante": 2,
+          "talent-miron-mao-que-alcanca": 1,
+          "talent-miron-calor-do-santuario": 2,
+          "talent-miron-refugio": 1,
+          "talent-miron-vigilia-branca": 1,
+          "talent-miron-maestria-da-luz": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
             "conditions": []
           }
         ]

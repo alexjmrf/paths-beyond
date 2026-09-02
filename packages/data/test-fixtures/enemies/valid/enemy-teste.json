@@ -1,0 +1,38 @@
+{
+  "id": "enemy-teste",
+  "name": "Inimigo de Teste",
+  "stats": {
+    "hp": 500,
+    "atk": 100,
+    "def": 50,
+    "spd": 80,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "infantry",
+  "weaponType": "sword",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 2,
+    "pp": 2
+  },
+  "duelSkills": [
+    "skill-teste"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-teste",
+      "conditions": []
+    }
+  ]
+}

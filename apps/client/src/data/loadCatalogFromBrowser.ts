@@ -25,6 +25,19 @@ function globJsonValues(globResult: Record<string, unknown>): unknown[] {
 }
 
 const classModules = import.meta.glob('../../../../packages/data/classes/*.json', { eager: true, import: 'default' });
+// §8.1 (M17, 2/N) — o ELENCO e as árvores dele. Os dois entram juntos e pelo mesmo motivo
+// que `buildCatalog` os exige sem `?? []`: catálogo sem árvore não é "partida sem talento",
+// é o talento de todo personagem sumindo em silêncio. Sem esta dupla o adapter de browser
+// deixaria de ter paridade com o de disco — o descompasso que este arquivo existe para
+// evitar, e que o cliente só descobriria em runtime.
+const characterModules = import.meta.glob('../../../../packages/data/characters/*.json', { eager: true, import: 'default' });
+const characterTalentTreeModules = import.meta.glob('../../../../packages/data/character-talent-trees/*.json', {
+  eager: true,
+  import: 'default',
+});
+// §8.1 (M17, 3/N) — os inimigos de fase autorados. Mesma paridade com o adapter de disco:
+// sem eles o cliente montaria a campanha com `enemyId` que não resolve.
+const enemyModules = import.meta.glob('../../../../packages/data/enemies/*.json', { eager: true, import: 'default' });
 const skillModules = import.meta.glob('../../../../packages/data/skills/*.json', { eager: true, import: 'default' });
 const itemModules = import.meta.glob('../../../../packages/data/items/*.json', { eager: true, import: 'default' });
 const itemSetModules = import.meta.glob('../../../../packages/data/item-sets/*.json', { eager: true, import: 'default' });
@@ -57,6 +70,9 @@ export function loadCatalogFromBrowser(): ContentCatalog {
 
   return buildCatalog({
     classes: globJsonValues(classModules),
+    characters: globJsonValues(characterModules),
+    characterTalentTrees: globJsonValues(characterTalentTreeModules),
+    enemies: globJsonValues(enemyModules),
     skills: globJsonValues(skillModules),
     items: globJsonValues(itemModules),
     itemSets: globJsonValues(itemSetModules),

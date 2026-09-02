@@ -2,6 +2,7 @@ import { aggregateStatSheet } from '../stats/aggregate.js';
 import type { StatModifier, StatSheet } from '../stats/types.js';
 import type { ItemInstance, ItemSet } from '../items/types.js';
 import { resolveSetBonuses } from '../items/sets.js';
+import type { ColumnTalentNode } from '../talents/columnTree.js';
 import { resolveTalentEffects } from '../talents/resolve.js';
 import type { Id } from '../types.js';
 import type { ClassDef, Hero } from './types.js';
@@ -13,6 +14,10 @@ export interface ResolveHeroStatSheetInput {
   // de `resolveSetBonuses`, que também recebe a lista pronta, não os ids.
   readonly equippedItems: readonly ItemInstance[];
   readonly itemSets: Readonly<Record<Id, ItemSet>>;
+  // §8.1/§8.2 (M17) — os nós da árvore DO PERSONAGEM. Antes vinham de `classDef.talentTree`;
+  // agora quem resolve o herói busca a árvore de `hero.characterId` no catálogo e a passa
+  // aqui. Vazio é legítimo e significa "sem árvore" (inimigo de fase, até a 3/N).
+  readonly talentTree: readonly ColumnTalentNode[];
 }
 
 function itemStatMods(item: ItemInstance): readonly StatModifier[] {
@@ -29,7 +34,7 @@ function itemStatMods(item: ItemInstance): readonly StatModifier[] {
 // nesta milestone: `ItemInstance.mainstat/substats` só guardam um `value` flat (decisão
 // desta sub-sessão, ver DECISIONS.md) — itens percentuais ficam pra um milestone futuro.
 export function resolveHeroStatSheet(input: ResolveHeroStatSheetInput): StatSheet {
-  const { hero, classDef, equippedItems, itemSets } = input;
+  const { hero, classDef, equippedItems, itemSets, talentTree } = input;
 
   const baseCurve = classDef.statCurve[hero.level - 1] ?? {};
   const awakeningMultiplier = classDef.awakeningMultipliers[hero.awakening] ?? 1000;
@@ -41,7 +46,7 @@ export function resolveHeroStatSheet(input: ResolveHeroStatSheetInput): StatShee
   const equipmentFlat = equippedItems.flatMap(itemStatMods);
   const equipmentPct: readonly StatModifier[] = [];
 
-  const resolvedTalents = resolveTalentEffects(classDef.talentTree, hero.talents);
+  const resolvedTalents = resolveTalentEffects(talentTree, hero.talents);
 
   const setBonus = resolveSetBonuses(equippedItems, itemSets);
 

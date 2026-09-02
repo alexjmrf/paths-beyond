@@ -1,4 +1,5 @@
-import { buildBattleSetupFromHeroes, type BattleSetup, type Hero, type HeroPlacement, type Id } from '@paths-beyond/core';
+import { toEncounterPlacements } from '@paths-beyond/content/src/encounterPlacements.js';
+import { buildBattleSetupFromHeroes, type BattleSetup, type Hero, type Id } from '@paths-beyond/core';
 // Import do módulo direto, não do barrel `@paths-beyond/content`: o barrel reexporta
 // `loadCatalogFromDisk`, que importa `node:fs` — mesmo motivo já documentado em
 // `loadCatalogFromBrowser.ts`.
@@ -24,28 +25,17 @@ function buildCampaignMap(encounter: Encounter): CampaignMapContent {
   const arenaMap = catalog.maps[encounter.mapId];
   if (!arenaMap) throw new Error(`mapa de campanha desconhecido no catálogo: ${encounter.mapId}`);
 
+  // §8.1 (M17, 3/N) — a conversão virou peça compartilhada de `packages/content`, porque
+  // ela passou a ter um ramo e cinco consumidores; ver `encounterPlacements.ts`.
+  const placements = toEncounterPlacements(encounter.units, catalog);
+
+  // `heroesByUnitId` é só do lado do jogador, e agora isso é uma afirmação do tipo em vez de
+  // um acidente: a tela de talentos e a de equipamento abrem sobre um HERÓI, e inimigo de
+  // fase não tem ficha para abrir.
   const heroesByUnitId: Record<Id, Hero> = {};
-  const placements: HeroPlacement[] = encounter.units.map((unit) => {
-    const classDef = catalog.classes[unit.hero.classId];
-    if (!classDef) throw new Error(`classe desconhecida no catálogo: ${unit.hero.classId}`);
-    heroesByUnitId[unit.unitId] = unit.hero;
-
-    const equippedItems = Object.values(unit.hero.equipment)
-      .filter((id): id is Id => id !== null)
-      .map((id) => catalog.items[id])
-      .filter((item): item is NonNullable<typeof item> => item !== undefined);
-
-    return {
-      unitId: unit.unitId,
-      hero: unit.hero,
-      classDef,
-      equippedItems,
-      side: unit.side,
-      pos: unit.pos,
-      height: unit.height,
-      ...(unit.aiArchetype ? { aiArchetype: unit.aiArchetype } : {}),
-    };
-  });
+  for (const unit of encounter.units) {
+    if (unit.side === 'player') heroesByUnitId[unit.unitId] = unit.hero;
+  }
 
   return {
     setup: buildBattleSetupFromHeroes({
@@ -69,6 +59,10 @@ function buildCampaignMap(encounter: Encounter): CampaignMapContent {
       skillsCatalog: catalog.skills,
       weaponDuelRanges: catalog.weaponDuelRanges,
       baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+      // §8.1 (M17, 2/N) — mesmo repasse que a arena e a masmorra passaram a fazer no
+      // servidor: a árvore é do personagem, e sem ela a campanha montaria a party com a
+      // alocação escrita e nenhum talento resolvido.
+      characterTalentTrees: catalog.characterTalentTrees,
     }),
     heroesByUnitId,
   };

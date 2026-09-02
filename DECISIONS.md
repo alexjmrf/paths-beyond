@@ -4014,3 +4014,337 @@ candidatos naturais a adquiríveis, e os que aparecem cedo e em todos os capítu
 **O que fica em aberto:** quais personagens são núcleo e quais são adquiríveis; como o save passa a
 carregar posse; como o balanceamento mede um pool que cresce; e em que milestone a aquisição entra
 (provavelmente depois do M17, já que ela depende do elenco existir).
+
+
+### M17 — sub-sessão 2/N: os consumidores da árvore por personagem
+
+A fatia começou como recuperação: o PC do usuário desligou no meio da 2/N, e o que ficou em disco
+era o lado de conteúdo pronto (nove personagens, nove árvores, comps reautoradas, `talentTree`
+virando parâmetro em `resolveHeroStatSheet`/`resolveHeroCombatProfile`, `allocate.ts` deletado) com
+os consumidores pela metade: **13 arquivos de teste falhando, 19 testes**. Nenhum trabalho foi
+perdido — `pnpm validate:data` passava com 25 schemas e 142 arquivos, e todas as falhas eram a
+mesma classe de defeito, quem chama não passando o dado novo.
+
+**A decisão de forma, e ela vale para as três camadas:** a árvore é **repassada por quem monta**,
+nunca buscada por quem resolve. `resolveHeroStatSheet` recebe `talentTree`; `buildBattleSetupFromHeroes`
+recebe `characterTalentTrees` e resolve por `hero.characterId`. Isso mantém a regra 1 (o core não lê
+conteúdo) e faz o esquecimento ser um erro de tipo em vez de um talento sumindo em silêncio — o modo
+de falha que D6 descreveu ao notar que `resolveTalentEffects` ignora nó desconhecido sem reclamar.
+
+**Cinco lugares passaram a repassar, e dois deles não estavam na lista de falhas:**
+`tools/balance` (o torneio, que sem isso mediria o roster real com zero talento — justamente a
+medição que D6 mandou refazer), `sim-cli`, os testes do servidor, e — os dois que só o `tsc` pegou —
+`apps/server/src/battle/routes.ts` e `economy/routes.ts`. Estes dois **passavam nos testes** porque os
+heróis dos fixtures não declaram `characterId` e o acesso ao registro indefinido nunca acontecia; em
+produção, com a arena e a masmorra sendo reexecutadas pelo servidor, seriam §9.1 ("divergência = bug
+crítico") em silêncio. **Ficou a lição de processo: `pnpm test` verde não substitui `pnpm typecheck`
+numa mudança de assinatura.**
+
+**Em `sim-cli` a decisão foi falhar alto:** `characterId` ausente resolve com árvore vazia (é
+legítimo — inimigo de fase ainda é `Hero` até a 3/N), mas `characterId` que o catálogo não conhece
+lança, do mesmo jeito que classe e item desconhecidos já lançavam ali. O contrário devolveria uma
+folha de status silenciosamente sem talento.
+
+**O teste de aceite 4 do M9 ficou mais forte sem ser reescrito.** `heroStatSheetCrossConsumer` compara
+o hash do stat sheet entre sim-cli e o caminho do servidor; como o herói de `comp-espadachim` agora
+declara `characterId`, os três consumidores passaram a ter de concordar **também sobre o talento
+resolvido**, e não só sobre curva, equipamento e set.
+
+**Três testes de `authorContent.test.ts` mediam coisas que deixaram de existir, e cada um saiu por um
+motivo diferente:**
+
+- a conformidade da árvore com §8.2 (row 1..8, `exclusiveWith` mútuo) **saiu inteira**, e não foi
+  substituída ali: `elenco.test.ts` já a mede na forma nova e sobre os arquivos **autorados**, que é
+  mais forte do que medir o gerador;
+- a árvore `tree:"spec"` da classe promovida **saiu sem substituto**: com a árvore pertencendo ao
+  personagem, a classe promovida não tem árvore para ter forma. `mestre-espadachim` chega por
+  `hero-jogador` (D7);
+- **"a maioria da comp é da classe do comp" mudou de forma, e a mudança é consequência direta de
+  D6.** Com um personagem por classe, duas unidades da classe do comp seriam a mesma pessoa duas
+  vezes — o herói sintético que D6 aposentou. A leitura da matriz passa a ser segurada pela
+  **âncora** (a primeira unidade é o personagem daquela classe, e dá nome ao comp), mais uma
+  asserção nova de que as três unidades são personagens **distintos** — o modo de falha em que
+  `compRoster` escolheria um apoio já presente e a matriz mediria um clone.
+
+**As asserções de talento que sobreviveram foram reescritas pelo EFEITO e não pelo id do nó** (a
+alocação da comp precisa conter *algum* nó que conceda `skill-assistir`), mais o recíproco que
+nenhuma delas pegava sozinha: **toda alocação escrita numa comp existe na árvore de quem a joga**.
+Sem ele, uma slug errada não quebraria nada — só apagaria o talento, e o torneio mediria outra build.
+
+**O que NÃO foi feito, e é fronteira de fatia e não pendência esquecida:** o cliente ainda tem a UI
+da árvore no modelo antigo (`TalentTreePanel.tsx`, `talentLayout.ts`, `talentPreview.ts` e as ações
+de talento do `battleStore.ts` importando `validateAllocation`/`resetTree`, que não existem mais).
+É a 4/N pelo §4 do briefing. O que **foi** feito no cliente é a mesma fiação das outras camadas, não
+UI: `loadCatalogFromBrowser` passou a carregar o elenco e as árvores (paridade com o adapter de
+disco), `campaign.ts` repassa `characterTalentTrees`, e `DungeonPanel` inclui o talento no poder
+mostrado — que precisa ser o mesmo cálculo da batalha, não um parecido.
+
+Suíte: **105 arquivos, 1495 testes**, todos passando (era 105/1318 com 19 falhando). `pnpm typecheck`
+limpo em **6 dos 7 pacotes** — só `apps/client` reprova, e exatamente nos quatro arquivos da UI da
+árvore. `RULES_VERSION` **ainda não sobe**: pelo §4 do briefing o bump é da 5/N, junto do
+`pnpm balance` reexecutado.
+
+
+### M17 — sub-sessão 3/N: o inimigo direto
+
+A fatia que §8.1 chama de "a simplificação que a mudança revelou": **inimigo de fase deixa de ser
+um `Hero` com classe, nível, equipamento e talentos** e passa a ser autorado direto. 43 unidades
+inimigas em 14 encontros, 41 fichas distintas.
+
+**Três decisões foram levadas ao usuário antes de escrever código, porque a spec não as cobre.**
+
+**D11 — o inimigo mora num CATÁLOGO (`packages/data/enemies/`), referenciado por `enemyId`.** A
+alternativa era embutir a ficha no encontro, como `comps/` faz com heróis. O catálogo ganhou por
+três razões: as oito masmorras vêm em pares base/elite que repetiriam a ficha inteira; um inimigo
+NOMEADO ("Guarda do Covil", "Comandante da Fortaleza") é a unidade em que a dificuldade é de fato
+editada; e `summon-blueprints/` já é precedente de catálogo de unidade de cenário. A consequência
+mais forte é de forma: o schema do encontro virou **união discriminada por `side`** — a unidade do
+jogador tem `hero` e não tem onde pôr um `enemyId`, a inimiga tem `enemyId` e não tem onde pôr um
+`hero`. O critério de aceite 2 ("o caminho antigo não é mais alcançável a partir do conteúdo")
+deixou de ser uma varredura e virou uma impossibilidade de escrita.
+
+**D12 — a força de hoje foi CONGELADA, não reescolhida.** A migração resolveu cada um dos 43
+inimigos uma vez, pelo core de verdade (`resolveHeroStatSheet` com o catálogo real), e gravou o
+`StatSheet` resultante como dado. A derivação — curva da classe no nível, multiplicador de
+despertar, flat de imprint, equipamento, set — **saiu do projeto**. O ganho não é o número: é que
+endurecer o capítulo 4 passou a ser editar `atk` num arquivo, em vez de descobrir qual das cinco
+tabelas produz o `atk`. O preço, dito por inteiro: os números ainda são o que uma curva de classe
+produzia, com a legibilidade que uma curva tem; eles não foram REESCOLHIDOS por dificuldade. Quem
+for afinar dificuldade faz isso agora, e é a primeira vez que dá para fazer sem mexer em classe.
+
+**D13 — o reforço invocável (`summon-blueprints/`) fica como está.** Valor é o recurso do exército
+do jogador (`battle/valor.ts` só invoca do lado `player`), então o reforço não é "unidade que só
+existe para ser enfrentada" de §8.1 e não entra no critério 2. Segue como `Hero`, e é o ÚLTIMO
+`Hero` do projeto que não é personagem — fica registrado como candidato a conversão futura, não
+como pendência desta milestone (§7 do briefing: nada além do mínimo que as decisões exigem).
+
+**A tabela de hashes congelados pegou um defeito de verdade, e é a razão de ela existir.** Antes
+de migrar, foram medidos os 43 `HeroCombatProfile` resolvidos pelo caminho antigo com o catálogo
+real inteiro. A primeira passada da migração resolveu os equipamentos **sem o catálogo de sets**, e
+o chefe do capítulo 6 — o único inimigo do jogo com duas peças do mesmo set (`set-forca`, +10% atk
+com 2 peças) — saiu com `atk: 142` em vez de 156. **Nenhum teste de desfecho pegaria isso:** o
+piloto de campanha e os testes de masmorra medem quem vence, e 10% de ataque a menos no chefe do
+capítulo final não vira o resultado. Quem pegou foi `inimigoAutorado.test.ts`, comparando hash. A
+tabela fica no repositório: mudar dificuldade daqui para frente exige atualizar o hash no mesmo
+commit, o que torna a mudança declarada em vez de silenciosa.
+
+**`resolveEnemyCombatProfile` devolve `HeroCombatProfile`, o MESMO tipo do herói.** Decisão de
+projeto e não conveniência: `buildBattleUnit` — e portanto o motor inteiro, do duelo à iniciativa —
+não fica sabendo que existem dois tipos de unidade. A diferença entre personagem e inimigo é de
+AUTORIA, e ela termina na resolução do perfil. Se vazasse para dentro de `BattleUnit`, cada regra
+do jogo passaria a poder perguntar "isto é um inimigo?", que é a porta pela qual entra a IA esperta
+que a regra 6 do projeto proíbe. Um teste afirma isso diretamente: o `BattleUnit` de um inimigo tem
+exatamente as mesmas chaves que o de um herói.
+
+**Duas regras foram EXTRAÍDAS em vez de copiadas.** `resolveWeaponRanges` e `toReactionLine` eram
+privadas de `hero/combatProfile.ts` e passaram a ser exportadas, porque não são do herói nem do
+inimigo — são do jogo. Alcance de duelo sai da arma (§6.1) e as reações universais são universais
+(§6.4). Duas cópias seriam duas chances de um inimigo passar a furar a assimetria de alcance que a
+spec chama de identidade tática, sem ninguém notar. Pelo mesmo motivo, o `EnemyDef` **não pode
+declarar `duelRange`** — o schema recusa o campo.
+
+**`toEncounterPlacements` nasceu em `packages/content` pelo mesmo argumento.** Cinco lugares
+convertiam unidade-de-encontro em placement (piloto, dois testes de conteúdo, campanha do cliente,
+masmorra do servidor). Cópias iguais não incomodavam; o que mudou é que a conversão passou a ter um
+RAMO, e cinco cópias de um ramo são cinco chances de um consumidor resolver o inimigo diferente dos
+outros — §9.1. Mora em `content` e não no core porque é ali que "id" vira "coisa".
+
+**Dois testes existentes mediam coisa que deixou de existir, e os dois ficaram melhores:**
+"a elite tem elenco mais forte que a normal" media NÍVEL, um proxy que mentia (duas classes no
+mesmo nível têm forças diferentes) — passou a medir hp, atk e def, os três, porque um inimigo com
+mais HP e menos ataque não é uma elite, é um saco de pancada maior. E "todo fragmento de herói
+aponta para um herói da campanha" varria os dois lados; fragmento de inimigo nunca fez sentido, e
+só era possível porque inimigo também era `Hero`.
+
+**Uma consequência visual que NÃO foi resolvida, e que é do cliente:** o glifo do tabuleiro resolve
+em três níveis (M16 2/N), e o nível 1 (por `classId`, via `heroesByUnitId`) existia por UM caso —
+separar Espadachim de Mestre-Espadachim, ambos `infantry`/`sword`, ambos no capítulo 6. Com o
+inimigo sem classe por construção, `unit-chefe` cai para o nível 2 e passa a ser desenhado com o
+glifo do Espadachim em vez das espadas cruzadas. Não é regressão de regra e nenhum teste reprova;
+é decisão de apresentação que §8.1 não cobre, e por isso não foi inventada aqui.
+
+`RULES_VERSION` **não sobe nesta fatia**: pelo §4 do briefing o bump é da 5/N, junto do
+`pnpm balance`. Com a força congelada, nenhum estado de batalha mudou. Suíte: **109 arquivos, 1582
+testes**. `pnpm validate:data`: 26 schemas, 183 arquivos.
+
+### M17 — sub-sessão 4/N: o cliente e os build codes
+
+A fatia que fecha o critério de aceite 1 — "um personagem aloca uma árvore de duas colunas ponta a
+ponta pelo cliente, a amarração impede as escolhas ilegais, e a convergência libera a troca".
+
+**A fatia começou encontrando um buraco que não era dela, e que o critério 1 encontraria primeiro.**
+Os seis heróis do lado do jogador em `packages/data/encounters/*.json` **não declaravam
+`characterId`**, e dois deles ainda alocavam nós da árvore de CLASSE
+(`talent-clerigo-foco-em-equipe`, `talent-arqueiro-reacao-propria`) que não existem em árvore
+nenhuma desde a 2/N. Nada quebrava: `resolveTalentEffects` ignora nó desconhecido em silêncio
+(§8.2), então **a party da campanha vinha jogando os seis capítulos com zero talento resolvido**. É
+exatamente o modo de falha que D6 nomeou e que a 2/N pegou nas rotas do servidor, um nível acima —
+e a lição repetida é que a checagem que faltava não era um teste de carregamento, era o **recíproco**
+("toda alocação escrita existe na árvore de quem a joga"), que a 2/N escreveu para as comps da arena
+e ninguém tinha escrito para a campanha.
+
+**A correção não é uma varredura, é o schema:** `encounters.schema.ts` passou a exigir `characterId`
+na unidade do lado do jogador (`campaignHeroSchema = heroSchema.extend({ characterId })`), pelo
+mesmo argumento que fechou o critério 2 na 3/N — um herói de campanha sem personagem não perde o
+talento com um erro, ele o perde em silêncio, e a única defesa contra isso é o arquivo não poder ser
+escrito. **`heroSchema` continua com o campo opcional, e a assimetria é real e não preguiça:** o
+blueprint de reforço invocável (D13) e a VAGA de referência da masmorra são fichas de cenário — a
+vaga é substituída em jogo pelos heróis que o jogador manda (`assembleDungeonBattle`), e exigir
+personagem nela seria exigir que o conteúdo já soubesse quem vai preenchê-la.
+
+**Decisão do usuário: as duas alocações mortas foram REESCRITAS com o equivalente mais próximo**, e
+não zeradas. `foco-em-equipe` concedia `grantReaction skill-assistir`; o equivalente na árvore de
+Miron é `mao-que-alcanca`, que mora na **linha 3** — e como a árvore de §8.2 é um CAMINHO, preservar
+o efeito passou a custar três pontos em vez de um (linhas 1→2→3 da coluna A). Sylla ficou com dois
+(`pes-leves` → `folego-de-combate`, linha 2 da coluna B). É mudança de poder da party, e a fatia
+5/N já ia rodar `pnpm balance` de qualquer jeito (regra 10).
+
+**A decisão de forma que atravessa a fatia inteira: o cliente NÃO sabe a regra da amarração.**
+`availabilityByNode` (`logic/talentLayout.ts`) monta, para cada nó, a alocação CANDIDATA — a que
+existiria se o jogador clicasse — e pergunta a `validateColumnAllocation` do core se ela vale. A
+amarração de coluna, o caminho contíguo, o teto de rank, o gate de despertar e o orçamento continuam
+existindo em um lugar só. A alternativa óbvia (reescrever `permiteSeguir` no cliente, para não
+chamar o validador N vezes por render) é mais rápida e dá uma tela que concorda com o motor até o
+dia em que uma das duas cópias mudar — regra 3 do CLAUDE.md, e §9.1 chama a divergência de bug
+crítico. O custo real é uma validação por nó por render sobre uma árvore de no máximo 27 nós.
+**Virou teste explícito**, porque é o tipo de coisa que uma otimização futura desfaz sem querer:
+"para todo nó, a resposta da tela é a do core sobre a alocação candidata".
+
+**O motivo do bloqueio também vem do core, palavra por palavra.** Se a tela escrevesse a própria
+explicação, as duas frases divergiriam — e a da tela é a que o jogador lê.
+
+**Desfazer deixou de ser simétrico, e é consequência direta de a árvore ser um caminho.** Tirar um
+ponto de um nó de `maxRank > 1` no meio do caminho é legal (o caminho continua inteiro); tirar o
+ÚLTIMO ponto de uma linha do meio deixaria as linhas de baixo penduradas, e o core recusa. Sem uma
+saída isso seria um beco: o jogador só poderia resetar a árvore inteira. A saída é `resetFromRow`
+(2/N), exposta no painel como **"resetar da linha N para baixo"**, ao lado do `-1` e não escondida —
+desfazer um caminho é desfazê-lo da ponta para trás.
+
+**O build code passou a ser de um PERSONAGEM.** Enquanto a árvore era da classe, `classId` bastava
+para saber onde a alocação encaixava; com árvore por personagem, duas pessoas da mesma classe têm
+árvores diferentes e `classId` deixou de identificar coisa alguma. `readBuildCodeFor` faz três
+perguntas antes de deixar a build entrar na tela — o texto é um código, é o código DESTE personagem,
+e a alocação é alcançável nesta árvore (esta última respondida pelo core). **A segunda pergunta é a
+que importa e não existia antes:** sem ela, o código de Sylla entraria na árvore de Miron, todo nó
+seria desconhecido, e o jogador colaria uma build para ficar com zero talento e nenhum aviso. Os
+códigos antigos quebram, e isso é D5 e não descuido.
+
+**Decisão do usuário sobre o SAVE antigo: devolver os pontos.** Um save gravado antes deste
+milestone carrega nós da árvore de classe; `validateColumnAllocation` os recusa, e a máquina de
+`reconcileSave` que já estava lá zera a alocação daquela unidade e **deixa o resto do save de pé**.
+D5 diz que não há caminho de migração — o que ele não diz é que o jogador tenha de perder capítulo,
+equipamento e preferências junto com a build. As alternativas (recusar o save inteiro, subir
+`SAVE_FORMAT_VERSION` para 2) foram descartadas por esse motivo. Nenhum código novo: o que a decisão
+exigiu foi um **teste passando pelo store de verdade**, e não por `reconcileSave` com um callback de
+mentira, porque o que precisava ser afirmado é a ligação — que `allocationIsValidFor` vá buscar a
+árvore do PERSONAGEM daquela unidade. Com a árvore da classe, aquela alocação era válida. Veio com o
+recíproco: alocação na forma nova sobrevive à recarga, sem o qual um validador que recusasse tudo
+passaria no primeiro teste e apagaria a build de todo mundo.
+
+**Decisão do usuário sobre o glifo do chefe (a pendência que a 3/N deixou): aceitar o fallback de
+perfil.** `unit-chefe` é desenhado com o glifo do Espadachim, e não com as espadas cruzadas, porque
+o inimigo não tem classe por construção. Zero código, e as duas alternativas (um `glyphId` em
+`EnemyDef`, ou um mapa `enemyId` → glifo no cliente) ficam registradas como descartadas — a primeira
+tensiona o D1 do M16 ("o glifo mora no cliente, nunca em `packages/data`").
+
+**O gerador foi corrigido junto, e isso foi VERIFICADO e não assumido:** `authorCampaign.ts` ganhou
+`characterId` no `UnitSpec` (opcional, porque `authorDungeons.ts` reusa o spec para as vagas) e as
+duas alocações novas; rodá-lo reproduz os seis arquivos byte a byte. Sem isso, a próxima regeneração
+desfaria a correção em silêncio.
+
+**Um fixture também mentia, e foi consertado no mesmo espírito:**
+`test-fixtures/encounters/valid/encontro-teste.json` declarava `class-teste`, uma classe que não
+existe no catálogo de fixture. Passou a nomear `personagem-soldado`, que existe e tem árvore — um
+`characterId` solto validaria e resolveria zero talento em silêncio, que é o buraco que esta fatia
+acabou de fechar no conteúdo real.
+
+`RULES_VERSION` **ainda não sobe** — pelo §4 do briefing o bump é da 5/N, junto do `pnpm balance`
+reexecutado. Suíte: **110 arquivos, 1607 testes**. `pnpm validate:data`: 26 schemas, 183 arquivos.
+`pnpm typecheck` limpo nos **7** pacotes (`apps/client` volta ao verde: era o único vermelho desde a
+2/N, e os quatro arquivos que reprovavam eram exatamente esta fatia).
+
+### M17 — sub-sessão 5/N: o fechamento (balanceamento, `RULES_VERSION` e o 409)
+
+A fatia que o §4 do briefing reserva para o fim. Ela encontrou **dois defeitos que nenhum teste
+pegava**, e o segundo é a razão de o primeiro ter passado despercebido por duas sub-sessões.
+
+**`RULES_VERSION` `0.16.0` → `0.17.0`.** É o primeiro bump do projeto em que a incompatibilidade é
+real e não disciplina de processo: uma regra ANTIGA saiu (duas árvores por classe, gate por pontos
+gastos, `requires`/`exclusiveWith`, teto de 8 pontos) e outra ocupou o lugar. `GOLDEN_HASH` não
+muda — o replay canônico monta `BattleUnit` direto, sem herói, sem classe e sem talento, e nenhuma
+das duas mudanças do milestone o alcança.
+
+**O 409 do critério 4 ganhou o teste que o critério pedia.** Já existia um que mandava
+`'versao-errada'`: prova que o campo é comparado, não o que o aceite diz ("rejeita replay de versão
+ANTERIOR"). O teste novo manda `'0.16.0'` — bem formada, e a corrente até ontem — e afirma junto que
+`RULES_VERSION !== '0.16.0'`, senão reverter o bump deixaria o teste medindo nada e ele continuaria
+verde.
+
+#### Achado A — as nove árvores da 2/N valiam poderes muito diferentes
+
+Medido, não suposto: **com os talentos zerados as nove comps ficam em 40,9–59,5%** (tudo dentro da
+faixa); **com as árvores, 30,4–67,1%**, cinco fora. As curvas de classe e os multiplicadores de
+skill estavam sãos — a dispersão inteira era das árvores autoradas na 2/N.
+
+A causa raiz, uma vez a matriz honesta (ver B): a comp sempre aloca **a coluna que concede
+`skill-assistir`**, e nas três classes mágicas essa coluna era puro suporte — defesa e cura sobre um
+`atk` base de 60, **sem nenhuma ofensiva** — enquanto nas físicas era defesa sobre `atk` 90. Miron
+gastava um ponto endurecendo uma cura que no duelo só dispara abaixo de 25% do HP próprio; Wren
+pagava `spd −12` num nó de rank 3, e §6.7 dá a `spd` três benefícios de uma vez (iniciativa,
+preempção, evasão). O padrão apareceu de imediato numa tabela: as duas árvores no fundo da matriz
+eram exatamente as duas com ZERO nós de AP na coluna alocada.
+
+**Uma armadilha de unidade custou dois lotes de ajuste, e vale registrar:** `pct` nestes geradores é
+**décimo de por cento** (`pct('atk', 45)` = 4,5%), enquanto `flat` é ponto absoluto de stat. Os
+primeiros buffs em `pct` mexeram quase nada; `flat('atk', 10)` sobre um `atk` base de 60 mexeu
+demais. Quem for reequilibrar deve começar por `flat`.
+
+**O método de isolar a força de cada árvore, para não ser redescoberto:** com o roster novo cada
+personagem aparece em exatamente três comps, então `delta_comp = soma das forças das três árvores`
+é um sistema 9×9 que se resolve por mínimos quadrados sobre `(winrate medida − piso sem talentos)`.
+É o que transformou "a Druida está fraca" em "a árvore de Wren vale −13,2pp e a de Nyra +12,3pp", e
+o que permitiu mirar cada lote em vez de tatear. O piso (talentos zerados, comps novas) é
+**guerreiro 59,1 · espadachim 56,4 · clérigo 51,9 · lanceiro 51,1 · couraçado 49,9 · grifeiro 48,4 ·
+arcanista 45,9 · arqueiro 45,7 · druida 41,6** e vale enquanto o elenco das comps não mudar.
+
+Dez lotes em `authorCharacters.ts`, medindo a cada um (400 partidas por par ordenado levam 14
+segundos e reproduzem a ordenação de 10.000 dentro de ~1pp). Resultado: a dispersão entre as nove
+árvores caiu de **25 pontos percentuais para 2,1**.
+
+#### Achado B — três das nove comps eram o MESMO time
+
+`compRoster` dava o Arqueiro de apoio a toda âncora corpo a corpo e o Couraçado a toda âncora de
+alcance. Como o apoio do Arqueiro é o Couraçado e vice-versa, **os dois entravam nas nove comps**, e
+quando a própria âncora era um deles a regra de colisão puxava sempre o primeiro perfil não usado —
+fazendo de `comp-arqueiro`, `comp-couracado` e `comp-espadachim` os mesmos três personagens, com as
+mesmas alocações, distintos só pela ordem das posições. Eles pontuavam **67,1%, 57,2% e 63,4%**: dez
+pontos percentuais de diferença que a matriz apresentava como "composição" e que eram **posição
+inicial**.
+
+**Por que nenhum teste pegou:** todas as asserções sobre comps olhavam UMA comp por vez (a âncora é
+da classe certa, as três unidades são personagens distintos *dentro* da comp, o apoio cobre o lado
+que falta). Nenhuma comparava as comps ENTRE si. É o mesmo formato de lacuna da 4/N — a checagem que
+faltava não era mais profunda, era de outro eixo.
+
+**Decisão do usuário: âncora + os dois seguintes no elenco, circulando.** As nove ficam distintas por
+construção (janelas de tamanho 3 num ciclo de 9 não se repetem) e cada personagem aparece em
+exatamente três comps, o que também remove o viés de dois personagens estarem em todas.
+
+**A ordem do elenco é INTERCALADA, e isso não é detalhe:** com a ordem de declaração de
+`CLASS_PROFILES` (espada, machado, lança seguidos; depois os casters) as janelas de três dariam uma
+comp inteiramente corpo a corpo e outra inteiramente de alcance — exatamente a degeneração de 20 em
+20 pareamentos que fez a regra de apoio existir em 2026-08-28. Alternando melee e alcance, toda
+janela tem os dois. **A regra saiu; a propriedade que ela protegia virou teste.**
+
+Três testes novos guardam o que foi encontrado: as nove comps são times distintos entre si; cada
+personagem aparece no mesmo número de comps; e toda comp é mista. Um quarto, em `elenco.test.ts`,
+fecha a brecha pela qual Miron e Wren passaram sem nenhuma fonte de AP/PP — o teste antigo contava
+`assistRangeBonus` e `grantReaction` como "economia". Ele traz um comentário dizendo o que **não**
+pega: poder. Duas colunas com um `maxPp` cada podem valer coisas muito diferentes, e foi assim que
+as nove árvores saíram da 2/N com 25 pontos de diferença; quem mede isso é `pnpm balance`.
+
+#### O resultado
+
+`pnpm balance -- --runs 10000`, os dois critérios do M8 de pé: **43,6%–57,3%** (faixa 40–60) e `spd`
+acima da mediana em **33,0%** das vencedoras (teto 60). Nenhuma composição sinalizada. Suíte: **110
+arquivos, 1619 testes**. `pnpm validate:data`: 26 schemas, 183 arquivos.

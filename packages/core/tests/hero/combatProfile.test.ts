@@ -6,17 +6,19 @@ import type { ClassDef, Hero } from '../../src/hero/types.js';
 import type { ItemInstance, ItemSet } from '../../src/items/types.js';
 import type { SkillDef } from '../../src/skills/types.js';
 import type { StatSheet } from '../../src/stats/types.js';
-import type { TalentNode } from '../../src/talents/types.js';
+import type { ColumnTalentNode } from '../../src/talents/columnTree.js';
 import type { WeaponType } from '../../src/tactics/types.js';
 
 function buildStatCurve(): Partial<StatSheet>[] {
   return Array.from({ length: 60 }, () => ({ hp: 1000, atk: 200, def: 100, spd: 90 }));
 }
 
-const talentTree: readonly TalentNode[] = [
+// M17 2/N — a árvore saiu da CLASSE e virou parâmetro de quem resolve o herói: os nós
+// abaixo são a árvore do personagem (§8.1), passada por `talentTree` em cada chamada.
+const talentTree: readonly ColumnTalentNode[] = [
   {
     id: 'talent-arsenal',
-    tree: 'class',
+    column: 'a',
     row: 1,
     maxRank: 1,
     effects: [
@@ -27,7 +29,7 @@ const talentTree: readonly TalentNode[] = [
   },
   {
     id: 'talent-reserva',
-    tree: 'class',
+    column: 'b',
     row: 1,
     maxRank: 1,
     effects: [
@@ -50,7 +52,6 @@ const meleeClass: ClassDef = {
   awakeningMultipliers: [1000, 1000, 1000, 1000, 1000, 1000, 1000],
   promotionFlat: [],
   imprintFlat: [[], [], [], [], [], []],
-  talentTree,
 };
 
 const baseHero: Hero = {
@@ -203,13 +204,14 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
       weaponDuelRanges,
       baselineReactionSkillIds,
     });
-    const expectedStats = resolveHeroStatSheet({ hero: baseHero, classDef: meleeClass, equippedItems: [], itemSets });
+    const expectedStats = resolveHeroStatSheet({ hero: baseHero, classDef: meleeClass, talentTree, equippedItems: [], itemSets });
     expect(profile.stats).toEqual(expectedStats);
   });
 
@@ -217,6 +219,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -233,6 +236,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -248,6 +252,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: heroWithReserva,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -262,6 +267,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const semSet = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: piecesOf('set-duelista', 3), // 3 de 4
       itemSets: specialItemSets,
       skillsCatalog,
@@ -273,6 +279,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const comSet = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: piecesOf('set-duelista', 4),
       itemSets: specialItemSets,
       skillsCatalog,
@@ -286,6 +293,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: piecesOf('set-reserva', 4),
       itemSets: specialItemSets,
       skillsCatalog,
@@ -302,6 +310,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: heroWithReserva,
       classDef: meleeClass,
+      talentTree,
       equippedItems: piecesOf('set-reserva', 4),
       itemSets: specialItemSets,
       skillsCatalog,
@@ -315,6 +324,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: piecesOf('set-reserva', 3),
       itemSets: specialItemSets,
       skillsCatalog,
@@ -328,6 +338,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -343,6 +354,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: rangedHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -358,6 +370,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -374,6 +387,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -391,6 +405,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -409,6 +424,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: heroWithScript,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -423,6 +439,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const profile = resolveHeroCombatProfile({
       hero: noTalentsHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -441,6 +458,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     const input = {
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,
@@ -458,6 +476,7 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
+      talentTree,
       equippedItems: [],
       itemSets,
       skillsCatalog,

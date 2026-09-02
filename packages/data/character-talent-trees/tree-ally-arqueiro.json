@@ -1,0 +1,258 @@
+{
+  "characterId": "ally-arqueiro",
+  "depth": 8,
+  "nodes": [
+    {
+      "id": "talent-sylla-olho-de-agulha",
+      "column": "a",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-pes-leves",
+      "column": "b",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 6
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-marca-persistente",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-arqueiro",
+          "patch": {
+            "multiplier": 1250
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-folego-de-combate",
+      "column": "b",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-folego-de-combate"
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-tiro-certeiro",
+      "column": "a",
+      "row": 3,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "chc",
+          "flat": 60
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-posicao-elevada",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-alcance-de-apoio",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-sangue-frio",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-mao-estendida",
+      "column": "b",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-flecha-pesada",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-arqueiro",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-respiro",
+      "column": "b",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-cacada-continua",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-troca-de-guarda",
+      "column": "middle",
+      "row": 6,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-retirada-calculada",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 25
+        },
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 6
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-precisao-letal",
+      "column": "a",
+      "row": 7,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "chd",
+          "flat": 120
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-apoio-constante",
+      "column": "b",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-maestria-do-arco",
+      "column": "a",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-arqueiro-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-sylla-comando-de-batedores",
+      "column": "b",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

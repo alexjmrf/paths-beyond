@@ -10,7 +10,8 @@
       "side": "player",
       "hero": {
         "id": "u-heroi",
-        "classId": "class-teste",
+        "characterId": "personagem-soldado",
+        "classId": "class-soldado",
         "level": 1,
         "exp": 0,
         "awakening": 0,
@@ -40,35 +41,13 @@
     {
       "unitId": "u-inimigo",
       "side": "enemy",
-      "hero": {
-        "id": "u-inimigo",
-        "classId": "class-teste",
-        "level": 1,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": null,
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "sword",
-        "duelSkills": [
-          "skill-teste"
-        ],
-        "mapSkills": [],
-        "tacticsScript": []
-      },
       "pos": {
         "x": 3,
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "enemyId": "enemy-teste"
     }
   ]
 }

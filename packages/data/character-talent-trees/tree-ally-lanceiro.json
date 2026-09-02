@@ -1,0 +1,279 @@
+{
+  "characterId": "ally-lanceiro",
+  "depth": 8,
+  "nodes": [
+    {
+      "id": "talent-nyra-estocada",
+      "column": "a",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-pe-firme",
+      "column": "b",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 10
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": -10
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-desarme-preciso",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-lanceiro",
+          "patch": {
+            "multiplier": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-folego-da-formacao",
+      "column": "b",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-alcance-longo",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-lanceiro",
+          "patch": {
+            "multiplier": 1150
+          }
+        },
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-giro-da-haste",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-pressao",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-alcance-de-apoio",
+      "column": "b",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-braco-treinado",
+      "column": "a",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        },
+        {
+          "t": "stat",
+          "stat": "pen",
+          "flat": 40
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-escudo-companheiro",
+      "column": "b",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 5
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-desarme-cruel",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-lanceiro",
+          "patch": {
+            "effects": [
+              {
+                "effectId": "effect-desarme",
+                "target": "target",
+                "chance": 650,
+                "duration": "duel"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-troca-de-haste",
+      "column": "middle",
+      "row": 6,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-contra-simples",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-contra-atacar",
+          "patch": {
+            "ppCost": 0
+          }
+        },
+        {
+          "t": "maxAp",
+          "n": -1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-sangue-frio",
+      "column": "a",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-ordem-de-linha",
+      "column": "b",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 10
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-maestria-da-lanca",
+      "column": "a",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-lanceiro-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-nyra-comando-de-formacao",
+      "column": "b",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

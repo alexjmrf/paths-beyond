@@ -1,0 +1,148 @@
+{
+  "characterId": "personagem-cavaleiro",
+  "depth": 5,
+  "nodes": [
+    {
+      "id": "talent-cav-a1",
+      "column": "a",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-b1",
+      "column": "b",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-a2",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-b2",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-a3",
+      "column": "a",
+      "row": 3,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-b3",
+      "column": "b",
+      "row": 3,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-m3",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-a4",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-b4",
+      "column": "b",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-a5",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-cav-b5",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        }
+      ]
+    }
+  ]
+}

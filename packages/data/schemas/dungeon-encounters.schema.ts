@@ -11,14 +11,27 @@ import { winConditionSchema } from './maps.schema.js';
 // quebrou — escrever masmorra em `encounters/` fez a campanha do cliente passar de 6 para
 // 14 capítulos e os testes de conteúdo acusarem na hora. Pastas separadas resolvem sem
 // nenhum filtro implícito espalhado por quem lê o catálogo.
-const dungeonEncounterUnitSchema = z.object({
+// §8.1 (M17, sub-sessão 3/N) — mesma união discriminada de `encounters.schema.ts`, e pela
+// mesma razão. Repetida em vez de compartilhada porque os dois schemas já eram irmãos
+// separados de propósito (masmorra não tem `chapter`, e foi essa diferença que obrigou a
+// separá-los em M14): unir só a unidade criaria uma dependência entre dois arquivos que o
+// projeto decidiu manter independentes.
+const dungeonCommonUnitFields = {
   unitId: idSchema,
-  side: z.enum(['player', 'enemy']),
-  hero: heroSchema,
   pos: coordSchema,
   height: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).default(0),
   aiArchetype: mapAiArchetypeSchema.optional(),
-});
+};
+
+const dungeonPlayerUnitSchema = z
+  .object({ ...dungeonCommonUnitFields, side: z.literal('player'), hero: heroSchema })
+  .strict();
+
+const dungeonEnemyUnitSchema = z
+  .object({ ...dungeonCommonUnitFields, side: z.literal('enemy'), enemyId: idSchema })
+  .strict();
+
+const dungeonEncounterUnitSchema = z.discriminatedUnion('side', [dungeonPlayerUnitSchema, dungeonEnemyUnitSchema]);
 
 const dungeonEncounterSchema = z
   .object({

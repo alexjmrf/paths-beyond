@@ -1,0 +1,39 @@
+{
+  "id": "enemy-emboscada-lanceiro",
+  "name": "Emboscador de Lança",
+  "stats": {
+    "hp": 580,
+    "atk": 105,
+    "def": 54,
+    "spd": 87,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "infantry",
+  "weaponType": "spear",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 3,
+    "pp": 2
+  },
+  "duelSkills": [
+    "skill-ataque-lanceiro",
+    "skill-especial-lanceiro"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-lanceiro",
+      "conditions": []
+    }
+  ]
+}

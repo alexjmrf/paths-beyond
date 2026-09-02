@@ -88,36 +88,7 @@
     {
       "unitId": "treino-elite-1",
       "side": "enemy",
-      "hero": {
-        "id": "treino-elite-1",
-        "classId": "class-espadachim",
-        "level": 18,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-espadachim",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "sword",
-        "duelSkills": [
-          "skill-ataque-espadachim",
-          "skill-especial-espadachim"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-espadachim",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-treino-elite-espadachim",
       "pos": {
         "x": 12,
         "y": 7
@@ -128,36 +99,7 @@
     {
       "unitId": "treino-elite-2",
       "side": "enemy",
-      "hero": {
-        "id": "treino-elite-2",
-        "classId": "class-arqueiro",
-        "level": 18,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-arqueiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "bow",
-        "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-arqueiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-treino-elite-arqueiro",
       "pos": {
         "x": 12,
         "y": 6
@@ -168,36 +110,7 @@
     {
       "unitId": "treino-elite-3",
       "side": "enemy",
-      "hero": {
-        "id": "treino-elite-3",
-        "classId": "class-clerigo",
-        "level": 17,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-clerigo",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "holy",
-        "duelSkills": [
-          "skill-ataque-clerigo",
-          "skill-especial-clerigo"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-clerigo",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-treino-elite-clerigo",
       "pos": {
         "x": 11,
         "y": 7

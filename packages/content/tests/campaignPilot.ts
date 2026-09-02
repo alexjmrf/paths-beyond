@@ -22,6 +22,7 @@ import {
 } from '@paths-beyond/core';
 import type { ContentCatalog, Encounter } from '../src/types.js';
 import { toSummonBlueprintPlacements } from '../src/summonPlacements.js';
+import { toEncounterPlacements } from '../src/encounterPlacements.js';
 
 // M12, sub-sessão 3/N — piloto automático do lado do jogador, usado por
 // `campanha.test.ts` pra provar que os 6 capítulos são JOGÁVEIS (o critério de aceite do
@@ -42,18 +43,9 @@ export function setupFor(catalog: ContentCatalog, encounter: Encounter): BattleS
   const arenaMap = catalog.maps[encounter.mapId];
   if (!arenaMap) throw new Error(`mapa desconhecido: ${encounter.mapId}`);
 
-  const placements: HeroPlacement[] = encounter.units.map((unit) => ({
-    unitId: unit.unitId,
-    hero: unit.hero,
-    classDef: catalog.classes[unit.hero.classId]!,
-    equippedItems: Object.values(unit.hero.equipment)
-      .filter((id): id is Id => id !== null)
-      .map((id) => catalog.items[id]!),
-    side: unit.side,
-    pos: unit.pos,
-    height: unit.height,
-    ...(unit.aiArchetype ? { aiArchetype: unit.aiArchetype } : {}),
-  }));
+  // §8.1 (M17, 3/N) — a conversão passou a ter um ramo (personagem vs. inimigo autorado) e
+  // virou peça compartilhada: cinco consumidores a faziam por conta própria.
+  const placements = toEncounterPlacements(encounter.units, catalog);
 
   return buildBattleSetupFromHeroes({
     placements,
@@ -66,6 +58,7 @@ export function setupFor(catalog: ContentCatalog, encounter: Encounter): BattleS
     skillsCatalog: catalog.skills,
     weaponDuelRanges: catalog.weaponDuelRanges,
     baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+    characterTalentTrees: catalog.characterTalentTrees,
     // Mesmo setup que o cliente monta (M12, sub-sessão 4/N): o replay gravado aqui só
     // vale como prova se a batalha for montada do mesmo jeito que a de verdade.
     valorSkills: catalog.valorSkills,

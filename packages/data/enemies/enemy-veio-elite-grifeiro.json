@@ -1,0 +1,39 @@
+{
+  "id": "enemy-veio-elite-grifeiro",
+  "name": "Capataz do Veio Alado",
+  "stats": {
+    "hp": 760,
+    "atk": 132,
+    "def": 115,
+    "spd": 93,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "flying",
+  "weaponType": "spear",
+  "moveType": "flying",
+  "moveRange": 5,
+  "pools": {
+    "ap": 3,
+    "pp": 2
+  },
+  "duelSkills": [
+    "skill-ataque-grifeiro",
+    "skill-especial-grifeiro"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-grifeiro",
+      "conditions": []
+    }
+  ]
+}

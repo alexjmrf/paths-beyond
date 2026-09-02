@@ -679,9 +679,24 @@ main {
 }
 
 .talent-points {
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* §8.2 (M17, 4/N) — a profundidade é FORMA e não poder: 5 linhas e 9 linhas gastam os
+   mesmos 9 pontos. Mostrar as duas leituras lado a lado é o que impede o jogador de ler
+   uma árvore rasa como uma árvore fraca. */
+.talent-depth {
   color: #9ca3af;
   font-size: 0.85rem;
-  margin-left: auto;
+  margin-right: auto;
+}
+
+.talent-subtitle {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-weight: 400;
 }
 
 .talent-graph {
@@ -703,6 +718,45 @@ main {
 .talent-node.allocated rect {
   fill: #1e3a8a;
   stroke: #60a5fa;
+}
+
+/* A convergência é uma PORTA (§8.2), e o desenho diz isso antes do texto: cantos redondos
+   contra os cantos retos das duas colunas principais, e um contorno próprio. */
+.talent-node.col-middle rect {
+  stroke: #a78bfa;
+  stroke-dasharray: 5 3;
+}
+
+.talent-node.col-middle.allocated rect {
+  fill: #4c1d95;
+  stroke: #c4b5fd;
+  stroke-dasharray: none;
+}
+
+/* Nó fora de alcance: a amarração de coluna, o caminho ou o orçamento o bloqueiam AGORA.
+   Apagado e não escondido — o jogador precisa ver a coluna que ele não escolheu para saber
+   o que está trocando. */
+.talent-node.locked rect {
+  fill: #111827;
+  stroke: #1f2937;
+}
+
+.talent-node.locked text {
+  fill: #4b5563;
+}
+
+/* A trilha do caminho alocado, linha a linha. É o que faz a build se ler como uma descida
+   em vez de nós soltos acesos. */
+.talent-path {
+  stroke: #60a5fa;
+  stroke-linecap: round;
+}
+
+.talent-column-titles text {
+  fill: #6b7280;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .talent-node.selected rect {
@@ -753,8 +807,18 @@ main {
   cursor: pointer;
 }
 
+.talent-node-actions button:nth-child(2) {
+  background: #b45309;
+}
+
 .talent-node-actions button:last-child {
   background: #7f1d1d;
+}
+
+.talent-node-actions button:disabled {
+  background: #374151;
+  color: #6b7280;
+  cursor: default;
 }
 
 .talent-hint {

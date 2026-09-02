@@ -1,4 +1,5 @@
-import { buildBattleSetupFromHeroes, resolveAutoBattle, type BattleSetup, type HeroPlacement, type Id } from '@paths-beyond/core';
+import { buildBattleSetupFromHeroes, resolveAutoBattle, type BattleSetup } from '@paths-beyond/core';
+import { toEncounterPlacements } from '../src/encounterPlacements.js';
 import { describe, expect, it } from 'vitest';
 import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
 import type { DungeonEncounter } from '../src/types.js';
@@ -23,19 +24,15 @@ function setupFor(encounter: DungeonEncounter, playerLevelDelta = 0): BattleSetu
   const map = catalog.maps[encounter.mapId];
   if (!map) throw new Error(`masmorra referencia mapa desconhecido: ${encounter.mapId}`);
 
-  const placements: HeroPlacement[] = encounter.units.map((unit) => ({
-    unitId: unit.unitId,
-    hero: unit.side === 'player' ? { ...unit.hero, level: unit.hero.level + playerLevelDelta } : unit.hero,
-    classDef: catalog.classes[unit.hero.classId]!,
-    equippedItems: Object.values(unit.hero.equipment)
-      .filter((id): id is Id => id !== null)
-      .map((id) => catalog.items[id]!)
-      .filter(Boolean),
-    side: unit.side,
-    pos: unit.pos,
-    height: unit.height,
-    ...(unit.aiArchetype ? { aiArchetype: unit.aiArchetype } : {}),
-  }));
+  // O empurrão de nível é do JOGADOR e só dele — é assim que o teste separa "difícil" de
+  // "inacabável". Aplicado na unidade de conteúdo, antes da conversão: depois de virar
+  // placement, o inimigo já não tem nível para empurrar (§8.1), e o herói também não
+  // deveria ser remendado do outro lado da conversão.
+  const units = encounter.units.map((unit) =>
+    unit.side === 'player' ? { ...unit, hero: { ...unit.hero, level: unit.hero.level + playerLevelDelta } } : unit,
+  );
+
+  const placements = toEncounterPlacements(units, catalog);
 
   return buildBattleSetupFromHeroes({
     placements,
@@ -49,6 +46,7 @@ function setupFor(encounter: DungeonEncounter, playerLevelDelta = 0): BattleSetu
     skillsCatalog: catalog.skills,
     weaponDuelRanges: catalog.weaponDuelRanges,
     baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+    characterTalentTrees: catalog.characterTalentTrees,
   });
 }
 

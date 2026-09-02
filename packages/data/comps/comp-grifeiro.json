@@ -5,13 +5,19 @@
     {
       "hero": {
         "id": "heroi-grifeiro-1",
+        "characterId": "ally-grifeiro",
         "classId": "class-grifeiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-grifeiro-foco-em-equipe": 1
+          "talent-kaia-voo-baixo": 2,
+          "talent-kaia-folego-das-asas": 2,
+          "talent-kaia-mao-estendida": 1,
+          "talent-kaia-sombra-protetora": 2,
+          "talent-kaia-rota-de-fuga": 1,
+          "talent-kaia-comando-aereo": 1
         },
         "equipment": {
           "weapon": "item-arma-grifeiro",
@@ -45,32 +51,41 @@
     {
       "hero": {
         "id": "heroi-grifeiro-2",
-        "classId": "class-grifeiro",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-grifeiro-foco-em-equipe": 1
+          "talent-aren-postura-firme": 1,
+          "talent-aren-folego-do-escudo": 1,
+          "talent-aren-mao-estendida": 1,
+          "talent-aren-couro-batido": 1,
+          "talent-aren-contra-simples": 1,
+          "talent-aren-alcance-de-apoio": 1,
+          "talent-aren-vigilia": 1,
+          "talent-aren-troca-limpa": 1,
+          "talent-aren-comando-de-flanco": 1
         },
         "equipment": {
-          "weapon": "item-arma-grifeiro",
+          "weapon": "item-arma-espadachim",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "spear",
+        "weaponType": "sword",
         "duelSkills": [
-          "skill-ataque-grifeiro",
-          "skill-especial-grifeiro"
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-grifeiro",
+            "skillId": "skill-especial-espadachim",
             "conditions": []
           }
         ]
@@ -84,15 +99,22 @@
     },
     {
       "hero": {
-        "id": "heroi-grifeiro-apoio",
+        "id": "heroi-grifeiro-3",
+        "characterId": "ally-arqueiro",
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1,
-          "talent-arqueiro-reacao-propria": 1
+          "talent-sylla-pes-leves": 1,
+          "talent-sylla-folego-de-combate": 1,
+          "talent-sylla-alcance-de-apoio": 1,
+          "talent-sylla-mao-estendida": 1,
+          "talent-sylla-respiro": 2,
+          "talent-sylla-retirada-calculada": 1,
+          "talent-sylla-apoio-constante": 1,
+          "talent-sylla-comando-de-batedores": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",

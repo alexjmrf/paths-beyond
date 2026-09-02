@@ -1,0 +1,309 @@
+{
+  "characterId": "ally-couracado",
+  "depth": 9,
+  "nodes": [
+    {
+      "id": "talent-bardan-aco-pesado",
+      "column": "a",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": -5
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-machado-largo",
+      "column": "b",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-respiro-sob-o-elmo",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-impacto",
+      "column": "b",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-couracado",
+          "patch": {
+            "multiplier": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-mao-estendida",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-sede-de-ruina",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-guarda-firmada",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-couracado",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-giro-de-machado",
+      "column": "middle",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-golpe-arrasador",
+      "column": "b",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-couracado",
+          "patch": {
+            "effects": [
+              {
+                "effectId": "effect-quebra-armadura",
+                "target": "target",
+                "chance": 600,
+                "duration": "duel"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-couraca-viva",
+      "column": "a",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 15
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 3
+        },
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-forca-bruta",
+      "column": "b",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-alcance-de-apoio",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-investida-pesada",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-contra-simples",
+      "column": "a",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-contra-atacar",
+          "patch": {
+            "ppCost": 0
+          }
+        },
+        {
+          "t": "maxAp",
+          "n": -1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-postura-trocada",
+      "column": "middle",
+      "row": 7,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-ultimo-suspiro",
+      "column": "b",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantSkill",
+          "skillId": "skill-ultimo-suspiro"
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-resistencia",
+      "column": "a",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "efr",
+          "flat": 50
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-penetracao",
+      "column": "b",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "pen",
+          "flat": 60
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-maestria-da-muralha",
+      "column": "a",
+      "row": 9,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-couracado-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-bardan-comando-de-cerco",
+      "column": "b",
+      "row": 9,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

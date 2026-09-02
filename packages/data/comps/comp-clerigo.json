@@ -5,13 +5,20 @@
     {
       "hero": {
         "id": "heroi-clerigo-1",
+        "characterId": "ally-clerigo",
         "classId": "class-clerigo",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-clerigo-foco-em-equipe": 1
+          "talent-miron-imposicao-de-maos": 1,
+          "talent-miron-oracao-constante": 2,
+          "talent-miron-mao-que-alcanca": 1,
+          "talent-miron-calor-do-santuario": 2,
+          "talent-miron-refugio": 1,
+          "talent-miron-vigilia-branca": 1,
+          "talent-miron-maestria-da-luz": 1
         },
         "equipment": {
           "weapon": "item-arma-clerigo",
@@ -56,43 +63,38 @@
     {
       "hero": {
         "id": "heroi-clerigo-2",
-        "classId": "class-clerigo",
+        "characterId": "ally-grifeiro",
+        "classId": "class-grifeiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-clerigo-foco-em-equipe": 1
+          "talent-kaia-voo-baixo": 2,
+          "talent-kaia-folego-das-asas": 2,
+          "talent-kaia-mao-estendida": 1,
+          "talent-kaia-sombra-protetora": 2,
+          "talent-kaia-rota-de-fuga": 1,
+          "talent-kaia-comando-aereo": 1
         },
         "equipment": {
-          "weapon": "item-arma-clerigo",
+          "weapon": "item-arma-grifeiro",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-guardiao",
+          "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "holy",
+        "weaponType": "spear",
         "duelSkills": [
-          "skill-ataque-clerigo",
-          "skill-especial-clerigo",
-          "skill-cura-clerigo"
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-cura-clerigo",
-            "conditions": [
-              {
-                "t": "selfHpBelow",
-                "pct": 250
-              }
-            ]
-          },
-          {
-            "enabled": true,
-            "skillId": "skill-especial-clerigo",
+            "skillId": "skill-especial-grifeiro",
             "conditions": []
           }
         ]
@@ -106,34 +108,42 @@
     },
     {
       "hero": {
-        "id": "heroi-clerigo-apoio",
-        "classId": "class-couracado",
+        "id": "heroi-clerigo-3",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-couracado-foco-em-equipe": 1
+          "talent-aren-postura-firme": 1,
+          "talent-aren-folego-do-escudo": 1,
+          "talent-aren-mao-estendida": 1,
+          "talent-aren-couro-batido": 1,
+          "talent-aren-contra-simples": 1,
+          "talent-aren-alcance-de-apoio": 1,
+          "talent-aren-vigilia": 1,
+          "talent-aren-troca-limpa": 1,
+          "talent-aren-comando-de-flanco": 1
         },
         "equipment": {
-          "weapon": "item-arma-couracado",
+          "weapon": "item-arma-espadachim",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "axe",
+        "weaponType": "sword",
         "duelSkills": [
-          "skill-ataque-couracado",
-          "skill-especial-couracado",
-          "skill-ultimo-suspiro"
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-couracado",
+            "skillId": "skill-especial-espadachim",
             "conditions": []
           }
         ]

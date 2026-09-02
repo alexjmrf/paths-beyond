@@ -1,0 +1,39 @@
+{
+  "id": "enemy-invasor-arqueiro",
+  "name": "Invasor Arqueiro",
+  "stats": {
+    "hp": 580,
+    "atk": 75,
+    "def": 44,
+    "spd": 87,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "infantry",
+  "weaponType": "bow",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 4,
+    "pp": 1
+  },
+  "duelSkills": [
+    "skill-ataque-arqueiro",
+    "skill-especial-arqueiro"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-arqueiro",
+      "conditions": []
+    }
+  ]
+}

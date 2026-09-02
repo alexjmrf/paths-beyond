@@ -1,0 +1,243 @@
+{
+  "characterId": "ally-guerreiro",
+  "depth": 7,
+  "nodes": [
+    {
+      "id": "talent-rurik-furia",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-estandarte",
+      "column": "b",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 10
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": -2
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-machado-cruel",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-guerreiro",
+          "patch": {
+            "multiplier": 1250
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-pisada-firme",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-brado",
+      "column": "b",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-guerreiro",
+          "patch": {
+            "effects": [
+              {
+                "effectId": "effect-brado-de-guerra",
+                "target": "self",
+                "chance": 1000,
+                "duration": "duel"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-sangue-por-sangue",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-golpe-partido",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-guerreiro",
+          "patch": {
+            "multiplier": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-folego-de-comando",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-sem-recuo",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-alcance-de-apoio",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-pele-de-couro",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 20
+        },
+        {
+          "t": "stat",
+          "stat": "pen",
+          "flat": 40
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-troca-de-linha",
+      "column": "middle",
+      "row": 6,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-ordem-clara",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-maestria-do-machado",
+      "column": "a",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-guerreiro-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-rurik-comando-de-vanguarda",
+      "column": "b",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

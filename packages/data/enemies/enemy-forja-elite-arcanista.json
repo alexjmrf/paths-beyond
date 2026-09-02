@@ -1,0 +1,39 @@
+{
+  "id": "enemy-forja-elite-arcanista",
+  "name": "Fundidor Arcano",
+  "stats": {
+    "hp": 700,
+    "atk": 93,
+    "def": 52,
+    "spd": 91,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "caster",
+  "weaponType": "arcane",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 4,
+    "pp": 1
+  },
+  "duelSkills": [
+    "skill-ataque-arcanista",
+    "skill-especial-arcanista"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-arcanista",
+      "conditions": []
+    }
+  ]
+}

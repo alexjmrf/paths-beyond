@@ -1,0 +1,236 @@
+{
+  "characterId": "ally-arcanista",
+  "depth": 6,
+  "nodes": [
+    {
+      "id": "talent-vesper-chama-crescente",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-manto-arcano",
+      "column": "b",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 40
+        },
+        {
+          "t": "stat",
+          "stat": "efr",
+          "flat": 40
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 5
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-combustao",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-arcanista",
+          "patch": {
+            "multiplier": 1250
+          }
+        },
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-reserva-de-mana",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 25
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-foco-abrasador",
+      "column": "a",
+      "row": 3,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "eff",
+          "flat": 60
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-passo-etereo",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 4
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-queima-persistente",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-arcanista",
+          "patch": {
+            "effects": [
+              {
+                "effectId": "effect-queimadura",
+                "target": "target",
+                "chance": 850,
+                "duration": "duel"
+              }
+            ]
+          }
+        },
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-circulo-de-apoio",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-arcanista",
+          "patch": {
+            "multiplier": 1350
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-poder-bruto",
+      "column": "a",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 45
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-convergencia-arcana",
+      "column": "middle",
+      "row": 5,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-condutor",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-maestria-arcana",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-arcanista-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-vesper-tecer-o-campo",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

@@ -21,10 +21,15 @@ import {
   generatePromotedClass,
   generateSignatureSkill,
   generateStatCurve,
-  generateTalentTree,
   generateWeaponItem,
   weaponItemId,
 } from '../scripts/authorContent.js';
+// §8.1 (M17, 2/N) — a árvore saiu da CLASSE e virou do PERSONAGEM, e o gerador dela foi
+// junto. O que este arquivo ainda tem a dizer sobre talento é a costura comp↔árvore: a
+// alocação que uma comp escreve tem de existir na árvore de quem a joga. A conformidade
+// das nove árvores com §8.2 é medida sobre os arquivos AUTORADOS, não sobre o gerador, em
+// `packages/content/tests/elenco.test.ts`.
+import { characterForClass, columnGrantingAssist, generateTalentTree } from '../scripts/authorCharacters.js';
 
 const espadachim = CLASS_PROFILES.find((p) => p.slug === 'espadachim')!;
 
@@ -54,48 +59,6 @@ describe('generateStatCurve', () => {
   it('é determinística', () => {
     expect(generateStatCurve(espadachim)).toEqual(generateStatCurve(espadachim));
   });
-});
-
-describe('generateTalentTree — conformidade com as regras de design de §8.2', () => {
-  for (const profile of CLASS_PROFILES) {
-    describe(profile.slug, () => {
-      const tree = generateTalentTree(profile);
-
-      it('tem 8 linhas representadas (row 1..8)', () => {
-        const rows = new Set(tree.map((node) => node.row));
-        expect(rows).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8]));
-      });
-
-      it('tem exatamente 3 linhas de escolha (nós com exclusiveWith, mínimo exigido pela spec)', () => {
-        const choiceRows = new Set(tree.filter((node) => (node.exclusiveWith?.length ?? 0) > 0).map((node) => node.row));
-        expect(choiceRows.size).toBe(3);
-      });
-
-      it('tem pelo menos 2 nós tocando economia de AP/PP/assistência', () => {
-        const econEffectTypes = new Set(['maxAp', 'maxPp', 'apRefund', 'duelApCap', 'assistRangeBonus']);
-        const econNodes = tree.filter((node) => node.effects.some((effect) => econEffectTypes.has(effect.t)));
-        expect(econNodes.length).toBeGreaterThanOrEqual(2);
-      });
-
-      it('preenchimento (+2% stat isolado) não passa de 30% dos nós', () => {
-        const fillerNodes = tree.filter(
-          (node) => node.effects.length === 1 && node.effects[0]!.t === 'stat' && (node.effects[0] as { pct?: number }).pct === 20 && !('flat' in node.effects[0]!),
-        );
-        expect(fillerNodes.length / tree.length).toBeLessThanOrEqual(0.3);
-      });
-
-      it('cada choice pair referencia o parceiro corretamente (exclusiveWith é mútuo)', () => {
-        const byId = new Map(tree.map((node) => [node.id, node]));
-        for (const node of tree) {
-          for (const partnerId of node.exclusiveWith ?? []) {
-            const partner = byId.get(partnerId);
-            expect(partner).toBeDefined();
-            expect(partner!.exclusiveWith).toContain(node.id);
-          }
-        }
-      });
-    });
-  }
 });
 
 describe('conteúdo gerado valida contra os schemas Zod reais', () => {
@@ -189,22 +152,48 @@ describe('comps multi-unidade com assistência real (M10, sub-sessão 4/N)', () 
     }
   });
 
-  it('toda unidade aloca o talento que concede skill-assistir — sem isso nenhuma assistiria', () => {
-    // O talento é o da classe DA UNIDADE, não o da classe do comp: a unidade de apoio é de
-    // outra classe (ver o bloco de comps mistas abaixo) e o talento dela tem outra slug.
+  it('toda unidade aloca um nó que concede skill-assistir — sem isso nenhuma assistiria', () => {
+    // A árvore é a do PERSONAGEM da unidade (§8.1), não a da classe do comp: as três
+    // unidades são personagens distintos desde a 2/N, e cada uma desce a própria coluna.
+    // Vale a asserção pelo EFEITO e não pelo id do nó — o nome da slug é sabor de autoria,
+    // "a alocação abre a janela de assistência" é a propriedade.
     for (const profile of CLASS_PROFILES) {
       for (const unit of generateComp(profile).units) {
-        const slug = unit.hero.classId.replace('class-', '');
-        expect(unit.hero.talents[`talent-${slug}-foco-em-equipe`], unit.hero.id).toBe(1);
+        const arvore = generateTalentTree(characterForClass(unit.hero.classId));
+        const alocados = arvore.nodes.filter((node) => (unit.hero.talents[node.id] ?? 0) > 0);
+        const concedem = alocados.filter((node) =>
+          node.effects.some((e) => e.t === 'grantReaction' && e.reactionId === SKILL_ASSISTIR.id),
+        );
+        expect(concedem.length, unit.hero.id).toBeGreaterThanOrEqual(1);
       }
     }
   });
 
-  it('o talento alocado de fato concede skill-assistir na árvore da classe', () => {
+  it('toda alocação de comp existe na árvore do personagem que a joga', () => {
+    // O recíproco do teste acima, e o que ele sozinho não pegaria: `resolveTalentEffects`
+    // ignora nó desconhecido em silêncio (§8.2), então uma slug errada numa comp não
+    // quebraria nada — só apagaria o talento e a matriz de winrate mediria outra build.
     for (const profile of CLASS_PROFILES) {
-      const node = generateTalentTree(profile).find((n) => n.id === `talent-${profile.slug}-foco-em-equipe`);
-      expect(node).toBeDefined();
-      expect(node!.effects).toContainEqual({ t: 'grantReaction', reactionId: SKILL_ASSISTIR.id });
+      for (const unit of generateComp(profile).units) {
+        const ids = new Set(generateTalentTree(characterForClass(unit.hero.classId)).nodes.map((n) => n.id));
+        for (const alocado of Object.keys(unit.hero.talents)) {
+          expect(ids.has(alocado), `${unit.hero.id} → ${alocado}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('a coluna escolhida pela comp é a que concede assistir, dos dois lados', () => {
+    // `columnGrantingAssist` é a decisão que `generateComp` toma; aqui ela é conferida
+    // contra a árvore gerada, e não contra si mesma.
+    for (const personagem of CLASS_PROFILES.map((p) => characterForClass(`class-${p.slug}`))) {
+      const coluna = columnGrantingAssist(personagem);
+      const arvore = generateTalentTree(personagem);
+      const concedem = arvore.nodes.filter((node) =>
+        node.effects.some((e) => e.t === 'grantReaction' && e.reactionId === SKILL_ASSISTIR.id),
+      );
+      expect(concedem.length, personagem.id).toBeGreaterThanOrEqual(1);
+      expect(concedem.map((n) => n.column), personagem.id).toContain(coluna);
     }
   });
 
@@ -267,11 +256,11 @@ describe('classe promovida (M8, sub-sessão 4/N)', () => {
     expect(promoted.promotionRequirement).toEqual({ minLevel: 20, itemId: 'item-brasao-mestre-espadachim' });
   });
 
-  it('a árvore de talentos é tree:"spec", não "class"', () => {
-    for (const node of promoted.talentTree) {
-      expect(node.tree).toBe('spec');
-    }
-  });
+  // §8.1 (M17, 2/N) — o teste da árvore `tree:"spec"` da promoção SAIU, e não foi
+  // substituído: com a árvore pertencendo ao personagem, a classe promovida não tem árvore
+  // nenhuma para ter forma. `mestre-espadachim` é a promoção do espadachim e chega por
+  // `hero-jogador` (D7), que já tem a árvore dele. O que a promoção ainda promete —
+  // requisito, tier e ganho real de stat — continua medido pelos testes vizinhos.
 
   it('tem stats mais fortes que class-espadachim no mesmo nível (promoção é ganho real de poder)', () => {
     const promotedCurve = promoted.statCurve;
@@ -557,8 +546,15 @@ describe('as mecânicas de M10 ganham consumidor real (M12, sub-sessão 2/N)', (
     // onDamaged: concedida por talento, e o comp PRECISA alocar o talento — sem isso o
     // gatilho continuaria sem consumidor no torneio.
     const compArqueiro = generateComp(arqueiro);
-    expect(generateTalentTree(arqueiro).some((n) => n.effects.some((e) => (e as { reactionId?: string }).reactionId === SKILL_REVIDE_PRECISO.id))).toBe(true);
-    expect(Object.keys(compArqueiro.units[0]!.hero.talents)).toContain('talent-arqueiro-reacao-propria');
+    const sylla = characterForClass('class-arqueiro');
+    const concede = generateTalentTree(sylla).nodes.filter((n) =>
+      n.effects.some((e) => e.t === 'grantReaction' && e.reactionId === SKILL_REVIDE_PRECISO.id),
+    );
+    expect(concede.length).toBeGreaterThanOrEqual(1);
+    // A âncora do comp é o próprio personagem da classe (`compRoster` põe o perfil do comp
+    // primeiro), e ela precisa DESCER pelo nó — a reação só existe se o ponto for gasto.
+    const alocacao = compArqueiro.units[0]!.hero.talents;
+    expect(concede.some((n) => (alocacao[n.id] ?? 0) > 0), 'nenhum nó de fôlego alocado').toBe(true);
   });
 
   it('só o Arqueiro tem reação própria — §6.4 fecha as universais em duas', () => {
@@ -580,6 +576,8 @@ describe('as mecânicas de M10 ganham consumidor real (M12, sub-sessão 2/N)', (
 // Lanceiro" segue significando algo sobre arqueiros) e ganha uma terceira que cobre o que falta.
 describe('comps mistas: cada composição tem resposta em corpo a corpo E em alcance', () => {
   const MELEE = new Set(['sword', 'axe', 'spear']);
+  // Três unidades por comp desde M10 4/N; nomeado aqui para a contagem abaixo dizer o que mede.
+  const COMP_UNIT_COUNT = 3;
 
   it('toda comp tem ao menos uma arma de alcance e ao menos uma de corpo a corpo', () => {
     // É a propriedade que faz a assimetria de §6.1 ser JOGÁVEL no torneio em vez de decidida na
@@ -592,11 +590,28 @@ describe('comps mistas: cada composição tem resposta em corpo a corpo E em alc
     }
   });
 
-  it('a maioria da comp continua sendo a classe do comp — a matriz não perde a leitura por classe', () => {
+  // §8.1 (M17, 2/N) — a leitura por classe MUDOU DE FORMA, e a mudança é consequência de D6.
+  // Até aqui a comp tinha duas unidades da própria classe, e a maioria era o que segurava a
+  // leitura da matriz. Com o elenco fechado e um personagem por classe, duas unidades da
+  // classe do comp seriam a MESMA PESSOA duas vezes — o herói sintético que D6 aposentou.
+  // A leitura passa a ser segurada pela ÂNCORA: a primeira unidade é o personagem daquela
+  // classe, e é dela que o comp tira o nome. "Arqueiro vence Lanceiro" segue significando
+  // algo sobre arqueiros; o que deixa de significar é "sobre três arqueiros".
+  it('a âncora do comp é o personagem da classe que dá nome a ele', () => {
     for (const profile of CLASS_PROFILES) {
-      const units = generateComp(profile).units;
-      const daClasse = units.filter((u) => u.hero.classId === `class-${profile.slug}`);
-      expect(daClasse.length, profile.slug).toBeGreaterThan(units.length - daClasse.length);
+      const ancora = generateComp(profile).units[0]!;
+      expect(ancora.hero.classId, profile.slug).toBe(`class-${profile.slug}`);
+      expect(ancora.hero.characterId, profile.slug).toBe(characterForClass(`class-${profile.slug}`).id);
+    }
+  });
+
+  it('as três unidades são personagens DISTINTOS — elenco fechado não empilha cópias', () => {
+    // O modo de falha que isto pega é o que D6 aposentou voltando pela porta do apoio: se
+    // `compRoster` escolhesse um apoio já presente, a comp teria a mesma pessoa duas vezes,
+    // com a mesma árvore e a mesma build, e a matriz mediria um clone.
+    for (const profile of CLASS_PROFILES) {
+      const personagens = generateComp(profile).units.map((u) => u.hero.characterId);
+      expect(new Set(personagens).size, profile.slug).toBe(personagens.length);
     }
   });
 
@@ -618,13 +633,53 @@ describe('comps mistas: cada composição tem resposta em corpo a corpo E em alc
     }
   });
 
-  it('a comp de uma classe de alcance ganha apoio corpo a corpo, e vice-versa', () => {
+  it('toda comp é MISTA — tem corpo a corpo e tem alcance', () => {
+    // A regra antiga ("classe de alcance ganha apoio corpo a corpo, e vice-versa") saiu na 5/N
+    // porque produzia o mesmo par de apoio nas nove comps. O que ela PROTEGIA continua sendo
+    // exigido aqui, e é a propriedade, não o mecanismo: sem as duas coisas no time, o torneio
+    // volta ao tabuleiro em que "fechar distância" não existe e ranged vence melee em 20 de 20.
+    //
+    // É por isto que `COMP_ROSTER_ORDER` é intercalada e não a ordem de declaração de
+    // CLASS_PROFILES: aquela daria uma comp inteiramente de espada/machado/lança e outra
+    // inteiramente de casters.
     for (const profile of CLASS_PROFILES) {
-      const units = generateComp(profile).units;
-      const apoio = units.find((u) => u.hero.classId !== `class-${profile.slug}`);
-      expect(apoio, `${profile.slug}: sem unidade de apoio`).toBeDefined();
-      // O apoio cobre o lado que falta: classe de alcance recebe corpo a corpo, e o contrário.
-      expect(MELEE.has(apoio!.hero.weaponType), profile.slug).toBe(MELEE.has(profile.weaponType) === false);
+      const armas = generateComp(profile).units.map((u) => u.hero.weaponType);
+      expect(armas.some((w) => MELEE.has(w)), `${profile.slug}: sem corpo a corpo`).toBe(true);
+      expect(armas.some((w) => !MELEE.has(w)), `${profile.slug}: sem alcance`).toBe(true);
     }
+  });
+
+  it('as nove comps são times DISTINTOS entre si', () => {
+    // O teste que faltava, e o defeito que ele teria pego: até a 5/N, `comp-arqueiro`,
+    // `comp-couracado` e `comp-espadachim` eram os MESMOS três personagens, diferindo só na
+    // ordem das posições — e pontuavam 67,1%, 57,2% e 63,4% em `pnpm balance`, ou seja, dez
+    // pontos percentuais de diferença medindo posição inicial e chamando aquilo de composição.
+    //
+    // Um terço da matriz media a mesma coisa três vezes, e nada reclamava: as asserções
+    // existentes olhavam UMA comp por vez (âncora certa, três personagens distintos DENTRO da
+    // comp), e nenhuma comparava as comps ENTRE si.
+    const times = CLASS_PROFILES.map((p) => ({
+      id: `comp-${p.slug}`,
+      chave: [...generateComp(p).units.map((u) => u.hero.characterId)].sort().join('+'),
+    }));
+    const porChave = new Map<string, string[]>();
+    for (const t of times) porChave.set(t.chave, [...(porChave.get(t.chave) ?? []), t.id]);
+    const duplicados = [...porChave.values()].filter((ids) => ids.length > 1);
+    expect(duplicados, 'comps com o mesmo elenco').toEqual([]);
+  });
+
+  it('cada personagem do elenco aparece no mesmo número de comps', () => {
+    // Consequência de "âncora + os dois seguintes, circulando", e a razão de ela ter sido
+    // escolhida: com a regra antiga, arqueiro e couraçado estavam em NOVE comps e o resto em
+    // uma ou duas. Um personagem super-representado desloca a matriz inteira na direção dele, e
+    // a leitura "o comp X está forte" passa a poder significar "o apoio de todo mundo está forte".
+    const contagem = new Map<string, number>();
+    for (const profile of CLASS_PROFILES) {
+      for (const unit of generateComp(profile).units) {
+        contagem.set(unit.hero.characterId, (contagem.get(unit.hero.characterId) ?? 0) + 1);
+      }
+    }
+    expect(contagem.size).toBe(CLASS_PROFILES.length);
+    expect([...new Set(contagem.values())]).toEqual([COMP_UNIT_COUNT]);
   });
 });

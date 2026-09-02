@@ -1,33 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import { resolveTalentEffects } from '../../src/talents/resolve.js';
-import type { TalentNode } from '../../src/talents/types.js';
+import type { ColumnTalentNode } from '../../src/talents/columnTree.js';
 
-const tree: TalentNode[] = [
-  { id: 'hp-node', tree: 'class', row: 1, maxRank: 3, effects: [{ t: 'stat', stat: 'hp', flat: 50 }] },
-  { id: 'atk-pct-node', tree: 'class', row: 1, maxRank: 2, effects: [{ t: 'stat', stat: 'atk', pct: 30 }] },
-  { id: 'grant-node', tree: 'class', row: 2, maxRank: 1, effects: [{ t: 'grantSkill', skillId: 'skill-x' }] },
-  { id: 'grant-reaction-node', tree: 'class', row: 2, maxRank: 1, effects: [{ t: 'grantReaction', reactionId: 'reaction-y' }] },
+// M17 2/N — os nós passaram a declarar `column` no lugar de `tree`. `resolveTalentEffects`
+// não lê nenhum dos dois (ele agrega efeito por rank alocado, §8.2), então a troca aqui é
+// só de forma: o que este arquivo mede continua sendo a agregação dos 12 efeitos.
+const tree: ColumnTalentNode[] = [
+  { id: 'hp-node', column: 'a', row: 1, maxRank: 3, effects: [{ t: 'stat', stat: 'hp', flat: 50 }] },
+  { id: 'atk-pct-node', column: 'a', row: 1, maxRank: 2, effects: [{ t: 'stat', stat: 'atk', pct: 30 }] },
+  { id: 'grant-node', column: 'a', row: 2, maxRank: 1, effects: [{ t: 'grantSkill', skillId: 'skill-x' }] },
+  { id: 'grant-reaction-node', column: 'a', row: 2, maxRank: 1, effects: [{ t: 'grantReaction', reactionId: 'reaction-y' }] },
   {
     id: 'patch-node',
-    tree: 'class',
+    column: 'a',
     row: 2,
     maxRank: 1,
     effects: [{ t: 'modifySkill', skillId: 'skill-z', patch: { flat: 100 } }],
   },
-  { id: 'ap-node', tree: 'spec', row: 1, maxRank: 2, effects: [{ t: 'maxAp', n: 1 }] },
-  { id: 'pp-node', tree: 'spec', row: 1, maxRank: 1, effects: [{ t: 'maxPp', n: 1 }] },
+  { id: 'ap-node', column: 'b', row: 1, maxRank: 2, effects: [{ t: 'maxAp', n: 1 }] },
+  { id: 'pp-node', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'maxPp', n: 1 }] },
   {
     id: 'refund-node',
-    tree: 'spec',
+    column: 'b',
     row: 1,
     maxRank: 1,
     effects: [{ t: 'apRefund', on: 'duelWon', n: 1 }],
   },
-  { id: 'assist-node', tree: 'spec', row: 1, maxRank: 1, effects: [{ t: 'assistRangeBonus', n: 1 }] },
-  { id: 'cap-node', tree: 'spec', row: 1, maxRank: 1, effects: [{ t: 'duelApCap', n: 1 }] },
-  { id: 'slot-node', tree: 'spec', row: 1, maxRank: 1, effects: [{ t: 'extraTacticsSlot' }] },
-  { id: 'condition-node', tree: 'spec', row: 1, maxRank: 1, effects: [{ t: 'extraTacticsCondition' }] },
-  { id: 'passive-node', tree: 'spec', row: 1, maxRank: 1, effects: [{ t: 'passive', passiveId: 'passive-1' }] },
+  { id: 'assist-node', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'assistRangeBonus', n: 1 }] },
+  { id: 'cap-node', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'duelApCap', n: 1 }] },
+  { id: 'slot-node', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'extraTacticsSlot' }] },
+  { id: 'condition-node', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'extraTacticsCondition' }] },
+  { id: 'passive-node', column: 'b', row: 1, maxRank: 1, effects: [{ t: 'passive', passiveId: 'passive-1' }] },
 ];
 
 describe('resolveTalentEffects — efeitos stat escalam por rank (§8.2)', () => {

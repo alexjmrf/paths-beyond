@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import encounterSchema from '../schemas/encounters.schema.js';
+import { enemyIdOrThrow } from './authorEnemies.js';
 import mapSchema from '../schemas/maps.schema.js';
 import skillSchema from '../schemas/skills.schema.js';
 
@@ -348,14 +349,32 @@ interface TacticsLine {
   readonly conditions: readonly unknown[];
 }
 
+type MapAi = 'aggressive' | 'hold-position' | 'guard-tile' | 'flank' | 'support-nearest';
+
+// §8.1 (M17, 3/N) — a unidade do jogador continua sendo uma FICHA (classe, nível, colar,
+// talentos: as coisas que existem porque um personagem progride), e o inimigo passou a ser
+// uma REFERÊNCIA ao catálogo de `enemies/`.
+//
+// A assimetria é o milestone inteiro num tipo só. Antes destes dois tipos serem separados,
+// autorar o capítulo 4 era escrever "um arqueiro nível 9" e torcer para que a curva
+// produzisse a dificuldade pretendida; agora é escolher `enemy-cerco-arqueiro`, cuja força
+// está escrita por extenso e é editável sem passar por classe nenhuma.
 export interface UnitSpec {
   readonly unitId: string;
+  // §8.1/§8.2 (M17, 4/N) — QUEM esta unidade é. Obrigatório na campanha, onde o lado do
+  // jogador é o ELENCO (`encounters.schema.ts` recusa o herói sem ele), e ausente na VAGA
+  // de referência da masmorra, que é slot e não pessoa — `authorDungeons.ts` reusa este
+  // spec e não preenche o campo.
+  //
+  // Declarado em vez de derivado de `unitId`: a árvore de talentos é do personagem (D6), e
+  // uma coincidência de nomes não é lugar de guardar isso.
+  readonly characterId?: string;
   readonly classId: string;
-  readonly side: 'player' | 'enemy';
+  readonly side: 'player';
   readonly pos: readonly [number, number];
   // §9.1 — IA de mapa declarativa POR HERÓI. Ausente = controlada por humano: é o que
   // separa a party do jogador dos inimigos, e é a razão de o campo ser opcional no schema.
-  readonly ai?: 'aggressive' | 'hold-position' | 'guard-tile' | 'flank' | 'support-nearest';
+  readonly ai?: MapAi;
   readonly level?: number;
   readonly necklace?: string;
   readonly talents?: Readonly<Record<string, number>>;
@@ -364,6 +383,18 @@ export interface UnitSpec {
   readonly tactics?: readonly TacticsLine[];
 }
 
+export interface EnemyUnitSpec {
+  readonly unitId: string;
+  // Checado contra `ENEMIES` na geração (`enemyIdOrThrow`): id errado aqui viraria um
+  // encontro que só falha um pacote adiante, na validação cruzada de `packages/content`.
+  readonly enemyId: string;
+  readonly side: 'enemy';
+  readonly pos: readonly [number, number];
+  readonly ai?: MapAi;
+}
+
+type EncounterUnitSpec = UnitSpec | EnemyUnitSpec;
+
 interface EncounterSpec {
   readonly id: string;
   readonly name: string;
@@ -371,7 +402,7 @@ interface EncounterSpec {
   readonly chapter: number;
   readonly permadeath: 'casual' | 'classic' | 'ironman';
   readonly winCondition?: unknown;
-  readonly units: readonly UnitSpec[];
+  readonly units: readonly EncounterUnitSpec[];
 }
 
 // Linha de script que só dispara com HP baixo, na frente da linha ofensiva: o script
@@ -390,28 +421,44 @@ const HERO_ID = 'hero-jogador';
 // herói. Decisão do usuário (ver DECISIONS.md).
 const PLAYER_CLERIGO: UnitSpec = {
   unitId: 'ally-clerigo',
+  characterId: 'ally-clerigo',
   classId: 'class-clerigo',
   side: 'player',
   pos: [0, 0], // sobrescrito por capítulo
   necklace: 'item-colar-guardiao',
-  talents: { 'talent-clerigo-foco-em-equipe': 1 },
+  // §8.2 (M17, 4/N) — era `talent-clerigo-foco-em-equipe`, um nó da árvore de CLASSE que
+  // deixou de existir. O equivalente na árvore de Miron é `mao-que-alcanca` (a mesma
+  // `grantReaction skill-assistir`), e ele mora na linha 3: a árvore nova é um CAMINHO, então
+  // chegar até ele custa descer a coluna A desde a linha 1.
+  talents: {
+    'talent-miron-imposicao-de-maos': 1,
+    'talent-miron-oracao-constante': 1,
+    'talent-miron-mao-que-alcanca': 1,
+  },
   extraDuelSkills: ['skill-cura-clerigo'],
   tactics: CLERIGO_TACTICS,
 };
 
 const PLAYER_ARQUEIRO: UnitSpec = {
   unitId: 'ally-arqueiro',
+  characterId: 'ally-arqueiro',
   classId: 'class-arqueiro',
   side: 'player',
   pos: [0, 0],
   necklace: 'item-colar-forca',
   // O talento que CONCEDE a reação `onDamaged` (M12, sub-sessão 2/N): sem ele
-  // `skill-folego-de-combate` não está nas reações conhecidas da unidade.
-  talents: { 'talent-arqueiro-reacao-propria': 1 },
+  // `skill-folego-de-combate` não está nas reações conhecidas da unidade. Era
+  // `talent-arqueiro-reacao-propria` na árvore de classe; na árvore de Sylla é
+  // `folego-de-combate`, linha 2 da coluna B, e a linha 1 dela é o preço do caminho.
+  talents: {
+    'talent-sylla-pes-leves': 1,
+    'talent-sylla-folego-de-combate': 1,
+  },
 };
 
 const PLAYER_ARCANISTA: UnitSpec = {
   unitId: 'ally-arcanista',
+  characterId: 'ally-arcanista',
   classId: 'class-arcanista',
   side: 'player',
   pos: [0, 0],
@@ -431,14 +478,14 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
     chapter: 1,
     permadeath: 'casual',
     units: [
-      { unitId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [1, 7], necklace: 'item-colar-forca' },
+      { unitId: HERO_ID, characterId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [1, 7], necklace: 'item-colar-forca' },
       // UM bandido, não dois. Não é escolha estética: AP e PP são pools da BATALHA
       // (§6.3) e o lado em menor número gasta o dobro pra defender o mesmo turno — um
       // herói sozinho contra dois perde por exaustão de recurso mesmo contra inimigos
       // muito abaixo do nível dele (medido: nível 5 contra o herói de 10, derrota).
       // Enquanto a party tem uma unidade só, o capítulo tem um inimigo só; a partir do
       // capítulo 2, com aliado, a campanha pode superar o jogador em número.
-      { unitId: 'unit-bandido-1', classId: 'class-guerreiro', side: 'enemy', pos: [12, 7], ai: 'aggressive', level: 8 },
+      { unitId: 'unit-bandido-1', enemyId: 'enemy-bandido', side: 'enemy', pos: [12, 7], ai: 'aggressive' },
     ],
   },
   {
@@ -448,12 +495,12 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
     chapter: 2,
     permadeath: 'casual',
     units: [
-      { unitId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [1, 7], necklace: 'item-colar-forca' },
+      { unitId: HERO_ID, characterId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [1, 7], necklace: 'item-colar-forca' },
       { ...at(PLAYER_CLERIGO, 1, 8), mapSkills: ['skill-luz-do-alvorecer'] },
       // Guarda o acampamento com trela curta (`guard-tile` anda no máximo 2 tiles por
       // vez): sair caçando o jogador seria abrir o objetivo.
-      { unitId: 'unit-patrulheiro-1', classId: 'class-lanceiro', side: 'enemy', pos: [11, 7], ai: 'guard-tile', level: 8 },
-      { unitId: 'unit-patrulheiro-2', classId: 'class-guerreiro', side: 'enemy', pos: [9, 3], ai: 'aggressive', level: 8 },
+      { unitId: 'unit-patrulheiro-1', enemyId: 'enemy-patrulheiro-lanceiro', side: 'enemy', pos: [11, 7], ai: 'guard-tile' },
+      { unitId: 'unit-patrulheiro-2', enemyId: 'enemy-patrulheiro-guerreiro', side: 'enemy', pos: [9, 3], ai: 'aggressive' },
       // (12,6) -> (12,4). O objetivo de `seize` é (12,7), e este arqueiro é `hold-position`: ele
       // NUNCA se move, então o alcance dele é um disco permanente. Com `bow` valendo 1 o disco
       // não alcançava o objetivo; com 2 ele passou a cobrir o objetivo E a aproximação, sem
@@ -461,7 +508,7 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // no round 6, o herói caído em (12,5)). A três tiles ele ainda pune quem vem pelo norte e
       // deixa de sentar em cima do objetivo. Mesmo defeito do capítulo 4, mesma correção:
       // posicionamento, não número.
-      { unitId: 'unit-patrulheiro-3', classId: 'class-arqueiro', side: 'enemy', pos: [12, 4], ai: 'hold-position', level: 8 },
+      { unitId: 'unit-patrulheiro-3', enemyId: 'enemy-patrulheiro-arqueiro', side: 'enemy', pos: [12, 4], ai: 'hold-position' },
     ],
   },
   {
@@ -473,12 +520,12 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
     units: [
       // A party nasce colada no desfiladeiro (distância 1) e os invasores a 5+ tiles: o
       // tile é do jogador no round 1 se ele quiser, e perdê-lo é decisão dele.
-      { unitId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [6, 7], necklace: 'item-colar-forca' },
+      { unitId: HERO_ID, characterId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [6, 7], necklace: 'item-colar-forca' },
       at(PLAYER_CLERIGO, 5, 7),
       at(PLAYER_ARQUEIRO, 6, 6),
-      { unitId: 'unit-invasor-1', classId: 'class-guerreiro', side: 'enemy', pos: [12, 7], ai: 'aggressive', level: 9 },
-      { unitId: 'unit-invasor-2', classId: 'class-lanceiro', side: 'enemy', pos: [12, 5], ai: 'aggressive', level: 9 },
-      { unitId: 'unit-invasor-3', classId: 'class-arqueiro', side: 'enemy', pos: [13, 9], ai: 'flank', level: 9 },
+      { unitId: 'unit-invasor-1', enemyId: 'enemy-invasor-guerreiro', side: 'enemy', pos: [12, 7], ai: 'aggressive' },
+      { unitId: 'unit-invasor-2', enemyId: 'enemy-invasor-lanceiro', side: 'enemy', pos: [12, 5], ai: 'aggressive' },
+      { unitId: 'unit-invasor-3', enemyId: 'enemy-invasor-arqueiro', side: 'enemy', pos: [13, 9], ai: 'flank' },
     ],
   },
   {
@@ -490,7 +537,7 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
     units: [
       // Os quatro patamares de altura 1 em volta da clareira central: a party sobe, os
       // inimigos atacam de baixo.
-      { unitId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [6, 7], necklace: 'item-colar-forca' },
+      { unitId: HERO_ID, characterId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [6, 7], necklace: 'item-colar-forca' },
       at(PLAYER_CLERIGO, 6, 8),
       at(PLAYER_ARQUEIRO, 9, 7),
       at(PLAYER_ARCANISTA, 9, 8),
@@ -504,10 +551,10 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // arcanista chegava ao turno 1 com 167 de 640 de HP. Foi (15,8) -> (15,10): 8 de
       // distância do herói mais próximo, dois de folga. Erro de posicionamento no encounter,
       // não do motor, como `packages/content/tests/encounters.test.ts` já dizia.
-      { unitId: 'unit-cerco-1', classId: 'class-guerreiro', side: 'enemy', pos: [7, 0], ai: 'aggressive', level: 9 },
-      { unitId: 'unit-cerco-2', classId: 'class-lanceiro', side: 'enemy', pos: [0, 7], ai: 'aggressive', level: 9 },
-      { unitId: 'unit-cerco-3', classId: 'class-arqueiro', side: 'enemy', pos: [15, 10], ai: 'flank', level: 9 },
-      { unitId: 'unit-cerco-4', classId: 'class-grifeiro', side: 'enemy', pos: [8, 15], ai: 'flank', level: 9 },
+      { unitId: 'unit-cerco-1', enemyId: 'enemy-cerco-guerreiro', side: 'enemy', pos: [7, 0], ai: 'aggressive' },
+      { unitId: 'unit-cerco-2', enemyId: 'enemy-cerco-lanceiro', side: 'enemy', pos: [0, 7], ai: 'aggressive' },
+      { unitId: 'unit-cerco-3', enemyId: 'enemy-cerco-arqueiro', side: 'enemy', pos: [15, 10], ai: 'flank' },
+      { unitId: 'unit-cerco-4', enemyId: 'enemy-cerco-grifeiro', side: 'enemy', pos: [8, 15], ai: 'flank' },
     ],
   },
   {
@@ -519,7 +566,7 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
     // Sobrepõe o `seize` do layout: a condição nomeia uma unidade que só existe aqui.
     winCondition: { t: 'escort', unitId: 'ally-mensageira', target: { x: 18, y: 7 } },
     units: [
-      { unitId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [1, 7], necklace: 'item-colar-forca' },
+      { unitId: HERO_ID, characterId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [1, 7], necklace: 'item-colar-forca' },
       at(PLAYER_CLERIGO, 1, 8),
       at(PLAYER_ARQUEIRO, 1, 6),
       at(PLAYER_ARCANISTA, 0, 7),
@@ -528,15 +575,16 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // motivo de a party inteira existir.
       {
         unitId: 'ally-mensageira',
+        characterId: 'ally-mensageira',
         classId: 'class-druida',
         side: 'player',
         pos: [2, 7],
         level: 8,
       },
-      { unitId: 'unit-emboscada-1', classId: 'class-lanceiro', side: 'enemy', pos: [10, 2], ai: 'flank', level: 9 },
-      { unitId: 'unit-emboscada-2', classId: 'class-guerreiro', side: 'enemy', pos: [10, 12], ai: 'flank', level: 9 },
-      { unitId: 'unit-emboscada-3', classId: 'class-arqueiro', side: 'enemy', pos: [16, 5], ai: 'hold-position', level: 9 },
-      { unitId: 'unit-emboscada-4', classId: 'class-couracado', side: 'enemy', pos: [17, 7], ai: 'guard-tile', level: 9 },
+      { unitId: 'unit-emboscada-1', enemyId: 'enemy-emboscada-lanceiro', side: 'enemy', pos: [10, 2], ai: 'flank' },
+      { unitId: 'unit-emboscada-2', enemyId: 'enemy-emboscada-guerreiro', side: 'enemy', pos: [10, 12], ai: 'flank' },
+      { unitId: 'unit-emboscada-3', enemyId: 'enemy-emboscada-arqueiro', side: 'enemy', pos: [16, 5], ai: 'hold-position' },
+      { unitId: 'unit-emboscada-4', enemyId: 'enemy-emboscada-couracado', side: 'enemy', pos: [17, 7], ai: 'guard-tile' },
     ],
   },
   {
@@ -546,7 +594,7 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
     chapter: 6,
     permadeath: 'casual',
     units: [
-      { unitId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [9, 12], necklace: 'item-colar-forca' },
+      { unitId: HERO_ID, characterId: HERO_ID, classId: 'class-espadachim', side: 'player', pos: [9, 12], necklace: 'item-colar-forca' },
       at(PLAYER_CLERIGO, 8, 12),
       at(PLAYER_ARQUEIRO, 10, 12),
       at(PLAYER_ARCANISTA, 9, 13),
@@ -554,6 +602,7 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // aguenta o portão enquanto o resto entra.
       {
         unitId: 'ally-couracado',
+        characterId: 'ally-couracado',
         classId: 'class-couracado',
         side: 'player',
         pos: [8, 13],
@@ -570,40 +619,16 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // então que a decisão aparece: arrombar (3 turnos-unidade) antes de a guarnição abrir,
       // ou esperar e lutar em campo aberto. Mantém a trela curta e o gatilho de morte de M10
       // (`skill-ultimo-suspiro`, `perBattle`).
-      {
-        unitId: 'unit-guarda-portao',
-        classId: 'class-couracado',
-        side: 'enemy',
-        pos: [9, 6],
-        ai: 'guard-tile',
-        extraDuelSkills: ['skill-ultimo-suspiro'],
-      },
+      { unitId: 'unit-guarda-portao', enemyId: 'enemy-guarda-portao', side: 'enemy', pos: [9, 6], ai: 'guard-tile' },
       // Nasce DENTRO da fortaleza. Até M14 saía voando por cima da muralha (montanha custa 1
       // para `flying`); com a muralha virando alvenaria ela sai pelo portão como todo mundo,
       // e o voo dela passa a valer pelo terreno do campo aberto lá fora.
-      { unitId: 'unit-sentinela-alada', classId: 'class-grifeiro', side: 'enemy', pos: [11, 3], ai: 'flank' },
+      { unitId: 'unit-sentinela-alada', enemyId: 'enemy-sentinela-alada', side: 'enemy', pos: [11, 3], ai: 'flank' },
       // Fica na retaguarda, dentro do alcance de assistência de quem está apanhando.
-      {
-        unitId: 'unit-capelao',
-        classId: 'class-clerigo',
-        side: 'enemy',
-        pos: [8, 3],
-        ai: 'support-nearest',
-        talents: { 'talent-clerigo-foco-em-equipe': 1 },
-        extraDuelSkills: ['skill-cura-clerigo'],
-        tactics: CLERIGO_TACTICS,
-      },
+      { unitId: 'unit-capelao', enemyId: 'enemy-capelao', side: 'enemy', pos: [8, 3], ai: 'support-nearest' },
       // Espera no planalto de altura 2: quem o engaja de baixo entrega vantagem de altura
       // (§6.6). `hold-position` nunca sai de lá — o jogador escolhe a hora.
-      {
-        unitId: 'unit-chefe',
-        classId: 'class-mestre-espadachim',
-        side: 'enemy',
-        pos: [9, 4],
-        ai: 'hold-position',
-        necklace: 'item-colar-forca',
-        level: 11,
-      },
+      { unitId: 'unit-chefe', enemyId: 'enemy-chefe', side: 'enemy', pos: [9, 4], ai: 'hold-position' },
     ],
   },
 ];
@@ -668,6 +693,7 @@ export function buildHero(spec: UnitSpec): unknown {
 
   return {
     id: spec.unitId,
+    ...(spec.characterId ? { characterId: spec.characterId } : {}),
     classId: spec.classId,
     level: spec.level ?? DEFAULT_LEVEL,
     exp: 0,
@@ -700,7 +726,9 @@ function buildEncounter(spec: EncounterSpec, mapSpec: MapSpec): unknown {
     units: spec.units.map((unit) => ({
       unitId: unit.unitId,
       side: unit.side,
-      hero: buildHero(unit),
+      // §8.1 — os dois lados do tabuleiro deixaram de ser o mesmo objeto. O jogador leva
+      // uma ficha; o inimigo é uma referência ao que já está autorado.
+      ...(unit.side === 'enemy' ? { enemyId: enemyIdOrThrow(unit.enemyId) } : { hero: buildHero(unit) }),
       pos: { x: unit.pos[0], y: unit.pos[1] },
       height: heightAt(mapSpec, unit.pos[0], unit.pos[1]),
       ...(unit.ai ? { aiArchetype: unit.ai } : {}),

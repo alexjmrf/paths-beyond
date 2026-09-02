@@ -112,6 +112,11 @@ function runOneBattle(attacker: Composition, defender: Composition, content: Con
     skillsCatalog: content.skills,
     weaponDuelRanges: content.weaponDuelRanges,
     baselineReactionSkillIds: content.baselineReactionSkillIds,
+    // §8.1 (M17, 2/N) — as comps da arena deixaram de ser sintéticas e passaram a ser
+    // heróis do ELENCO (D6), então cada `hero.characterId` só resolve talento com a
+    // árvore dele em mãos. Sem este repasse o torneio mediria o roster real com zero
+    // talento alocado, que é justamente a medição que D6 mandou refazer.
+    characterTalentTrees: content.characterTalentTrees,
   });
 
   const buffedSetup = { ...setup, units: applyDefenderBonus(setup.units) };

@@ -141,4 +141,37 @@
 // por cliente/servidor, mesmo padrão de `valorSkills` em M12 4/N). Não observável em
 // `pnpm balance` nem no GOLDEN_HASH: o torneio não usa Valor e o replay canônico não tem
 // portão.
-export const RULES_VERSION = '0.16.0';
+// M17 (sub-sessões 1/N a 5/N) — **a árvore de talentos mudou de dono e de forma**, e este é
+// o bump que o §4 do briefing reservou para o fechamento do milestone. Ao contrário dos
+// anteriores, ele não descreve uma regra nova somada às antigas: uma regra ANTIGA foi
+// removida e substituída, e é isso que o torna incompatível de verdade.
+//
+// O que saiu: duas árvores por CLASSE (`tree: 'class'|'spec'`), o gate por pontos gastos na
+// árvore, `requires`/`exclusiveWith` como topologia, e o teto de 8 pontos por árvore.
+// O que entrou (§8.2): uma árvore por PERSONAGEM, duas colunas principais presentes em
+// todas as linhas mais uma coluna do meio ocasional, UM nó por linha, profundidade de 5 a 9
+// declarada por personagem, a coluna amarrando a linha seguinte, o nó do meio como a porta
+// que libera a troca de lado, e o orçamento FIXO em 9 para todo mundo (D9 — a profundidade
+// é troca de forma, não de poder).
+//
+// **Não há caminho de migração, e isso é decisão e não omissão (D5).** O formato de alocação
+// mudou: uma alocação gravada na forma antiga nomeia nós que não existem em árvore nenhuma,
+// e `resolveTalentEffects` ignora nó desconhecido em silêncio (§8.2) — mantê-la seria
+// entregar ao jogador uma build que resolve zero talento sem avisar. O cliente devolve os
+// pontos (`reconcileSave`, decisão do usuário na 4/N) e o servidor recusa o replay com 409,
+// que é exatamente o que este bump liga.
+//
+// A segunda mudança do milestone é de MODELO e não de cálculo: **inimigo de fase deixou de
+// ser um `Hero`** com classe, nível, equipamento e talentos e passou a ser autorado direto
+// (§8.1, 3/N). Não altera nenhuma fórmula — `resolveEnemyCombatProfile` devolve o mesmo
+// `HeroCombatProfile`, e a força dos 43 inimigos foi CONGELADA na migração, conferida contra
+// uma tabela de hashes — mas muda o que um `Encounter` é, e portanto o que um `BattleSetup`
+// reconstruído a partir de conteúdo significa.
+//
+// **Observável em `pnpm balance`, e pela primeira vez em vários milestones.** O torneio
+// deixou de medir 9 comps sintéticas por classe e passou a medir o ELENCO real (D6), com
+// árvores por personagem; os números de 2026-08-28 não se transferem, e a matriz foi
+// remedida do zero nesta fatia. **GOLDEN_HASH não muda:** o replay canônico monta
+// `BattleUnit` direto, sem herói, sem classe e sem talento — nenhuma das duas mudanças o
+// alcança.
+export const RULES_VERSION = '0.17.0';

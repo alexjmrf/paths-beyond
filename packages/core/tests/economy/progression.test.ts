@@ -35,7 +35,6 @@ const classDef: ClassDef = {
   awakeningMultipliers: [1000, 1200, 1200, 1200, 1200, 1200, 1200],
   promotionFlat: [],
   imprintFlat: [[], [{ stat: 'atk', flat: 60 }], [{ stat: 'atk', flat: 60 }], [], [], []],
-  talentTree: [],
 };
 
 const heroi: Hero = {
@@ -83,7 +82,9 @@ const fragmentoDoHeroi: MaterialDef = {
 const carteira: Wallet = { gold: 10_000, stones: 0, arenaMarks: 0 };
 
 function statsDe(hero: Hero): StatSheet {
-  return resolveHeroStatSheet({ hero, classDef, equippedItems: [], itemSets: {} });
+  // A árvore vazia é o assunto deste arquivo: progressão mede nível, awakening e imprint,
+  // e nenhum dos três passa por talento.
+  return resolveHeroStatSheet({ hero, classDef, talentTree: [], equippedItems: [], itemSets: {} });
 }
 
 describe('awaken', () => {

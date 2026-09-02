@@ -47,6 +47,9 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
 
   return buildCatalog({
     classes: readJsonFiles(typeDir(root, 'classes', layout)),
+    characters: readJsonFiles(typeDir(root, 'characters', layout)),
+    characterTalentTrees: readJsonFiles(typeDir(root, 'character-talent-trees', layout)),
+    enemies: readJsonFiles(typeDir(root, 'enemies', layout)),
     skills: readJsonFiles(typeDir(root, 'skills', layout)),
     items: readJsonFiles(typeDir(root, 'items', layout)),
     itemSets: readJsonFiles(typeDir(root, 'item-sets', layout)),

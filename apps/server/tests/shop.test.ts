@@ -21,6 +21,13 @@ const TICKET_SECRET = 'segredo-de-teste';
 
 const emptyCatalog: ContentCatalog = {
   classes: {},
+  // §8.1 (M17, 2/N) — o elenco entrou no catálogo. Vazio aqui de propósito: os heróis
+  // destes fixtures não declaram `characterId`, e árvore vazia é o que o servidor
+  // resolve para eles.
+  characters: {},
+  characterTalentTrees: {},
+  // §8.1 (M17, 3/N) — vazio: nenhum destes fixtures monta encontro de campanha ou masmorra.
+  enemies: {},
   skills: {},
   items: {},
   itemSets: {},

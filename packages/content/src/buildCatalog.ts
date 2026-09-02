@@ -1,5 +1,7 @@
 import type {
   ClassDef,
+  ColumnTalentTree,
+  EnemyDef,
   DungeonDef,
   EconomyRules,
   EffectDef,
@@ -19,6 +21,9 @@ import type {
   WinCondition,
 } from '@paths-beyond/core';
 import classSchema from '@paths-beyond/data/schemas/classes.schema.js';
+import characterSchema from '@paths-beyond/data/schemas/characters.schema.js';
+import characterTalentTreeSchema from '@paths-beyond/data/schemas/character-talent-trees.schema.js';
+import enemySchema from '@paths-beyond/data/schemas/enemies.schema.js';
 import compSchema from '@paths-beyond/data/schemas/comps.schema.js';
 import effectSchema from '@paths-beyond/data/schemas/effects.schema.js';
 import valorSkillSchema from '@paths-beyond/data/schemas/valor-skills.schema.js';
@@ -39,6 +44,7 @@ import terrainSchema from '@paths-beyond/data/schemas/terrains.schema.js';
 import weaponDuelRangesSchema from '@paths-beyond/data/schemas/weapon-duel-ranges.schema.js';
 import type {
   ArenaMap,
+  CharacterContent,
   Composition,
   ContentCatalog,
   DungeonEncounter,
@@ -69,6 +75,9 @@ interface MapContent {
 // sub-sessão 3) fará o mesmo via `import.meta.glob`.
 export interface ParsedContentFiles {
   readonly classes: readonly unknown[];
+  readonly characters: readonly unknown[];
+  readonly characterTalentTrees: readonly unknown[];
+  readonly enemies: readonly unknown[];
   readonly skills: readonly unknown[];
   readonly items: readonly unknown[];
   readonly itemSets: readonly unknown[];
@@ -120,6 +129,23 @@ function deriveBaselineReactionSkillIds(skills: readonly SkillDef[]): readonly I
 
 export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
   const classes = indexById(input.classes.map((raw) => classSchema.parse(raw) as ClassDef));
+
+  // §8.1 (M17, sub-sessão 2/N) — o elenco e as árvores dele. OBRIGATÓRIOS, sem o
+  // `?? []` que `summonBlueprints` usa: catálogo sem árvore não significa "esta partida não
+  // tem talento", significa que o talento de todo personagem sumiu em silêncio.
+  const characters = indexById(input.characters.map((raw) => characterSchema.parse(raw) as CharacterContent));
+
+  // Indexadas por `characterId` e não por um `id` próprio — a árvore de §8.2 não tem id
+  // próprio, e não precisa: ela é de um personagem e só dele.
+  const characterTalentTrees: Record<Id, ColumnTalentTree> = {};
+  for (const raw of input.characterTalentTrees) {
+    const tree = characterTalentTreeSchema.parse(raw) as unknown as ColumnTalentTree;
+    characterTalentTrees[tree.characterId] = tree;
+  }
+
+  // §8.1 (M17, 3/N) — os inimigos autorados. Obrigatórios pela mesma razão que o elenco:
+  // catálogo sem inimigo não é "campanha sem inimigo", é um `enemyId` que não resolve.
+  const enemies = indexById(input.enemies.map((raw) => enemySchema.parse(raw) as unknown as EnemyDef));
 
   const skillList = input.skills.map((raw) => skillSchema.parse(raw) as SkillDef);
   const skills = indexById(skillList);
@@ -193,6 +219,9 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
 
   return {
     classes,
+    characters,
+    characterTalentTrees,
+    enemies,
     skills,
     items,
     itemSets,

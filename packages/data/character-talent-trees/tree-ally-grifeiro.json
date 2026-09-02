@@ -1,0 +1,223 @@
+{
+  "characterId": "ally-grifeiro",
+  "depth": 6,
+  "nodes": [
+    {
+      "id": "talent-kaia-mergulho",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-voo-baixo",
+      "column": "b",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 6
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": -5
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-impeto-prolongado",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-grifeiro",
+          "patch": {
+            "multiplier": 1250
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-folego-das-asas",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-garras",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-grifeiro",
+          "patch": {
+            "multiplier": 1150
+          }
+        },
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-corrente-ascendente",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 4
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-precisao-do-alto",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "chc",
+          "flat": 50
+        },
+        {
+          "t": "stat",
+          "stat": "chd",
+          "flat": 80
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-sombra-protetora",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-picada-continua",
+      "column": "a",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-rasante",
+      "column": "middle",
+      "row": 5,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-rota-de-fuga",
+      "column": "b",
+      "row": 5,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 25
+        },
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-maestria-do-grifo",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-grifeiro-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-kaia-comando-aereo",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

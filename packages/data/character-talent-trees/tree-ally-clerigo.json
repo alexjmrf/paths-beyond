@@ -1,0 +1,258 @@
+{
+  "characterId": "ally-clerigo",
+  "depth": 7,
+  "nodes": [
+    {
+      "id": "talent-miron-imposicao-de-maos",
+      "column": "a",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-cura-clerigo",
+          "patch": {
+            "multiplier": 1200
+          }
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-luz-punitiva",
+      "column": "b",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 40
+        },
+        {
+          "t": "stat",
+          "stat": "heal",
+          "pct": -20
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-oracao-constante",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 3
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-zelo",
+      "column": "b",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-mao-que-alcanca",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-passo-de-fe",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-golpe-consagrado",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-clerigo",
+          "patch": {
+            "multiplier": 1250
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-calor-do-santuario",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "heal",
+          "pct": 30
+        },
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 30
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-fervor",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-refugio",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-chamado",
+      "column": "middle",
+      "row": 5,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-punho-da-fe",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-vigilia-branca",
+      "column": "a",
+      "row": 6,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        },
+        {
+          "t": "stat",
+          "stat": "efr",
+          "flat": 30
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-clerigo",
+          "patch": {
+            "multiplier": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-martelo-leve",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-clerigo",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-maestria-da-luz",
+      "column": "a",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-clerigo-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-miron-cruzada",
+      "column": "b",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

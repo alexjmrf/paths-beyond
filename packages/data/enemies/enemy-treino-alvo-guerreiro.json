@@ -1,0 +1,39 @@
+{
+  "id": "enemy-treino-alvo-guerreiro",
+  "name": "Alvo de Treino de Machado",
+  "stats": {
+    "hp": 560,
+    "atk": 102,
+    "def": 48,
+    "spd": 83,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "infantry",
+  "weaponType": "axe",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 3,
+    "pp": 1
+  },
+  "duelSkills": [
+    "skill-ataque-guerreiro",
+    "skill-especial-guerreiro"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-guerreiro",
+      "conditions": []
+    }
+  ]
+}

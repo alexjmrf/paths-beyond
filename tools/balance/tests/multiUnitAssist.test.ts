@@ -76,6 +76,7 @@ describe('assistência real com conteúdo real (M10, sub-sessão 4/N)', () => {
       skillsCatalog: content.skills,
       weaponDuelRanges: content.weaponDuelRanges,
       baselineReactionSkillIds: content.baselineReactionSkillIds,
+      characterTalentTrees: content.characterTalentTrees,
     });
     return buildInitialState(setup, seed);
   }

@@ -18,6 +18,7 @@
       "side": "player",
       "hero": {
         "id": "hero-jogador",
+        "characterId": "hero-jogador",
         "classId": "class-espadachim",
         "level": 10,
         "exp": 0,
@@ -57,13 +58,16 @@
       "side": "player",
       "hero": {
         "id": "ally-clerigo",
+        "characterId": "ally-clerigo",
         "classId": "class-clerigo",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-clerigo-foco-em-equipe": 1
+          "talent-miron-imposicao-de-maos": 1,
+          "talent-miron-oracao-constante": 1,
+          "talent-miron-mao-que-alcanca": 1
         },
         "equipment": {
           "weapon": "item-arma-clerigo",
@@ -109,13 +113,15 @@
       "side": "player",
       "hero": {
         "id": "ally-arqueiro",
+        "characterId": "ally-arqueiro",
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-reacao-propria": 1
+          "talent-sylla-pes-leves": 1,
+          "talent-sylla-folego-de-combate": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",
@@ -150,6 +156,7 @@
       "side": "player",
       "hero": {
         "id": "ally-arcanista",
+        "characterId": "ally-arcanista",
         "classId": "class-arcanista",
         "level": 10,
         "exp": 0,
@@ -191,6 +198,7 @@
       "side": "player",
       "hero": {
         "id": "ally-mensageira",
+        "characterId": "ally-mensageira",
         "classId": "class-druida",
         "level": 8,
         "exp": 0,
@@ -228,36 +236,7 @@
     {
       "unitId": "unit-emboscada-1",
       "side": "enemy",
-      "hero": {
-        "id": "unit-emboscada-1",
-        "classId": "class-lanceiro",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-lanceiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "spear",
-        "duelSkills": [
-          "skill-ataque-lanceiro",
-          "skill-especial-lanceiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-lanceiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-emboscada-lanceiro",
       "pos": {
         "x": 10,
         "y": 2
@@ -268,36 +247,7 @@
     {
       "unitId": "unit-emboscada-2",
       "side": "enemy",
-      "hero": {
-        "id": "unit-emboscada-2",
-        "classId": "class-guerreiro",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-guerreiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "axe",
-        "duelSkills": [
-          "skill-ataque-guerreiro",
-          "skill-especial-guerreiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-guerreiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-emboscada-guerreiro",
       "pos": {
         "x": 10,
         "y": 12
@@ -308,36 +258,7 @@
     {
       "unitId": "unit-emboscada-3",
       "side": "enemy",
-      "hero": {
-        "id": "unit-emboscada-3",
-        "classId": "class-arqueiro",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-arqueiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "bow",
-        "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-arqueiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-emboscada-arqueiro",
       "pos": {
         "x": 16,
         "y": 5
@@ -348,36 +269,7 @@
     {
       "unitId": "unit-emboscada-4",
       "side": "enemy",
-      "hero": {
-        "id": "unit-emboscada-4",
-        "classId": "class-couracado",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-couracado",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "axe",
-        "duelSkills": [
-          "skill-ataque-couracado",
-          "skill-especial-couracado"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-couracado",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-emboscada-couracado",
       "pos": {
         "x": 17,
         "y": 7

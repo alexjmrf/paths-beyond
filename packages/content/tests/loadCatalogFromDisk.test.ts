@@ -67,6 +67,7 @@ describe('loadCatalogFromDisk() — itens/sets reais (regressão de M8 sub-sess�
         skillsCatalog: catalog.skills,
         weaponDuelRanges: catalog.weaponDuelRanges,
         baselineReactionSkillIds: [],
+        characterTalentTrees: catalog.characterTalentTrees,
       });
 
     const withoutItems = buildSetup([basePlacement]).units[0]!;

@@ -5,13 +5,19 @@
     {
       "hero": {
         "id": "heroi-arcanista-1",
+        "characterId": "ally-arcanista",
         "classId": "class-arcanista",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arcanista-foco-em-equipe": 1
+          "talent-vesper-manto-arcano": 2,
+          "talent-vesper-reserva-de-mana": 2,
+          "talent-vesper-mao-estendida": 1,
+          "talent-vesper-circulo-de-apoio": 2,
+          "talent-vesper-condutor": 1,
+          "talent-vesper-tecer-o-campo": 1
         },
         "equipment": {
           "weapon": "item-arma-arcanista",
@@ -45,32 +51,40 @@
     {
       "hero": {
         "id": "heroi-arcanista-2",
-        "classId": "class-arcanista",
+        "characterId": "ally-lanceiro",
+        "classId": "class-lanceiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arcanista-foco-em-equipe": 1
+          "talent-nyra-pe-firme": 1,
+          "talent-nyra-folego-da-formacao": 1,
+          "talent-nyra-mao-estendida": 1,
+          "talent-nyra-alcance-de-apoio": 1,
+          "talent-nyra-escudo-companheiro": 2,
+          "talent-nyra-contra-simples": 1,
+          "talent-nyra-ordem-de-linha": 1,
+          "talent-nyra-comando-de-formacao": 1
         },
         "equipment": {
-          "weapon": "item-arma-arcanista",
+          "weapon": "item-arma-lanceiro",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-guardiao",
+          "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "arcane",
+        "weaponType": "spear",
         "duelSkills": [
-          "skill-ataque-arcanista",
-          "skill-especial-arcanista"
+          "skill-ataque-lanceiro",
+          "skill-especial-lanceiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-arcanista",
+            "skillId": "skill-especial-lanceiro",
             "conditions": []
           }
         ]
@@ -84,34 +98,38 @@
     },
     {
       "hero": {
-        "id": "heroi-arcanista-apoio",
-        "classId": "class-couracado",
+        "id": "heroi-arcanista-3",
+        "characterId": "ally-mensageira",
+        "classId": "class-druida",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-couracado-foco-em-equipe": 1
+          "talent-wren-raizes-profundas": 3,
+          "talent-wren-seiva": 2,
+          "talent-wren-mao-estendida": 1,
+          "talent-wren-abrigo": 2,
+          "talent-wren-maestria-do-bosque": 1
         },
         "equipment": {
-          "weapon": "item-arma-couracado",
+          "weapon": "item-arma-druida",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-forca",
+          "necklace": "item-colar-guardiao",
           "ring": null,
           "boots": null
         },
-        "weaponType": "axe",
+        "weaponType": "nature",
         "duelSkills": [
-          "skill-ataque-couracado",
-          "skill-especial-couracado",
-          "skill-ultimo-suspiro"
+          "skill-ataque-druida",
+          "skill-especial-druida"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-couracado",
+            "skillId": "skill-especial-druida",
             "conditions": []
           }
         ]

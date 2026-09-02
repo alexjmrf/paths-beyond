@@ -110,7 +110,9 @@ export { buildBattleSetupFromHeroes, buildBattleUnit } from './battle/assemble.j
 export type {
   BuildBattleSetupFromHeroesInput,
   BuildBattleUnitInput,
+  EnemyPlacement,
   HeroPlacement,
+  Placement,
   SummonBlueprintPlacement,
 } from './battle/assemble.js';
 export { applyCommand } from './battle/commands.js';
@@ -177,14 +179,16 @@ export type {
   ValueRange,
 } from './items/types.js';
 
+// §8.1 (M17, 3/N) — o caminho do inimigo autorado, o par de `resolveHeroCombatProfile`.
+export { resolveEnemyCombatProfile } from './enemy/combatProfile.js';
+export type { EnemyDef, ResolveEnemyCombatProfileInput } from './enemy/types.js';
+
 export { MELEE_ASSIST_RANGE, resolveHeroCombatProfile } from './hero/combatProfile.js';
 export type { HeroCombatProfile, ResolveHeroCombatProfileInput } from './hero/combatProfile.js';
 export { resolveHeroStatSheet } from './hero/resolve.js';
 export type { ResolveHeroStatSheetInput } from './hero/resolve.js';
 export type { ClassDef, Hero } from './hero/types.js';
 
-export { validateAllocation } from './talents/allocate.js';
-export type { ValidateAllocationInput, ValidationIssue, ValidationResult } from './talents/allocate.js';
 export { canPromote, promote } from './talents/promotion.js';
 export type {
   CanPromoteInput,
@@ -193,7 +197,7 @@ export type {
   PromoteResult,
   PromotionRequirement,
 } from './talents/promotion.js';
-export { resetTree } from './talents/reset.js';
+export { resetFromRow } from './talents/reset.js';
 export {
   allocatedPath,
   validateColumnAllocation,
@@ -202,10 +206,17 @@ export {
   MIN_DEPTH,
   TALENT_POINT_BUDGET,
 } from './talents/columnTree.js';
-export type { ColumnTalentNode, ColumnTalentTree, TalentColumn } from './talents/columnTree.js';
+export type {
+  ColumnTalentNode,
+  ColumnTalentTree,
+  TalentColumn,
+  ValidateColumnAllocationInput,
+  ValidationIssue,
+  ValidationResult,
+} from './talents/columnTree.js';
 export { resolveTalentEffects } from './talents/resolve.js';
 export type { ApRefundRule, ResolvedTalents } from './talents/resolve.js';
-export type { TalentAllocation, TalentEffect, TalentNode, TalentTree } from './talents/types.js';
+export type { TalentAllocation, TalentEffect } from './talents/types.js';
 
 // §10 (M14) — economia PvE: energia de conta, recompensa de masmorra, awakening e imprint.
 // Tudo puro e sem relógio: quem sabe que horas são é o servidor, que passa `nowMs`.

@@ -10,6 +10,7 @@
       "side": "player",
       "hero": {
         "id": "hero-jogador",
+        "characterId": "hero-jogador",
         "classId": "class-espadachim",
         "level": 10,
         "exp": 0,
@@ -49,13 +50,16 @@
       "side": "player",
       "hero": {
         "id": "ally-clerigo",
+        "characterId": "ally-clerigo",
         "classId": "class-clerigo",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-clerigo-foco-em-equipe": 1
+          "talent-miron-imposicao-de-maos": 1,
+          "talent-miron-oracao-constante": 1,
+          "talent-miron-mao-que-alcanca": 1
         },
         "equipment": {
           "weapon": "item-arma-clerigo",
@@ -101,13 +105,15 @@
       "side": "player",
       "hero": {
         "id": "ally-arqueiro",
+        "characterId": "ally-arqueiro",
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-reacao-propria": 1
+          "talent-sylla-pes-leves": 1,
+          "talent-sylla-folego-de-combate": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",
@@ -140,36 +146,7 @@
     {
       "unitId": "unit-invasor-1",
       "side": "enemy",
-      "hero": {
-        "id": "unit-invasor-1",
-        "classId": "class-guerreiro",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-guerreiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "axe",
-        "duelSkills": [
-          "skill-ataque-guerreiro",
-          "skill-especial-guerreiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-guerreiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-invasor-guerreiro",
       "pos": {
         "x": 12,
         "y": 7
@@ -180,36 +157,7 @@
     {
       "unitId": "unit-invasor-2",
       "side": "enemy",
-      "hero": {
-        "id": "unit-invasor-2",
-        "classId": "class-lanceiro",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-lanceiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "spear",
-        "duelSkills": [
-          "skill-ataque-lanceiro",
-          "skill-especial-lanceiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-lanceiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-invasor-lanceiro",
       "pos": {
         "x": 12,
         "y": 5
@@ -220,36 +168,7 @@
     {
       "unitId": "unit-invasor-3",
       "side": "enemy",
-      "hero": {
-        "id": "unit-invasor-3",
-        "classId": "class-arqueiro",
-        "level": 9,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {},
-        "equipment": {
-          "weapon": "item-arma-arqueiro",
-          "helmet": null,
-          "armor": null,
-          "necklace": null,
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "bow",
-        "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-arqueiro",
-            "conditions": []
-          }
-        ]
-      },
+      "enemyId": "enemy-invasor-arqueiro",
       "pos": {
         "x": 13,
         "y": 9

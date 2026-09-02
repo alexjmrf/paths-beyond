@@ -43,7 +43,6 @@ const classDef: ClassDef = {
   awakeningMultipliers: [1000, 1000, 1000, 1000, 1000, 1000, 1000],
   promotionFlat: [],
   imprintFlat: [[], [], [], [], [], []],
-  talentTree: [],
 };
 
 const strongClassDef: ClassDef = { ...classDef, id: 'classe-forte', statCurve: Array.from({ length: 60 }, () => statSheet({ hp: 5000, atk: 2000, def: 100 })) };
@@ -76,6 +75,13 @@ const arenaMap: ArenaMap = { grid: buildGrid(), winCondition: { t: 'rout' }, ini
 
 const catalog: ContentCatalog = {
   classes: { [classDef.id]: classDef, [strongClassDef.id]: strongClassDef, [weakClassDef.id]: weakClassDef },
+  // §8.1 (M17, 2/N) — o elenco entrou no catálogo. Vazio aqui de propósito: os heróis
+  // destes fixtures não declaram `characterId`, e árvore vazia é o que o servidor
+  // resolve para eles.
+  characters: {},
+  characterTalentTrees: {},
+  // §8.1 (M17, 3/N) — vazio: nenhum destes fixtures monta encontro de campanha ou masmorra.
+  enemies: {},
   skills: { [basico.id]: basico },
   items: {},
   itemSets: {},
@@ -258,6 +264,32 @@ describe('POST /battles', () => {
       payload: { ...validBody, rulesVersion: 'versao-errada' },
     });
     expect(response.statusCode).toBe(409);
+  });
+
+  it('rejeita replay da RULES_VERSION ANTERIOR com 409 (critério 4 do M17)', async () => {
+    // §9.4 — "recusar replays de versão diferente". O teste acima usa uma string que nunca
+    // foi versão de nada, e prova que o campo é comparado; este prova a coisa que o
+    // critério de aceite pede, que é diferente: uma versão **anterior de verdade**, bem
+    // formada, que era a corrente até este milestone.
+    //
+    // A distinção importa porque M17 é o primeiro bump em que a incompatibilidade é REAL e
+    // não disciplina de processo (ver `packages/core/src/rulesVersion.ts`): a topologia da
+    // árvore de talentos mudou e o formato de alocação junto (D5, sem migração). Um cliente
+    // que ainda estivesse em 0.16.0 mandaria comandos jogados sobre outra regra, e aceitar
+    // isso seria §9.1 — divergência entre o que o cliente jogou e o que o servidor reexecuta.
+    const app = buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/battles',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...validBody, rulesVersion: '0.16.0' },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toContain(RULES_VERSION);
+    // E a versão anterior tem de ser mesmo anterior: se alguém reverter o bump sem reverter
+    // o resto do milestone, este teste passa a medir nada e precisa reprovar.
+    expect(RULES_VERSION).not.toBe('0.16.0');
   });
 
   it('rejeita herói atacante que não pertence ao chamador', async () => {

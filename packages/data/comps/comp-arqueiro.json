@@ -5,14 +5,21 @@
     {
       "hero": {
         "id": "heroi-arqueiro-1",
+        "characterId": "ally-arqueiro",
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1,
-          "talent-arqueiro-reacao-propria": 1
+          "talent-sylla-pes-leves": 1,
+          "talent-sylla-folego-de-combate": 1,
+          "talent-sylla-alcance-de-apoio": 1,
+          "talent-sylla-mao-estendida": 1,
+          "talent-sylla-respiro": 2,
+          "talent-sylla-retirada-calculada": 1,
+          "talent-sylla-apoio-constante": 1,
+          "talent-sylla-comando-de-batedores": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",
@@ -46,33 +53,39 @@
     {
       "hero": {
         "id": "heroi-arqueiro-2",
-        "classId": "class-arqueiro",
+        "characterId": "ally-guerreiro",
+        "classId": "class-guerreiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1,
-          "talent-arqueiro-reacao-propria": 1
+          "talent-rurik-estandarte": 2,
+          "talent-rurik-brado": 1,
+          "talent-rurik-mao-estendida": 1,
+          "talent-rurik-folego-de-comando": 2,
+          "talent-rurik-alcance-de-apoio": 1,
+          "talent-rurik-ordem-clara": 1,
+          "talent-rurik-comando-de-vanguarda": 1
         },
         "equipment": {
-          "weapon": "item-arma-arqueiro",
+          "weapon": "item-arma-guerreiro",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "bow",
+        "weaponType": "axe",
         "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-arqueiro",
+            "skillId": "skill-especial-guerreiro",
             "conditions": []
           }
         ]
@@ -86,34 +99,39 @@
     },
     {
       "hero": {
-        "id": "heroi-arqueiro-apoio",
-        "classId": "class-couracado",
+        "id": "heroi-arqueiro-3",
+        "characterId": "ally-arcanista",
+        "classId": "class-arcanista",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-couracado-foco-em-equipe": 1
+          "talent-vesper-manto-arcano": 2,
+          "talent-vesper-reserva-de-mana": 2,
+          "talent-vesper-mao-estendida": 1,
+          "talent-vesper-circulo-de-apoio": 2,
+          "talent-vesper-condutor": 1,
+          "talent-vesper-tecer-o-campo": 1
         },
         "equipment": {
-          "weapon": "item-arma-couracado",
+          "weapon": "item-arma-arcanista",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-forca",
+          "necklace": "item-colar-guardiao",
           "ring": null,
           "boots": null
         },
-        "weaponType": "axe",
+        "weaponType": "arcane",
         "duelSkills": [
-          "skill-ataque-couracado",
-          "skill-especial-couracado",
-          "skill-ultimo-suspiro"
+          "skill-ataque-arcanista",
+          "skill-especial-arcanista"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-couracado",
+            "skillId": "skill-especial-arcanista",
             "conditions": []
           }
         ]

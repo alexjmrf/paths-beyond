@@ -417,35 +417,5 @@
         "flat": 100
       }
     ]
-  ],
-  "talentTree": [
-    {
-      "id": "talent-vigor-basico",
-      "tree": "class",
-      "row": 1,
-      "maxRank": 3,
-      "effects": [
-        {
-          "t": "stat",
-          "stat": "hp",
-          "flat": 50
-        }
-      ]
-    },
-    {
-      "id": "talent-golpe-forte",
-      "tree": "class",
-      "row": 2,
-      "requires": [
-        "talent-vigor-basico"
-      ],
-      "maxRank": 1,
-      "effects": [
-        {
-          "t": "grantSkill",
-          "skillId": "skill-golpe-forte"
-        }
-      ]
-    }
   ]
 }

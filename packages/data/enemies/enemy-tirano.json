@@ -1,0 +1,39 @@
+{
+  "id": "enemy-tirano",
+  "name": "O Tirano",
+  "stats": {
+    "hp": 1075,
+    "atk": 153,
+    "def": 89,
+    "spd": 93,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "infantry",
+  "weaponType": "sword",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 4,
+    "pp": 3
+  },
+  "duelSkills": [
+    "skill-ataque-mestre-espadachim",
+    "skill-especial-mestre-espadachim"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-mestre-espadachim",
+      "conditions": []
+    }
+  ]
+}

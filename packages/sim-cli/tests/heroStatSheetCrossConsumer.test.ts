@@ -31,6 +31,15 @@ describe('critério de aceite 4 (M9): mesmo Hero → mesmo hash de StatSheet ent
       .filter((id): id is string => id !== null)
       .map((id) => catalog.items[id]!);
 
+    // §8.1 (M17, 2/N) — a árvore do PERSONAGEM. O herói de `comp-espadachim` declara
+    // `characterId` desde a 2/N, então este teste ficou mais forte do que era: os três
+    // consumidores agora têm de concordar também sobre o TALENTO resolvido, e não só sobre
+    // curva, equipamento e set. Um consumidor que buscasse a árvore por outro caminho — ou
+    // que a deixasse cair para vazia — divergiria no hash aqui.
+    expect(hero.characterId, 'o herói da comp precisa declarar characterId').toBeDefined();
+    const talentTree = catalog.characterTalentTrees[hero.characterId!]?.nodes;
+    expect(talentTree, `árvore ausente para ${hero.characterId}`).toBeDefined();
+
     const heroJson = JSON.stringify(hero);
     const simCliOutput = runStatSheetCommand({ heroFile: 'hero.json' }, (path) => {
       if (path !== 'hero.json') throw new Error(`arquivo não simulado: ${path}`);
@@ -47,10 +56,17 @@ describe('critério de aceite 4 (M9): mesmo Hero → mesmo hash de StatSheet ent
       skillsCatalog: catalog.skills,
       weaponDuelRanges: catalog.weaponDuelRanges,
       baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+      talentTree: talentTree!,
     }).stats;
     const serverHash = hashState(serverStats);
 
-    const directStats = resolveHeroStatSheet({ hero, classDef: classDef!, equippedItems, itemSets: catalog.itemSets });
+    const directStats = resolveHeroStatSheet({
+      hero,
+      classDef: classDef!,
+      equippedItems,
+      itemSets: catalog.itemSets,
+      talentTree: talentTree!,
+    });
     const directHash = hashState(directStats);
 
     expect(simCliHash).toBe(serverHash);

@@ -5,13 +5,22 @@
     {
       "hero": {
         "id": "heroi-couracado-1",
+        "characterId": "ally-couracado",
         "classId": "class-couracado",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-couracado-foco-em-equipe": 1
+          "talent-bardan-aco-pesado": 1,
+          "talent-bardan-respiro-sob-o-elmo": 1,
+          "talent-bardan-mao-estendida": 1,
+          "talent-bardan-guarda-firmada": 1,
+          "talent-bardan-couraca-viva": 1,
+          "talent-bardan-alcance-de-apoio": 1,
+          "talent-bardan-contra-simples": 1,
+          "talent-bardan-resistencia": 1,
+          "talent-bardan-maestria-da-muralha": 1
         },
         "equipment": {
           "weapon": "item-arma-couracado",
@@ -46,33 +55,50 @@
     {
       "hero": {
         "id": "heroi-couracado-2",
-        "classId": "class-couracado",
+        "characterId": "ally-clerigo",
+        "classId": "class-clerigo",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-couracado-foco-em-equipe": 1
+          "talent-miron-imposicao-de-maos": 1,
+          "talent-miron-oracao-constante": 2,
+          "talent-miron-mao-que-alcanca": 1,
+          "talent-miron-calor-do-santuario": 2,
+          "talent-miron-refugio": 1,
+          "talent-miron-vigilia-branca": 1,
+          "talent-miron-maestria-da-luz": 1
         },
         "equipment": {
-          "weapon": "item-arma-couracado",
+          "weapon": "item-arma-clerigo",
           "helmet": null,
           "armor": null,
-          "necklace": "item-colar-forca",
+          "necklace": "item-colar-guardiao",
           "ring": null,
           "boots": null
         },
-        "weaponType": "axe",
+        "weaponType": "holy",
         "duelSkills": [
-          "skill-ataque-couracado",
-          "skill-especial-couracado",
-          "skill-ultimo-suspiro"
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-couracado",
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
             "conditions": []
           }
         ]
@@ -86,34 +112,39 @@
     },
     {
       "hero": {
-        "id": "heroi-couracado-apoio",
-        "classId": "class-arqueiro",
+        "id": "heroi-couracado-3",
+        "characterId": "ally-grifeiro",
+        "classId": "class-grifeiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1,
-          "talent-arqueiro-reacao-propria": 1
+          "talent-kaia-voo-baixo": 2,
+          "talent-kaia-folego-das-asas": 2,
+          "talent-kaia-mao-estendida": 1,
+          "talent-kaia-sombra-protetora": 2,
+          "talent-kaia-rota-de-fuga": 1,
+          "talent-kaia-comando-aereo": 1
         },
         "equipment": {
-          "weapon": "item-arma-arqueiro",
+          "weapon": "item-arma-grifeiro",
           "helmet": null,
           "armor": null,
           "necklace": "item-colar-forca",
           "ring": null,
           "boots": null
         },
-        "weaponType": "bow",
+        "weaponType": "spear",
         "duelSkills": [
-          "skill-ataque-arqueiro",
-          "skill-especial-arqueiro"
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
         ],
         "mapSkills": [],
         "tacticsScript": [
           {
             "enabled": true,
-            "skillId": "skill-especial-arqueiro",
+            "skillId": "skill-especial-grifeiro",
             "conditions": []
           }
         ]

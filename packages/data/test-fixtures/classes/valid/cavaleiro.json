@@ -427,20 +427,5 @@
         "flat": 100
       }
     ]
-  ],
-  "talentTree": [
-    {
-      "id": "talent-carga",
-      "tree": "spec",
-      "row": 1,
-      "maxRank": 1,
-      "effects": [
-        {
-          "t": "stat",
-          "stat": "atk",
-          "flat": 30
-        }
-      ]
-    }
   ]
 }

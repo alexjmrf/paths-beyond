@@ -1,0 +1,293 @@
+{
+  "characterId": "hero-jogador",
+  "depth": 9,
+  "nodes": [
+    {
+      "id": "talent-aren-fio-agressivo",
+      "column": "a",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-postura-firme",
+      "column": "b",
+      "row": 1,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-corte-profundo",
+      "column": "a",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-espadachim",
+          "patch": {
+            "multiplier": 1300
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-folego-do-escudo",
+      "column": "b",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-sede-de-vitoria",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-passo-lateral",
+      "column": "middle",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 4
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-punho-de-ferro",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-couro-batido",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 12
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-golpe-fragilizante",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-espadachim",
+          "patch": {
+            "effects": [
+              {
+                "effectId": "effect-fragilidade",
+                "target": "target",
+                "chance": 500,
+                "duration": "duel"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-contra-simples",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-contra-atacar",
+          "patch": {
+            "ppCost": 0
+          }
+        },
+        {
+          "t": "maxAp",
+          "n": -1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-duelo-prolongado",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-leitura-do-campo",
+      "column": "middle",
+      "row": 6,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-alcance-de-apoio",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-abertura",
+      "column": "a",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-espadachim",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-vigilia",
+      "column": "b",
+      "row": 7,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-cacada",
+      "column": "a",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-troca-limpa",
+      "column": "b",
+      "row": 8,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "assist",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-maestria-da-lamina",
+      "column": "a",
+      "row": 9,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-espadachim-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-aren-comando-de-flanco",
+      "column": "b",
+      "row": 9,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "enemy-veio-elite-espadachim",
+  "name": "Capataz do Veio de Espada",
+  "stats": {
+    "hp": 780,
+    "atk": 135,
+    "def": 86,
+    "spd": 89,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "infantry",
+  "weaponType": "sword",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 3,
+    "pp": 2
+  },
+  "duelSkills": [
+    "skill-ataque-espadachim",
+    "skill-especial-espadachim"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-espadachim",
+      "conditions": []
+    }
+  ]
+}

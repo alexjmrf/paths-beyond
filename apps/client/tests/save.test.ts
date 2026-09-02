@@ -301,6 +301,58 @@ describe('o store restaura o progresso ao abrir', () => {
     expect(state.talentAllocationByUnit['unidade-a']).toEqual(allocation);
   });
 
+  it('save no formato de talento ANTIGO devolve os pontos e mantém o resto do progresso', async () => {
+    // §8.2 (M17, 4/N) — a decisão do usuário para o save gravado antes deste milestone:
+    // **devolver os pontos**. D5 do briefing diz que não há caminho de migração, e o formato
+    // de nó mudou junto com a árvore — `talent-clerigo-foco-em-equipe` era um nó da árvore de
+    // CLASSE e não existe em árvore nenhuma hoje.
+    //
+    // O teste passa pelo store de verdade, e não por `reconcileSave` com um callback de
+    // mentira, porque o que está sendo afirmado é a ligação: que `allocationIsValidFor` vá
+    // buscar a árvore do PERSONAGEM daquela unidade e recuse o nó antigo. Com a árvore da
+    // classe (a forma anterior) esta alocação era válida.
+    const capitulo = 1; // o primeiro em que Miron entra na party
+    storage.setItem(
+      SAVE_STORAGE_KEY,
+      serializeSave({
+        ...baseSave,
+        campaignMapIndex: capitulo,
+        tacticsOverrides: {},
+        talentAllocationByUnit: { 'ally-clerigo': { 'talent-clerigo-foco-em-equipe': 1 } },
+      }),
+    );
+
+    const { useBattleStore } = await importStore();
+    const state = useBattleStore.getState();
+
+    expect(state.talentAllocationByUnit['ally-clerigo']).toEqual({});
+    // O que NÃO se perde junto: o capítulo alcançado. Zerar a árvore é devolver os pontos,
+    // não recomeçar o jogo.
+    expect(state.campaignMapIndex).toBe(capitulo);
+  });
+
+  it('alocação na forma NOVA sobrevive à recarga', async () => {
+    // O recíproco do teste acima, e ele importa: sem esta metade, um `allocationIsValidFor`
+    // que recusasse tudo passaria no teste anterior e apagaria a build de todo mundo.
+    const valida = {
+      'talent-miron-imposicao-de-maos': 1,
+      'talent-miron-oracao-constante': 1,
+      'talent-miron-mao-que-alcanca': 1,
+    };
+    storage.setItem(
+      SAVE_STORAGE_KEY,
+      serializeSave({
+        ...baseSave,
+        campaignMapIndex: 1,
+        tacticsOverrides: {},
+        talentAllocationByUnit: { 'ally-clerigo': valida },
+      }),
+    );
+
+    const { useBattleStore } = await importStore();
+    expect(useBattleStore.getState().talentAllocationByUnit['ally-clerigo']).toEqual(valida);
+  });
+
   it('save de `rulesVersion` antiga mantém o capítulo e larga as táticas', async () => {
     const unit = campaignMaps[0]!.setup.units.find((u) => u.side === 'player')!;
     storage.setItem(

@@ -1,7 +1,8 @@
 import type { SkillDef } from '../skills/types.js';
 import type { StatModifier } from '../stats/types.js';
 import type { Id } from '../types.js';
-import type { TalentAllocation, TalentNode } from './types.js';
+import type { ColumnTalentNode } from './columnTree.js';
+import type { TalentAllocation } from './types.js';
 
 export interface ApRefundRule {
   readonly on: 'kill' | 'duelWon' | 'assist';
@@ -31,7 +32,7 @@ export interface ResolvedTalents {
 // `grantReaction`, `passive`, `modifySkill`, `extraTacticsSlot/Condition`) aplicam uma
 // vez, independente do rank. Nós desconhecidos/rank 0 são ignorados silenciosamente —
 // validar a alocação é trabalho de `validateAllocation`, não deste resolver.
-export function resolveTalentEffects(tree: readonly TalentNode[], allocation: TalentAllocation): ResolvedTalents {
+export function resolveTalentEffects(tree: readonly ColumnTalentNode[], allocation: TalentAllocation): ResolvedTalents {
   const nodesById = new Map(tree.map((node) => [node.id, node] as const));
 
   const statMods: StatModifier[] = [];

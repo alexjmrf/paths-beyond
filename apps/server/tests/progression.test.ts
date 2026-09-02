@@ -47,6 +47,13 @@ function heroi(id: string, classId: string, weaponType: Hero['weaponType'], skil
 // é o único que pode ganhar imprint, e o teste usa exatamente esse id.
 const HERO_COM_FRAGMENTO = 'hero-jogador';
 
+// §8.1 (M17, 2/N) — `resolveHeroStatSheet` passou a receber a árvore do PERSONAGEM em vez
+// de lê-la da classe. Os heróis deste arquivo são montados por `heroi()` acima, sem
+// `characterId` e com `talents: {}`: árvore vazia é a entrada FIEL a eles, e não um
+// atalho. O que este arquivo mede é awakening, imprint e equipamento mexendo no stat —
+// talento tem os testes dele em `packages/core` e o conteúdo dele em `elenco.test.ts`.
+const ARVORE_DE_TESTE: readonly [] = [];
+
 interface Harness {
   readonly app: ReturnType<typeof buildApp>;
   readonly heroRepository: ReturnType<typeof createMemoryHeroRepository>;
@@ -159,6 +166,7 @@ describe('POST /heroes/:heroId/awaken', () => {
       classDef,
       equippedItems: [],
       itemSets: catalog.itemSets,
+      talentTree: ARVORE_DE_TESTE,
     });
 
     const resultado = await post(h, `/heroes/${HERO_COM_FRAGMENTO}/awaken`, { nonce: 'n-awaken-2' });
@@ -172,6 +180,7 @@ describe('POST /heroes/:heroId/awaken', () => {
       classDef,
       equippedItems: [],
       itemSets: catalog.itemSets,
+      talentTree: ARVORE_DE_TESTE,
     });
     expect(poderDepois.atk).toBeGreaterThan(poderAntes.atk);
   });
@@ -204,14 +213,14 @@ describe('POST /heroes/:heroId/imprint', () => {
 
     const antes = await h.heroRepository.getHeroById(HERO_COM_FRAGMENTO);
     const classDef = catalog.classes[antes!.hero.classId]!;
-    const poderAntes = resolveHeroStatSheet({ hero: antes!.hero, classDef, equippedItems: [], itemSets: catalog.itemSets });
+    const poderAntes = resolveHeroStatSheet({ hero: antes!.hero, classDef, equippedItems: [], itemSets: catalog.itemSets, talentTree: ARVORE_DE_TESTE });
 
     const resultado = await post(h, `/heroes/${HERO_COM_FRAGMENTO}/imprint`, { nonce: 'n-imprint-2' });
     expect(resultado.status).toBe(200);
     expect(resultado.body.hero.imprint).toBe(1);
 
     const depois = await h.heroRepository.getHeroById(HERO_COM_FRAGMENTO);
-    const poderDepois = resolveHeroStatSheet({ hero: depois!.hero, classDef, equippedItems: [], itemSets: catalog.itemSets });
+    const poderDepois = resolveHeroStatSheet({ hero: depois!.hero, classDef, equippedItems: [], itemSets: catalog.itemSets, talentTree: ARVORE_DE_TESTE });
     expect(poderDepois.atk).toBeGreaterThanOrEqual(poderAntes.atk);
     expect(JSON.stringify(poderDepois)).not.toBe(JSON.stringify(poderAntes));
   });
@@ -316,6 +325,7 @@ describe('ciclo completo: farm → drop → enhance → equipar → subir de pod
       classDef,
       equippedItems: inicial!.equippedItems,
       itemSets: catalog.itemSets,
+      talentTree: ARVORE_DE_TESTE,
     });
 
     // 1. Farm: joga a masmorra de equipamento e recebe drop.
@@ -342,6 +352,7 @@ describe('ciclo completo: farm → drop → enhance → equipar → subir de pod
       classDef,
       equippedItems: final!.equippedItems,
       itemSets: catalog.itemSets,
+      talentTree: ARVORE_DE_TESTE,
     });
 
     const somaAntes = Object.values(poderInicial).reduce((s, n) => s + n, 0);

@@ -14,10 +14,15 @@ import {
   type DungeonDef,
   type DungeonRunRewards,
   type EnergyState,
-  type HeroPlacement,
+  type Placement,
   type Id,
 } from '@paths-beyond/core';
-import { toSummonBlueprintPlacements, type ContentCatalog, type DungeonEncounter } from '@paths-beyond/content';
+import {
+  toEncounterPlacements,
+  toSummonBlueprintPlacements,
+  type ContentCatalog,
+  type DungeonEncounter,
+} from '@paths-beyond/content';
 
 type DungeonEncounterUnit = DungeonEncounter['units'][number];
 import type { FastifyPluginAsync } from 'fastify';
@@ -93,7 +98,7 @@ async function assembleDungeonBattle(
     if (hero.ownerPlayerId !== ownerPlayerId) return { error: 'esse herói não é seu' };
   }
 
-  const placements: HeroPlacement[] = [];
+  const placements: Placement[] = [];
 
   stored.forEach((hero, index) => {
     const slot = slots[index]!;
@@ -110,25 +115,17 @@ async function assembleDungeonBattle(
     });
   });
 
-  for (const unit of encounter.units.filter((u: DungeonEncounterUnit) => u.side === 'enemy')) {
-    const classDef = opts.catalog.classes[unit.hero.classId];
-    if (!classDef) throw new Error(`classe desconhecida: ${unit.hero.classId}`);
-    placements.push({
-      unitId: unit.unitId,
-      hero: unit.hero,
-      classDef,
-      // O inimigo de masmorra usa o equipamento declarado no próprio herói do conteúdo;
-      // resolver os ids contra o catálogo é o mesmo que a campanha faz.
-      equippedItems: Object.values(unit.hero.equipment)
-        .filter((id): id is Id => id !== null)
-        .map((id) => opts.catalog.items[id])
-        .filter((item): item is NonNullable<typeof item> => item !== undefined),
-      side: 'enemy',
-      pos: unit.pos,
-      height: unit.height,
-      ...(unit.aiArchetype ? { aiArchetype: unit.aiArchetype } : {}),
-    });
-  }
+  // §8.1 (M17, 3/N) — o inimigo de masmorra deixou de ser um `Hero` com classe e
+  // equipamento a resolver e passou a ser uma referência a `enemies/`. A conversão é a
+  // MESMA que o cliente e o piloto usam (`toEncounterPlacements`), e isso não é economia
+  // de linhas: o cliente joga a masmorra e o servidor a reexecuta para conferir (M14 3/N),
+  // então os dois lados montando o inimigo por caminhos diferentes seria §9.1.
+  placements.push(
+    ...toEncounterPlacements(
+      encounter.units.filter((u: DungeonEncounterUnit) => u.side === 'enemy'),
+      opts.catalog,
+    ),
+  );
 
   return {
     setup: buildBattleSetupFromHeroes({
@@ -147,6 +144,10 @@ async function assembleDungeonBattle(
       skillsCatalog: opts.catalog.skills,
       weaponDuelRanges: opts.catalog.weaponDuelRanges,
       baselineReactionSkillIds: opts.catalog.baselineReactionSkillIds,
+      // §8.1 (M17, 2/N) — mesma razão do repasse na arena: a masmorra é reexecutada aqui
+      // para conferir a run do cliente, e um dos dois lados montar a party sem a árvore do
+      // personagem recusaria a run inteira.
+      characterTalentTrees: opts.catalog.characterTalentTrees,
     }),
   };
 }

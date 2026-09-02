@@ -1,0 +1,50 @@
+{
+  "id": "enemy-capelao",
+  "name": "Capelão",
+  "stats": {
+    "hp": 600,
+    "atk": 78,
+    "def": 50,
+    "spd": 86,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "caster",
+  "weaponType": "holy",
+  "moveType": "foot",
+  "moveRange": 4,
+  "pools": {
+    "ap": 3,
+    "pp": 2
+  },
+  "duelSkills": [
+    "skill-ataque-clerigo",
+    "skill-especial-clerigo",
+    "skill-cura-clerigo"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-cura-clerigo",
+      "conditions": [
+        {
+          "t": "selfHpBelow",
+          "pct": 250
+        }
+      ]
+    },
+    {
+      "enabled": true,
+      "skillId": "skill-especial-clerigo",
+      "conditions": []
+    }
+  ]
+}

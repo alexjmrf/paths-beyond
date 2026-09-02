@@ -4,21 +4,16 @@ import {
   moveTypeSchema,
   partialStatSheetSchema,
   statKeySchema,
-  talentEffectSchema,
   unitTypeSchema,
   weaponTypeSchema,
 } from './shared.js';
 
-// §8.2 — TalentNode.
-const talentNodeSchema = z.object({
-  id: idSchema,
-  tree: z.enum(['class', 'spec']),
-  row: z.number().int().min(1).max(8),
-  requires: z.array(idSchema).default([]),
-  exclusiveWith: z.array(idSchema).default([]),
-  maxRank: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  effects: z.array(talentEffectSchema).min(1),
-});
+// §8.1 (M17, sub-sessão 2/N) — `talentNodeSchema` e o campo `talentTree` SAÍRAM daqui.
+// "A classe... não é mais a unidade de progressão: a árvore não pertence mais à classe."
+// A árvore agora é conteúdo próprio, em `character-talent-trees.schema.ts`, indexada por
+// personagem. O §7 do briefing do M17 proíbe os dois formatos convivendo, e o schema não
+// é `.strict()`, então um `talentTree` esquecido num JSON antigo passaria despercebido —
+// por isso o gerador reemitiu as 10 classes em vez de só o schema mudar.
 
 // §8.1 — "Promoção exige item + nível mínimo". Ausente = classe base (tier:'base'),
 // que não é alcançada por promoção.
@@ -57,7 +52,6 @@ const classSchema = z.object({
   imprintFlat: z.array(
     z.array(z.object({ stat: statKeySchema, flat: z.number().int().optional(), pct: z.number().int().optional() })),
   ).length(6),
-  talentTree: z.array(talentNodeSchema),
 });
 
 export default classSchema;

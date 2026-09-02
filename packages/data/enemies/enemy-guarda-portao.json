@@ -1,0 +1,40 @@
+{
+  "id": "enemy-guarda-portao",
+  "name": "Guarda do Portão",
+  "stats": {
+    "hp": 600,
+    "atk": 81,
+    "def": 47,
+    "spd": 82,
+    "chc": 0,
+    "chd": 0,
+    "eff": 0,
+    "efr": 0,
+    "pen": 0,
+    "heal": 0,
+    "lifesteal": 0,
+    "focus": 0,
+    "vigor": 0
+  },
+  "unitType": "armored",
+  "weaponType": "axe",
+  "moveType": "heavy",
+  "moveRange": 3,
+  "pools": {
+    "ap": 3,
+    "pp": 2
+  },
+  "duelSkills": [
+    "skill-ataque-couracado",
+    "skill-especial-couracado",
+    "skill-ultimo-suspiro"
+  ],
+  "mapSkills": [],
+  "tacticsScript": [
+    {
+      "enabled": true,
+      "skillId": "skill-especial-couracado",
+      "conditions": []
+    }
+  ]
+}

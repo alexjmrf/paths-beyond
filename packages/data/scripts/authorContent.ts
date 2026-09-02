@@ -7,6 +7,12 @@ import itemSchema from '../schemas/items.schema.js';
 import itemSetSchema from '../schemas/item-sets.schema.js';
 import skillSchema from '../schemas/skills.schema.js';
 import effectSchema from '../schemas/effects.schema.js';
+import {
+  characterForClass,
+  columnGrantingAssist,
+  columnPathAllocation,
+  type CharacterSpec,
+} from './authorCharacters.js';
 
 // M8, sub-sessão 2/N — conteúdo real balanceado. Ver DECISIONS.md pro roster completo
 // e o raciocínio por trás do template de árvore de talentos.
@@ -182,152 +188,13 @@ export const SKILL_ASSISTIR = {
   tags: [],
 };
 
-// §8.2 — regras de design da árvore aplicadas por um template comum a todas as 7
-// classes desta fatia (só varia id/nome/números por perfil):
-//   - 8 linhas, 11 nós no total.
-//   - 3 linhas de escolha (rows 1/4/7, 2 nós exclusiveWith cada) que mudam o papel do
-//     herói de verdade — row 4 é literalmente o exemplo dado pela spec ("contra-atacar
-//     custa 0 PP, mas perde 1 AP máximo" vs. "ataque de assinatura aplica um debuff").
-//   - 2 nós que tocam a economia de AP/PP/assistência isoladamente (rows 2 e 5); as
-//     duas opções da row 7 também tocam economia, então o mínimo de 2 é folgado.
-//   - 2 nós de preenchimento (+2% stat, rows 3 e 6) = 2/11 ≈ 18% ≤ 30%.
-// `tree` default 'class' cobre as classes base desta fatia; a classe promovida (M8,
-// sub-sessão 4/N) passa 'spec' — mesmo template estrutural, só a etiqueta muda (§8.2: a
-// árvore de Especialização segue as mesmas 4 regras de design da árvore de Classe).
-export function generateTalentTree(profile: ClassProfile, tree: 'class' | 'spec' = 'class') {
-  const s = profile.slug;
-  const sigId = signatureSkillId(profile);
-
-  // M12 — nó exclusivo da classe que tem uma reação própria (hoje só o Arqueiro). Não é
-  // linha de escolha: some para as demais classes em vez de virar um nó vazio.
-  const grantedReactionNodes = profile.grantedReactionId
-    ? [
-        {
-          id: `talent-${s}-reacao-propria`,
-          tree,
-          row: 8,
-          maxRank: 1 as const,
-          // Vazio, mas presente: mantém a forma dos nós uniforme para quem percorre a
-          // árvore (o painel de talentos do cliente e os testes de estrutura de §8.2).
-          exclusiveWith: [] as string[],
-          effects: [{ t: 'grantReaction' as const, reactionId: profile.grantedReactionId }],
-        },
-      ]
-    : [];
-
-  return [
-    ...grantedReactionNodes,
-    {
-      id: `talent-${s}-agressivo`,
-      tree,
-      row: 1,
-      maxRank: 1 as const,
-      exclusiveWith: [`talent-${s}-defensivo`],
-      effects: [
-        { t: 'stat' as const, stat: 'atk' as const, pct: 50 },
-        { t: 'stat' as const, stat: 'def' as const, pct: -30 },
-      ],
-    },
-    {
-      id: `talent-${s}-defensivo`,
-      tree,
-      row: 1,
-      maxRank: 1 as const,
-      exclusiveWith: [`talent-${s}-agressivo`],
-      effects: [
-        { t: 'stat' as const, stat: 'def' as const, pct: 50 },
-        { t: 'stat' as const, stat: 'atk' as const, pct: -30 },
-      ],
-    },
-    {
-      id: `talent-${s}-vigor-extra`,
-      tree,
-      row: 2,
-      maxRank: 1 as const,
-      effects: [{ t: 'maxPp' as const, n: 1 }],
-    },
-    {
-      id: `talent-${s}-robustez`,
-      tree,
-      row: 3,
-      maxRank: 2 as const,
-      effects: [{ t: 'stat' as const, stat: 'hp' as const, pct: 20 }],
-    },
-    {
-      id: `talent-${s}-contra-simples`,
-      tree,
-      row: 4,
-      maxRank: 1 as const,
-      exclusiveWith: [`talent-${s}-golpe-fragilizante`],
-      effects: [
-        { t: 'modifySkill' as const, skillId: 'skill-contra-atacar', patch: { ppCost: 0 } },
-        { t: 'maxAp' as const, n: -1 },
-      ],
-    },
-    {
-      id: `talent-${s}-golpe-fragilizante`,
-      tree,
-      row: 4,
-      maxRank: 1 as const,
-      exclusiveWith: [`talent-${s}-contra-simples`],
-      effects: [
-        {
-          t: 'modifySkill' as const,
-          skillId: sigId,
-          patch: { effects: [{ effectId: 'effect-fragilidade', target: 'target', chance: 500, duration: 'duel' }] },
-        },
-      ],
-    },
-    {
-      id: `talent-${s}-recuperacao-de-vitoria`,
-      tree,
-      row: 5,
-      maxRank: 1 as const,
-      effects: [{ t: 'apRefund' as const, on: 'duelWon' as const, n: 1 }],
-    },
-    {
-      id: `talent-${s}-fortalecimento`,
-      tree,
-      row: 6,
-      maxRank: 2 as const,
-      effects: [{ t: 'stat' as const, stat: 'atk' as const, pct: 20 }],
-    },
-    {
-      id: `talent-${s}-foco-em-equipe`,
-      tree,
-      row: 7,
-      maxRank: 1 as const,
-      exclusiveWith: [`talent-${s}-foco-solo`],
-      effects: [
-        // §6.5 — assistir é a recompensa por investir em posicionamento, não algo que
-        // toda unidade tem de graça (§6.4 fecha a lista de universais em 2). Fica no
-        // MESMO nó que já dava +1 de assistRange, e continua exclusivo com `foco-solo`:
-        // a escolha da row 7 é literalmente "jogo em time vs. jogo sozinho".
-        { t: 'grantReaction' as const, reactionId: SKILL_ASSISTIR.id },
-        { t: 'assistRangeBonus' as const, n: 1 },
-        { t: 'extraTacticsCondition' as const },
-      ],
-    },
-    {
-      id: `talent-${s}-foco-solo`,
-      tree,
-      row: 7,
-      maxRank: 1 as const,
-      exclusiveWith: [`talent-${s}-foco-em-equipe`],
-      effects: [
-        { t: 'stat' as const, stat: 'atk' as const, flat: 40 },
-        { t: 'duelApCap' as const, n: 1 },
-      ],
-    },
-    {
-      id: `talent-${s}-maestria`,
-      tree,
-      row: 8,
-      maxRank: 1 as const,
-      effects: [{ t: 'passive' as const, passiveId: `passive-${s}-maestria` }],
-    },
-  ];
-}
+// §8.1 (M17, sub-sessão 2/N) — `generateTalentTree` FOI REMOVIDO daqui.
+//
+// A árvore deixou de pertencer à classe, então o gerador de classes deixou de ter o que
+// gerar: as nove árvores agora são do PERSONAGEM e são autoradas uma a uma em
+// `authorCharacters.ts`, porque a forma de duas colunas é desenho e não template. O que
+// vivia aqui era um molde único aplicado a 10 classes com os ids trocados — exatamente o
+// que §8.2 proíbe ao exigir que as duas colunas sejam "papéis diferentes de verdade".
 
 export function generateClass(profile: ClassProfile) {
   return {
@@ -343,7 +210,6 @@ export function generateClass(profile: ClassProfile) {
     awakeningMultipliers: [...STANDARD_AWAKENING_MULTIPLIERS],
     promotionFlat: [],
     imprintFlat: STANDARD_IMPRINT_FLAT.map((entry) => entry.map((mod) => ({ ...mod }))),
-    talentTree: generateTalentTree(profile),
   };
 }
 
@@ -535,92 +401,137 @@ const COMP_UNIT_POSITIONS = [
 // é exatamente o tabuleiro em que "fechar distância", a resposta tática que a spec nomeia, não
 // existe. A correção não é mexer em número — é a comp ter as duas coisas.
 //
-// A forma, decidida com o usuário: **temática por classe, com apoio**. Duas unidades continuam
-// sendo a classe do comp (a matriz segue legível por classe) e a terceira cobre o lado que falta.
-// Uma classe de alcance recebe o Couraçado à frente; uma de corpo a corpo recebe o Arqueiro atrás.
-// Os dois foram escolhidos por serem os mais "lisos" do catálogo — nenhum tem cura, invocação ou
-// efeito de área que contaminaria a leitura do eixo que a matriz mede.
+// M17, sub-sessão 5/N — **a REGRA de apoio saiu; a propriedade que ela protegia ficou.**
+//
+// A regra era "corpo a corpo ganha o Arqueiro atrás, alcance ganha o Couraçado à frente". Ela
+// nasceu quando duas das três unidades eram a classe do comp, e sobreviveu à 2/N sem que
+// ninguém medisse o que ela passou a produzir com três personagens distintos: como o apoio do
+// Arqueiro é o Couraçado e o do Couraçado é o Arqueiro, **os dois entravam em todas as nove
+// comps**, e quando a própria âncora era um deles a regra de colisão puxava sempre o primeiro
+// perfil não usado — fazendo de `comp-arqueiro`, `comp-couracado` e `comp-espadachim` O MESMO
+// TIME, distinto só pela ordem das posições. Um terço da matriz media posição inicial, não
+// composição, com 10 pontos percentuais de diferença entre as três (medido em 2026-09-01).
+//
+// Decisão do usuário: **âncora + os dois seguintes no elenco, circulando.** As nove comps ficam
+// distintas por construção (janelas de tamanho 3 num ciclo de 9 nunca se repetem) e cada
+// personagem aparece em exatamente três comps — o que também tira o viés de dois personagens
+// estarem em todas elas.
+//
+// A ordem do elenco abaixo é INTERCALADA, e isso é o que preserva a razão de a regra antiga ter
+// existido: com a ordem de declaração de `CLASS_PROFILES` (três de espada/machado/lança seguidos,
+// depois três casters) as janelas de três dariam uma comp inteiramente corpo a corpo e outra
+// inteiramente de alcance, que é exatamente a degeneração de 20-em-20 descrita acima. Alternando
+// melee e alcance, **toda janela de três tem os dois** — testado, não suposto.
+const COMP_ROSTER_ORDER = [
+  'espadachim',
+  'arqueiro',
+  'guerreiro',
+  'arcanista',
+  'lanceiro',
+  'druida',
+  'couracado',
+  'clerigo',
+  'grifeiro',
+] as const;
+
 const MELEE_WEAPONS = new Set(['sword', 'axe', 'spear']);
 
-function isMelee(profile: ClassProfile): boolean {
+export function isMelee(profile: ClassProfile): boolean {
   return MELEE_WEAPONS.has(profile.weaponType);
 }
 
-const SUPPORT_FOR_MELEE_SLUG = 'arqueiro';
-const SUPPORT_FOR_RANGED_SLUG = 'couracado';
-
-function supportProfileFor(profile: ClassProfile): ClassProfile {
-  const slug = isMelee(profile) ? SUPPORT_FOR_MELEE_SLUG : SUPPORT_FOR_RANGED_SLUG;
-  const found = CLASS_PROFILES.find((p) => p.slug === slug);
-  // Falha alto em vez de cair num fallback: uma comp sem apoio volta a ser monoclasse e o
-  // torneio volta a medir o jogo mais simples, em silêncio — que é o defeito que esta mudança
-  // existe para corrigir.
-  if (!found) throw new Error(`perfil de apoio ausente: ${slug}`);
+export function classProfileFor(classId: string): ClassProfile {
+  const found = CLASS_PROFILES.find((p) => `class-${p.slug}` === classId);
+  if (!found) throw new Error(`perfil de classe ausente: ${classId}`);
   return found;
 }
 
+function profileBySlug(slug: string): ClassProfile {
+  const found = CLASS_PROFILES.find((p) => p.slug === slug);
+  // Falha alto em vez de cair num fallback: uma comp montada a partir de uma ordem que não
+  // bate com o catálogo mediria um time diferente do que o arquivo diz, em silêncio.
+  if (!found) throw new Error(`perfil ausente em COMP_ROSTER_ORDER: ${slug}`);
+  return found;
+}
+
+// M17, sub-sessão 2/N — o time de uma composição, agora feito de PERSONAGENS.
+//
+// Até aqui uma comp era duas unidades da classe do comp mais um apoio (passe do HANDOFF,
+// 2026-08-28: "a matriz segue legível por classe"). Com o elenco fechado (D6) e um
+// personagem por classe, "duas unidades da classe do comp" seriam duas cópias da mesma
+// pessoa — o herói sintético que D6 aposentou. Decisão do usuário: **três personagens
+// distintos**, com a âncora dando nome ao comp.
+function compRoster(profile: ClassProfile): readonly CharacterSpec[] {
+  const inicio = COMP_ROSTER_ORDER.indexOf(profile.slug as (typeof COMP_ROSTER_ORDER)[number]);
+  if (inicio < 0) throw new Error(`classe fora de COMP_ROSTER_ORDER: ${profile.slug}`);
+
+  const perfis: ClassProfile[] = [];
+  for (let i = 0; i < COMP_UNIT_POSITIONS.length; i++) {
+    perfis.push(profileBySlug(COMP_ROSTER_ORDER[(inicio + i) % COMP_ROSTER_ORDER.length]!));
+  }
+
+  return perfis.map((p) => characterForClass(`class-${p.slug}`));
+}
+
 export function generateComp(profile: ClassProfile) {
-  const support = supportProfileFor(profile);
+  const elenco = compRoster(profile);
 
   return {
     id: `comp-${profile.slug}`,
     name: profile.name,
-    units: COMP_UNIT_POSITIONS.map((pos, index) => {
-      // A última posição é o apoio. As duas primeiras seguram a identidade do comp.
-      const ehApoio = index === COMP_UNIT_POSITIONS.length - 1;
-      const dono = ehApoio ? support : profile;
-      // O id carrega a slug do COMP, não a da classe do apoio: sem isso o arqueiro de apoio do
-      // comp-espadachim se chamaria `heroi-arqueiro-3` e colidiria com o herói do comp-arqueiro
-      // quando as duas composições se enfrentassem — `runTournament` usa `hero.id` como `unitId`,
-      // e dois `unitId` iguais na mesma batalha são a mesma unidade para o motor.
-      const heroId = ehApoio ? `heroi-${profile.slug}-apoio` : `heroi-${profile.slug}-${index + 1}`;
+    units: elenco.map((personagem, index) => {
+      const dono = classProfileFor(personagem.classId);
+      const coluna = columnGrantingAssist(personagem);
+      const pos = COMP_UNIT_POSITIONS[index]!;
 
       return {
-      hero: {
-        id: heroId,
-        classId: `class-${dono.slug}`,
-        level: 10,
-        exp: 0,
-        awakening: 0,
-        imprint: 0,
-        // §6.5 — sem este talento nenhuma unidade tem `skill-assistir` (não é baseline por
-        // §6.4), e a janela de assistência nunca abriria: o comp seria multi-unidade no
-        // papel e continuaria medindo duelos isolados, que é exatamente o que a auditoria
-        // de 2026-08-07 apontou como o buraco da matriz de M8.
-        talents: {
-          [`talent-${dono.slug}-foco-em-equipe`]: 1,
-          // M12 — a reação própria da classe só existe se o comp alocar o talento; sem
-          // isto o gatilho `onDamaged` continuaria sem consumidor no torneio.
-          ...(dono.grantedReactionId ? { [`talent-${dono.slug}-reacao-propria`]: 1 } : {}),
+        hero: {
+          // O id da INSTÂNCIA carrega a slug do comp, e não a do personagem: o mesmo
+          // personagem aparece em várias composições (o elenco é fechado, são nove para
+          // nove comps), e `runTournament` usa `hero.id` como `unitId` — dois `unitId`
+          // iguais na mesma batalha são a mesma unidade para o motor.
+          id: `heroi-${profile.slug}-${index + 1}`,
+          // §8.1 (M17) — QUEM ele é. É daqui que sai a árvore que resolve `talents`.
+          characterId: personagem.id,
+          classId: personagem.classId,
+          level: 10,
+          exp: 0,
+          awakening: 0,
+          imprint: 0,
+          // §8.2 — o caminho inteiro por uma coluna, gastando os 9 pontos. A coluna não é
+          // escolhida por gosto: é a que concede `skill-assistir`, que não é baseline por
+          // §6.4. Sem ela a janela de assistência nunca abriria e o comp seria
+          // multi-unidade no papel enquanto mede duelos isolados — o buraco que a
+          // auditoria de 2026-08-07 apontou na matriz de M8.
+          talents: columnPathAllocation(personagem, coluna),
+          equipment: {
+            weapon: weaponItemId(dono),
+            helmet: null,
+            armor: null,
+            necklace: necklaceIdFor(dono),
+            ring: null,
+            boots: null,
+          },
+          weaponType: dono.weaponType,
+          duelSkills: [
+            basicSkillId(dono),
+            signatureSkillId(dono),
+            ...(dono.extraDuelSkillId ? [dono.extraDuelSkillId] : []),
+          ],
+          mapSkills: [],
+          // §6.3 — o script é lido de cima para baixo, primeira linha que passa vence. A
+          // cura do Clérigo entra ACIMA da especial e com condição: "curar ou bater" vira
+          // decisão de script, que é o produto do jogo, em vez de trocar dano por cura sempre.
+          tacticsScript: [
+            ...(dono.extraDuelSkillId === SKILL_CURA_CLERIGO.id
+              ? [{ enabled: true, skillId: SKILL_CURA_CLERIGO.id, conditions: [{ t: 'selfHpBelow' as const, pct: 250 }] }]
+              : []),
+            { enabled: true, skillId: signatureSkillId(dono), conditions: [] },
+          ],
         },
-        equipment: {
-          weapon: weaponItemId(dono),
-          helmet: null,
-          armor: null,
-          necklace: necklaceIdFor(dono),
-          ring: null,
-          boots: null,
-        },
-        weaponType: dono.weaponType,
-        duelSkills: [
-          basicSkillId(dono),
-          signatureSkillId(dono),
-          ...(dono.extraDuelSkillId ? [dono.extraDuelSkillId] : []),
-        ],
-        mapSkills: [],
-        // §6.3 — o script é lido de cima para baixo, primeira linha que passa vence. A
-        // cura do Clérigo entra ACIMA da especial e com condição: "curar ou bater" vira
-        // decisão de script, que é o produto do jogo, em vez de trocar dano por cura sempre.
-        tacticsScript: [
-          ...(dono.extraDuelSkillId === SKILL_CURA_CLERIGO.id
-            ? [{ enabled: true, skillId: SKILL_CURA_CLERIGO.id, conditions: [{ t: 'selfHpBelow' as const, pct: 250 }] }]
-            : []),
-          { enabled: true, skillId: signatureSkillId(dono), conditions: [] },
-        ],
-      },
-      pos: { x: pos.x, y: pos.y },
-      height: 0,
-      aiArchetype: 'aggressive' as const,
+        pos: { x: pos.x, y: pos.y },
+        height: 0,
+        aiArchetype: 'aggressive' as const,
       };
     }),
   };
@@ -816,7 +727,7 @@ export const CLASS_PROFILES: readonly ClassProfile[] = [
 ];
 
 // M8, sub-sessão 4/N — promoção. Reusa os mesmos blocos (`generateStatCurve`,
-// `generateTalentTree(profile, 'spec')`, `generateBasicSkill`/`generateSignatureSkill`)
+// `generateBasicSkill`/`generateSignatureSkill`)
 // já usados pras 9 classes base, só com um `ClassProfile` mais forte (~25% acima de
 // `class-espadachim`, mesma proporção observada entre `class-cavaleiro`/`class-soldado`
 // em M1) e `slug` próprio pra não colidir ids com a classe base. Decisão registrada em
@@ -851,7 +762,6 @@ export function generatePromotedClass() {
     awakeningMultipliers: [...STANDARD_AWAKENING_MULTIPLIERS],
     promotionFlat: [{ stat: 'hp' as const, flat: 200 }],
     imprintFlat: STANDARD_IMPRINT_FLAT.map((entry) => entry.map((mod) => ({ ...mod }))),
-    talentTree: generateTalentTree(PROMOTED_PROFILE, 'spec'),
   };
 }
 

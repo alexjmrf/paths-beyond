@@ -5,13 +5,22 @@
     {
       "hero": {
         "id": "heroi-espadachim-1",
+        "characterId": "hero-jogador",
         "classId": "class-espadachim",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-espadachim-foco-em-equipe": 1
+          "talent-aren-postura-firme": 1,
+          "talent-aren-folego-do-escudo": 1,
+          "talent-aren-mao-estendida": 1,
+          "talent-aren-couro-batido": 1,
+          "talent-aren-contra-simples": 1,
+          "talent-aren-alcance-de-apoio": 1,
+          "talent-aren-vigilia": 1,
+          "talent-aren-troca-limpa": 1,
+          "talent-aren-comando-de-flanco": 1
         },
         "equipment": {
           "weapon": "item-arma-espadachim",
@@ -45,54 +54,21 @@
     {
       "hero": {
         "id": "heroi-espadachim-2",
-        "classId": "class-espadachim",
-        "level": 10,
-        "exp": 0,
-        "awakening": 0,
-        "imprint": 0,
-        "talents": {
-          "talent-espadachim-foco-em-equipe": 1
-        },
-        "equipment": {
-          "weapon": "item-arma-espadachim",
-          "helmet": null,
-          "armor": null,
-          "necklace": "item-colar-forca",
-          "ring": null,
-          "boots": null
-        },
-        "weaponType": "sword",
-        "duelSkills": [
-          "skill-ataque-espadachim",
-          "skill-especial-espadachim"
-        ],
-        "mapSkills": [],
-        "tacticsScript": [
-          {
-            "enabled": true,
-            "skillId": "skill-especial-espadachim",
-            "conditions": []
-          }
-        ]
-      },
-      "pos": {
-        "x": 0,
-        "y": 1
-      },
-      "height": 0,
-      "aiArchetype": "aggressive"
-    },
-    {
-      "hero": {
-        "id": "heroi-espadachim-apoio",
+        "characterId": "ally-arqueiro",
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
         "awakening": 0,
         "imprint": 0,
         "talents": {
-          "talent-arqueiro-foco-em-equipe": 1,
-          "talent-arqueiro-reacao-propria": 1
+          "talent-sylla-pes-leves": 1,
+          "talent-sylla-folego-de-combate": 1,
+          "talent-sylla-alcance-de-apoio": 1,
+          "talent-sylla-mao-estendida": 1,
+          "talent-sylla-respiro": 2,
+          "talent-sylla-retirada-calculada": 1,
+          "talent-sylla-apoio-constante": 1,
+          "talent-sylla-comando-de-batedores": 1
         },
         "equipment": {
           "weapon": "item-arma-arqueiro",
@@ -112,6 +88,53 @@
           {
             "enabled": true,
             "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "hero": {
+        "id": "heroi-espadachim-3",
+        "characterId": "ally-guerreiro",
+        "classId": "class-guerreiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {
+          "talent-rurik-estandarte": 2,
+          "talent-rurik-brado": 1,
+          "talent-rurik-mao-estendida": 1,
+          "talent-rurik-folego-de-comando": 2,
+          "talent-rurik-alcance-de-apoio": 1,
+          "talent-rurik-ordem-clara": 1,
+          "talent-rurik-comando-de-vanguarda": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
             "conditions": []
           }
         ]

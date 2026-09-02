@@ -6,8 +6,8 @@ import {
   openGateCoords,
   manhattanDistance,
   tileAt,
-  resetTree,
-  validateAllocation,
+  resetFromRow,
+  validateColumnAllocation,
   type AiTurnStep,
   type BattleCommand,
   type BattleState,
@@ -23,7 +23,7 @@ import {
   type BattleSetup,
   type TacticsScript,
   type TalentAllocation,
-  type TalentTree,
+  type ColumnTalentTree,
   type Replay,
   type ValorSkillDef,
 } from '@paths-beyond/core';
@@ -47,7 +47,7 @@ import { narrateAiTurns } from '../data/aiNarration.js';
 import { campaignMaps } from '../data/campaign.js';
 import { catalog } from '../data/catalog.js';
 import { DEFAULT_UI_SCALE, isSupportedUiScale } from '../data/overlayTheme.js';
-import { decodeBuildCode } from '../logic/buildCode.js';
+import { readBuildCodeFor } from '../logic/buildCode.js';
 import {
   browserSaveStorage,
   clearSave,
@@ -59,7 +59,7 @@ import {
   type SaveGame,
   type SaveStorage,
 } from '../logic/save.js';
-import { MAX_POINTS_PER_TREE } from '../logic/talentLayout.js';
+
 
 // Seed fixa pra esta fatia de M6 — o cliente ainda não tem tela de configuração de
 // batalha; a semente real por partida é trabalho de uma fatia futura (persistência/save).
@@ -105,15 +105,30 @@ export function classDefForUnit(campaignMapIndex: number, unitId: string): Class
 // o save e o store: o que sai dele na abertura e o que entra nele quando muda.
 const saveStorage: SaveStorage | null = browserSaveStorage();
 
+// §8.1/§8.2 (M17, 4/N) — a árvore de talentos de uma unidade vem do PERSONAGEM que ela é,
+// não mais da classe dela. `heroesByUnitId` continua sendo o caminho porque `BattleUnit`
+// (core) não carrega `characterId` — ele é estado de batalha resolvido, e quem é aquela
+// pessoa é assunto do conteúdo que montou a batalha.
+export function characterTreeForUnit(campaignMapIndex: number, unitId: string): ColumnTalentTree | undefined {
+  const characterId = campaignMaps[campaignMapIndex]?.heroesByUnitId[unitId]?.characterId;
+  return characterId ? catalog.characterTalentTrees[characterId] : undefined;
+}
+
+// O despertar do herói entra na validação porque `minAwakening` é gate de nó (§10, M14):
+// sem ele a tela ofereceria um nó avançado que o motor recusaria depois.
+function awakeningForUnit(campaignMapIndex: number, unitId: string): number {
+  return campaignMaps[campaignMapIndex]?.heroesByUnitId[unitId]?.awakening ?? 0;
+}
+
 function allocationIsValidFor(campaignMapIndex: number, unitId: string, allocation: TalentAllocation): boolean {
-  const classDef = classDefForUnit(campaignMapIndex, unitId);
-  // Unidade de outro capítulo: a árvore da classe dela não é resolvível a partir do
-  // capítulo corrente, então não há o que afirmar — a alocação fica como está.
-  if (!classDef) return true;
-  return validateAllocation({
-    tree: classDef.talentTree,
+  const tree = characterTreeForUnit(campaignMapIndex, unitId);
+  // Unidade de outro capítulo: a árvore dela não é resolvível a partir do capítulo
+  // corrente, então não há o que afirmar — a alocação fica como está.
+  if (!tree) return true;
+  return validateColumnAllocation({
+    tree,
     allocation,
-    maxPointsPerTree: MAX_POINTS_PER_TREE,
+    awakening: awakeningForUnit(campaignMapIndex, unitId),
   }).valid;
 }
 
@@ -369,7 +384,9 @@ interface BattleStore {
   closeTalentEditor: () => void;
   allocateTalent: (unitId: string, nodeId: Id) => void;
   deallocateTalent: (unitId: string, nodeId: Id) => void;
-  resetTalentTree: (unitId: string, tree: TalentTree) => void;
+  // §8.2 — a árvore é um CAMINHO, então desfazer é TRUNCAR da linha para baixo, e não
+  // escolher uma das duas árvores (que não existem mais). `fromRow: 1` é o reset inteiro.
+  resetTalentTree: (unitId: string, fromRow: number) => void;
   loadBuildCode: (unitId: string, code: string) => void;
   toggleInstantResultMode: () => void;
   setBoardAnimating: (value: boolean) => void;
@@ -741,20 +758,28 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // §11 — "Talentos: Grafo, preview do efeito, string de build compartilhável." Alocar
   // não é uma ação de batalha (sem BattleCommand — treinar talento é fora de combate no
   // jogo real). Toda mudança (+1/-1/reset/carregar código) sempre recomputa a alocação
-  // inteira e revalida com `validateAllocation` antes de aplicar — decrementar um nó pode
-  // quebrar o gate de linha de outro nó mais alto que dependia daqueles pontos, então a
-  // trava não é só "não deixar exceder maxRank", é "a árvore inteira continua válida".
+  // inteira e revalida com `validateColumnAllocation` antes de aplicar.
+  //
+  // §8.2 (M17, 4/N) — a revalidação da árvore INTEIRA a cada clique deixou de ser
+  // precaução e virou o mecanismo: a árvore é um CAMINHO, então tirar um ponto do meio dele
+  // deixa as linhas de baixo penduradas no nada, e é o core que diz isso. O cliente não
+  // reimplementa a amarração de coluna em lugar nenhum — ver `logic/talentLayout.ts`.
   openTalentEditor: (unitId) => set({ talentEditorUnitId: unitId, lastTalentReason: null }),
   closeTalentEditor: () => set({ talentEditorUnitId: null }),
 
   allocateTalent: (unitId, nodeId) => {
     const { talentAllocationByUnit, campaignMapIndex } = get();
+    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    if (!tree) {
+      set({ lastTalentReason: 'esta unidade não é um personagem do elenco' });
+      return;
+    }
     const current = talentAllocationByUnit[unitId] ?? {};
     const nextAllocation: TalentAllocation = { ...current, [nodeId]: (current[nodeId] ?? 0) + 1 };
-    const result = validateAllocation({
-      tree: classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? [],
+    const result = validateColumnAllocation({
+      tree,
       allocation: nextAllocation,
-      maxPointsPerTree: MAX_POINTS_PER_TREE,
+      awakening: awakeningForUnit(campaignMapIndex, unitId),
     });
     if (!result.valid) {
       set({ lastTalentReason: result.issues[0]?.reason ?? 'alocação inválida' });
@@ -768,18 +793,22 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 
   deallocateTalent: (unitId, nodeId) => {
     const { talentAllocationByUnit, campaignMapIndex } = get();
+    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    if (!tree) return;
     const current = talentAllocationByUnit[unitId] ?? {};
     const currentRank = current[nodeId] ?? 0;
     if (currentRank <= 0) return;
 
     const nextAllocation: TalentAllocation = { ...current, [nodeId]: currentRank - 1 };
-    const result = validateAllocation({
-      tree: classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? [],
+    const result = validateColumnAllocation({
+      tree,
       allocation: nextAllocation,
-      maxPointsPerTree: MAX_POINTS_PER_TREE,
+      awakening: awakeningForUnit(campaignMapIndex, unitId),
     });
     if (!result.valid) {
-      set({ lastTalentReason: result.issues[0]?.reason ?? 'remover este ponto invalida outro nó' });
+      // A saída não é um beco: o painel oferece o reset a partir da linha, que é como se
+      // desfaz um caminho — da ponta para trás.
+      set({ lastTalentReason: result.issues[0]?.reason ?? 'remover este ponto invalida o caminho' });
       return;
     }
     set({
@@ -788,32 +817,34 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     });
   },
 
-  resetTalentTree: (unitId, tree) => {
+  resetTalentTree: (unitId, fromRow) => {
     const { talentAllocationByUnit, campaignMapIndex } = get();
-    const current = talentAllocationByUnit[unitId] ?? {};
-    const next = resetTree(current, tree, classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? []);
+    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    if (!tree) return;
+    const next = resetFromRow(tree, talentAllocationByUnit[unitId] ?? {}, fromRow);
     set({ talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: next }, lastTalentReason: null });
   },
 
   loadBuildCode: (unitId, code) => {
     const { campaignMapIndex } = get();
-    const decoded = decodeBuildCode(code);
-    if (!decoded) {
-      set({ lastTalentReason: 'código de build inválido' });
+    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    if (!tree) {
+      set({ lastTalentReason: 'esta unidade não é um personagem do elenco' });
       return;
     }
-    const result = validateAllocation({
-      tree: classDefForUnit(campaignMapIndex, unitId)?.talentTree ?? [],
-      allocation: decoded.talents,
-      maxPointsPerTree: MAX_POINTS_PER_TREE,
-    });
-    if (!result.valid) {
-      set({ lastTalentReason: result.issues[0]?.reason ?? 'build do código é inválida' });
+    const lido = readBuildCodeFor(
+      tree.characterId,
+      tree,
+      code,
+      awakeningForUnit(campaignMapIndex, unitId),
+    );
+    if (!lido.ok) {
+      set({ lastTalentReason: lido.reason });
       return;
     }
     const { talentAllocationByUnit } = get();
     set({
-      talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: decoded.talents },
+      talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: lido.talents },
       lastTalentReason: null,
     });
   },

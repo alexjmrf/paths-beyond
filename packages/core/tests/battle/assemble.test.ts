@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildBattleSetupFromHeroes, buildBattleUnit } from '../../src/battle/assemble.js';
+import { buildBattleSetupFromHeroes, buildBattleUnit, type BuildBattleSetupFromHeroesInput } from '../../src/battle/assemble.js';
+import type { EnemyDef } from '../../src/enemy/types.js';
 import type { HeroCombatProfile } from '../../src/hero/combatProfile.js';
 import type { ClassDef, Hero } from '../../src/hero/types.js';
 import type { ItemSet } from '../../src/items/types.js';
 import type { SkillDef } from '../../src/skills/types.js';
 import type { StatSheet } from '../../src/stats/types.js';
 import type { GridMap, Terrain } from '../../src/grid/types.js';
-import type { TalentNode } from '../../src/talents/types.js';
 
 const stats: StatSheet = {
   hp: 5000,
@@ -130,7 +130,6 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
     zocEnabled: false,
   };
 
-  const talentTree: readonly TalentNode[] = [];
   const classDef: ClassDef = {
     id: 'classe-setup',
     name: 'Classe Setup',
@@ -144,7 +143,6 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
     awakeningMultipliers: [1000, 1000, 1000, 1000, 1000, 1000, 1000],
     promotionFlat: [],
     imprintFlat: [[], [], [], [], [], []],
-    talentTree,
   };
 
   const basico: SkillDef = {
@@ -174,6 +172,95 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
     };
   }
 
+  // §8.1 (M17, 3/N) — o INIMIGO AUTORADO entrando pela mesma porta.
+  //
+  // `buildBattleSetupFromHeroes` passou a aceitar dois tipos de placement, e o que estes
+  // testes protegem é que a diferença TERMINA na montagem: o `BattleUnit` que sai não
+  // carrega marca de origem, porque se carregasse cada regra do jogo poderia perguntar
+  // "isto é um inimigo?" — a porta pela qual entra a IA esperta que a regra 6 proíbe.
+  describe('placement de inimigo autorado', () => {
+    const patrulheiro: EnemyDef = {
+      id: 'enemy-patrulheiro',
+      name: 'Patrulheiro',
+      stats: {
+        hp: 980, atk: 150, def: 92, spd: 84, chc: 100, chd: 1500,
+        eff: 0, efr: 0, pen: 0, heal: 0, lifesteal: 0, focus: 0, vigor: 0,
+      },
+      unitType: 'infantry',
+      weaponType: 'sword',
+      moveType: 'foot',
+      moveRange: 3,
+      pools: { ap: 2, pp: 2 },
+      duelSkills: ['skill-basico'],
+      mapSkills: [],
+      tacticsScript: [{ enabled: true, skillId: 'skill-basico', conditions: [] }],
+    };
+
+    function montar(placements: BuildBattleSetupFromHeroesInput['placements']) {
+      return buildBattleSetupFromHeroes({
+        placements,
+        map,
+        permadeath: 'classic',
+        winCondition: { t: 'rout' },
+        effectDefs: {},
+        initialValor: 5,
+        itemSets,
+        skillsCatalog,
+        weaponDuelRanges,
+        baselineReactionSkillIds,
+        characterTalentTrees: {},
+      });
+    }
+
+    it('vira BattleUnit com a força declarada, sem passar por Hero nem por classe', () => {
+      const setup = montar([
+        { unitId: 'u-inimigo', enemy: patrulheiro, side: 'enemy', pos: { x: 2, y: 2 }, height: 0, aiArchetype: 'aggressive' },
+      ]);
+
+      const unidade = setup.units[0]!;
+      expect(unidade.hp).toBe(980);
+      expect(unidade.stats).toEqual(patrulheiro.stats);
+      expect(unidade.ap).toBe(2);
+      expect(unidade.moveRange).toBe(3);
+      expect(unidade.aiArchetype).toBe('aggressive');
+    });
+
+    it('`heroId` recebe o id do inimigo — de que ficha a unidade saiu, e não um herói inventado', () => {
+      const setup = montar([
+        { unitId: 'u-inimigo', enemy: patrulheiro, side: 'enemy', pos: { x: 2, y: 2 }, height: 0 },
+      ]);
+      expect(setup.units[0]!.heroId).toBe('enemy-patrulheiro');
+    });
+
+    it('os dois tipos de placement convivem no mesmo BattleSetup, na ordem em que entram', () => {
+      const setup = montar([
+        { unitId: 'u-heroi', hero: buildHero({ id: 'heroi-1' }), classDef, equippedItems: [], side: 'player', pos: { x: 0, y: 0 }, height: 0 },
+        { unitId: 'u-inimigo', enemy: patrulheiro, side: 'enemy', pos: { x: 2, y: 2 }, height: 0 },
+      ]);
+
+      expect(setup.units.map((u) => u.unitId)).toEqual(['u-heroi', 'u-inimigo']);
+      expect(setup.units.map((u) => u.side)).toEqual(['player', 'enemy']);
+    });
+
+    it('o BattleUnit do inimigo tem exatamente os mesmos campos que o de um herói', () => {
+      // A prova de que a distinção não vazou para dentro do motor: um campo a mais (ou a
+      // menos) num dos dois lados seria uma unidade que o resto do jogo trata diferente.
+      const setup = montar([
+        { unitId: 'u-heroi', hero: buildHero({ id: 'heroi-1' }), classDef, equippedItems: [], side: 'player', pos: { x: 0, y: 0 }, height: 0 },
+        { unitId: 'u-inimigo', enemy: patrulheiro, side: 'enemy', pos: { x: 2, y: 2 }, height: 0 },
+      ]);
+
+      expect(Object.keys(setup.units[1]!).sort()).toEqual(Object.keys(setup.units[0]!).sort());
+    });
+
+    it('é determinística: mesma entrada, mesmo hash', () => {
+      const placements: BuildBattleSetupFromHeroesInput['placements'] = [
+        { unitId: 'u-inimigo', enemy: patrulheiro, side: 'enemy', pos: { x: 2, y: 2 }, height: 0 },
+      ];
+      expect(JSON.stringify(montar(placements))).toBe(JSON.stringify(montar(placements)));
+    });
+  });
+
   it('monta um BattleSetup completo a partir de heróis reais, um BattleUnit por placement', () => {
     const attacker = buildHero({ id: 'heroi-atacante' });
     const defender = buildHero({ id: 'heroi-defensor' });
@@ -201,6 +288,10 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
       skillsCatalog,
       weaponDuelRanges,
       baselineReactionSkillIds,
+      // M17 2/N — nenhuma unidade deste arquivo é personagem do elenco, então o catálogo
+      // de árvores é vazio e todo mundo resolve com zero talentos. O que se mede aqui é a
+      // montagem do `BattleSetup`, não a agregação de talento.
+      characterTalentTrees: {},
     });
 
     expect(setup.map).toBe(map);
@@ -236,6 +327,10 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
       skillsCatalog,
       weaponDuelRanges,
       baselineReactionSkillIds,
+      // M17 2/N — nenhuma unidade deste arquivo é personagem do elenco, então o catálogo
+      // de árvores é vazio e todo mundo resolve com zero talentos. O que se mede aqui é a
+      // montagem do `BattleSetup`, não a agregação de talento.
+      characterTalentTrees: {},
     };
     const a = JSON.stringify(buildBattleSetupFromHeroes(input));
     const b = JSON.stringify(buildBattleSetupFromHeroes(input));
@@ -270,6 +365,10 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
       skillsCatalog,
       weaponDuelRanges,
       baselineReactionSkillIds,
+      // M17 2/N — nenhuma unidade deste arquivo é personagem do elenco, então o catálogo
+      // de árvores é vazio e todo mundo resolve com zero talentos. O que se mede aqui é a
+      // montagem do `BattleSetup`, não a agregação de talento.
+      characterTalentTrees: {},
       valorSkills,
     });
 
@@ -290,6 +389,10 @@ describe('buildBattleSetupFromHeroes — Hero[]→BattleSetup completo (M7, sub-
       skillsCatalog,
       weaponDuelRanges,
       baselineReactionSkillIds,
+      // M17 2/N — nenhuma unidade deste arquivo é personagem do elenco, então o catálogo
+      // de árvores é vazio e todo mundo resolve com zero talentos. O que se mede aqui é a
+      // montagem do `BattleSetup`, não a agregação de talento.
+      characterTalentTrees: {},
     });
 
     expect('valorSkills' in setup).toBe(false);

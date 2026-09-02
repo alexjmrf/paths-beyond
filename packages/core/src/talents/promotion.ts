@@ -1,6 +1,5 @@
 import type { Id } from '../types.js';
-import { resetTree } from './reset.js';
-import type { TalentAllocation, TalentNode } from './types.js';
+import type { TalentAllocation } from './types.js';
 
 // §8.1 — "Promoção exige item + nível mínimo, e é irreversível sem item raro de reset."
 // Sem sistema de inventário no projeto ainda: `hasRequiredItem` é resolvido por fora
@@ -34,7 +33,6 @@ export function canPromote(input: CanPromoteInput): CanPromoteResult {
 export interface PromoteInput {
   readonly newClassId: Id;
   readonly allocation: TalentAllocation;
-  readonly specTreeNodes: readonly TalentNode[]; // árvore de especialização da classe ANTIGA
 }
 
 export interface PromoteResult {
@@ -42,11 +40,20 @@ export interface PromoteResult {
   readonly talents: TalentAllocation;
 }
 
-// §8.2 — "Classe (8 pontos, compartilhada entre specs)": a promoção troca a classe e
-// reseta só a árvore de especialização; os pontos de classe (compartilhados) ficam.
+// §8.1 (M17) — a promoção NÃO TOCA MAIS NA ÁRVORE, e isso não é uma simplificação: é o
+// que sobra quando a árvore deixa de pertencer à classe.
+//
+// A versão antiga resetava a árvore de especialização e preservava a de classe, porque
+// promover trocava a spec e a spec tinha árvore própria. Com §8.2 ("uma árvore por
+// personagem... ela é parte de quem ele é"), trocar a classe de um personagem não troca
+// a árvore dele — não há o que resetar, e resetar seria punir o jogador por progredir.
+// O que a promoção muda é de onde vem a curva de stat, `moveType`, armas e pools (D2).
+//
+// `promote` continua existindo, e continua sem chamador de produção: §8.1 mantém a
+// promoção normativa e este é o lugar onde a regra dela mora quando ela for ligada.
 export function promote(input: PromoteInput): PromoteResult {
   return {
     classId: input.newClassId,
-    talents: resetTree(input.allocation, 'spec', input.specTreeNodes),
+    talents: input.allocation,
   };
 }
