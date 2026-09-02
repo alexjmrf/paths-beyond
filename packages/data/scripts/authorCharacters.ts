@@ -92,6 +92,11 @@ interface CharacterSpec {
   readonly name: string;
   readonly slug: string; // usado nos ids de talento
   readonly classId: string;
+  // D14 (M18) — como o personagem entra no jogo. O corte foi LIDO da campanha como ela já
+  // estava autorada: Aren no capítulo 1, Miron no 2, Sylla no 3 e Vesper no 4 são o núcleo
+  // garantido; Wren (só no 5), Bardan (só no 6) e os três que não aparecem em capítulo
+  // nenhum são adquiríveis.
+  readonly acquisition: 'story' | 'summon';
   readonly rows: readonly RowSpec[];
 }
 
@@ -139,6 +144,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Aren',
     slug: 'aren',
     classId: 'class-espadachim',
+    acquisition: 'story',
     rows: [
       {
         a: { slug: 'fio-agressivo', effects: [pct('atk', 50), pct('def', -30)] },
@@ -191,6 +197,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Miron',
     slug: 'miron',
     classId: 'class-clerigo',
+    acquisition: 'story',
     rows: [
       {
         a: { slug: 'imposicao-de-maos', effects: [harder('skill-cura-clerigo', 1200), pct('atk', 45)] },
@@ -235,6 +242,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Sylla',
     slug: 'sylla',
     classId: 'class-arqueiro',
+    acquisition: 'story',
     rows: [
       {
         a: { slug: 'olho-de-agulha', effects: [pct('atk', 45), pct('def', -25)] },
@@ -282,6 +290,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Vesper',
     slug: 'vesper',
     classId: 'class-arcanista',
+    acquisition: 'story',
     rows: [
       {
         a: { slug: 'chama-crescente', maxRank: 2, effects: [pct('atk', 50), pct('def', -30)] },
@@ -323,6 +332,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Wren',
     slug: 'wren',
     classId: 'class-druida',
+    acquisition: 'summon',
     rows: [
       {
         a: { slug: 'raizes-profundas', maxRank: 3, effects: [pct('hp', 40), flat('atk', 3), flat('spd', -1)] },
@@ -359,6 +369,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Bardan',
     slug: 'bardan',
     classId: 'class-couracado',
+    acquisition: 'summon',
     rows: [
       {
         a: { slug: 'aco-pesado', effects: [pct('def', 50), flat('spd', -5)] },
@@ -411,6 +422,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Kaia',
     slug: 'kaia',
     classId: 'class-grifeiro',
+    acquisition: 'summon',
     rows: [
       {
         a: { slug: 'mergulho', maxRank: 2, effects: [pct('atk', 45), pct('def', -25)] },
@@ -451,6 +463,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Rurik',
     slug: 'rurik',
     classId: 'class-guerreiro',
+    acquisition: 'summon',
     rows: [
       {
         a: { slug: 'furia', maxRank: 2, effects: [pct('atk', 50), pct('def', -30)] },
@@ -495,6 +508,7 @@ const ELENCO: readonly CharacterSpec[] = [
     name: 'Nyra',
     slug: 'nyra',
     classId: 'class-lanceiro',
+    acquisition: 'summon',
     rows: [
       {
         a: { slug: 'estocada', effects: [pct('atk', 45), pct('def', -25)] },
@@ -539,7 +553,16 @@ const ELENCO: readonly CharacterSpec[] = [
 // ---------------------------------------------------------------------------
 
 export function generateCharacter(spec: CharacterSpec) {
-  return { id: spec.id, name: spec.name, classId: spec.classId };
+  return {
+    id: spec.id,
+    name: spec.name,
+    classId: spec.classId,
+    acquisition: spec.acquisition,
+    // Derivado aqui, no GERADOR, e não no motor: o gerador é quem autora, e é o lugar onde
+    // uma convenção de nome é legítima. `packages/gacha` não pode derivar o mesmo id
+    // (regra 4), e por isso o banner o declara.
+    fragmentMaterialId: `material-fragmento-${spec.id}`,
+  };
 }
 
 export function generateTalentTree(spec: CharacterSpec) {

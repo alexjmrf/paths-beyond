@@ -1,5 +1,7 @@
 {
   "id": "hero-jogador",
   "name": "Aren",
-  "classId": "class-espadachim"
+  "classId": "class-espadachim",
+  "acquisition": "story",
+  "fragmentMaterialId": "material-fragmento-hero-jogador"
 }

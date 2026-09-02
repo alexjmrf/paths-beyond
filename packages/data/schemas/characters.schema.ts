@@ -18,9 +18,10 @@ import { idSchema } from './shared.js';
 // `{ characterId, depth, nodes }` e o schema dela é `.strict()`: nome e classe não
 // caberiam lá dentro sem contrariar a spec.
 //
-// A POSSE (quem o jogador de fato tem) também não mora aqui: D10 registrou que aquisição
-// é estado de conta e milestone própria. O elenco é catálogo estático — o que existe no
-// jogo, não o que uma conta destravou.
+// A POSSE (quem o jogador de fato tem) também não mora aqui, e M18 não mudou isso: posse é
+// estado de conta, no servidor. O elenco é catálogo estático — o que existe no jogo, não o
+// que uma conta destravou. O que M18 acrescentou é a outra metade da pergunta, que É
+// estática: COMO um personagem entra no jogo (D14).
 const characterSchema = z
   .object({
     id: idSchema,
@@ -29,6 +30,15 @@ const characterSchema = z
     // catálogo de classes é validação cruzada, e vive em `packages/content` — este
     // schema, como todos os outros de `packages/data`, valida um arquivo isolado.
     classId: idSchema,
+    // D14 (M18) — como o personagem entra no jogo. `story` é o NÚCLEO garantido a todo
+    // jogador, e é contra ele que a campanha é afinada; `summon` é adquirível por banner.
+    // Obrigatório e sem padrão de propósito: um personagem novo tem de declarar de que
+    // lado está, senão ele nasce garantido por omissão e ninguém repara.
+    acquisition: z.enum(['story', 'summon']),
+    // O fragmento que a duplicata deste personagem paga, e que o `imprint` de §10 consome.
+    // Obrigatório para os dois tipos: um personagem de história também tem imprint, e o
+    // fragmento dele dropa na masmorra de Chefe desde M14.
+    fragmentMaterialId: idSchema,
   })
   .strict();
 

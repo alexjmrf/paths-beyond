@@ -122,6 +122,46 @@ export interface CharacterContent {
   readonly id: Id;
   readonly name: string;
   readonly classId: Id;
+  // D14 (M18) — `story` é o núcleo garantido a todo jogador (é contra ele que a campanha é
+  // afinada); `summon` é adquirível por banner.
+  readonly acquisition: 'story' | 'summon';
+  readonly fragmentMaterialId: Id;
+}
+
+// §10 (M18, 2/N) — o BANNER. Espelho de `packages/data/schemas/banners.schema.ts`.
+// Estruturalmente compatível com o `BannerDef` de `packages/gacha`, e é assim de propósito:
+// o catálogo entrega o banner direto à rolagem, sem uma camada de conversão que pudesse
+// divergir. O teste de conformidade em `tests/banner.test.ts` é quem trava isso.
+export interface BannerEntryContent {
+  readonly characterId: Id;
+  readonly weight: number;
+  readonly fragmentMaterialId: Id;
+}
+
+export interface BannerContent {
+  readonly id: Id;
+  readonly name: string;
+  readonly pityThreshold: number;
+  readonly pool: readonly BannerEntryContent[];
+}
+
+// §10/D17 (M18) — os números da moeda PREMIUM. Moram aqui, e NÃO em `EconomyRules` do
+// core, e isso é a §15 sendo levada a sério no tipo e não só no diretório: pôr o custo de
+// summon dentro do `EconomyRules` do core seria o gacha entrando no core pela porta do
+// tipo, ainda que nenhuma função de lá o lesse. O core continua conhecendo energia,
+// awakening, imprint e enhance — que são regras dele — e nada de aquisição.
+//
+// Os dois vivem no mesmo arquivo de dado (`economy-rules/economy.json`) porque são a mesma
+// tabela de economia para quem autora; é só a leitura que se separa.
+export interface PremiumRules {
+  readonly summon: {
+    readonly premiumCost: number;
+    readonly pityThreshold: number;
+  };
+  readonly energyPurchase: {
+    readonly premiumCost: number;
+    readonly energy: number;
+  };
 }
 
 export interface ContentCatalog {
@@ -173,6 +213,12 @@ export interface ContentCatalog {
   readonly dungeons: Readonly<Record<Id, DungeonDef>>;
   readonly dungeonEncounters: Readonly<Record<Id, DungeonEncounter>>;
   readonly materials: Readonly<Record<Id, MaterialDef>>;
+  // §10 (M18, 2/N) — os banners de invocação. Obrigatórios pela mesma razão que o elenco:
+  // catálogo sem banner não é "este jogo não tem aquisição", é uma rota de summon que não
+  // resolve.
+  readonly banners: Readonly<Record<Id, BannerContent>>;
+  // §10/D17 (M18) — separados de `economyRules` de propósito; ver `PremiumRules`.
+  readonly premiumRules: PremiumRules;
   readonly economyRules: EconomyRules;
   readonly substatWeights: readonly SubstatWeightEntry[];
   readonly mainstatWeights: readonly MainstatWeightEntry[];

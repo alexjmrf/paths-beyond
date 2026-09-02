@@ -1,5 +1,7 @@
 {
   "id": "personagem-soldado",
   "name": "Soldado de Teste",
-  "classId": "class-soldado"
+  "classId": "class-soldado",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-personagem-soldado"
 }

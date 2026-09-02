@@ -31,6 +31,7 @@ import encounterSchema from '@paths-beyond/data/schemas/encounters.schema.js';
 import dungeonSchema from '@paths-beyond/data/schemas/dungeons.schema.js';
 import dungeonEncounterSchema from '@paths-beyond/data/schemas/dungeon-encounters.schema.js';
 import materialSchema from '@paths-beyond/data/schemas/materials.schema.js';
+import bannerSchema from '@paths-beyond/data/schemas/banners.schema.js';
 import economyRulesSchema from '@paths-beyond/data/schemas/economy-rules.schema.js';
 import substatWeightsSchema from '@paths-beyond/data/schemas/substat-weights.schema.js';
 import mainstatWeightsSchema from '@paths-beyond/data/schemas/mainstat-weights.schema.js';
@@ -44,11 +45,13 @@ import terrainSchema from '@paths-beyond/data/schemas/terrains.schema.js';
 import weaponDuelRangesSchema from '@paths-beyond/data/schemas/weapon-duel-ranges.schema.js';
 import type {
   ArenaMap,
+  BannerContent,
   CharacterContent,
   Composition,
   ContentCatalog,
   DungeonEncounter,
   Encounter,
+  PremiumRules,
   SummonBlueprintContent,
 } from './types.js';
 
@@ -96,6 +99,9 @@ export interface ParsedContentFiles {
   readonly dungeons?: readonly unknown[];
   readonly dungeonEncounters?: readonly unknown[];
   readonly materials?: readonly unknown[];
+  // Obrigatório, sem `?`, pelo mesmo motivo de `characters` e `enemies`: esquecer de
+  // passar tem de ser erro de tipo, não um catálogo sem banner descoberto em produção.
+  readonly banners: readonly unknown[];
   readonly economyRules?: readonly unknown[];
   readonly substatWeights?: unknown;
   readonly mainstatWeights?: unknown;
@@ -105,6 +111,10 @@ export interface ParsedContentFiles {
 // Sem tabela de economia carregada, o catálogo ainda é válido — só não dá para farmar.
 // Zeros explícitos em vez de `undefined` evitam que cada consumidor tenha de checar.
 const EMPTY_ECONOMY_RULES: EconomyRules = { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] };
+const EMPTY_PREMIUM_RULES: PremiumRules = {
+  summon: { premiumCost: 0, pityThreshold: 1 },
+  energyPurchase: { premiumCost: 0, energy: 0 },
+};
 const EMPTY_ENHANCE_RATES: EnhanceRates = { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 };
 
 function indexById<T extends { id: Id }>(list: readonly T[]): Record<Id, T> {
@@ -205,8 +215,16 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     (input.dungeonEncounters ?? []).map((raw) => dungeonEncounterSchema.parse(raw) as unknown as DungeonEncounter),
   );
   const materials = indexById((input.materials ?? []).map((raw) => materialSchema.parse(raw) as MaterialDef));
-  const economyRulesList = (input.economyRules ?? []).map((raw) => economyRulesSchema.parse(raw) as unknown as EconomyRules);
-  const economyRules = economyRulesList[0] ?? EMPTY_ECONOMY_RULES;
+  // §10 (M18, 2/N) — os banners. Obrigatórios como o elenco: sem eles um `bannerId` não
+  // resolve, e "catálogo sem banner" não é um jogo sem aquisição.
+  const banners = indexById(input.banners.map((raw) => bannerSchema.parse(raw) as unknown as BannerContent));
+
+  // O MESMO arquivo é lido duas vezes com dois recortes: o que o core conhece
+  // (`EconomyRules`) e o que é da moeda premium (`PremiumRules`). Ver o comentário de
+  // `PremiumRules` em `types.ts` — a separação é §15 no tipo, não organização.
+  const economyRulesRaw = (input.economyRules ?? []).map((raw) => economyRulesSchema.parse(raw));
+  const economyRules = (economyRulesRaw[0] as unknown as EconomyRules | undefined) ?? EMPTY_ECONOMY_RULES;
+  const premiumRules = (economyRulesRaw[0] as unknown as PremiumRules | undefined) ?? EMPTY_PREMIUM_RULES;
   const substatWeights = (
     input.substatWeights === undefined ? [] : substatWeightsSchema.parse(input.substatWeights)
   ) as SubstatWeightEntry[];
@@ -235,7 +253,9 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     dungeons,
     dungeonEncounters,
     materials,
+    banners,
     economyRules,
+    premiumRules,
     substatWeights,
     mainstatWeights,
     enhanceRates,

@@ -58,6 +58,10 @@ const weaponDuelRangesModules = import.meta.glob('../../../../packages/data/weap
 const dungeonModules = import.meta.glob('../../../../packages/data/dungeons/*.json', { eager: true, import: 'default' });
 const dungeonEncounterModules = import.meta.glob('../../../../packages/data/dungeon-encounters/*.json', { eager: true, import: 'default' });
 const materialModules = import.meta.glob('../../../../packages/data/materials/*.json', { eager: true, import: 'default' });
+// §10 (M18, 2/N) — os banners de invocação. O cliente ainda não tem tela de summon (é a
+// 6/N), e carregar aqui é a mesma paridade que os outros: um adapter que conhece menos
+// tipos de conteúdo que o outro é um descompasso descoberto em runtime.
+const bannerModules = import.meta.glob('../../../../packages/data/banners/*.json', { eager: true, import: 'default' });
 const economyRulesModules = import.meta.glob('../../../../packages/data/economy-rules/*.json', { eager: true, import: 'default' });
 const substatWeightsModules = import.meta.glob('../../../../packages/data/substat-weights/*.json', { eager: true, import: 'default' });
 const mainstatWeightsModules = import.meta.glob('../../../../packages/data/mainstat-weights/*.json', { eager: true, import: 'default' });
@@ -71,6 +75,7 @@ export function loadCatalogFromBrowser(): ContentCatalog {
   return buildCatalog({
     classes: globJsonValues(classModules),
     characters: globJsonValues(characterModules),
+    banners: globJsonValues(bannerModules),
     characterTalentTrees: globJsonValues(characterTalentTreeModules),
     enemies: globJsonValues(enemyModules),
     skills: globJsonValues(skillModules),

@@ -1,0 +1,12 @@
+{
+  "id": "banner-teste",
+  "name": "Invocação de Teste",
+  "pityThreshold": 3,
+  "pool": [
+    {
+      "characterId": "personagem-soldado",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-personagem-soldado"
+    }
+  ]
+}

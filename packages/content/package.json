@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@paths-beyond/core": "workspace:*",
-    "@paths-beyond/data": "workspace:*"
+    "@paths-beyond/data": "workspace:*",
+    "@paths-beyond/gacha": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

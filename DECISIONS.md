@@ -4488,3 +4488,85 @@ dentro de um teste é um teste que não sabe o que está medindo.
 **Suíte: 113 arquivos, 1650 testes** (era 110/1619) — 29 testes novos em `packages/gacha` e 2 na
 trava de lint. `pnpm validate:data`: 26 schemas, 183 arquivos, inalterado, porque esta fatia não
 autorou dado nenhum.
+
+
+### M18 — sub-sessão 2/N: o dado, e a chave do fragmento que estava errada
+
+**Três números vieram do usuário antes de qualquer autoria**, porque o briefing os deixou abertos
+justamente para não serem inventados na hora: **custo do summon 500** premium, **pity N = 10**,
+**energia extra 100 premium por 60 de energia** — e **pesos iguais, sem raridade**, nos cinco
+adquiríveis. O argumento que fechou a raridade é do próprio projeto e não de gosto: o critério de
+aceite do M8 exige que nenhuma composição passe de 60% de winrate, ou seja, o jogo **proíbe** que
+um personagem seja mais forte que outro. Raridade sem diferença de poder é escassez arbitrária, e
+raridade com diferença de poder reprova no `pnpm balance` do critério 5. O pacote foi calibrado
+contra as fontes que existirão (6 capítulos + 8 masmorras de primeira completude = 5200 premium =
+**10 invocações** sobre um pool de 5): o jogador termina a campanha com a maior parte do pool e
+não com ele inteiro, que é o que faz posse ainda decidir quem ele leva numa vaga (D16).
+
+#### O achado, e ele contradiz o que a 1/N tinha previsto
+
+**O fragmento de imprint pertencia à INSTÂNCIA de herói, não ao personagem** — e isso só
+funcionava por coincidência de autoria. `applyImprint` comparava `fragment.forHeroId !== hero.id`,
+e nos seis capítulos `hero.id` e `characterId` são a mesma string, personagem por personagem
+(conferido um a um antes de levar a decisão ao usuário). **Fora da campanha já estava quebrado:**
+`devHero('dev-arqueiro', …)` é um herói cujo id não é id de personagem e que não declara
+`characterId` nenhum — ele nunca casava com fragmento algum, **em silêncio**.
+
+A aquisição torna a forma antiga insustentável, e não por gosto: dois jogadores com o mesmo
+personagem têm instâncias de herói diferentes, então **um fragmento por instância não teria como
+ser autorado como conteúdo**. Levado ao usuário porque muda uma coisa que eu havia afirmado — que
+`RULES_VERSION` provavelmente não subiria no M18. **Decisão: corrigir a chave.**
+`MaterialDef.forHeroId` virou `forCharacterId`, `applyImprint` compara com `hero.characterId`, e
+**`RULES_VERSION` 0.17.0 → 0.18.0**, sem caminho de migração.
+
+**Isto NÃO é o gacha entrando no core.** §15 proíbe o gacha em `packages/core`, e a rolagem
+continua em `packages/gacha`. A regra de `imprint` já morava no core desde o M14 e é do M14 —
+o que aconteceu foi ela ser corrigida. A alternativa descartada (o servidor sintetizar o
+`forHeroId` da linha certa antes de chamar `applyImprint`) manteria o core intacto e deixaria no
+lugar uma regra errada por construção, tapada num consumidor: o próximo que chamasse
+`applyImprint` direto reencontraria o defeito sem aviso.
+
+**Um ganho que não era o objetivo:** o herói sem `characterId` passou a falhar **alto** ("não é
+personagem") em vez de nunca casar. Os dois erros eram indistinguíveis antes, porque a busca por
+`hero.id` simplesmente não achava nada nos dois casos; agora são dois testes.
+
+#### A decisão de forma que atravessa a fatia: a moeda premium NÃO entra no `EconomyRules` do core
+
+`summon` e `energyPurchase` são autorados no mesmo `economy-rules/economy.json` — para quem
+autora é a mesma tabela — mas são LIDOS em dois recortes: `EconomyRules` (o que o core conhece:
+energia, awakening, imprint, enhance) e **`PremiumRules`, que vive em `packages/content`**. Pôr o
+custo do summon dentro do `EconomyRules` do core seria o gacha entrando no core pela porta do
+TIPO, ainda que nenhuma função de lá o lesse. §15 levada a sério no tipo, e não só no diretório.
+
+#### O resto do dado
+
+**Um fragmento por personagem — existiam nove personagens e UM fragmento.** O `imprint` de oito
+deles não tinha como ser pago, e nada reclamava porque **ninguém perguntava o recíproco**: a
+asserção existente era "todo fragmento aponta para alguém que existe", que fica verde com oito
+personagens sem fragmento. É a mesma classe de lacuna que M17 4/N e 5/N encontraram — checagem
+faltando em outro eixo, não em maior profundidade —, e o recíproco virou teste.
+
+**As duas metades do elenco têm FONTES diferentes de fragmento, e a asserção partiu em duas:**
+o fragmento de personagem de história dropa na masmorra de Chefe (os três que faltavam foram
+autorados); o de adquirível **não dropa**, e isso é asserção explícita — um fragmento de
+adquirível caindo na masmorra deixaria o jogador subir o imprint de alguém que ele **não possui**.
+
+**`characters` ganhou `acquisition` e `fragmentMaterialId`**, ambos obrigatórios e sem padrão: um
+personagem novo tem de declarar de que lado está, senão nasce garantido por omissão e ninguém
+repara. **`banners.schema.ts` é `.strict()`** pelo mesmo motivo da árvore de coluna e do inimigo
+autorado — o erro provável aqui é alguém escrever `rate: 0.02`, e um schema permissivo a
+aceitaria, o motor a ignoraria, e o banner rodaria com taxas que ninguém declarou.
+
+**`ParsedContentFiles.banners` entrou OBRIGATÓRIO, sem `?`**, e o typecheck imediatamente listou
+os oito lugares que precisavam passá-lo — inclusive o adapter de browser do cliente. É a lição de
+processo de M17 2/N aplicada de propósito desta vez: esquecer vira erro de tipo, não conteúdo
+sumindo em silêncio.
+
+**A validação cruzada banner × elenco vive em `packages/content`**, e ela roda o
+`validateBanner` que a 1/N escreveu contra o conteúdo que a 2/N autorou — as duas metades do M18
+concordando é teste, não confiança. A asserção que mais importa ali é de novo o recíproco: **todo
+adquirível está em algum pool**, senão marcar alguém como `summon` e esquecê-lo fora do banner o
+deixaria inalcançável por qualquer caminho, sem erro nenhum.
+
+**Suíte: 115 arquivos, 1674 testes** (era 113/1650). `pnpm validate:data`: **27 schemas, 192
+arquivos** (era 26/183) — a trava de contagem reprovou e obrigou a atualização a ser consciente.

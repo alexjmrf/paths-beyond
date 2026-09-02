@@ -127,6 +127,13 @@ const catalog: ContentCatalog = {
   substatWeights: [],
   mainstatWeights: [],
   enhanceRates: { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 },
+  // M18 2/N — vazio de propósito: nenhuma destas suítes exercita aquisição, e declarar
+  // aqui é o que o tipo obrigatório de `ContentCatalog` cobra (esquecer vira erro de tipo).
+  banners: {},
+  premiumRules: {
+    summon: { premiumCost: 500, pityThreshold: 10 },
+    energyPurchase: { premiumCost: 100, energy: 60 },
+  },
   baselineReactionSkillIds: [counter.id, defend.id],
 };
 

@@ -65,6 +65,8 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     dungeons: readJsonFiles(typeDir(root, 'dungeons', layout)),
     dungeonEncounters: readJsonFiles(typeDir(root, 'dungeon-encounters', layout)),
     materials: readJsonFiles(typeDir(root, 'materials', layout)),
+    // §10 (M18, 2/N) — os banners de invocação.
+    banners: readJsonFiles(typeDir(root, 'banners', layout)),
     economyRules: readJsonFiles(typeDir(root, 'economy-rules', layout)),
     substatWeights: readFirstJsonFile(typeDir(root, 'substat-weights', layout)),
     mainstatWeights: readFirstJsonFile(typeDir(root, 'mainstat-weights', layout)),

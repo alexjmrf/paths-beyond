@@ -174,4 +174,21 @@
 // remedida do zero nesta fatia. **GOLDEN_HASH não muda:** o replay canônico monta
 // `BattleUnit` direto, sem herói, sem classe e sem talento — nenhuma das duas mudanças o
 // alcança.
-export const RULES_VERSION = '0.17.0';
+//
+// M18, sub-sessão 2/N: **o fragmento de imprint deixa de pertencer a uma INSTÂNCIA de
+// herói e passa a pertencer ao PERSONAGEM.** `MaterialDef.forHeroId` virou
+// `forCharacterId`, e `applyImprint` compara com `hero.characterId`. A regra antiga
+// funcionava por coincidência de autoria — todo herói da campanha tinha `id` e
+// `characterId` iguais —, e já estava quebrada fora dela: um herói sem `characterId` nunca
+// casava com fragmento nenhum, em silêncio. A aquisição de M18 a torna insustentável, e
+// não por gosto: dois jogadores com o mesmo personagem têm instâncias de herói diferentes,
+// então um fragmento por instância não teria como ser autorado como conteúdo.
+//
+// Isto NÃO é o gacha entrando no core — §15 continua valendo e a rolagem vive em
+// `packages/gacha`. É uma regra de M14, que já morava aqui, sendo corrigida.
+//
+// Sem caminho de migração: `forHeroId` deixou de existir, e um material autorado na forma
+// antiga é recusado pelo schema em vez de validar sem efeito. Não observável em
+// `pnpm balance` (o torneio não faz imprint) nem no GOLDEN_HASH (o replay canônico monta
+// `BattleUnit` direto).
+export const RULES_VERSION = '0.18.0';

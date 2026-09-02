@@ -80,5 +80,13 @@
       "gold": 8000,
       "stones": 24
     }
-  ]
+  ],
+  "summon": {
+    "premiumCost": 500,
+    "pityThreshold": 10
+  },
+  "energyPurchase": {
+    "premiumCost": 100,
+    "energy": 60
+  }
 }

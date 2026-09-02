@@ -75,9 +75,9 @@ export const progressionRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async
   });
 
   // §10 — "Imprint: duplicatas viram bônus permanente de stat." O fragmento é resolvido
-  // pelo CATÁLOGO (`forHeroId`), não escolhido pelo cliente: aceitar um id no corpo daria
-  // ao cliente a chance de propor o fragmento de outro herói. O motor recusaria — mas a
-  // rota nem deve oferecer a pergunta.
+  // pelo CATÁLOGO (`forCharacterId`, desde M18 2/N), não escolhido pelo cliente: aceitar um
+  // id no corpo daria ao cliente a chance de propor o fragmento de outro personagem. O
+  // motor recusaria — mas a rota nem deve oferecer a pergunta.
   fastify.post('/heroes/:heroId/imprint', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const player = request.player;
@@ -87,10 +87,18 @@ export const progressionRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async
     const stored = await opts.heroRepository.getHeroById(heroId);
     if (!stored || stored.ownerPlayerId !== player.id) return reply.code(403).send({ error: 'esse herói não é seu' });
 
+    // M18 2/N — a busca é pelo PERSONAGEM. Um herói sem `characterId` não tem fragmento a
+    // encontrar, e isso agora é dito em vez de virar um `find` que nunca acha.
+    if (stored.hero.characterId === undefined) {
+      return reply.code(400).send({ error: 'este herói não é um personagem e não tem imprint' });
+    }
+    const characterId = stored.hero.characterId;
     const fragment = Object.values(opts.catalog.materials).find(
-      (material) => material.kind === 'heroFragment' && material.forHeroId === stored.hero.id,
+      (material) => material.kind === 'heroFragment' && material.forCharacterId === characterId,
     );
-    if (!fragment) return reply.code(400).send({ error: 'este herói não tem fragmento declarado no catálogo' });
+    if (!fragment) {
+      return reply.code(400).send({ error: 'este personagem não tem fragmento declarado no catálogo' });
+    }
 
     const claim = await claimAction(body.nonce, player.id, 'imprint');
     if (!claim.ok) return reply.code(claim.status).send({ error: claim.error });

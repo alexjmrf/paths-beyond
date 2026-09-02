@@ -1,5 +1,7 @@
 {
   "id": "ally-clerigo",
   "name": "Miron",
-  "classId": "class-clerigo"
+  "classId": "class-clerigo",
+  "acquisition": "story",
+  "fragmentMaterialId": "material-fragmento-ally-clerigo"
 }

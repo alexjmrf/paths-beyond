@@ -26,9 +26,20 @@ const SEXTA = Date.UTC(2024, 0, 5, 12);
 
 const catalog = loadCatalogFromDisk();
 
-function heroi(id: string, classId: string, weaponType: Hero['weaponType'], skill: string, level = 50): Hero {
+function heroi(
+  id: string,
+  classId: string,
+  weaponType: Hero['weaponType'],
+  skill: string,
+  level = 50,
+  // M18 2/N — o fragmento passou a pertencer ao PERSONAGEM. Um herói sem `characterId`
+  // deixou de ser um caso "sem fragmento" e virou um caso "não é personagem": são dois
+  // erros diferentes, e este parâmetro é o que permite montar os dois.
+  characterId?: string,
+): Hero {
   return {
     id,
+    characterId,
     classId,
     level,
     exp: 0,
@@ -43,9 +54,12 @@ function heroi(id: string, classId: string, weaponType: Hero['weaponType'], skil
   };
 }
 
-// O herói que tem fragmento declarado no catálogo (`material-fragmento-hero-jogador`) —
-// é o único que pode ganhar imprint, e o teste usa exatamente esse id.
-const HERO_COM_FRAGMENTO = 'hero-jogador';
+// O herói cujo PERSONAGEM tem fragmento declarado no catálogo
+// (`material-fragmento-hero-jogador`). Desde M18 2/N o id da instância e o do personagem
+// são declarados separados de propósito: enquanto fossem a mesma string, a rota poderia
+// estar comparando o campo errado e passaria assim mesmo.
+const HERO_COM_FRAGMENTO = 'heroi-do-comandante';
+const PERSONAGEM_COM_FRAGMENTO = 'hero-jogador';
 
 // §8.1 (M17, 2/N) — `resolveHeroStatSheet` passou a receber a árvore do PERSONAGEM em vez
 // de lê-la da classe. Os heróis deste arquivo são montados por `heroi()` acima, sem
@@ -79,12 +93,28 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
   const heroRepository = createMemoryHeroRepository([
     {
       ownerPlayerId: 'player-1',
-      hero: heroi(HERO_COM_FRAGMENTO, 'class-espadachim', 'sword', 'skill-ataque-espadachim'),
+      hero: heroi(
+        HERO_COM_FRAGMENTO,
+        'class-espadachim',
+        'sword',
+        'skill-ataque-espadachim',
+        50,
+        PERSONAGEM_COM_FRAGMENTO,
+      ),
       equippedItems: [],
     },
     {
+      // Sem `characterId`: é a forma do `dev-arqueiro` do servidor de desenvolvimento, e
+      // desde M18 2/N ela é recusada com um motivo em vez de nunca casar em silêncio.
       ownerPlayerId: 'player-1',
       hero: heroi('heroi-2', 'class-couracado', 'axe', 'skill-ataque-couracado'),
+      equippedItems: [],
+    },
+    {
+      // Personagem de verdade, mas um que o catálogo de materiais não conhece: é o caso
+      // "sem fragmento declarado", que era o único antes e agora é o segundo dos dois.
+      ownerPlayerId: 'player-1',
+      hero: heroi('heroi-3', 'class-couracado', 'axe', 'skill-ataque-couracado', 50, 'personagem-inexistente'),
       equippedItems: [],
     },
   ]);
@@ -200,11 +230,20 @@ describe('POST /heroes/:heroId/awaken', () => {
 });
 
 describe('POST /heroes/:heroId/imprint', () => {
-  it('o fragmento é do catálogo: herói sem fragmento declarado é recusado', async () => {
+  it('o fragmento é do catálogo: personagem sem fragmento declarado é recusado', async () => {
     const h = buildHarness();
-    const resultado = await post(h, '/heroes/heroi-2/imprint', { nonce: 'n-imprint-1' });
+    const resultado = await post(h, '/heroes/heroi-3/imprint', { nonce: 'n-imprint-1' });
     expect(resultado.status).toBe(400);
     expect(resultado.body.error).toContain('fragmento');
+  });
+
+  it('herói que não é personagem é recusado com o motivo certo, e não como "sem fragmento"', async () => {
+    // Os dois erros eram indistinguíveis antes de M18 2/N, porque a busca por `hero.id`
+    // simplesmente não achava nada nos dois casos.
+    const h = buildHarness();
+    const resultado = await post(h, '/heroes/heroi-2/imprint', { nonce: 'n-imprint-1b' });
+    expect(resultado.status).toBe(400);
+    expect(resultado.body.error).toContain('não é um personagem');
   });
 
   it('com fragmentos, sobe o imprint e o stat do herói aumenta', async () => {

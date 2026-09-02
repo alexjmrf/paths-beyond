@@ -75,16 +75,23 @@ export interface DungeonRunRewards {
 }
 
 // `heroFragment` é a "duplicata" de §10 ("Imprint: duplicatas viram bônus permanente de
-// stat") resolvida como item consumível de um herói específico — decisão do usuário em
-// M14 1/N, porque o projeto não tem coleção de heróis e gacha está fora de escopo (§15).
-// `forHeroId` é o que impede fragmento de um herói virar imprint de outro.
+// stat"), resolvida como consumível — decisão do usuário em M14 1/N.
+//
+// **M18 corrigiu a chave, e isto é mudança de regra.** Até aqui o fragmento pertencia a
+// uma INSTÂNCIA de herói (`forHeroId`, comparado com `hero.id`), o que funcionava por
+// coincidência de autoria: os heróis da campanha tinham `id` e `characterId` iguais. A
+// duplicata é de um PERSONAGEM — sempre foi, e a aquisição de M18 torna isso inevitável,
+// porque dois jogadores com o mesmo personagem têm instâncias de herói diferentes e um
+// fragmento por instância não teria como ser autorado como conteúdo.
+//
+// `forCharacterId` é o que impede fragmento de um personagem virar imprint de outro.
 export type MaterialKind = 'awakening' | 'heroFragment' | 'generic';
 
 export interface MaterialDef {
   readonly id: Id;
   readonly name: string;
   readonly kind: MaterialKind;
-  readonly forHeroId?: Id;
+  readonly forCharacterId?: Id;
 }
 
 // §10 — "Energia de conta limita o farm diário." Decisão do usuário: regeneração contínua

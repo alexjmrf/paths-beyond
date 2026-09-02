@@ -1,5 +1,7 @@
 {
   "id": "ally-guerreiro",
   "name": "Rurik",
-  "classId": "class-guerreiro"
+  "classId": "class-guerreiro",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-ally-guerreiro"
 }

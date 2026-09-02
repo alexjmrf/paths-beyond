@@ -106,6 +106,9 @@ importers:
       '@paths-beyond/data':
         specifier: workspace:*
         version: link:../data
+      '@paths-beyond/gacha':
+        specifier: workspace:*
+        version: link:../gacha
     devDependencies:
       '@types/node':
         specifier: ^22.10.5

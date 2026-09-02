@@ -33,6 +33,23 @@ const economyRulesSchema = z.object({
   enhance: z
     .array(z.object({ gold: z.number().int().min(0), stones: z.number().int().min(0) }))
     .length(5),
+  // §10 (M18) — os dois sumidouros da QUARTA moeda, a premium (D17). Ela não se ganha
+  // farmando e não paga evolução de personagem: awakening, imprint e enhance continuam em
+  // ouro, pedras e material, pela mesma razão que a loja de arena nunca vende poder bruto.
+  //
+  // O `pityThreshold` aparece aqui E no banner de propósito, e não é duplicação: o do
+  // banner é o que a rolagem consome (um banner futuro pode ter pity próprio), e este é o
+  // padrão do jogo. Um teste de `packages/content` trava os dois iguais enquanto houver um
+  // banner só — divergirem em silêncio seria o defeito.
+  summon: z.object({
+    premiumCost: z.number().int().positive(),
+    pityThreshold: z.number().int().positive(),
+  }),
+  // "Comprar energia extra para farmar mais", nas palavras do usuário ao decidir D17.
+  energyPurchase: z.object({
+    premiumCost: z.number().int().positive(),
+    energy: z.number().int().positive(),
+  }),
 });
 
 export default economyRulesSchema;

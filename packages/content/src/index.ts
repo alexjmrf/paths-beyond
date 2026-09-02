@@ -6,6 +6,9 @@ export { toEncounterPlacements } from './encounterPlacements.js';
 export type { ContentLayout, LoadCatalogFromDiskOptions } from './loadCatalogFromDisk.js';
 export type {
   ArenaMap,
+  BannerContent,
+  BannerEntryContent,
+  PremiumRules,
   CharacterContent,
   CompUnitContent,
   EnemyEncounterUnit,

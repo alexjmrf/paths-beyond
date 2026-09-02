@@ -69,19 +69,25 @@ const impassableTerrains = new Set(
     .map((t) => t.id),
 );
 
-// §8.1 (M17, 3/N) — só o lado do JOGADOR, e agora isso é explícito. Um fragmento de herói
-// existe para despertar alguém do elenco (§10); apontar para um inimigo nunca fez sentido,
-// e antes desta fatia o conjunto os incluía por acidente — inimigo também era um `Hero`.
-const heroIds = new Set(
-  readdirSync(join(dataRoot, 'encounters'))
-    .filter((f) => f.endsWith('.json'))
-    .flatMap((f) => {
-      const encounter = JSON.parse(readFileSync(join(dataRoot, 'encounters', f), 'utf8')) as {
-        units: { side: string; hero?: { id: string } }[];
-      };
-      return encounter.units.filter((u) => u.side === 'player').map((u) => u.hero!.id);
-    }),
-);
+// §8.1 (M17, 3/N) — um fragmento existe para dar imprint a alguém do elenco (§10);
+// apontar para um inimigo nunca fez sentido, e antes daquela fatia o conjunto os incluía
+// por acidente, porque inimigo também era um `Hero`.
+//
+// **M18 2/N: a referência deixou de ser a CAMPANHA e passou a ser o ELENCO.** O fragmento
+// pertence ao personagem, e três personagens do elenco (Kaia, Rurik, Nyra) não aparecem em
+// capítulo nenhum — derivar o conjunto dos encontros deixaria o fragmento deles reprovando
+// por existir. O elenco é a lista certa, e é a mesma que D14 parte em núcleo e adquiríveis.
+interface PersonagemContent {
+  readonly id: string;
+  readonly acquisition: 'story' | 'summon';
+  readonly fragmentMaterialId: string;
+}
+
+const personagens = readdirSync(join(dataRoot, 'characters'))
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => JSON.parse(readFileSync(join(dataRoot, 'characters', f), 'utf8')) as PersonagemContent);
+
+const characterIds = new Set(personagens.map((c) => c.id));
 
 describe('masmorras (§10)', () => {
   it('cada um dos 4 focos de §10 tem uma normal e uma elite', () => {
@@ -257,17 +263,37 @@ describe('encounters de masmorra', () => {
 });
 
 describe('materiais', () => {
-  it('todo fragmento de herói aponta para um herói que existe na campanha', () => {
+  it('todo fragmento aponta para um personagem que existe no elenco', () => {
     const fragmentos = materials.filter((m) => m.kind === 'heroFragment');
     expect(fragmentos.length).toBeGreaterThan(0);
     for (const fragmento of fragmentos) {
-      expect(heroIds, `${fragmento.id} aponta para herói inexistente`).toContain(fragmento.forHeroId!);
+      expect(characterIds, `${fragmento.id} aponta para personagem inexistente`).toContain(fragmento.forCharacterId!);
     }
   });
 
-  it('só fragmento de herói declara `forHeroId`', () => {
+  it('só fragmento declara `forCharacterId`', () => {
     for (const material of materials) {
-      if (material.kind !== 'heroFragment') expect(material.forHeroId).toBeUndefined();
+      if (material.kind !== 'heroFragment') expect(material.forCharacterId).toBeUndefined();
+    }
+  });
+
+  // O RECÍPROCO, que é o que faltava e é o modo de falha que D6 nomeou: a checagem acima
+  // sozinha fica verde com oito personagens sem fragmento nenhum. Até M18 2/N existia UM
+  // fragmento para nove personagens, e o imprint de oito deles não tinha como ser pago —
+  // sem nada reclamar, porque ninguém perguntava o outro lado.
+  it('TODO personagem do elenco tem um fragmento, e é o que ele declara', () => {
+    const porPersonagem = new Map(
+      materials.filter((m) => m.kind === 'heroFragment').map((m) => [m.forCharacterId!, m.id]),
+    );
+
+    for (const id of characterIds) {
+      expect(porPersonagem.get(id), `${id} não tem fragmento`).toBeDefined();
+    }
+
+    for (const personagem of personagens) {
+      expect(personagem.fragmentMaterialId, `${personagem.id} aponta para o fragmento errado`).toBe(
+        porPersonagem.get(personagem.id),
+      );
     }
   });
 });
@@ -339,10 +365,28 @@ describe('regras de economia', () => {
     }
   });
 
-  it('o fragmento de imprint também tem de dropar em alguma masmorra', () => {
+  // M18 2/N — a asserção partiu em duas, porque as duas metades do elenco têm fontes
+  // DIFERENTES de fragmento (D14/D17), e uma regra só não conseguiria dizer as duas coisas.
+  it('o fragmento de um personagem de HISTÓRIA dropa em alguma masmorra', () => {
     const dropados = new Set(dungeons.flatMap((d) => (d.materialDrops ?? []).map((drop) => drop.materialId)));
-    for (const fragmento of materials.filter((m) => m.kind === 'heroFragment')) {
-      expect(dropados, `${fragmento.id} não dropa em lugar nenhum`).toContain(fragmento.id);
+
+    for (const personagem of personagens.filter((c) => c.acquisition === 'story')) {
+      expect(dropados, `${personagem.fragmentMaterialId} não dropa em lugar nenhum`).toContain(
+        personagem.fragmentMaterialId,
+      );
+    }
+  });
+
+  it('o fragmento de um ADQUIRÍVEL não dropa: a fonte dele é a duplicata da invocação', () => {
+    // O recíproco, e ele importa mais do que parece: um fragmento de adquirível caindo na
+    // masmorra deixaria o jogador subir o imprint de um personagem que ele NÃO POSSUI —
+    // pagando progressão em alguém que nunca vai levar ao mapa.
+    const dropados = new Set(dungeons.flatMap((d) => (d.materialDrops ?? []).map((drop) => drop.materialId)));
+
+    for (const personagem of personagens.filter((c) => c.acquisition === 'summon')) {
+      expect(dropados, `${personagem.fragmentMaterialId} dropa, e não deveria`).not.toContain(
+        personagem.fragmentMaterialId,
+      );
     }
   });
 });

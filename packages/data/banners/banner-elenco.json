@@ -1,0 +1,32 @@
+{
+  "id": "banner-elenco",
+  "name": "Invocação do Elenco",
+  "pityThreshold": 10,
+  "pool": [
+    {
+      "characterId": "ally-mensageira",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-mensageira"
+    },
+    {
+      "characterId": "ally-couracado",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-couracado"
+    },
+    {
+      "characterId": "ally-grifeiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-grifeiro"
+    },
+    {
+      "characterId": "ally-guerreiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-guerreiro"
+    },
+    {
+      "characterId": "ally-lanceiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-lanceiro"
+    }
+  ]
+}

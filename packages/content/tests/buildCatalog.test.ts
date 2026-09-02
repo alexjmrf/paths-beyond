@@ -27,6 +27,7 @@ function baseInput(): ParsedContentFiles {
   return {
     classes: readAllJson(fixtureDir('classes', 'valid')),
     characters: readAllJson(fixtureDir('characters', 'valid')),
+    banners: readAllJson(fixtureDir('banners', 'valid')),
     characterTalentTrees: readAllJson(fixtureDir('character-talent-trees', 'valid')),
     enemies: readAllJson(fixtureDir('enemies', 'valid')),
     skills: readAllJson(fixtureDir('skills', 'valid')),

@@ -1,5 +1,7 @@
 {
   "id": "ally-grifeiro",
   "name": "Kaia",
-  "classId": "class-grifeiro"
+  "classId": "class-grifeiro",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-ally-grifeiro"
 }

@@ -1,5 +1,7 @@
 {
   "id": "ally-arcanista",
   "name": "Vesper",
-  "classId": "class-arcanista"
+  "classId": "class-arcanista",
+  "acquisition": "story",
+  "fragmentMaterialId": "material-fragmento-ally-arcanista"
 }

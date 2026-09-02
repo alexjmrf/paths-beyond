@@ -39,6 +39,10 @@ const classDef: ClassDef = {
 
 const heroi: Hero = {
   id: 'heroi-teste',
+  // M18 — o fragmento passou a pertencer ao PERSONAGEM, não à instância. Este herói
+  // declara os dois separadamente de propósito: enquanto `id` e `characterId` fossem a
+  // mesma string, trocar a chave da comparação não teria como falhar em teste.
+  characterId: 'personagem-teste',
   classId: 'classe-teste',
   level: 10,
   exp: 0,
@@ -74,9 +78,9 @@ const passosDeImprint: readonly ImprintStep[] = [
 
 const fragmentoDoHeroi: MaterialDef = {
   id: FRAGMENTO,
-  name: 'Fragmento do herói de teste',
+  name: 'Fragmento do personagem de teste',
   kind: 'heroFragment',
-  forHeroId: 'heroi-teste',
+  forCharacterId: 'personagem-teste',
 };
 
 const carteira: Wallet = { gold: 10_000, stones: 0, arenaMarks: 0 };
@@ -177,11 +181,41 @@ describe('applyImprint', () => {
     expect(statsDe(r.hero).atk).toBe(antes.atk + 60);
   });
 
-  it('fragmento de OUTRO herói não serve', () => {
-    const deOutro: MaterialDef = { ...fragmentoDoHeroi, forHeroId: 'outro-heroi' };
+  it('fragmento de OUTRO personagem não serve', () => {
+    const deOutro: MaterialDef = { ...fragmentoDoHeroi, forCharacterId: 'outro-personagem' };
     const r = applyImprint({ hero: heroi, materials: { [FRAGMENTO]: 5 }, fragment: deOutro, steps: passosDeImprint });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toContain('outro-heroi');
+    if (!r.ok) expect(r.reason).toContain('outro-personagem');
+  });
+
+  it('a chave é o PERSONAGEM e não a instância: id de herói igual ao do fragmento não serve', () => {
+    // Este é o teste que a coincidência de autoria escondia. Até M17 todo herói da
+    // campanha tinha `id` e `characterId` iguais, então comparar com o errado passava.
+    const fragmentoComIdDeHeroi: MaterialDef = { ...fragmentoDoHeroi, forCharacterId: 'heroi-teste' };
+    const r = applyImprint({
+      hero: heroi,
+      materials: { [FRAGMENTO]: 5 },
+      fragment: fragmentoComIdDeHeroi,
+      steps: passosDeImprint,
+    });
+
+    expect(r.ok).toBe(false);
+  });
+
+  it('herói SEM personagem falha alto em vez de nunca casar em silêncio', () => {
+    // O `dev-arqueiro` do servidor de desenvolvimento é exatamente esta forma: um herói
+    // sem `characterId`. Antes de M18 ele simplesmente nunca casava com fragmento nenhum,
+    // sem dizer por quê.
+    const semPersonagem: Hero = { ...heroi, characterId: undefined };
+    const r = applyImprint({
+      hero: semPersonagem,
+      materials: { [FRAGMENTO]: 5 },
+      fragment: fragmentoDoHeroi,
+      steps: passosDeImprint,
+    });
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('não é personagem');
   });
 
   it('material que não é fragmento não serve', () => {

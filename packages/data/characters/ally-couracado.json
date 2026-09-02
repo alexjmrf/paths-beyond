@@ -1,5 +1,7 @@
 {
   "id": "ally-couracado",
   "name": "Bardan",
-  "classId": "class-couracado"
+  "classId": "class-couracado",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-ally-couracado"
 }

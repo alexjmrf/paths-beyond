@@ -2,5 +2,5 @@
   "id": "material-fragmento-hero-jogador",
   "name": "Fragmento do Comandante",
   "kind": "heroFragment",
-  "forHeroId": "hero-jogador"
+  "forCharacterId": "hero-jogador"
 }

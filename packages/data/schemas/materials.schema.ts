@@ -3,22 +3,29 @@ import { idSchema } from './shared.js';
 
 // §10 (M14) — materiais de progressão. `awakening` é o "material de promoção" que a
 // masmorra de Chefe dropa; `heroFragment` é a "duplicata" de §10 ("Imprint: duplicatas
-// viram bônus permanente de stat") resolvida como consumível de um herói nomeado
-// (decisão do usuário, ver DECISIONS.md — o projeto não tem coleção de heróis e gacha
-// está fora de escopo, §15).
+// viram bônus permanente de stat"), que desde M18 também sai de uma invocação que repete
+// alguém que o jogador já possui.
 //
-// `forHeroId` é obrigatório em `heroFragment` e proibido nos outros: um fragmento sem dono
-// viraria imprint de qualquer herói, e um núcleo com dono seria promessa que o motor não
+// **M18 2/N trocou a chave: era `forHeroId`, é `forCharacterId`.** O fragmento pertence ao
+// PERSONAGEM, não a uma instância de herói. A forma antiga funcionava por coincidência de
+// autoria (todo herói da campanha tinha `id` e `characterId` iguais) e não sobrevive à
+// posse: dois jogadores com o mesmo personagem têm instâncias diferentes, e um fragmento
+// por instância não teria como ser autorado como conteúdo. Sem migração — `forHeroId`
+// deixou de existir e um material na forma antiga é recusado aqui.
+//
+// `forCharacterId` é obrigatório em `heroFragment` e proibido nos outros: um fragmento sem
+// dono viraria imprint de qualquer um, e um núcleo com dono seria promessa que o motor não
 // cumpre (`applyImprint` só aceita `kind: 'heroFragment'`).
 const materialSchema = z
   .object({
     id: idSchema,
     name: z.string().min(1),
     kind: z.enum(['awakening', 'heroFragment', 'generic']),
-    forHeroId: idSchema.optional(),
+    forCharacterId: idSchema.optional(),
   })
-  .refine((m) => (m.kind === 'heroFragment' ? m.forHeroId !== undefined : m.forHeroId === undefined), {
-    message: 'forHeroId é obrigatório em heroFragment e proibido nos demais kinds.',
+  .strict()
+  .refine((m) => (m.kind === 'heroFragment' ? m.forCharacterId !== undefined : m.forCharacterId === undefined), {
+    message: 'forCharacterId é obrigatório em heroFragment e proibido nos demais kinds.',
   });
 
 export default materialSchema;

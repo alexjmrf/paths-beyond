@@ -1,5 +1,7 @@
 {
   "id": "ally-mensageira",
   "name": "Wren",
-  "classId": "class-druida"
+  "classId": "class-druida",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-ally-mensageira"
 }

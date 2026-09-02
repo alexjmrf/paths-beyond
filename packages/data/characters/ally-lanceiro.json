@@ -1,5 +1,7 @@
 {
   "id": "ally-lanceiro",
   "name": "Nyra",
-  "classId": "class-lanceiro"
+  "classId": "class-lanceiro",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-ally-lanceiro"
 }

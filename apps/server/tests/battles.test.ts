@@ -99,6 +99,13 @@ const catalog: ContentCatalog = {
   substatWeights: [],
   mainstatWeights: [],
   enhanceRates: { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 },
+  // M18 2/N — vazio de propósito: nenhuma destas suítes exercita aquisição, e declarar
+  // aqui é o que o tipo obrigatório de `ContentCatalog` cobra (esquecer vira erro de tipo).
+  banners: {},
+  premiumRules: {
+    summon: { premiumCost: 500, pityThreshold: 10 },
+    energyPurchase: { premiumCost: 100, energy: 60 },
+  },
   baselineReactionSkillIds: [],
 };
 
@@ -272,24 +279,25 @@ describe('POST /battles', () => {
     // critério de aceite pede, que é diferente: uma versão **anterior de verdade**, bem
     // formada, que era a corrente até este milestone.
     //
-    // A distinção importa porque M17 é o primeiro bump em que a incompatibilidade é REAL e
-    // não disciplina de processo (ver `packages/core/src/rulesVersion.ts`): a topologia da
-    // árvore de talentos mudou e o formato de alocação junto (D5, sem migração). Um cliente
-    // que ainda estivesse em 0.16.0 mandaria comandos jogados sobre outra regra, e aceitar
-    // isso seria §9.1 — divergência entre o que o cliente jogou e o que o servidor reexecuta.
+    // A distinção importa porque M17 foi o primeiro bump em que a incompatibilidade é REAL
+    // e não disciplina de processo (ver `packages/core/src/rulesVersion.ts`), e M18 2/N é o
+    // segundo: a chave do fragmento de imprint saiu da instância de herói e foi para o
+    // personagem, sem caminho de migração. Um cliente que ainda estivesse em 0.17.0
+    // mandaria comandos jogados sobre outra regra, e aceitar isso seria §9.1 — divergência
+    // entre o que o cliente jogou e o que o servidor reexecuta.
     const app = buildTestApp();
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
       headers: { 'x-player-token': ATTACKER_TOKEN },
-      payload: { ...validBody, rulesVersion: '0.16.0' },
+      payload: { ...validBody, rulesVersion: '0.17.0' },
     });
 
     expect(response.statusCode).toBe(409);
     expect(response.json().error).toContain(RULES_VERSION);
     // E a versão anterior tem de ser mesmo anterior: se alguém reverter o bump sem reverter
     // o resto do milestone, este teste passa a medir nada e precisa reprovar.
-    expect(RULES_VERSION).not.toBe('0.16.0');
+    expect(RULES_VERSION).not.toBe('0.17.0');
   });
 
   it('rejeita herói atacante que não pertence ao chamador', async () => {

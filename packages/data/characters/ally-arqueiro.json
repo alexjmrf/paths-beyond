@@ -1,5 +1,7 @@
 {
   "id": "ally-arqueiro",
   "name": "Sylla",
-  "classId": "class-arqueiro"
+  "classId": "class-arqueiro",
+  "acquisition": "story",
+  "fragmentMaterialId": "material-fragmento-ally-arqueiro"
 }

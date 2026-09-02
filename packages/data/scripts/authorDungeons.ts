@@ -6,6 +6,12 @@ import dungeonSchema from '../schemas/dungeons.schema.js';
 import { buildHero, packageRoot, writeJson, type EnemyUnitSpec, type UnitSpec } from './authorCampaign.js';
 import { enemyIdOrThrow } from './authorEnemies.js';
 
+// D14 (M18) — os quatro garantidos a todo jogador, na ordem em que a campanha os
+// apresenta. A lista vive aqui e em `authorCharacters.ts` porque são dois geradores
+// independentes; `packages/content/tests/banner.test.ts` é quem trava as duas contra o
+// conteúdo autorado, e é lá que uma divergência aparece.
+const NUCLEO_DE_HISTORIA = ['hero-jogador', 'ally-clerigo', 'ally-arqueiro', 'ally-arcanista'] as const;
+
 // M14, sub-sessão 2/N — as masmorras de farm de §10, autoradas por gerador pelo mesmo
 // motivo que os mapas de campanha (M12, 3/N): um encounter é centenas de linhas de JSON, e
 // um `pos` errado à mão passa despercebido.
@@ -211,7 +217,14 @@ const DUNGEONS: readonly DungeonSpec[] = [
       materialDropCount: 2,
       materialDrops: [
         { weight: 4, materialId: 'material-nucleo-de-despertar', amount: { min: 1, max: 3 } },
-        { weight: 1, materialId: 'material-fragmento-hero-jogador', amount: { min: 1, max: 1 } },
+        // M18 2/N — o fragmento de cada personagem do NÚCLEO DE HISTÓRIA. Os adquiríveis
+        // ficam de fora de propósito: a fonte do fragmento deles é a duplicata da
+        // invocação, e caírem aqui deixaria o jogador subir o imprint de quem ele não tem.
+        ...NUCLEO_DE_HISTORIA.map((characterId) => ({
+          weight: 1,
+          materialId: `material-fragmento-${characterId}`,
+          amount: { min: 1, max: 1 },
+        })),
       ],
     },
   },
@@ -241,7 +254,11 @@ const DUNGEONS: readonly DungeonSpec[] = [
       materialDropCount: 3,
       materialDrops: [
         { weight: 3, materialId: 'material-nucleo-de-despertar', amount: { min: 3, max: 6 } },
-        { weight: 2, materialId: 'material-fragmento-hero-jogador', amount: { min: 1, max: 2 } },
+        ...NUCLEO_DE_HISTORIA.map((characterId) => ({
+          weight: 2,
+          materialId: `material-fragmento-${characterId}`,
+          amount: { min: 1, max: 2 },
+        })),
       ],
     },
   },
