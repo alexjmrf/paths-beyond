@@ -158,6 +158,27 @@ ou masmorra passa por `Hero`/classe; `pnpm balance` reexecutado com os dois crit
 
 ---
 
+> **M18 foi definido pelo usuário em 2026-09-02**, sobre o rumo de aquisição que `DECISIONS.md`
+> registrava desde 2026-08-28. Briefing: `docs/milestones/M18-aquisicao-de-personagens.md`.
+
+### M18 — Aquisição de personagens
+A economia de M14 já tinha a forma inteira de um gacha — `imprint` alimentado por fragmento,
+`awakening`, três moedas, energia limitando o farm — e o que faltava era a **aquisição**. O elenco
+fechado de M17 parte em **núcleo de história** (quatro garantidos a todo jogador: Aren, Miron,
+Sylla e Vesper) e **adquiríveis** (Wren, Bardan, Kaia, Rurik e Nyra), e a campanha deixa de nomear
+a party para declarar **vagas**, no padrão que as masmorras de M14 já usam — sem isso, posse não
+significa nada, porque o capítulo entrega o personagem que o banner venderia. Entra uma **quarta
+moeda, premium**, que não se ganha farmando e não paga evolução de personagem: as fontes são
+história, primeira completude, achievements, eventos e dinheiro real, e os sumidouros são o summon
+e a compra de energia extra. A rolagem vive em `packages/gacha`, pacote novo — §15 continua
+literal, o gacha **não** toca em `packages/core`. Junto vem o buraco de segurança que a mudança
+expõe: **nenhuma rota pergunta hoje se o jogador possui o personagem que mandou**.
+**Aceite:** um jogador novo começa com o núcleo, puxa um personagem pelo cliente gastando a moeda
+premium e o usa, com a duplicata virando fragmento e o pity garantindo na rolagem N+1; o servidor
+recusa arena e masmorra com personagem não possuído; nenhum capítulo nomeia a party e a campanha é
+zerável só com os quatro do núcleo; as quatro fontes da moeda premium concedem uma única vez cada
+e os dois sumidouros gastam; `pnpm balance` reexecutado com os dois critérios do M8 de pé.
+
 ---
 
 ## 15. Decisões em aberto (registrar em `DECISIONS.md` ao resolver)
@@ -167,4 +188,4 @@ ou masmorra passa por `Hero`/classe; `pnpm balance` reexecutado com os dois crit
 - **Alcance de assistência:** começar em 2 tiles para melee e `duelRange` para ranged. Se assistências dispararem em mais de 70% dos duelos, elas viraram obrigatórias e não decisão — encareça o custo em PP.
 - **Duelo ranged unilateral (§6.1):** é forte de propósito. Se arqueiros dominarem, a correção é reduzir o dano deles, não permitir contra-ataque — a assimetria é o que dá identidade tática ao alcance.
 - **Permadeath:** sugestão de `classic` como padrão, com `casual` disponível desde o início.
-- **Monetização:** fora do escopo. Se houver gacha, ele NÃO toca em `packages/core`.
+- **Monetização:** ~~fora do escopo~~ — **resolvido no M18** (2026-09-02): o jogo é um gacha com núcleo de história, e a restrição virou D15/D19 em `DECISIONS.md`. A parte que continua valendo ao pé da letra: o gacha **NÃO** toca em `packages/core` — a rolagem vive em `packages/gacha`. Integração de pagamento segue fora do escopo.

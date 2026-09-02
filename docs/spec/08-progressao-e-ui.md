@@ -1,11 +1,13 @@
 <!-- Economia PvE e requisitos de UI -->
 ## 10. Progressão e economia (PvE)
 
-- **Campanha** em capítulos: 6–10 mapas, diálogo, desbloqueio de heróis.
+- **Campanha** em capítulos: 6–10 mapas, diálogo, desbloqueio de heróis. **A partir do M18 o capítulo NÃO nomeia a party:** ele declara inimigos, objetivo e **vagas**, e o jogador leva quem possui — o mesmo padrão das masmorras. A campanha é afinada contra o **núcleo de história** (os personagens garantidos a todo jogador), e o que vier de aquisição é poder opcional por cima.
 - **Masmorras de farm** com foco definido: Equipamento (drop por set), Experiência, Ouro, Chefe (materiais de promoção). Energia de conta limita o farm diário.
 - **Awakening (0–6)**: multiplica a curva base e libera nós avançados de talento a partir de 5.
 - **Imprint**: duplicatas viram bônus permanente de stat.
-- Moedas: `ouro`, `pedras`, `marcas de arena`. Na loja de PvP venda gear de set específico e cosméticos — **nunca poder bruto**.
+- **Aquisição de personagens (M18):** o elenco parte em **núcleo de história** — garantido a todo jogador, e é contra ele que a campanha é afinada — e **adquiríveis**, puxados por summon. Duplicata vira fragmento do próprio personagem, que é o que alimenta o `imprint`. **Posse é estado de conta**, e o servidor recusa qualquer batalha montada com personagem não possuído (§9.4).
+- Moedas: `ouro`, `pedras`, `marcas de arena` e `pedras premium`. Na loja de PvP venda gear de set específico e cosméticos — **nunca poder bruto**.
+- **A moeda premium (M18) não se ganha farmando e não paga evolução de personagem.** Fontes: avanço de história, primeira completude de fase ou missão, achievements, eventos e dinheiro real. Sumidouros: o **summon** e a **compra de energia extra**. Awakening, imprint e enhance continuam em ouro, pedras e material — pela mesma razão que a loja de arena nunca vende poder bruto.
 
 ---
 

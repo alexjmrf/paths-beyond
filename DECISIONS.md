@@ -3961,7 +3961,12 @@ motor recusa o impossível, e quanto um caminho absorve é desenho de quem autor
 numa campanha que hoje apresenta seis. É a primeira coisa da 2/N, e é autoria.
 
 
-### Em aberto — o rumo de aquisição de personagens: gacha com núcleo de história
+### ~~Em aberto~~ RESOLVIDO — o rumo de aquisição de personagens: gacha com núcleo de história
+
+> **Resolvido em 2026-09-02:** virou o M18. As quatro perguntas que este registro deixava em
+> aberto foram respondidas pelo usuário em D14–D20 (seção "M18 definido", no fim deste arquivo);
+> só "como o balanceamento mede um pool que cresce" segue aberta. O texto abaixo fica como estava,
+> por ser o registro do rumo no momento em que foi declarado.
 
 Registrado em 2026-08-28, a pedido do usuário, como **rumo** e não como decisão implementável: nada
 disto entra em código até virar milestone com briefing próprio.
@@ -4348,3 +4353,80 @@ as nove árvores saíram da 2/N com 25 pontos de diferença; quem mede isso é `
 `pnpm balance -- --runs 10000`, os dois critérios do M8 de pé: **43,6%–57,3%** (faixa 40–60) e `spd`
 acima da mediana em **33,0%** das vencedoras (teto 60). Nenhuma composição sinalizada. Suíte: **110
 arquivos, 1619 testes**. `pnpm validate:data`: 26 schemas, 183 arquivos.
+
+
+### M18 definido — aquisição de personagens, e a quarta moeda
+
+Aberto pelo usuário em 2026-09-02, sobre o rumo registrado em 2026-08-28 ("Em aberto — o rumo de
+aquisição de personagens"), que agora **deixa de estar em aberto**. O roadmap terminava no M17;
+esta é a primeira milestone definida depois dele. Briefing:
+`docs/milestones/M18-aquisicao-de-personagens.md`.
+
+**D14 — O elenco parte em núcleo de história (4) e adquiríveis (5).** Núcleo: Aren
+(`hero-jogador`), Miron (`ally-clerigo`), Sylla (`ally-arqueiro`), Vesper (`ally-arcanista`).
+Adquiríveis: Wren (`ally-mensageira`), Bardan (`ally-couracado`), Kaia (`ally-grifeiro`), Rurik
+(`ally-guerreiro`), Nyra (`ally-lanceiro`).
+
+O corte **não foi escolhido, foi lido da campanha como ela já está autorada** — verificado
+`characterId` por `characterId` nos seis encontros antes de propor. Aren aparece no capítulo 1,
+Miron no 2, Sylla no 3, Vesper no 4: é exatamente o "começa com 2 ou 3 e chega a cerca de 4
+garantidos" que o usuário descreveu em 2026-08-28. Wren só aparece no capítulo 5 e Bardan só no 6
+— a observação de autoria registrada naquela data ("os dois já têm a forma de 'encontrado, não
+dado'") se confirmou. Kaia, Rurik e Nyra **não aparecem em capítulo nenhum**: existem desde D7 só
+para as comps da arena, e são adquiríveis puros sem precisar de nenhuma reautoria.
+
+**Alternativas descartadas:** núcleo de 3 (Vesper também adquirível — obrigaria o capítulo 4 a
+virar vagas junto e deixaria a campanha afinada contra três); e núcleo de 6, ou seja, todos os que
+a campanha usa (não custaria nada, e é justamente o problema: com o pool sendo só os três que
+ninguém encontra, a posse nunca entra no caminho do jogador e o sistema não seria exercitado).
+
+**D15 — A rolagem mora em `packages/gacha`, pacote próprio.** §15 continua literal: o gacha não
+toca em `packages/core`. O pacote é puro, determinístico e em ponto fixo — as mesmas regras do
+core, fora dele — e **importa** o core para RNG e ponto fixo; o core continua não importando nada,
+e a seta aponta para dentro. Descartado: a rolagem em `apps/server/src/summon/`, leitura mais
+literal de "a rolagem de banner é servidor", mas que deixa a regra onde só um consumidor a alcança
+e faz o teste de determinismo depender de subir uma rota.
+
+**D16 — A campanha deixa de nomear a party e passa a declarar vagas.** É o que faz posse
+significar alguma coisa: sem isso, ter ou não ter Wren não muda nada, porque o capítulo 5 a
+entrega. O padrão já existe — as masmorras de M14 declaram vagas
+(`dungeon-covil-do-tirano-vaga-1`) e o jogador leva quem tem; a campanha passa a ser o mesmo. A
+consequência dura: a campanha tem de ser **zerável só com o núcleo de quatro**, e hoje os
+capítulos 5 e 6 exigem Wren e Bardan nominalmente.
+
+**D17 — Entra uma QUARTA moeda, premium; as três de hoje ficam como estão.** `pedras` continua
+sendo moeda de farm que dropa de masmorra e paga `enhance`. A premium **não se ganha farmando**:
+fontes são avanço de história, primeira completude de fase ou missão, achievements, eventos e
+dinheiro real; sumidouros são o summon e a **compra de energia extra**. Ela **não paga evolução de
+personagem** — awakening e imprint continuam em ouro e material, pela mesma razão que §10 já dá
+para a loja de arena ("nunca poder bruto").
+
+A alternativa descartada foi repropor o `pedras` de hoje como a premium: manteria as três moedas
+que §10 lista, mas tiraria do `enhance` o sumidouro dela e obrigaria a reautorar as tabelas de
+drop das quatro masmorras. §10 foi atualizada para listar as quatro — a quarta entra registrada,
+não em silêncio.
+
+**D18 — Pity duro contado.** Depois de N rolagens sem personagem novo, a N+1 é garantida; o
+contador mora na conta. A escolha é **por testabilidade**: pity duro é uma propriedade afirmável
+("a rolagem N+1 nunca falha"), e taxa pura sem garantia só seria afirmável como estatística sobre
+muitas seeds — exatamente o tipo de teste que a regra 5 evita.
+
+**D19 — Dinheiro real fica fora.** §15: "monetização fora do escopo". O M18 entrega a moeda e
+todas as fontes de jogo; a compra com dinheiro real existe como caminho de crédito que só o
+servidor chama, sem gateway, sem integração e sem tela.
+
+**D20 — Achievements e eventos entram no M18.** Decisão do usuário contra a alternativa de
+adiá-los: são duas das quatro fontes da moeda premium, e sem eles a moeda entraria pela metade.
+Nenhum dos dois tem hoje schema ou consumidor — são sistemas novos.
+
+**O que o levantamento encontrou antes de o briefing ser escrito, e não é estimativa:** posse de
+personagem **não existe em lugar nenhum** (nem em `Player`, nem no save do cliente), e nenhuma
+rota pergunta se o jogador possui o personagem que mandou — §9.4 não tem como pegar isso porque
+não há o que consultar; existe **um** `material-fragmento-*` para nove personagens, então o
+`imprint` de oito deles não tem como ser pago hoje; e o progresso de campanha é save do CLIENTE,
+enquanto "avanço de história" e "primeira completude" são fontes de moeda, que é estado de conta.
+
+**Fica em aberto:** como o torneio mede um pool que cresce (herdado de D10 — com 40 personagens
+são 9.880 combinações de três; com 9 ainda é computável e a 6/N mede como hoje); as taxas por
+raridade, o N do pity e o custo do summon, todos a decidir com o usuário ao autorar o banner na
+sub-sessão 2/N.
