@@ -370,7 +370,11 @@ export interface UnitSpec {
   // uma coincidência de nomes não é lugar de guardar isso.
   readonly characterId?: string;
   readonly classId: string;
-  readonly side: 'player';
+  // §10/D16 (M18, 5/N) — `ally` é o ALIADO DE CENÁRIO: uma unidade que luta do lado do
+  // jogador e NÃO é do elenco. Existe porque o capítulo 5 escolta a Mensageira, e ela virou
+  // adquirível: quem não a puxou não teria a unidade nomeada por `escort`, e o capítulo
+  // nasceria sem desfecho possível. Um aliado nunca declara `characterId`.
+  readonly side: 'player' | 'ally';
   readonly pos: readonly [number, number];
   // §9.1 — IA de mapa declarativa POR HERÓI. Ausente = controlada por humano: é o que
   // separa a party do jogador dos inimigos, e é a razão de o campo ser opcional no schema.
@@ -573,11 +577,16 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       // A escoltada: nível abaixo do resto e sem colar. Perdê-la é derrota imediata
       // (§5.7, leitura de M11), então ela é a peça que o jogador tem que cobrir — e o
       // motivo de a party inteira existir.
+      //
+      // §10/D16 (M18, 5/N) — ela é um ALIADO DE CENÁRIO e não uma personagem do jogador.
+      // Wren é adquirível (D14): enquanto ela ocupava uma vaga da party, quem não a tinha
+      // não tinha a unidade que `escort` nomeia, e o capítulo era injogável — medido, não
+      // suposto. Como NPC ela está sempre lá, e a aquisição ganha o sentido que a narrativa
+      // já dava: "A Mensageira" é quem você encontra e escolta.
       {
         unitId: 'ally-mensageira',
-        characterId: 'ally-mensageira',
         classId: 'class-druida',
-        side: 'player',
+        side: 'ally',
         pos: [2, 7],
         level: 8,
       },
@@ -598,13 +607,19 @@ const ENCOUNTERS: readonly EncounterSpec[] = [
       at(PLAYER_CLERIGO, 8, 12),
       at(PLAYER_ARQUEIRO, 10, 12),
       at(PLAYER_ARCANISTA, 9, 13),
-      // O quinto da party, e só no capítulo final: `armored`, `moveType:'heavy'`, é quem
-      // aguenta o portão enquanto o resto entra.
+      // A quinta unidade do tabuleiro, e só no capítulo final: `armored`,
+      // `moveType:'heavy'`, é quem aguenta o portão enquanto o resto entra.
+      //
+      // §10/D16 (M18, 5/N) — ALIADO DE CENÁRIO, pela mesma razão da Mensageira no capítulo
+      // 5 e por decisão do usuário. Bardan é adquirível (D14), e enquanto ele ocupava uma
+      // VAGA o capítulo nomeava alguém que o jogador talvez não possua — a vaga é preenchida
+      // em produção por quem ele levar, então nomear um adquirível ali é escrever uma party
+      // que não é a dele. Como NPC ele está sempre lá, a dificuldade fica idêntica, e o
+      // capítulo final continua com cinco unidades do lado do jogador.
       {
         unitId: 'ally-couracado',
-        characterId: 'ally-couracado',
         classId: 'class-couracado',
-        side: 'player',
+        side: 'ally',
         pos: [8, 13],
         necklace: 'item-colar-guardiao',
       },
@@ -728,6 +743,9 @@ function buildEncounter(spec: EncounterSpec, mapSpec: MapSpec): unknown {
       side: unit.side,
       // §8.1 — os dois lados do tabuleiro deixaram de ser o mesmo objeto. O jogador leva
       // uma ficha; o inimigo é uma referência ao que já está autorado.
+      // §8.1 — o inimigo é uma referência ao que já está autorado; o jogador e o aliado de
+      // cenário levam ficha. A diferença entre estes dois é o `characterId`, que `buildHero`
+      // só emite quando o spec o declara — e o aliado, por D16, nunca declara.
       ...(unit.side === 'enemy' ? { enemyId: enemyIdOrThrow(unit.enemyId) } : { hero: buildHero(unit) }),
       pos: { x: unit.pos[0], y: unit.pos[1] },
       height: heightAt(mapSpec, unit.pos[0], unit.pos[1]),

@@ -80,7 +80,20 @@ export interface EnemyEncounterUnit extends EncounterUnitCommon {
   readonly enemyId: Id;
 }
 
-export type EncounterUnitContent = PlayerEncounterUnit | EnemyEncounterUnit;
+// §10/D16 (M18, 5/N) — o ALIADO DE CENÁRIO: luta do lado do jogador e NÃO é do elenco.
+// Nasceu do capítulo 5, que escolta a Mensageira depois de D14 fazer dela uma personagem
+// adquirível — enquanto ela ocupava uma vaga da party, quem não a possuía não tinha a
+// unidade que `escort` nomeia, e o capítulo era injogável.
+//
+// Um arm próprio, e não um `PlayerEncounterUnit` sem `characterId`: o aliado é uma coisa
+// declaradamente diferente, e a trava de M17 4/N (todo herói do jogador tem personagem)
+// continua inteira.
+export interface AllyEncounterUnit extends EncounterUnitCommon {
+  readonly side: 'ally';
+  readonly hero: Hero;
+}
+
+export type EncounterUnitContent = PlayerEncounterUnit | AllyEncounterUnit | EnemyEncounterUnit;
 
 export interface Encounter {
   readonly id: Id;

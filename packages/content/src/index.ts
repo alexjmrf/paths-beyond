@@ -14,6 +14,7 @@ export type {
   PremiumRules,
   CharacterContent,
   CompUnitContent,
+  AllyEncounterUnit,
   EnemyEncounterUnit,
   Composition,
   ContentCatalog,

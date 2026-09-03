@@ -195,10 +195,9 @@
     },
     {
       "unitId": "ally-mensageira",
-      "side": "player",
+      "side": "ally",
       "hero": {
         "id": "ally-mensageira",
-        "characterId": "ally-mensageira",
         "classId": "class-druida",
         "level": 8,
         "exp": 0,

@@ -195,6 +195,42 @@ describe('POST /campaign/:id/run — a fonte "avanço de história"', () => {
   });
 });
 
+describe('o aliado de cenário chega ao tabuleiro (D16)', () => {
+  // A primeira escrita de `assembleChapterBattle` filtrava só `enemy` ao montar o que não é
+  // vaga, e PERDIA o aliado. O capítulo 1 não tem nenhum, então nada aqui teria reclamado —
+  // e o capítulo 5 jogado pelo servidor nasceria sem a unidade que `escort` nomeia.
+  it('o capítulo 5 montado pelo servidor tem a escoltada, e a condição a nomeia', async () => {
+    const h = buildHarness();
+    const heroIds = [heroiDoCapitulo().id];
+    const ticket = await post(h, '/campaign/encounter-campanha-5/ticket', { heroIds });
+
+    expect(ticket.status).toBe(200);
+    const setup = ticket.body.setup;
+    expect(setup.winCondition.t).toBe('escort');
+
+    const escoltada = setup.units.find((u: any) => u.unitId === setup.winCondition.unitId);
+    expect(escoltada, 'a unidade escoltada não chegou ao tabuleiro').toBeDefined();
+    expect(escoltada.side).toBe('player');
+  });
+
+  it('o capítulo 6 montado pelo servidor tem o couraçado de cenário', async () => {
+    const h = buildHarness();
+    const heroIds = [heroiDoCapitulo().id];
+    const ticket = await post(h, '/campaign/encounter-campanha-6/ticket', { heroIds });
+
+    expect(ticket.status).toBe(200);
+    expect(ticket.body.setup.units.some((u: any) => u.unitId === 'ally-couracado')).toBe(true);
+  });
+
+  it('o capítulo 5 declara 4 vagas, e levar 5 heróis é recusado', async () => {
+    const h = buildHarness();
+    const { body } = await get(h, '/campaign');
+    const capitulo5 = body.chapters.find((c: any) => c.chapter === 5);
+
+    expect(capitulo5.slots).toBe(4);
+  });
+});
+
 describe('GET /me/rewards e POST /rewards/:id/claim', () => {
   it('uma conta nova não tem nada reivindicável, e nada reivindicado', async () => {
     const h = buildHarness();

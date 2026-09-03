@@ -187,10 +187,9 @@
     },
     {
       "unitId": "ally-couracado",
-      "side": "player",
+      "side": "ally",
       "hero": {
         "id": "ally-couracado",
-        "characterId": "ally-couracado",
         "classId": "class-couracado",
         "level": 10,
         "exp": 0,

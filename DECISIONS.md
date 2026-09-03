@@ -4722,3 +4722,72 @@ elas deixam de significar o que o nome promete, e o teste avisa.
 
 **Suíte: 119 arquivos, 1735 testes** (era 116/1693). `pnpm validate:data`: **29 schemas, 204
 arquivos** (era 27/192) — a trava de contagem reprovou primeiro, como deve.
+
+
+### M18 — sub-sessão 5/N: a campanha por vagas, e o aliado de cenário
+
+`packages/core` **sem uma linha alterada** — `RULES_VERSION` fica em `0.18.0`. **Correção de
+escopo declarada antes de começar:** eu havia dito que o cliente da campanha entraria nesta fatia;
+movi TODO o trabalho de cliente para a 6/N (summon, roster e campanha pelo servidor juntos), porque
+o critério 3 não pede cliente e fazer a campanha do cliente em duas fatias seria refazê-la.
+
+#### A fatia começou medindo, e a medição achou um defeito que ninguém procurava
+
+Antes de perguntar qualquer coisa, o piloto automático jogou os seis capítulos duas vezes: com a
+party como estava e levando **só o núcleo**. Resultado: capítulos 1–4 e 6 vencem com o núcleo; **o
+capítulo 5 perde**. E o motivo não era dificuldade:
+
+```
+encounter-campanha-5.winCondition = { t: "escort", unitId: "ally-mensageira", ... }
+```
+
+A condição de vitória do capítulo 5 **escolta a Wren**, e D14 fez dela uma personagem
+ADQUIRÍVEL. Quem não a puxou não tem a unidade que a condição nomeia — o capítulo não fica difícil,
+fica **sem desfecho possível**. Um conflito estrutural entre duas decisões já tomadas, invisível
+para qualquer schema, e que só apareceu porque a medição veio antes da pergunta.
+
+**Decisão do usuário: a Wren vira NPC do capítulo.** E isso não é um remendo — é o que a narrativa
+sempre disse: "A Mensageira" é quem o jogador ENCONTRA e escolta, e é escoltando-a que ela se junta
+a ele. O adquirível ganhou o motivo de ser adquirível. Descartados: promovê-la a núcleo (contraria
+D14 e gasta justamente o personagem que melhor encarna "encontrado, não dado") e trocar a condição
+do capítulo (apagaria a ÚNICA fase do jogo que exercita `escort`, uma das cinco condições de §5.7).
+
+#### O ALIADO DE CENÁRIO é um lado próprio da união, e não um `player` sem `characterId`
+
+A diferença importa e é o que mantém a trava de M17 4/N inteira: todo herói do lado do jogador
+declara o seu personagem, e o aliado é uma coisa **declaradamente diferente** em vez da ausência de
+um campo. Pelo mesmo motivo ele **não pode** declarar `characterId` — se pudesse, o capítulo
+voltaria a nomear alguém que o jogador talvez não possua, que é o defeito que a forma foi
+consertar. No CONTEÚDO são três lados; no TABULEIRO continuam dois (`toEncounterPlacements` mapeia
+`ally` para `side: 'player'`), porque um terceiro lado no motor seria regra nova para uma distinção
+que é só de autoria.
+
+#### O recíproco que eu escrevi pegou a outra metade sozinho
+
+O teste "nenhum personagem adquirível aparece como VAGA da campanha" reprovou de imediato: o
+**capítulo 6 ainda nomeava Bardan**. Ele não era necessário para vencer (medido), mas enquanto a
+vaga o nomeasse, a campanha continuaria com um adquirível escrito nela — e vaga é preenchida em
+produção por quem o jogador leva, então nomear um adquirível ali é escrever uma party que não é a
+dele. **Decisão do usuário: Bardan vira aliado de cenário também**, simétrico à Wren. A dificuldade
+fica idêntica (5 unidades no tabuleiro) e a party de VAGAS passa a bater com o núcleo em toda a
+campanha: **4 é o teto, e os capítulos 5 e 6 caíram de 5 vagas para 4**.
+
+#### Um defeito meu, e a razão de ele quase ter passado
+
+`assembleChapterBattle` (4/N) montava o que não é vaga filtrando **só `enemy`** — e portanto
+DESCARTAVA o aliado. O capítulo 5 jogado pelo servidor nasceria sem a unidade que `escort` nomeia,
+ou seja, derrota imediata. Nada teria reclamado: o teste de campanha da 4/N usa o capítulo 1, que
+não tem aliado nenhum. A correção é `side !== 'player'` — a vaga é substituída pelo herói do
+jogador; o aliado não, ele está sempre lá, e é para isso que ele existe. Dois testes novos montam
+os capítulos 5 e 6 PELO SERVIDOR e conferem que o aliado chegou ao tabuleiro.
+
+#### O critério 3 ficou provado em duas metades, e nenhuma delas basta sozinha
+
+A da **forma** (`encounters.test.ts`): nenhuma vaga de nenhum capítulo nomeia um adquirível. A
+**jogável** (`campanha.test.ts`): o piloto vence os seis capítulos com a party que as vagas
+declaram, que é só o núcleo. A forma sozinha permitiria uma campanha que não nomeia ninguém e ainda
+assim é invencível com quatro; a jogável sozinha ficaria verde com um capítulo que exige alguém de
+fora e por acaso ainda é vencível.
+
+**Suíte: 119 arquivos, 1752 testes** (era 119/1735). `validate:data` inalterado em 29/204 — a fatia
+reautorou conteúdo, não acrescentou arquivos.

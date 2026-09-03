@@ -115,10 +115,16 @@ async function assembleChapterBattle(
   });
   if (placements.length !== stored.length) return { error: 'herói com classe desconhecida no catálogo' };
 
-  // O lado inimigo vem do conteúdo, pela mesma conversão que o cliente e o piloto de
+  // O que NÃO é vaga vem do conteúdo, pela mesma conversão que o cliente e o piloto de
   // campanha usam desde M17 3/N — uma função, não uma cópia por consumidor.
-  const inimigos = toEncounterPlacements(
-    encounter.units.filter((unit) => unit.side === 'enemy'),
+  //
+  // §10/D16 (M18, 5/N) — isso inclui os ALIADOS DE CENÁRIO, e a primeira escrita desta
+  // função os perdia: ela filtrava só `enemy`, e o capítulo 5 jogado pelo servidor nasceria
+  // sem a unidade que `escort` nomeia — derrota imediata, e nenhum teste de capítulo 1
+  // encostaria nisso. A vaga é substituída pelo herói do jogador; o aliado, não: ele está
+  // sempre lá, e é justamente por isso que ele existe.
+  const doCenario = toEncounterPlacements(
+    encounter.units.filter((unit) => unit.side !== 'player'),
     opts.catalog,
   );
 
@@ -129,7 +135,7 @@ async function assembleChapterBattle(
   // é `BattleUnit`, e nada dentro dele tem `stats` até passar por aqui.
   return {
     setup: buildBattleSetupFromHeroes({
-      placements: [...placements, ...inimigos],
+      placements: [...placements, ...doCenario],
       map: arenaMap.grid,
       permadeath: encounter.permadeath,
       winCondition: encounter.winCondition ?? arenaMap.winCondition,

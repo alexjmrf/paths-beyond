@@ -25,8 +25,25 @@ describe('campanha em capítulos (§10)', () => {
     // M12, sub-sessão 3/N — até aqui a campanha eram 3 capítulos de UMA unidade do
     // jogador (herança de M6). A party crescendo é o que dá sujeito à assistência de M10
     // e ao `escort` de alguém que não seja o próprio herói.
+    // §10/D16 (M18, 5/N) — os capítulos 5 e 6 caíram de 5 vagas para 4: a Mensageira e o
+    // Couraçado deixaram de ocupar uma e viraram ALIADOS DE CENÁRIO. Não é a party
+    // encolhendo — é o adquirível saindo de dentro dela, que é o que torna os dois
+    // capítulos jogáveis por quem não os possui (D14). A party de vagas passou a bater com
+    // o núcleo de história em toda a campanha: 4 é o teto.
     const partySizes = catalog.encounters.map((e) => e.units.filter((u) => u.side === 'player').length);
-    expect(partySizes).toEqual([1, 2, 3, 4, 5, 5]);
+    expect(partySizes).toEqual([1, 2, 3, 4, 4, 4]);
+
+    // E o TABULEIRO não encolheu: os dois capítulos continuam com cinco unidades do lado do
+    // jogador, quatro vagas mais o aliado. Sem esta asserção, apagar a NPC deixaria o teste
+    // acima verde com o capítulo 5 sem objetivo e o 6 sem quem segura o portão.
+    for (const chapter of [5, 6]) {
+      const encounter = catalog.encounters.find((e) => e.chapter === chapter)!;
+      expect(encounter.units.filter((u) => u.side === 'ally'), `capítulo ${chapter}`).toHaveLength(1);
+      expect(
+        encounter.units.filter((u) => u.side === 'player' || u.side === 'ally'),
+        `capítulo ${chapter}`,
+      ).toHaveLength(5);
+    }
 
     for (const encounter of catalog.encounters) {
       expect(encounter.units.some((u) => u.unitId === 'hero-jogador' && u.side === 'player')).toBe(true);
@@ -92,7 +109,9 @@ describe('integridade cruzada com o resto do catálogo', () => {
   it('todo herói do lado do jogador é um personagem do elenco', () => {
     for (const encounter of catalog.encounters) {
       for (const unit of encounter.units) {
-        if (unit.side === 'enemy') continue;
+        // M18 5/N — só o lado 'player'. O ALIADO DE CENÁRIO não é do elenco por definição
+        // (D16), e o recíproco disso tem teste próprio logo abaixo.
+        if (unit.side !== 'player') continue;
         const personagem = catalog.characters[unit.hero.characterId!];
         expect(personagem, `${encounter.id}/${unit.unitId}: ${unit.hero.characterId}`).toBeDefined();
       }
@@ -106,7 +125,7 @@ describe('integridade cruzada com o resto do catálogo', () => {
     // de status de uma classe e os talentos de outra.
     for (const encounter of catalog.encounters) {
       for (const unit of encounter.units) {
-        if (unit.side === 'enemy') continue;
+        if (unit.side !== 'player') continue;
         const personagem = catalog.characters[unit.hero.characterId!]!;
         expect(unit.hero.classId, `${encounter.id}/${unit.unitId}`).toBe(personagem.classId);
       }
@@ -124,7 +143,7 @@ describe('integridade cruzada com o resto do catálogo', () => {
     // jogando (linha 5 sem as linhas 1..4, ou uma troca de coluna sem passar pelo meio).
     for (const encounter of catalog.encounters) {
       for (const unit of encounter.units) {
-        if (unit.side === 'enemy') continue;
+        if (unit.side !== 'player') continue;
         const arvore = catalog.characterTalentTrees[unit.hero.characterId!];
         expect(arvore, `${encounter.id}/${unit.unitId}: sem árvore`).toBeDefined();
         const resultado = validateColumnAllocation({
@@ -215,5 +234,64 @@ describe('cada encounter monta uma batalha de verdade', () => {
       return JSON.stringify(buildInitialState(setup, 42));
     };
     expect(build()).toBe(build());
+  });
+});
+
+// §10/D16 (M18, 5/N) — o ALIADO DE CENÁRIO, e o que ele não pode ser.
+describe('o aliado de cenário na campanha', () => {
+  const aliados = catalog.encounters.flatMap((encounter) =>
+    encounter.units.filter((unit) => unit.side === 'ally').map((unit) => ({ encounter, unit })),
+  );
+
+  it('são dois: a escoltada do capítulo 5 e o couraçado do 6 — os dois adquiríveis da campanha', () => {
+    expect(aliados.map((a) => `${a.encounter.chapter}:${a.unit.unitId}`).sort()).toEqual([
+      '5:ally-mensageira',
+      '6:ally-couracado',
+    ]);
+  });
+
+  it('NENHUM aliado declara personagem — se declarasse, o capítulo voltaria a nomear a party', () => {
+    // É o recíproco de "todo player é do elenco", e é o que impede a regressão exata que
+    // esta fatia consertou: uma escoltada que é personagem torna o capítulo injogável para
+    // quem não a possui.
+    for (const { encounter, unit } of aliados) {
+      if (unit.side !== 'ally') continue;
+      expect(unit.hero.characterId, `${encounter.id}/${unit.unitId}`).toBeUndefined();
+    }
+  });
+
+  it('o capítulo 5 escolta o ALIADO, e não uma vaga da party', () => {
+    // Se a condição voltasse a nomear uma unidade `player`, ela nomearia uma VAGA — e a
+    // vaga é preenchida em produção por quem o jogador levar, então o objetivo passaria a
+    // ser "escolte quem você escolheu", que não é um objetivo.
+    const capitulo5 = catalog.encounters.find((e) => e.chapter === 5)!;
+    const condicao = capitulo5.winCondition;
+
+    expect(condicao?.t).toBe('escort');
+    if (condicao?.t !== 'escort') throw new Error('inalcançável');
+
+    const alvo = capitulo5.units.find((unit) => unit.unitId === condicao.unitId);
+    expect(alvo?.side).toBe('ally');
+  });
+
+  it('nenhum personagem ADQUIRÍVEL aparece como vaga da campanha — o critério 3 na forma', () => {
+    // O critério de aceite 3 diz que a campanha é zerável só com o núcleo. A prova de que
+    // ela é JOGÁVEL é o piloto (campanha.test.ts); esta é a prova de que ela não EXIGE
+    // ninguém de fora do núcleo, e ela é da forma: nenhuma vaga nomeia um adquirível.
+    const adquiriveis = new Set(
+      Object.values(catalog.characters)
+        .filter((character) => character.acquisition === 'summon')
+        .map((character) => character.id),
+    );
+
+    for (const encounter of catalog.encounters) {
+      for (const unit of encounter.units) {
+        if (unit.side !== 'player') continue;
+        expect(
+          adquiriveis.has(unit.hero.characterId!),
+          `${encounter.id}/${unit.unitId} é adquirível e a campanha o exige`,
+        ).toBe(false);
+      }
+    }
   });
 });

@@ -50,7 +50,11 @@ export function toEncounterPlacements(
       hero: unit.hero,
       classDef,
       equippedItems,
-      side: unit.side,
+      // §10/D16 (M18, 5/N) — o ALIADO DE CENÁRIO luta do lado do jogador. Ele é um lado
+      // próprio no CONTEÚDO (para não poder ser confundido com alguém do elenco) e o
+      // mesmo lado no TABULEIRO — o motor conhece dois lados, e um terceiro ali seria
+      // regra nova para uma distinção que é só de autoria.
+      side: 'player',
       pos: unit.pos,
       height: unit.height,
       ...(unit.aiArchetype ? { aiArchetype: unit.aiArchetype } : {}),

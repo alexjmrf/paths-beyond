@@ -140,3 +140,41 @@ describe('as skills de mapa em área (§5.4) têm consumidor real', () => {
     }
   });
 });
+
+// §10/D14/D16 (M18, 5/N) — o CRITÉRIO DE ACEITE 3 do milestone, na sua forma jogável.
+//
+// "Nenhum capítulo nomeia a party, e a campanha é zerável só com os quatro do núcleo."
+// A metade da FORMA está em `encounters.test.ts` (nenhuma vaga nomeia um adquirível); esta
+// é a metade JOGÁVEL, e as duas juntas é que fecham o critério — a forma sozinha permitiria
+// uma campanha que não nomeia ninguém e ainda assim é invencível com quatro.
+describe('a campanha é zerável só com o núcleo de história (critério 3)', () => {
+  const NUCLEO = new Set(
+    Object.values(catalog.characters)
+      .filter((character) => character.acquisition === 'story')
+      .map((character) => character.id),
+  );
+
+  it('o núcleo tem quatro personagens', () => {
+    expect(NUCLEO.size).toBe(4);
+  });
+
+  it('toda VAGA de todo capítulo é preenchida por alguém do núcleo', () => {
+    for (const encounter of catalog.encounters) {
+      for (const unit of encounter.units) {
+        if (unit.side !== 'player') continue;
+        expect(NUCLEO.has(unit.hero.characterId!), `${encounter.id}/${unit.unitId}`).toBe(true);
+      }
+    }
+  });
+
+  it('e o piloto automático vence os SEIS capítulos com essa party', () => {
+    // O piloto joga exatamente o que as vagas declaram, que o teste acima acabou de provar
+    // ser só o núcleo. Se um capítulo passasse a exigir mais do que quatro personagens
+    // conseguem, é aqui que apareceria — e foi assim que o capítulo 5 foi pego, quando a
+    // Mensageira ainda ocupava uma vaga e sumia junto com o objetivo.
+    for (const encounter of catalog.encounters) {
+      const resultado = playthrough(catalog, encounter);
+      expect(resultado.state.outcome, `${encounter.id}`).toBe('victory');
+    }
+  });
+});

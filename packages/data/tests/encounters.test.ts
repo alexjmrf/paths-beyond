@@ -49,6 +49,24 @@ const unidadeInimiga = {
   aiArchetype: 'aggressive',
 };
 
+// §10/D16 (M18, 5/N) — a terceira forma de unidade: o ALIADO DE CENÁRIO.
+//
+// Ele existe porque o capítulo 5 escolta a Wren, e D14 fez dela uma personagem
+// ADQUIRÍVEL: quem não a puxou não tinha a unidade do objetivo, e o capítulo nascia sem
+// desfecho possível. Decisão do usuário — ela vira NPC do capítulo, o que também é o que a
+// narrativa sempre disse: "A Mensageira" é quem você ENCONTRA e escolta.
+//
+// É um lado próprio da união, e não um `player` sem `characterId`, de propósito: manter a
+// trava de M17 4/N inteira (todo personagem do jogador declara o seu) e ainda assim
+// permitir uma unidade aliada que não é do elenco.
+const aliadoDeCenario = {
+  unitId: 'unit-mensageira',
+  side: 'ally',
+  hero: { ...unidadeJogador.hero, id: 'npc-mensageira' },
+  pos: { x: 2, y: 2 },
+  height: 0,
+};
+
 function encontro(overrides: Record<string, unknown> = {}) {
   return {
     id: 'encounter-teste',
@@ -139,5 +157,67 @@ describe('critério 2: o conteúdo real não tem um único inimigo passando por 
       expect(inimigo.enemyId, JSON.stringify(inimigo)).toBeTruthy();
       expect('hero' in inimigo, 'inimigo ainda carrega uma ficha de herói').toBe(false);
     }
+  });
+});
+
+describe('o aliado de cenário (D16/M18 5/N)', () => {
+  it('aceita um encontro com jogador, aliado de cenário e inimigo', () => {
+    const { characterId: _semPersonagem, ...fichaDeCenario } = aliadoDeCenario.hero;
+    const npc = { ...aliadoDeCenario, hero: fichaDeCenario };
+
+    expect(() => encounterSchema.parse(encontro({ units: [unidadeJogador, npc, unidadeInimiga] }))).not.toThrow();
+  });
+
+  it('o aliado NÃO declara `characterId` — ele não é do elenco, e não tem árvore a resolver', () => {
+    // O recíproco da trava de M17 4/N, e ele importa: se o aliado pudesse declarar
+    // personagem, o capítulo voltaria a nomear alguém que o jogador talvez não possua —
+    // que é exatamente o defeito que esta fatia foi consertar.
+    expect(() => encounterSchema.parse(encontro({ units: [unidadeJogador, aliadoDeCenario, unidadeInimiga] }))).toThrow();
+  });
+
+  it('o aliado não tem onde pôr um `enemyId`', () => {
+    const confuso = { unitId: 'unit-npc', side: 'ally', enemyId: 'enemy-bandido', pos: { x: 2, y: 2 }, height: 0 };
+    expect(() => encounterSchema.parse(encontro({ units: [unidadeJogador, confuso, unidadeInimiga] }))).toThrow();
+  });
+
+  it('`escort` pode nomear um ALIADO DE CENÁRIO, e é para isso que ele existe', () => {
+    const { characterId: _semPersonagem, ...fichaDeCenario } = aliadoDeCenario.hero;
+    const npc = { ...aliadoDeCenario, hero: fichaDeCenario };
+
+    expect(() =>
+      encounterSchema.parse(
+        encontro({
+          units: [unidadeJogador, npc, unidadeInimiga],
+          winCondition: { t: 'escort', unitId: 'unit-mensageira', target: { x: 9, y: 9 } },
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('`escort` continua recusando nomear uma unidade INIMIGA', () => {
+    expect(() =>
+      encounterSchema.parse(
+        encontro({ winCondition: { t: 'escort', unitId: 'unit-bandido-1', target: { x: 9, y: 9 } } }),
+      ),
+    ).toThrow();
+  });
+
+  it('`escort` recusa nomear unidade que não existe no encontro', () => {
+    expect(() =>
+      encounterSchema.parse(
+        encontro({ winCondition: { t: 'escort', unitId: 'unit-fantasma', target: { x: 9, y: 9 } } }),
+      ),
+    ).toThrow();
+  });
+
+  it('as travas de tile único e unitId único alcançam o aliado também', () => {
+    const { characterId: _semPersonagem, ...fichaDeCenario } = aliadoDeCenario.hero;
+    const npc = { ...aliadoDeCenario, hero: fichaDeCenario };
+
+    const mesmoTile = { ...npc, pos: unidadeJogador.pos };
+    expect(() => encounterSchema.parse(encontro({ units: [unidadeJogador, mesmoTile] }))).toThrow();
+
+    const mesmoId = { ...npc, unitId: 'unit-heroi' };
+    expect(() => encounterSchema.parse(encontro({ units: [unidadeJogador, mesmoId] }))).toThrow();
   });
 });

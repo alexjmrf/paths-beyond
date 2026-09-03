@@ -63,7 +63,30 @@ const playerUnitSchema = z
 // outras: este schema valida um arquivo isolado.
 const enemyUnitSchema = z.object({ ...commonUnitFields, side: z.literal('enemy'), enemyId: idSchema }).strict();
 
-const encounterUnitSchema = z.discriminatedUnion('side', [playerUnitSchema, enemyUnitSchema]);
+// §10/D16 (M18, 5/N) — a TERCEIRA forma: o ALIADO DE CENÁRIO.
+//
+// Ela nasceu de um conflito medido, não de uma vontade de generalizar: o capítulo 5 escolta
+// `ally-mensageira`, e D14 fez dela uma personagem ADQUIRÍVEL. Quem não a puxou não tinha a
+// unidade nomeada pela condição de vitória, e o capítulo não ficava difícil — ficava
+// **injogável**, porque `escort` referencia um `unitId` que não existiria.
+//
+// Decisão do usuário: ela vira NPC do capítulo. É também o que a narrativa sempre disse —
+// "A Mensageira" é quem o jogador ENCONTRA e escolta, e é escoltando-a que ela se junta a
+// ele. O adquirível ganhou o motivo de ser adquirível.
+//
+// **Um lado próprio da união, e não um `player` sem `characterId`.** A diferença importa: a
+// trava de M17 4/N (todo herói do jogador declara o seu personagem) continua inteira, e o
+// aliado é uma coisa declaradamente diferente em vez da ausência de um campo. Pelo mesmo
+// motivo ele NÃO pode declarar `characterId` — se pudesse, o capítulo voltaria a nomear
+// alguém que o jogador talvez não possua, que é o defeito que esta forma foi consertar.
+const allyUnitSchema = z
+  .object({ ...commonUnitFields, side: z.literal('ally'), hero: heroSchema.strict() })
+  .strict()
+  .refine((unit) => !('characterId' in unit.hero) || unit.hero.characterId === undefined, {
+    message: 'um aliado de cenário não é do elenco e não pode declarar characterId.',
+  });
+
+const encounterUnitSchema = z.union([playerUnitSchema, allyUnitSchema, enemyUnitSchema]);
 
 const encounterSchema = z
   .object({
@@ -101,9 +124,13 @@ const encounterSchema = z
       // partida nasce sem desfecho possível (o motor resolve isso como derrota imediata).
       const condition = encounter.winCondition;
       if (condition?.t !== 'escort') return true;
-      return encounter.units.some((unit) => unit.unitId === condition.unitId && unit.side === 'player');
+      // M18 5/N — o aliado de cenário conta: escoltar alguém que ainda não é seu é o
+      // sentido inteiro do capítulo 5. O que continua recusado é nomear um INIMIGO.
+      return encounter.units.some(
+        (unit) => unit.unitId === condition.unitId && (unit.side === 'player' || unit.side === 'ally'),
+      );
     },
-    { message: 'a condição `escort` precisa nomear uma unidade do jogador presente no encounter.' },
+    { message: 'a condição `escort` precisa nomear uma unidade do jogador ou um aliado de cenário presente no encounter.' },
   );
 
 export default encounterSchema;
