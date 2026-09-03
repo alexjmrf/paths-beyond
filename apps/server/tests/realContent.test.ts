@@ -8,6 +8,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
+  createMemoryRewardsRepository,
   createMemorySeasonRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
@@ -68,6 +69,7 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
     const app = buildApp({
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
+    rewardsRepository: createMemoryRewardsRepository(),
       repository,
       heroRepository,
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),

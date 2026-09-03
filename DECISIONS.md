@@ -4629,3 +4629,96 @@ esta fatia criou já entra pelo repositório de Postgres.
 
 **Suíte: 116 arquivos, 1693 testes** (era 115/1674). `validate:data` inalterado em 27/192 — a
 fatia não autorou dado.
+
+
+### M18 — sub-sessão 4/N: as quatro fontes, e a campanha indo para o servidor
+
+`packages/core` **sem uma linha alterada** — `RULES_VERSION` fica em `0.18.0`. A fatia é
+`packages/data`, `packages/content` e `apps/server`.
+
+#### A decisão que a fatia teve de parar para tomar
+
+Das quatro fontes que D20 mandou entrar, uma não tinha onde existir: **o servidor não sabia que a
+campanha existe.** Não havia uma única rota de campanha em `apps/server` — ela era jogada
+inteiramente no cliente, com o progresso em `localStorage`. A masmorra, por contraste, o servidor
+observa de verdade desde M14 3/N: `markCleared` só acontece depois de ele **reexecutar os comandos
+e confirmar a vitória**.
+
+Levada ao usuário com três saídas. **A resposta dele foi um critério, não uma opção:** *"veja
+principalmente a forma principal que é feita em jogos que já existem para evitar mal funcionamento
+e problemas no futuro"*. A forma consagrada é inequívoca e coincide com §9.4 — **em todo
+gacha/live-service comercial o servidor é autoritativo sobre progressão**: o cliente pede o início
+da batalha, joga, submete, e quem marca "fase limpa" e paga a recompensa é sempre o servidor.
+Cliente afirmando "limpei" é o vetor clássico de fraude, e aqui seria pior que o normal, porque a
+moeda que ele ganharia também se compra com dinheiro real.
+
+**Decisão: a campanha passa pelo MESMO fluxo da masmorra** — `POST /campaign/:id/ticket` devolve o
+setup e a seed, o cliente joga a camada de grid, e `POST /campaign/:id/run` reexecuta os comandos
+e exige vitória. A alternativa (`POST /campaign/:id/clear` na palavra do cliente) fica registrada
+como descartada.
+
+**Corte de escopo declarado:** a 4/N faz o lado SERVIDOR. A migração do cliente para jogar a
+campanha por este caminho vai junto da 5/N, que já reescreve a campanha para as vagas de D16 —
+fazer o cliente da campanha duas vezes seria desperdício.
+
+**Um ganho que não era o objetivo, e fecha um buraco que o critério 2 não cobria:** a campanha era
+**o único caminho do jogo em que dava para levar ao mapa um personagem que não se possui**, porque
+nenhum servidor a via. Com a rota, ela ganhou a mesma checagem de posse da arena e da masmorra.
+
+**Um defeito meu, pego pelo primeiro teste:** a primeira escrita de `assembleChapterBattle` montava
+o `BattleSetup` à mão, com um `as unknown as BattleSetup`. Isso não é só feio — é uma TERCEIRA
+montagem da mesma batalha, e §9.1 chama de bug crítico a divergência entre o que o cliente jogou e
+o que o servidor reexecuta. `Placement` não é `BattleUnit`, e nada dentro dele tem `stats` até
+passar por `buildBattleSetupFromHeroes`. O cast escondia isso do compilador; o runtime não perdoou.
+
+#### As duas fontes autoradas
+
+**Decisão do usuário: a condição de conquista só olha estado que o servidor JÁ TEM** —
+`chaptersCleared`, `dungeonsCleared`, `charactersOwned`, `heroImprint`, `heroAwakening`, `elo`. A
+alternativa descartada eram contadores acumulados (batalhas vencidas, invocações feitas, dias
+ativos), que exigiriam uma tabela de contadores e um gancho em cada rota — e cada gancho é uma
+chance de o contador dessincronizar do que ele deveria contar, sem nada ficar vermelho.
+
+Isso tem uma consequência que não estava na pergunta e é boa: **toda conquista é retroativa de
+graça.** A condição é conferida contra o estado NA HORA da reivindicação, então quem já a cumpriu
+antes de ela ser autorada pode reivindicar assim que ela existir.
+
+**`gold` NÃO é um `kind`, e a ausência é deliberada:** o banco guarda o SALDO, não o acumulado, e
+"junte 10.000 de ouro" viraria uma conquista que some ao gastar.
+
+**Decisão do usuário: um evento é um achievement com JANELA.** Por isso ele reusa a condição
+autorada daquele, a mesma rota, o mesmo repositório e a mesma idempotência — duas implementações
+da mesma coisa divergiriam. Descartado: o evento como MULTIPLICADOR temporário das outras fontes,
+que é o que gachas costumam fazer e é muito mais invasivo (toda fonte passaria a perguntar "há
+evento ativo?", e o balanceamento de M8 ganharia um modo a mais para medir).
+
+**A janela é meia-aberta (`[início, fim)`), e isso é decisão e não descuido:** com as duas pontas
+inclusive, dois eventos autorados para emendar (`[a,b]` e `[b,c]`) se sobreporiam por um
+milissegundo — e o instante de virada é exatamente o que alguém escreve ao querer emendar. Tem
+teste próprio.
+
+#### Duas decisões de forma, ambas contra a mesma fresta
+
+**`claim` e `markChapterCleared` devolvem SE FOI A PRIMEIRA VEZ**, em vez de terem um `has` antes
+de um `add`. Perguntar e depois escrever deixa a janela em que duas requisições simultâneas do
+mesmo jogador pagam o mesmo prêmio duas vezes. No Postgres é `ON CONFLICT DO NOTHING` + `rowCount`,
+com a chave primária composta decidindo quem chegou primeiro.
+
+**O retrato da conta é montado UMA vez por requisição** e passado ao avaliador. A alternativa —
+cada condição consultando o que precisa — faria uma tela com dez conquistas bater no banco dezenas
+de vezes para responder a mesma pergunta.
+
+**O avaliador é função PURA e não mora na rota** (`rewards/conditions.ts`), mesmo precedente de
+`matchmaking/elo.ts` e `battle/ticket.ts`. Também não mora em `packages/core` (§15 mantém a
+aquisição fora de lá) nem em `packages/gacha` (que é a mecânica da rolagem e nada mais).
+
+#### O teste que o schema não podia escrever
+
+Uma conquista **inalcançável** — "limpe 8 capítulos" com 6 no jogo, "tenha 12 personagens" com 9 no
+elenco — passa em qualquer schema, porque o número é válido isoladamente. A asserção cruza os dois
+lados em `packages/content`, e duas conquistas ("elenco completo", "a fortaleza caiu") são travadas
+contra a CONTAGEM REAL do catálogo: se um personagem ou um capítulo entrar e elas não acompanharem,
+elas deixam de significar o que o nome promete, e o teste avisa.
+
+**Suíte: 119 arquivos, 1735 testes** (era 116/1693). `pnpm validate:data`: **29 schemas, 204
+arquivos** (era 27/192) — a trava de contagem reprovou primeiro, como deve.

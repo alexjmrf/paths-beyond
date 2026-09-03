@@ -62,6 +62,9 @@ const materialModules = import.meta.glob('../../../../packages/data/materials/*.
 // 6/N), e carregar aqui é a mesma paridade que os outros: um adapter que conhece menos
 // tipos de conteúdo que o outro é um descompasso descoberto em runtime.
 const bannerModules = import.meta.glob('../../../../packages/data/banners/*.json', { eager: true, import: 'default' });
+// §10 (M18, 4/N) — as fontes da moeda premium; mesma paridade com o adapter de disco.
+const achievementModules = import.meta.glob('../../../../packages/data/achievements/*.json', { eager: true, import: 'default' });
+const eventModules = import.meta.glob('../../../../packages/data/events/*.json', { eager: true, import: 'default' });
 const economyRulesModules = import.meta.glob('../../../../packages/data/economy-rules/*.json', { eager: true, import: 'default' });
 const substatWeightsModules = import.meta.glob('../../../../packages/data/substat-weights/*.json', { eager: true, import: 'default' });
 const mainstatWeightsModules = import.meta.glob('../../../../packages/data/mainstat-weights/*.json', { eager: true, import: 'default' });
@@ -76,6 +79,8 @@ export function loadCatalogFromBrowser(): ContentCatalog {
     classes: globJsonValues(classModules),
     characters: globJsonValues(characterModules),
     banners: globJsonValues(bannerModules),
+    achievements: globJsonValues(achievementModules),
+    events: globJsonValues(eventModules),
     characterTalentTrees: globJsonValues(characterTalentTreeModules),
     enemies: globJsonValues(enemyModules),
     skills: globJsonValues(skillModules),

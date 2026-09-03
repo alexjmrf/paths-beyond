@@ -1,0 +1,10 @@
+{
+  "id": "achievement-teste",
+  "name": "Conquista de Teste",
+  "description": "Limpe uma masmorra.",
+  "premium": 100,
+  "condition": {
+    "kind": "dungeonsCleared",
+    "atLeast": 1
+  }
+}

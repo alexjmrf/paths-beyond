@@ -6,6 +6,7 @@ import { createInMemoryRateLimiter } from './battle/rateLimit.js';
 import {
   createPostgresArenaDefenseRepository,
   createPostgresCharacterOwnershipRepository,
+  createPostgresRewardsRepository,
   createPostgresHeroRepository,
   createPostgresPlayerRepository,
   createPostgresReplayRepository,
@@ -33,6 +34,7 @@ const app = buildApp({
   // corrigido em silêncio junto de outra coisa.
   economyRepository: createMemoryEconomyRepository(),
   ownershipRepository: createPostgresCharacterOwnershipRepository(pool),
+  rewardsRepository: createPostgresRewardsRepository(pool),
   repository: createPostgresPlayerRepository(pool),
   heroRepository: createPostgresHeroRepository(pool),
   arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),

@@ -67,6 +67,9 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     materials: readJsonFiles(typeDir(root, 'materials', layout)),
     // §10 (M18, 2/N) — os banners de invocação.
     banners: readJsonFiles(typeDir(root, 'banners', layout)),
+    // §10 (M18, 4/N) — as fontes autoradas da moeda premium.
+    achievements: readJsonFiles(typeDir(root, 'achievements', layout)),
+    events: readJsonFiles(typeDir(root, 'events', layout)),
     economyRules: readJsonFiles(typeDir(root, 'economy-rules', layout)),
     substatWeights: readFirstJsonFile(typeDir(root, 'substat-weights', layout)),
     mainstatWeights: readFirstJsonFile(typeDir(root, 'mainstat-weights', layout)),

@@ -1,0 +1,10 @@
+{
+  "id": "achievement-faxina-completa",
+  "name": "Faxina Completa",
+  "description": "Limpe quatro masmorras à mão.",
+  "premium": 400,
+  "condition": {
+    "kind": "dungeonsCleared",
+    "atLeast": 4
+  }
+}

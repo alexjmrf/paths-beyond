@@ -7,6 +7,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
+  createMemoryRewardsRepository,
   createMemorySeasonRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
@@ -72,6 +73,7 @@ const heroes: StoredHero[] = [
 const app = buildApp({
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
+    rewardsRepository: createMemoryRewardsRepository(),
   repository: createMemoryPlayerRepository([
     // Ouro e pedras semeados: o ciclo de aceite começa em farmar, mas verificar enhance
     // sem nada na carteira exigiria farmar ouro antes de cada tentativa.

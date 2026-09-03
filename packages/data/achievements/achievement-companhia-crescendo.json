@@ -1,0 +1,10 @@
+{
+  "id": "achievement-companhia-crescendo",
+  "name": "Companhia Crescendo",
+  "description": "Tenha seis personagens.",
+  "premium": 300,
+  "condition": {
+    "kind": "charactersOwned",
+    "atLeast": 6
+  }
+}

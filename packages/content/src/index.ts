@@ -5,6 +5,9 @@ export { toSummonBlueprintPlacements } from './summonPlacements.js';
 export { toEncounterPlacements } from './encounterPlacements.js';
 export type { ContentLayout, LoadCatalogFromDiskOptions } from './loadCatalogFromDisk.js';
 export type {
+  AchievementContent,
+  EventContent,
+  RewardCondition,
   ArenaMap,
   BannerContent,
   BannerEntryContent,

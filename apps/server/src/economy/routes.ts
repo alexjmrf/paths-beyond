@@ -413,13 +413,27 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
 
     // A primeira vitória MANUAL é o que libera a varredura. Vitória automática não marca
     // nada de novo (só acontece depois de já estar limpa) e a elite nunca libera nada.
-    if (!auto) await opts.economyRepository.markCleared(player.id, dungeon.id);
+    //
+    // §10 (M18, 4/N) — e é também a PRIMEIRA COMPLETUDE, uma das quatro fontes da moeda
+    // premium. Ela é paga aqui, e não numa rota de reivindicação, porque este é o único
+    // ponto do sistema que sabe que a masmorra acabou de ser vencida pela primeira vez —
+    // `clears` foi lido no começo desta requisição, antes de `markCleared`.
+    let premiumAwarded = 0;
+    if (!auto) {
+      const primeiraVez = !clears.has(dungeon.id);
+      await opts.economyRepository.markCleared(player.id, dungeon.id);
+      if (primeiraVez) {
+        premiumAwarded = opts.catalog.premiumRules.premiumRewards.dungeonFirstClear;
+        await opts.repository.updatePremium(player.id, player.premium + premiumAwarded);
+      }
+    }
 
     return {
       outcome,
       roundsPlayed,
       rewards,
       energy: spent.energy,
+      premiumAwarded,
       wallet: { gold: wallet.gold, stones: wallet.stones, arenaMarks: wallet.arenaMarks },
     };
   });

@@ -3,6 +3,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { authPlugin } from './auth.js';
 import type { RateLimiter } from './battle/rateLimit.js';
 import { battleRoutes } from './battle/routes.js';
+import { campaignRoutes } from './campaign/routes.js';
+import { rewardsRoutes } from './rewards/routes.js';
 import { progressionRoutes } from './economy/progressionRoutes.js';
 import { economyRoutes } from './economy/routes.js';
 import { matchmakingRoutes } from './matchmaking/routes.js';
@@ -13,6 +15,7 @@ import type {
   HeroRepository,
   PlayerRepository,
   ReplayRepository,
+  RewardsRepository,
   SeasonRepository,
 } from './repository/types.js';
 import { seasonRoutes } from './season/routes.js';
@@ -29,6 +32,8 @@ export interface BuildAppDeps {
   economyRepository: EconomyRepository;
   // §10/§9.4 (M18, sub-sessão 3/N) — posse de personagem e contador de pity.
   ownershipRepository: CharacterOwnershipRepository;
+  // §10 (M18, sub-sessão 4/N) — reivindicações de prêmio e capítulos limpos.
+  rewardsRepository: RewardsRepository;
   replayRepository: ReplayRepository;
   seasonRepository: SeasonRepository;
   catalog: ContentCatalog;
@@ -109,6 +114,28 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       seasonRepository: deps.seasonRepository,
       playerRepository: deps.repository,
       now: deps.now,
+    });
+
+    await protectedRoutes.register(campaignRoutes, {
+      repository: deps.repository,
+      heroRepository: deps.heroRepository,
+      ownershipRepository: deps.ownershipRepository,
+      rewardsRepository: deps.rewardsRepository,
+      catalog: deps.catalog,
+      rateLimiter: deps.rateLimiter,
+      ticketSecret: deps.ticketSecret,
+      now: deps.now ?? (() => Date.now()),
+      ...(deps.newNonce ? { newNonce: deps.newNonce } : {}),
+    });
+
+    await protectedRoutes.register(rewardsRoutes, {
+      repository: deps.repository,
+      heroRepository: deps.heroRepository,
+      ownershipRepository: deps.ownershipRepository,
+      economyRepository: deps.economyRepository,
+      rewardsRepository: deps.rewardsRepository,
+      catalog: deps.catalog,
+      now: deps.now ?? (() => Date.now()),
     });
 
     await protectedRoutes.register(summonRoutes, {

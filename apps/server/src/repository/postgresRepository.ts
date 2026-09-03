@@ -19,6 +19,7 @@ import {
   type DungeonRunRecord,
   type EconomyActionRecord,
   type CharacterOwnershipRepository,
+  type RewardsRepository,
   type EconomyRepository,
 } from './types.js';
 
@@ -536,6 +537,45 @@ export function createPostgresCharacterOwnershipRepository(pool: Pool): Characte
          ON CONFLICT (player_id, banner_id) DO UPDATE SET rolls_since_new = EXCLUDED.rolls_since_new`,
         [playerId, bannerId, rollsSinceNew],
       );
+    },
+  };
+}
+
+// §10 (M18, 4/N) — reivindicações e capítulos limpos.
+export function createPostgresRewardsRepository(pool: Pool): RewardsRepository {
+  return {
+    async listClaims(playerId) {
+      const result = await pool.query<{ reward_id: string }>(
+        'SELECT reward_id FROM player_claims WHERE player_id = $1 ORDER BY reward_id',
+        [playerId],
+      );
+      return result.rows.map((row) => row.reward_id);
+    },
+    async claim(playerId, rewardId) {
+      // `ON CONFLICT DO NOTHING` + `rowCount` é a checagem e a escrita numa operação só: a
+      // chave primária composta decide quem chegou primeiro, e duas requisições simultâneas
+      // não conseguem pagar o mesmo prêmio duas vezes.
+      const result = await pool.query(
+        `INSERT INTO player_claims (player_id, reward_id) VALUES ($1, $2)
+         ON CONFLICT (player_id, reward_id) DO NOTHING`,
+        [playerId, rewardId],
+      );
+      return (result.rowCount ?? 0) > 0;
+    },
+    async listClearedChapters(playerId) {
+      const result = await pool.query<{ chapter_id: string }>(
+        'SELECT chapter_id FROM campaign_clears WHERE player_id = $1 ORDER BY chapter_id',
+        [playerId],
+      );
+      return result.rows.map((row) => row.chapter_id);
+    },
+    async markChapterCleared(playerId, chapterId) {
+      const result = await pool.query(
+        `INSERT INTO campaign_clears (player_id, chapter_id) VALUES ($1, $2)
+         ON CONFLICT (player_id, chapter_id) DO NOTHING`,
+        [playerId, chapterId],
+      );
+      return (result.rowCount ?? 0) > 0;
     },
   };
 }

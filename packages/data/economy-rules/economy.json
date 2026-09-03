@@ -88,5 +88,9 @@
   "energyPurchase": {
     "premiumCost": 100,
     "energy": 60
+  },
+  "premiumRewards": {
+    "chapterFirstClear": 600,
+    "dungeonFirstClear": 200
   }
 }

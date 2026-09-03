@@ -127,3 +127,79 @@ describe('os números do summon (D17/D18)', () => {
     }
   });
 });
+
+// §10 (M18, 4/N) — as duas fontes AUTORADAS da moeda premium conversando com o resto do
+// conteúdo. Mesma divisão de trabalho de sempre: o schema valida a forma de um arquivo, e
+// aqui se pergunta o que cruza tipos de conteúdo.
+describe('as fontes autoradas da moeda premium', () => {
+  const achievements = Object.values(catalog.achievements);
+  const events = Object.values(catalog.events);
+
+  it('há conquistas e eventos autorados', () => {
+    expect(achievements.length).toBeGreaterThan(0);
+    expect(events.length).toBeGreaterThan(0);
+  });
+
+  it('nenhuma conquista é INALCANÇÁVEL: o limiar cabe no que o jogo tem', () => {
+    // O erro provável aqui é autorar "limpe 8 capítulos" com 6 no jogo, ou "tenha 12
+    // personagens" com 9 no elenco — uma conquista que ninguém nunca pode reivindicar, e
+    // que nenhum schema pega porque o número é válido isoladamente.
+    const capitulos = catalog.encounters.length;
+    const masmorras = Object.keys(catalog.dungeons).length;
+    const personagens = Object.keys(catalog.characters).length;
+
+    for (const achievement of [...achievements, ...events]) {
+      const condition = 'condition' in achievement ? achievement.condition : undefined;
+      if (!condition) continue;
+
+      if (condition.kind === 'chaptersCleared') {
+        expect(condition.atLeast, `${achievement.id}`).toBeLessThanOrEqual(capitulos);
+      }
+      if (condition.kind === 'dungeonsCleared') {
+        expect(condition.atLeast, `${achievement.id}`).toBeLessThanOrEqual(masmorras);
+      }
+      if (condition.kind === 'charactersOwned') {
+        expect(condition.atLeast, `${achievement.id}`).toBeLessThanOrEqual(personagens);
+      }
+      // Os tetos de imprint e awakening são do motor (§10: 0–5 e 0–6), não do conteúdo.
+      if (condition.kind === 'heroImprint') expect(condition.atLeast, `${achievement.id}`).toBeLessThanOrEqual(5);
+      if (condition.kind === 'heroAwakening') expect(condition.atLeast, `${achievement.id}`).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('a conquista de "elenco completo" pede exatamente o elenco, nem mais nem menos', () => {
+    // Um alvo móvel de propósito: se um personagem entrar no elenco e esta conquista não
+    // acompanhar, ela deixa de significar "completo" sem nada ficar vermelho.
+    const completo = achievements.find((a) => a.id === 'achievement-elenco-completo');
+
+    expect(completo?.condition).toEqual({
+      kind: 'charactersOwned',
+      atLeast: Object.keys(catalog.characters).length,
+    });
+  });
+
+  it('a conquista de "fortaleza caiu" pede exatamente os capítulos que existem', () => {
+    const fim = achievements.find((a) => a.id === 'achievement-a-fortaleza-caiu');
+
+    expect(fim?.condition).toEqual({ kind: 'chaptersCleared', atLeast: catalog.encounters.length });
+  });
+
+  it('nenhum id se repete entre conquistas e eventos — eles dividem a tabela de reivindicação', () => {
+    const ids = [...achievements.map((a) => a.id), ...events.map((e) => e.id)];
+
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('a energia de um evento e o custo de summon são coerentes: nenhum prêmio é zero', () => {
+    for (const reward of [...achievements, ...events]) {
+      expect(reward.premium, `${reward.id}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('os dois números de primeira completude são positivos', () => {
+    const { chapterFirstClear, dungeonFirstClear } = catalog.premiumRules.premiumRewards;
+
+    expect(chapterFirstClear).toBeGreaterThan(0);
+    expect(dungeonFirstClear).toBeGreaterThan(0);
+  });
+});

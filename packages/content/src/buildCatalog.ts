@@ -32,6 +32,8 @@ import dungeonSchema from '@paths-beyond/data/schemas/dungeons.schema.js';
 import dungeonEncounterSchema from '@paths-beyond/data/schemas/dungeon-encounters.schema.js';
 import materialSchema from '@paths-beyond/data/schemas/materials.schema.js';
 import bannerSchema from '@paths-beyond/data/schemas/banners.schema.js';
+import achievementSchema from '@paths-beyond/data/schemas/achievements.schema.js';
+import eventSchema from '@paths-beyond/data/schemas/events.schema.js';
 import economyRulesSchema from '@paths-beyond/data/schemas/economy-rules.schema.js';
 import substatWeightsSchema from '@paths-beyond/data/schemas/substat-weights.schema.js';
 import mainstatWeightsSchema from '@paths-beyond/data/schemas/mainstat-weights.schema.js';
@@ -44,8 +46,10 @@ import summonBlueprintSchema from '@paths-beyond/data/schemas/summon-blueprints.
 import terrainSchema from '@paths-beyond/data/schemas/terrains.schema.js';
 import weaponDuelRangesSchema from '@paths-beyond/data/schemas/weapon-duel-ranges.schema.js';
 import type {
+  AchievementContent,
   ArenaMap,
   BannerContent,
+  EventContent,
   CharacterContent,
   Composition,
   ContentCatalog,
@@ -102,6 +106,8 @@ export interface ParsedContentFiles {
   // Obrigatório, sem `?`, pelo mesmo motivo de `characters` e `enemies`: esquecer de
   // passar tem de ser erro de tipo, não um catálogo sem banner descoberto em produção.
   readonly banners: readonly unknown[];
+  readonly achievements: readonly unknown[];
+  readonly events: readonly unknown[];
   readonly economyRules?: readonly unknown[];
   readonly substatWeights?: unknown;
   readonly mainstatWeights?: unknown;
@@ -114,6 +120,7 @@ const EMPTY_ECONOMY_RULES: EconomyRules = { energy: { max: 0, refillIntervalMs: 
 const EMPTY_PREMIUM_RULES: PremiumRules = {
   summon: { premiumCost: 0, pityThreshold: 1 },
   energyPurchase: { premiumCost: 0, energy: 0 },
+  premiumRewards: { chapterFirstClear: 0, dungeonFirstClear: 0 },
 };
 const EMPTY_ENHANCE_RATES: EnhanceRates = { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 };
 
@@ -219,6 +226,12 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
   // resolve, e "catálogo sem banner" não é um jogo sem aquisição.
   const banners = indexById(input.banners.map((raw) => bannerSchema.parse(raw) as unknown as BannerContent));
 
+  // §10 (M18, 4/N) — as fontes autoradas da moeda premium.
+  const achievements = indexById(
+    input.achievements.map((raw) => achievementSchema.parse(raw) as unknown as AchievementContent),
+  );
+  const events = indexById(input.events.map((raw) => eventSchema.parse(raw) as unknown as EventContent));
+
   // O MESMO arquivo é lido duas vezes com dois recortes: o que o core conhece
   // (`EconomyRules`) e o que é da moeda premium (`PremiumRules`). Ver o comentário de
   // `PremiumRules` em `types.ts` — a separação é §15 no tipo, não organização.
@@ -254,6 +267,8 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     dungeonEncounters,
     materials,
     banners,
+    achievements,
+    events,
     economyRules,
     premiumRules,
     substatWeights,

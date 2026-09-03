@@ -7,6 +7,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
+  createMemoryRewardsRepository,
   createMemorySeasonRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
@@ -50,7 +51,10 @@ const emptyCatalog: ContentCatalog = {
   premiumRules: {
     summon: { premiumCost: 500, pityThreshold: 10 },
     energyPurchase: { premiumCost: 100, energy: 60 },
+    premiumRewards: { chapterFirstClear: 600, dungeonFirstClear: 200 },
   },
+  achievements: {},
+  events: {},
   baselineReactionSkillIds: [],
 };
 
@@ -61,6 +65,7 @@ function buildTestApp(players: readonly Player[], defenses: readonly ArenaDefens
   return buildApp({
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
+    rewardsRepository: createMemoryRewardsRepository(),
     repository,
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(defenses),

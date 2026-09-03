@@ -1,0 +1,10 @@
+{
+  "id": "achievement-nome-na-arena",
+  "name": "Nome na Arena",
+  "description": "Alcance 1300 de ELO.",
+  "premium": 350,
+  "condition": {
+    "kind": "elo",
+    "atLeast": 1300
+  }
+}

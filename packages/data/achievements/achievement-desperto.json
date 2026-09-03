@@ -1,0 +1,10 @@
+{
+  "id": "achievement-desperto",
+  "name": "Desperto",
+  "description": "Leve algum herói a awakening 3.",
+  "premium": 400,
+  "condition": {
+    "kind": "heroAwakening",
+    "atLeast": 3
+  }
+}

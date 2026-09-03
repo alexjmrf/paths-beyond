@@ -10,6 +10,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
+  createMemoryRewardsRepository,
   createMemorySeasonRepository,
 } from '../src/repository/memoryRepository.js';
 import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
@@ -57,6 +58,7 @@ interface Harness {
   readonly app: ReturnType<typeof buildApp>;
   readonly economyRepository: ReturnType<typeof createMemoryEconomyRepository>;
   readonly ownershipRepository: ReturnType<typeof createMemoryCharacterOwnershipRepository>;
+  readonly rewardsRepository: ReturnType<typeof createMemoryRewardsRepository>;
   readonly playerRepository: ReturnType<typeof createMemoryPlayerRepository>;
   now: number;
   nonceCounter: number;
@@ -109,11 +111,13 @@ function buildHarness(options: { energy?: number } = {}): Harness {
   const economyRepository = createMemoryEconomyRepository();
 
   const ownershipRepository = createMemoryCharacterOwnershipRepository();
+  const rewardsRepository = createMemoryRewardsRepository();
   const harness: Harness = {
     now: SEXTA,
     nonceCounter: 0,
     economyRepository,
     ownershipRepository,
+    rewardsRepository,
     playerRepository,
     app: buildApp({
       repository: playerRepository,
@@ -123,6 +127,7 @@ function buildHarness(options: { energy?: number } = {}): Harness {
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
       ownershipRepository,
+      rewardsRepository,
       catalog,
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
@@ -235,6 +240,24 @@ describe('GET /dungeons', () => {
 });
 
 describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
+  // §10 (M18, 4/N) — a fonte "primeira completude". Paga aqui, e não numa rota de
+  // reivindicação, porque este é o único ponto do sistema que sabe que a masmorra acabou de
+  // ser vencida PELA PRIMEIRA VEZ.
+  it('a primeira vitória manual paga a moeda premium; a segunda não paga nada', async () => {
+    const h = buildHarness();
+
+    const primeira = await jogarEVencer(h, NORMAL);
+    expect(primeira.status).toBe(200);
+    expect(primeira.body.premiumAwarded).toBe(catalog.premiumRules.premiumRewards.dungeonFirstClear);
+
+    const segunda = await jogarEVencer(h, NORMAL);
+    expect(segunda.body.outcome).toBe('victory');
+    expect(segunda.body.premiumAwarded).toBe(0);
+
+    const player = await h.playerRepository.getPlayerById('player-farmer');
+    expect(player?.premium).toBe(catalog.premiumRules.premiumRewards.dungeonFirstClear);
+  });
+
   // §9.4 (M18, 3/N) — a mesma checagem de posse da arena, na outra rota que monta batalha a
   // partir de ids do cliente. Se só uma das duas perguntasse, a que não pergunta seria a
   // porta.

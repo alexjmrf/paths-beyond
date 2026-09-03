@@ -8,6 +8,7 @@ import {
   type ArenaDefense,
   type ArenaDefenseRepository,
   type CharacterOwnershipRepository,
+  type RewardsRepository,
   type HeroRepository,
   type Player,
   type PlayerRepository,
@@ -273,6 +274,41 @@ export function createMemoryCharacterOwnershipRepository(
     },
     async setPity(playerId, bannerId, rollsSinceNew) {
       pity.set(pityKey(playerId, bannerId), rollsSinceNew);
+    },
+  };
+}
+
+// §10 (M18, 4/N) — reivindicações e capítulos limpos, em memória.
+export function createMemoryRewardsRepository(): RewardsRepository {
+  const claims = new Map<string, Set<string>>();
+  const chapters = new Map<string, Set<string>>();
+
+  function bucket(map: Map<string, Set<string>>, playerId: string): Set<string> {
+    const existing = map.get(playerId);
+    if (existing) return existing;
+    const created = new Set<string>();
+    map.set(playerId, created);
+    return created;
+  }
+
+  return {
+    async listClaims(playerId) {
+      return [...bucket(claims, playerId)].sort();
+    },
+    async claim(playerId, rewardId) {
+      const owned = bucket(claims, playerId);
+      if (owned.has(rewardId)) return false;
+      owned.add(rewardId);
+      return true;
+    },
+    async listClearedChapters(playerId) {
+      return [...bucket(chapters, playerId)].sort();
+    },
+    async markChapterCleared(playerId, chapterId) {
+      const cleared = bucket(chapters, playerId);
+      if (cleared.has(chapterId)) return false;
+      cleared.add(chapterId);
+      return true;
     },
   };
 }

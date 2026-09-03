@@ -1,0 +1,10 @@
+{
+  "id": "achievement-marca-do-vinculo",
+  "name": "Marca do Vínculo",
+  "description": "Leve algum herói a imprint 1.",
+  "premium": 200,
+  "condition": {
+    "kind": "heroImprint",
+    "atLeast": 1
+  }
+}

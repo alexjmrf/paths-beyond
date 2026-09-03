@@ -1,0 +1,8 @@
+{
+  "id": "event-abertura",
+  "name": "Abertura da Temporada",
+  "description": "Reivindique durante a janela de abertura.",
+  "premium": 500,
+  "startsAt": 1767225600000,
+  "endsAt": 1798761600000
+}

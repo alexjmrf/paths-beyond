@@ -1,0 +1,10 @@
+{
+  "id": "achievement-maos-a-obra",
+  "name": "Mãos à Obra",
+  "description": "Limpe uma masmorra à mão.",
+  "premium": 150,
+  "condition": {
+    "kind": "dungeonsCleared",
+    "atLeast": 1
+  }
+}

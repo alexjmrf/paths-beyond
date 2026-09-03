@@ -162,6 +162,41 @@ export interface PremiumRules {
     readonly premiumCost: number;
     readonly energy: number;
   };
+  // §10 (M18, 4/N) — duas das quatro FONTES: a primeira completude. Uniformes por tipo,
+  // então um número por tipo em vez de um por peça de conteúdo.
+  readonly premiumRewards: {
+    readonly chapterFirstClear: number;
+    readonly dungeonFirstClear: number;
+  };
+}
+
+// §10 (M18, 4/N) — as condições autoradas de conquista e evento. A avaliação delas é do
+// servidor (é ele que tem o estado de conta); o que mora aqui é a forma.
+export type RewardCondition =
+  | { readonly kind: 'chaptersCleared'; readonly atLeast: number }
+  | { readonly kind: 'dungeonsCleared'; readonly atLeast: number }
+  | { readonly kind: 'charactersOwned'; readonly atLeast: number }
+  | { readonly kind: 'heroImprint'; readonly atLeast: number }
+  | { readonly kind: 'heroAwakening'; readonly atLeast: number }
+  | { readonly kind: 'elo'; readonly atLeast: number };
+
+export interface AchievementContent {
+  readonly id: Id;
+  readonly name: string;
+  readonly description: string;
+  readonly premium: number;
+  readonly condition: RewardCondition;
+}
+
+export interface EventContent {
+  readonly id: Id;
+  readonly name: string;
+  readonly description: string;
+  readonly premium: number;
+  // Epoch ms, como `EnergyState.asOfMs`: o projeto compara instantes como número.
+  readonly startsAt: number;
+  readonly endsAt: number;
+  readonly condition?: RewardCondition;
 }
 
 export interface ContentCatalog {
@@ -219,6 +254,9 @@ export interface ContentCatalog {
   readonly banners: Readonly<Record<Id, BannerContent>>;
   // §10/D17 (M18) — separados de `economyRules` de propósito; ver `PremiumRules`.
   readonly premiumRules: PremiumRules;
+  // §10 (M18, 4/N) — as duas fontes autoradas da moeda premium.
+  readonly achievements: Readonly<Record<Id, AchievementContent>>;
+  readonly events: Readonly<Record<Id, EventContent>>;
   readonly economyRules: EconomyRules;
   readonly substatWeights: readonly SubstatWeightEntry[];
   readonly mainstatWeights: readonly MainstatWeightEntry[];

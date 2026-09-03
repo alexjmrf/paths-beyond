@@ -1,0 +1,10 @@
+{
+  "id": "achievement-a-estrada-aberta",
+  "name": "A Estrada Aberta",
+  "description": "Limpe três capítulos da campanha.",
+  "premium": 300,
+  "condition": {
+    "kind": "chaptersCleared",
+    "atLeast": 3
+  }
+}

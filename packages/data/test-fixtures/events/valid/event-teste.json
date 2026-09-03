@@ -1,0 +1,8 @@
+{
+  "id": "event-teste",
+  "name": "Evento de Teste",
+  "description": "Apareça dentro da janela.",
+  "premium": 50,
+  "startsAt": 1000,
+  "endsAt": 2000
+}

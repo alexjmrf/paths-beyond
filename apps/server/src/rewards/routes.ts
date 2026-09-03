@@ -1,0 +1,143 @@
+import type { ContentCatalog, RewardCondition } from '@paths-beyond/content';
+import type { FastifyPluginAsync } from 'fastify';
+import type {
+  CharacterOwnershipRepository,
+  EconomyRepository,
+  HeroRepository,
+  PlayerRepository,
+  RewardsRepository,
+} from '../repository/types.js';
+import { ownedCharacterIds } from '../summon/ownership.js';
+import { isWithinWindow, meetsCondition, type AccountSnapshot } from './conditions.js';
+
+// §10 (M18, sub-sessão 4/N) — as duas fontes AUTORADAS da moeda premium: conquistas e
+// eventos. As outras duas (primeira completude de capítulo e de masmorra) são pagas no
+// próprio caminho da batalha, porque é lá que se sabe que ela aconteceu.
+//
+// Conquista e evento compartilham rota, repositório e idempotência, e isso não é economia:
+// é que a decisão do usuário fez de um evento **um achievement com janela** — a única
+// diferença é o relógio, e duas implementações da mesma coisa divergiriam.
+
+export interface RewardsRoutesOptions {
+  readonly repository: PlayerRepository;
+  readonly heroRepository: HeroRepository;
+  readonly ownershipRepository: CharacterOwnershipRepository;
+  readonly economyRepository: EconomyRepository;
+  readonly rewardsRepository: RewardsRepository;
+  readonly catalog: ContentCatalog;
+  readonly now: () => number;
+}
+
+// O retrato da conta contra o qual toda condição é avaliada. Montado UMA vez por
+// requisição e passado adiante: a alternativa (cada condição consultando o que precisa)
+// faria uma tela com dez conquistas bater no banco dezenas de vezes para responder a mesma
+// pergunta.
+async function snapshot(opts: RewardsRoutesOptions, playerId: string, elo: number): Promise<AccountSnapshot> {
+  const [chapters, dungeons, owned, heroes] = await Promise.all([
+    opts.rewardsRepository.listClearedChapters(playerId),
+    opts.economyRepository.listClears(playerId),
+    ownedCharacterIds(opts.ownershipRepository, opts.catalog, playerId),
+    opts.heroRepository.listHeroesByOwner(playerId),
+  ]);
+
+  return {
+    chaptersCleared: chapters.length,
+    dungeonsCleared: dungeons.length,
+    charactersOwned: owned.size,
+    bestImprint: heroes.reduce((best, stored) => Math.max(best, stored.hero.imprint), 0),
+    bestAwakening: heroes.reduce((best, stored) => Math.max(best, stored.hero.awakening), 0),
+    elo,
+  };
+}
+
+interface RewardView {
+  readonly id: string;
+  readonly kind: 'achievement' | 'event';
+  readonly name: string;
+  readonly description: string;
+  readonly premium: number;
+  readonly claimed: boolean;
+  readonly claimable: boolean;
+  // Só em evento: se a janela está aberta agora. O cliente precisa distinguir "ainda não
+  // cumpri" de "perdi a janela", e derivar isso lá exigiria o relógio do cliente — que é
+  // justamente o que não decide nada neste projeto.
+  readonly windowOpen?: boolean;
+}
+
+export const rewardsRoutes: FastifyPluginAsync<RewardsRoutesOptions> = async (fastify, opts) => {
+  function conditionMet(condition: RewardCondition | undefined, account: AccountSnapshot): boolean {
+    return condition === undefined || meetsCondition(condition, account);
+  }
+
+  fastify.get('/me/rewards', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const player = request.player;
+
+    const nowMs = opts.now();
+    const account = await snapshot(opts, player.id, player.elo);
+    const claimed = new Set(await opts.rewardsRepository.listClaims(player.id));
+
+    const achievements: RewardView[] = Object.values(opts.catalog.achievements).map((achievement) => ({
+      id: achievement.id,
+      kind: 'achievement',
+      name: achievement.name,
+      description: achievement.description,
+      premium: achievement.premium,
+      claimed: claimed.has(achievement.id),
+      claimable: !claimed.has(achievement.id) && meetsCondition(achievement.condition, account),
+    }));
+
+    const events: RewardView[] = Object.values(opts.catalog.events).map((event) => {
+      const open = isWithinWindow(event, nowMs);
+      return {
+        id: event.id,
+        kind: 'event',
+        name: event.name,
+        description: event.description,
+        premium: event.premium,
+        claimed: claimed.has(event.id),
+        claimable: !claimed.has(event.id) && open && conditionMet(event.condition, account),
+        windowOpen: open,
+      };
+    });
+
+    return {
+      premium: player.premium,
+      account,
+      rewards: [...achievements, ...events].sort((a, b) => a.id.localeCompare(b.id)),
+    };
+  });
+
+  fastify.post('/rewards/:id/claim', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const player = request.player;
+    const rewardId = (request.params as { id: string }).id;
+
+    const achievement = opts.catalog.achievements[rewardId];
+    const event = opts.catalog.events[rewardId];
+    if (!achievement && !event) return reply.code(404).send({ error: 'prêmio desconhecido' });
+
+    const nowMs = opts.now();
+    const account = await snapshot(opts, player.id, player.elo);
+
+    if (event && !isWithinWindow(event, nowMs)) {
+      return reply.code(403).send({ error: 'fora da janela do evento' });
+    }
+
+    const condition = achievement ? achievement.condition : event!.condition;
+    if (!conditionMet(condition, account)) {
+      return reply.code(403).send({ error: 'condição não cumprida' });
+    }
+
+    // A reivindicação vem DEPOIS das checagens e é a checagem-e-escrita numa operação só:
+    // se ela devolve `false`, alguém já pagou este prêmio — inclusive uma requisição
+    // simultânea do próprio jogador.
+    const first = await opts.rewardsRepository.claim(player.id, rewardId);
+    if (!first) return reply.code(409).send({ error: 'este prêmio já foi reivindicado' });
+
+    const premium = achievement ? achievement.premium : event!.premium;
+    const updated = await opts.repository.updatePremium(player.id, player.premium + premium);
+
+    return { rewardId, premiumAwarded: premium, premium: updated.premium };
+  });
+};

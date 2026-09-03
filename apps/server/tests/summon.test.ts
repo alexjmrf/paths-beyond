@@ -9,6 +9,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
+  createMemoryRewardsRepository,
   createMemorySeasonRepository,
 } from '../src/repository/memoryRepository.js';
 import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
@@ -35,6 +36,7 @@ interface Harness {
   readonly app: ReturnType<typeof buildApp>;
   readonly playerRepository: ReturnType<typeof createMemoryPlayerRepository>;
   readonly ownershipRepository: ReturnType<typeof createMemoryCharacterOwnershipRepository>;
+  readonly rewardsRepository: ReturnType<typeof createMemoryRewardsRepository>;
   readonly economyRepository: ReturnType<typeof createMemoryEconomyRepository>;
 }
 
@@ -52,11 +54,13 @@ function buildHarness(options: { premium?: number } = {}): Harness {
     },
   ]);
   const ownershipRepository = createMemoryCharacterOwnershipRepository();
+  const rewardsRepository = createMemoryRewardsRepository();
   const economyRepository = createMemoryEconomyRepository();
 
   return {
     playerRepository,
     ownershipRepository,
+    rewardsRepository,
     economyRepository,
     app: buildApp({
       repository: playerRepository,
@@ -66,6 +70,7 @@ function buildHarness(options: { premium?: number } = {}): Harness {
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
       ownershipRepository,
+      rewardsRepository,
       catalog,
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),

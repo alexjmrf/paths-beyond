@@ -1,0 +1,10 @@
+{
+  "id": "achievement-a-fortaleza-caiu",
+  "name": "A Fortaleza Caiu",
+  "description": "Limpe os seis capítulos da campanha.",
+  "premium": 600,
+  "condition": {
+    "kind": "chaptersCleared",
+    "atLeast": 6
+  }
+}

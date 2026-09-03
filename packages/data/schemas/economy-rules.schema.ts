@@ -50,6 +50,14 @@ const economyRulesSchema = z.object({
     premiumCost: z.number().int().positive(),
     energy: z.number().int().positive(),
   }),
+  // §10 (M18, 4/N) — a primeira completude, duas das quatro FONTES da moeda premium. Os
+  // valores são uniformes por tipo (todo capítulo paga o mesmo, toda masmorra paga o
+  // mesmo), então moram aqui e não em cada peça de conteúdo: espalhá-los por 6 encontros e
+  // 8 masmorras seria 14 lugares para um número que é um só.
+  premiumRewards: z.object({
+    chapterFirstClear: z.number().int().positive(),
+    dungeonFirstClear: z.number().int().positive(),
+  }),
 });
 
 export default economyRulesSchema;

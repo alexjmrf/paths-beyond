@@ -1,0 +1,10 @@
+{
+  "id": "achievement-primeiro-passo",
+  "name": "Primeiro Passo",
+  "description": "Limpe o primeiro capítulo da campanha.",
+  "premium": 150,
+  "condition": {
+    "kind": "chaptersCleared",
+    "atLeast": 1
+  }
+}

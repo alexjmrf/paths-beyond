@@ -1,0 +1,12 @@
+{
+  "id": "event-convocacao",
+  "name": "Convocação",
+  "description": "Tenha cinco personagens durante a janela de abertura.",
+  "premium": 400,
+  "startsAt": 1767225600000,
+  "endsAt": 1798761600000,
+  "condition": {
+    "kind": "charactersOwned",
+    "atLeast": 5
+  }
+}

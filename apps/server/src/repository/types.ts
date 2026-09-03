@@ -216,6 +216,29 @@ export interface EconomyActionRecord {
 // seria uma cópia que pode divergir, e obrigaria um passo de concessão em toda conta nova;
 // derivando, um personagem de história acrescentado amanhã já é de todos, que é o que
 // "garantido a todo jogador" quer dizer.
+// §10 (M18, 4/N) — o que o jogador já reivindicou, e quais capítulos ele já limpou.
+//
+// Reivindicações de conquista e de evento compartilham a mesma tabela porque a pergunta é
+// a mesma ("este prêmio já foi pago a este jogador?") e os ids são únicos entre os dois
+// (`achievement-*` e `event-*`). Duas tabelas seriam duas implementações da mesma coisa.
+//
+// Os capítulos ficam SEPARADOS de `EconomyRepository.listClears`, que é das masmorras, e
+// não por organização: aquele conjunto tem significado próprio — é o que libera a varredura
+// (`requiresClearOf`) — e misturar capítulo nele faria um capítulo limpo destravar uma
+// masmorra por acidente.
+export interface RewardsRepository {
+  listClaims(playerId: string): Promise<readonly string[]>;
+  // Devolve `false` se já estava reivindicado. É a checagem e a escrita numa operação só,
+  // porque separá-las deixaria a fresta em que duas requisições simultâneas pagam duas
+  // vezes o mesmo prêmio.
+  claim(playerId: string, rewardId: string): Promise<boolean>;
+
+  listClearedChapters(playerId: string): Promise<readonly string[]>;
+  // Devolve `true` se foi a PRIMEIRA vez. É o que decide se a moeda de primeira completude
+  // é paga, pelo mesmo motivo de `claim`: perguntar e depois escrever abriria a fresta.
+  markChapterCleared(playerId: string, chapterId: string): Promise<boolean>;
+}
+
 export interface CharacterOwnershipRepository {
   // Só o que foi ADQUIRIDO. Quem chama une com o núcleo do catálogo (`ownedCharacterIds`).
   listAcquired(playerId: string): Promise<readonly string[]>;
