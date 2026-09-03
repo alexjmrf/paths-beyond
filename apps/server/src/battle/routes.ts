@@ -12,8 +12,15 @@ import { toSummonBlueprintPlacements, type ContentCatalog } from '@paths-beyond/
 import type { FastifyPluginAsync } from 'fastify';
 import { computeEloUpdate } from '../matchmaking/elo.js';
 import type { RateLimiter } from './rateLimit.js';
+import { ownedCharacterIds, unownedAmong } from '../summon/ownership.js';
 import { deriveSeed, generateNonce } from './ticket.js';
-import type { ArenaDefenseRepository, HeroRepository, PlayerRepository, ReplayRepository } from '../repository/types.js';
+import type {
+  ArenaDefenseRepository,
+  CharacterOwnershipRepository,
+  HeroRepository,
+  PlayerRepository,
+  ReplayRepository,
+} from '../repository/types.js';
 
 // §9.1 — "o defensor monta um time de até 5 heróis."
 const MAX_TEAM_SIZE = 5;
@@ -56,6 +63,9 @@ export interface BattleRoutesOptions {
   // §9.4 (M13, sub-sessão 2/N) — segredo do HMAC que deriva a seed do nonce. Sem ele
   // o cliente poderia procurar um nonce que produzisse uma seed favorável.
   readonly ticketSecret: string;
+  // §9.4 (M18, 3/N) — posse de personagem. Até aqui nenhuma rota perguntava se o jogador
+  // possui o personagem que mandou: bastava a instância de herói ser dele.
+  readonly ownershipRepository: CharacterOwnershipRepository;
 }
 
 type AssembleResult =
@@ -85,6 +95,16 @@ async function assembleArenaBattle(
   );
   if (attackerHeroes.length !== attackerHeroIds.length || !attackerOwnsAll) {
     return { ok: false, code: 403, error: 'algum heroId não pertence a você' };
+  }
+
+  // §9.4 (M18, 3/N) — e o PERSONAGEM também tem de ser dele. As duas checagens são
+  // diferentes e as duas fazem falta: a de cima diz que a instância de herói é sua, esta
+  // diz que você adquiriu quem ela representa. Sem a segunda, um cliente adulterado que
+  // conseguisse criar uma instância jogaria com alguém que nunca puxou.
+  const owned = await ownedCharacterIds(opts.ownershipRepository, opts.catalog, attackerPlayerId);
+  const faltando = unownedAmong(attackerHeroes, owned);
+  if (faltando.length > 0) {
+    return { ok: false, code: 403, error: `você não possui: ${faltando.join(', ')}` };
   }
 
   const defense = defenderPlayerId ? await opts.arenaDefenseRepository.getDefenseByOwner(defenderPlayerId) : null;

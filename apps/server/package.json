@@ -16,7 +16,8 @@
     "@paths-beyond/data": "workspace:*",
     "fastify": "^5.11.0",
     "fastify-plugin": "^6.0.0",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "@paths-beyond/gacha": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

@@ -8,6 +8,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import { DEFAULT_ELO, type Player, type Season } from '../src/repository/types.js';
@@ -121,6 +122,7 @@ function buildTestApp(players: readonly Player[], seasons: readonly Season[], no
   const repository = createMemoryPlayerRepository(players);
   return buildApp({
     economyRepository: createMemoryEconomyRepository(),
+    ownershipRepository: createMemoryCharacterOwnershipRepository(),
     repository,
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),

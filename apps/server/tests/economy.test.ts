@@ -5,6 +5,7 @@ import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
@@ -55,6 +56,7 @@ function heroi(id: string, classId: string, weaponType: Hero['weaponType'], skil
 interface Harness {
   readonly app: ReturnType<typeof buildApp>;
   readonly economyRepository: ReturnType<typeof createMemoryEconomyRepository>;
+  readonly ownershipRepository: ReturnType<typeof createMemoryCharacterOwnershipRepository>;
   readonly playerRepository: ReturnType<typeof createMemoryPlayerRepository>;
   now: number;
   nonceCounter: number;
@@ -91,13 +93,27 @@ function buildHarness(options: { energy?: number } = {}): Harness {
       hero: heroi('heroi-fraco', 'class-clerigo', 'holy', 'skill-ataque-clerigo', 5),
       equippedItems: [],
     },
+    {
+      // §9.4 (M18, 3/N) — um herói que REPRESENTA um personagem adquirível. Os outros três
+      // não declaram `characterId`, então a checagem de posse não os alcança; sem este, ela
+      // ficaria verde sem nunca ter rodado nesta rota.
+      ownerPlayerId: 'player-farmer',
+      hero: {
+        ...heroi('heroi-personagem', 'class-espadachim', 'sword', 'skill-ataque-espadachim'),
+        characterId: PERSONAGEM_ADQUIRIVEL,
+      },
+      equippedItems: [],
+    },
   ]);
 
   const economyRepository = createMemoryEconomyRepository();
+
+  const ownershipRepository = createMemoryCharacterOwnershipRepository();
   const harness: Harness = {
     now: SEXTA,
     nonceCounter: 0,
     economyRepository,
+    ownershipRepository,
     playerRepository,
     app: buildApp({
       repository: playerRepository,
@@ -106,6 +122,7 @@ function buildHarness(options: { energy?: number } = {}): Harness {
       replayRepository: createMemoryReplayRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
+      ownershipRepository,
       catalog,
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
@@ -130,6 +147,9 @@ function buildHarness(options: { energy?: number } = {}): Harness {
 
 const NORMAL = 'dungeon-campo-de-treino';
 const ELITE = 'dungeon-campo-de-treino-elite';
+
+// Um adquirível de verdade do catálogo (D14): Kaia só entra por invocação.
+const PERSONAGEM_ADQUIRIVEL = 'ally-grifeiro';
 
 async function pedirTicket(h: Harness, dungeonId: string, heroIds: readonly string[] = ['heroi-1']) {
   const response = await h.app.inject({
@@ -215,6 +235,26 @@ describe('GET /dungeons', () => {
 });
 
 describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
+  // §9.4 (M18, 3/N) — a mesma checagem de posse da arena, na outra rota que monta batalha a
+  // partir de ids do cliente. Se só uma das duas perguntasse, a que não pergunta seria a
+  // porta.
+  it('recusa herói cujo PERSONAGEM o jogador não possui', async () => {
+    const h = buildHarness();
+    const { status, body } = await pedirTicket(h, NORMAL, ['heroi-personagem']);
+
+    expect(status).toBe(400);
+    expect(body.error).toContain(PERSONAGEM_ADQUIRIVEL);
+  });
+
+  it('com o personagem adquirido, o mesmo herói passa', async () => {
+    const h = buildHarness();
+    await h.ownershipRepository.grant('player-farmer', PERSONAGEM_ADQUIRIVEL);
+
+    const { status } = await pedirTicket(h, NORMAL, ['heroi-personagem']);
+
+    expect(status).toBe(200);
+  });
+
   it('vitória manual paga a recompensa e marca a masmorra como limpa', async () => {
     const h = buildHarness();
     const resultado = await jogarEVencer(h, NORMAL);

@@ -8,6 +8,7 @@ import { economyRoutes } from './economy/routes.js';
 import { matchmakingRoutes } from './matchmaking/routes.js';
 import type {
   ArenaDefenseRepository,
+  CharacterOwnershipRepository,
   EconomyRepository,
   HeroRepository,
   PlayerRepository,
@@ -15,6 +16,7 @@ import type {
   SeasonRepository,
 } from './repository/types.js';
 import { seasonRoutes } from './season/routes.js';
+import { summonRoutes } from './summon/routes.js';
 import type { ShopCatalog } from './shop/catalog.js';
 import { shopRoutes } from './shop/routes.js';
 
@@ -25,6 +27,8 @@ export interface BuildAppDeps {
   // §10 (M14, sub-sessão 3/N) — estado de conta do PvE (energia, moedas, materiais,
   // inventário, limpezas e trava de entrada).
   economyRepository: EconomyRepository;
+  // §10/§9.4 (M18, sub-sessão 3/N) — posse de personagem e contador de pity.
+  ownershipRepository: CharacterOwnershipRepository;
   replayRepository: ReplayRepository;
   seasonRepository: SeasonRepository;
   catalog: ContentCatalog;
@@ -64,6 +68,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       repository: deps.repository,
       heroRepository: deps.heroRepository,
       arenaDefenseRepository: deps.arenaDefenseRepository,
+      ownershipRepository: deps.ownershipRepository,
       replayRepository: deps.replayRepository,
       catalog: deps.catalog,
       rateLimiter: deps.rateLimiter,
@@ -74,6 +79,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       repository: deps.repository,
       heroRepository: deps.heroRepository,
       economyRepository: deps.economyRepository,
+      ownershipRepository: deps.ownershipRepository,
       catalog: deps.catalog,
       rateLimiter: deps.rateLimiter,
       ticketSecret: deps.ticketSecret,
@@ -85,6 +91,9 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       repository: deps.repository,
       heroRepository: deps.heroRepository,
       economyRepository: deps.economyRepository,
+      // `progressionRoutes` compartilha `EconomyRoutesOptions` com `economyRoutes` desde
+      // M14 4/N; ele não consulta posse, mas o tipo é um só.
+      ownershipRepository: deps.ownershipRepository,
       catalog: deps.catalog,
       rateLimiter: deps.rateLimiter,
       ticketSecret: deps.ticketSecret,
@@ -100,6 +109,15 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       seasonRepository: deps.seasonRepository,
       playerRepository: deps.repository,
       now: deps.now,
+    });
+
+    await protectedRoutes.register(summonRoutes, {
+      repository: deps.repository,
+      economyRepository: deps.economyRepository,
+      ownershipRepository: deps.ownershipRepository,
+      catalog: deps.catalog,
+      ticketSecret: deps.ticketSecret,
+      now: deps.now ?? (() => Date.now()),
     });
 
     await protectedRoutes.register(shopRoutes, {

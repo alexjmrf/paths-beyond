@@ -9,6 +9,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
@@ -66,6 +67,7 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
 
     const app = buildApp({
     economyRepository: createMemoryEconomyRepository(),
+    ownershipRepository: createMemoryCharacterOwnershipRepository(),
       repository,
       heroRepository,
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),

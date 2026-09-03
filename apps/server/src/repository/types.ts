@@ -21,12 +21,18 @@ export const DEFAULT_ARENA_MARKS = 0;
 export const DEFAULT_GOLD = 0;
 export const DEFAULT_STONES = 0;
 
+// §10/D17 (M18) — a QUARTA moeda, premium. Também começa em zero: ela não se ganha
+// farmando, e as fontes dela (avanço de história, primeira completude, achievements,
+// eventos) são todas coisas que o jogador ainda não fez numa conta nova.
+export const DEFAULT_PREMIUM = 0;
+
 // Conta nova de PvE: sem ouro, sem pedras, sem energia apurada. `asOfMs: 0` faz a
 // primeira apuração creditar a regeneração desde a época — quem cria o jogador de
 // verdade passa o instante atual (e o teto, se quiser começar com a barra cheia).
 export const DEFAULT_PVE_ACCOUNT = {
   gold: DEFAULT_GOLD,
   stones: DEFAULT_STONES,
+  premium: DEFAULT_PREMIUM,
   energy: { stored: 0, asOfMs: 0 },
 } as const;
 
@@ -42,6 +48,9 @@ export interface Player {
   // pedras pagam enhance (decisão do usuário em M14 2/N — é o sumidouro que faltava).
   readonly gold: number;
   readonly stones: number;
+  // §10/D17 (M18) — a moeda premium. Separada de `stones` de propósito: `pedras` dropa de
+  // masmorra e paga enhance; esta não se ganha farmando e paga summon e energia extra.
+  readonly premium: number;
   // §10 — "energia de conta limita o farm diário". Guardada como o par
   // `{stored, asOfMs}` que `resolveEnergy` (core) consome: a energia atual é DERIVADA do
   // instante, não um contador que o servidor precisa incrementar em background.
@@ -59,6 +68,7 @@ export interface PlayerRepository {
     arenaMarks?: number;
     gold?: number;
     stones?: number;
+    premium?: number;
     energy?: EnergyState;
   }): Promise<Player>;
   updateElo(id: string, elo: number): Promise<Player>;
@@ -66,6 +76,10 @@ export interface PlayerRepository {
   // §10 (M14) — carteira e energia. Separadas de `updateArenaMarks` porque marcas são
   // PvP e estas são PvE: um fluxo nunca mexe nas duas coisas ao mesmo tempo.
   updateWallet(id: string, wallet: { gold: number; stones: number }): Promise<Player>;
+  // §10/D17 (M18) — separada de `updateWallet` pelo mesmo motivo que aquela é separada de
+  // `updateArenaMarks`: nenhum fluxo mexe nas duas coisas ao mesmo tempo. Summon e energia
+  // extra tocam só esta; farmar e forjar tocam só aquela.
+  updatePremium(id: string, premium: number): Promise<Player>;
   updateEnergy(id: string, energy: EnergyState): Promise<Player>;
   // Candidatos de matchmaking dentro de uma faixa de ELO, excluindo o próprio chamador —
   // "quem tem defesa configurada" é filtrado depois, na rota (cruza com
@@ -183,8 +197,32 @@ export interface DungeonRunRecord {
 export interface EconomyActionRecord {
   readonly nonce: string;
   readonly playerId: string;
-  readonly kind: 'enhance' | 'awaken' | 'imprint' | 'equip';
+  // M18 3/N acrescentou `summon` e `energy`: são ações que cobram recurso, e reusar este
+  // mecanismo é melhor que inventar outro — reenvio de rede não pode cobrar duas vezes, e
+  // o problema é literalmente o mesmo.
+  readonly kind: 'enhance' | 'awaken' | 'imprint' | 'equip' | 'summon' | 'energy';
   readonly createdAt: string; // ISO 8601
+}
+
+// §10 (M18, 3/N) — a POSSE de personagem, e o contador de pity.
+//
+// Posse é estado de conta, e até M18 não existia em lugar nenhum: `listHeroesByOwner`
+// devolvia as instâncias de herói semeadas, e nenhuma rota perguntava se o jogador possuía
+// o personagem que mandou. §9.4 ("o servidor recalcula a partir do banco") não tinha como
+// pegar isso, porque não havia o que consultar.
+//
+// **O núcleo de história NÃO tem linha aqui.** Ele é derivado do catálogo — quem tem
+// `acquisition: 'story'` é de todo mundo, por definição (D14). Guardar linhas para ele
+// seria uma cópia que pode divergir, e obrigaria um passo de concessão em toda conta nova;
+// derivando, um personagem de história acrescentado amanhã já é de todos, que é o que
+// "garantido a todo jogador" quer dizer.
+export interface CharacterOwnershipRepository {
+  // Só o que foi ADQUIRIDO. Quem chama une com o núcleo do catálogo (`ownedCharacterIds`).
+  listAcquired(playerId: string): Promise<readonly string[]>;
+  grant(playerId: string, characterId: string): Promise<void>;
+  // Contador de pity por (jogador, banner). Ausente = nunca rolou neste banner.
+  getPity(playerId: string, bannerId: string): Promise<number | null>;
+  setPity(playerId: string, bannerId: string, rollsSinceNew: number): Promise<void>;
 }
 
 export interface EconomyRepository {

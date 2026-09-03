@@ -3,9 +3,11 @@ import {
   DEFAULT_ARENA_MARKS,
   DEFAULT_ELO,
   DEFAULT_GOLD,
+  DEFAULT_PREMIUM,
   DEFAULT_STONES,
   type ArenaDefense,
   type ArenaDefenseRepository,
+  type CharacterOwnershipRepository,
   type HeroRepository,
   type Player,
   type PlayerRepository,
@@ -40,6 +42,7 @@ export function createMemoryPlayerRepository(seed: readonly Player[] = []): Play
         arenaMarks: DEFAULT_ARENA_MARKS,
         gold: DEFAULT_GOLD,
         stones: DEFAULT_STONES,
+        premium: DEFAULT_PREMIUM,
         energy: DEFAULT_ENERGY,
         ...input,
       };
@@ -64,6 +67,13 @@ export function createMemoryPlayerRepository(seed: readonly Player[] = []): Play
       const existing = byId.get(id);
       if (!existing) throw new Error(`player not found: ${id}`);
       const updated: Player = { ...existing, gold: wallet.gold, stones: wallet.stones };
+      byId.set(id, updated);
+      return updated;
+    },
+    async updatePremium(id, premium) {
+      const existing = byId.get(id);
+      if (!existing) throw new Error(`player not found: ${id}`);
+      const updated: Player = { ...existing, premium };
       byId.set(id, updated);
       return updated;
     },
@@ -235,6 +245,34 @@ export function createMemoryEconomyRepository(): EconomyRepository {
     async saveAction(action) {
       actions.set(action.nonce, action);
       return action;
+    },
+  };
+}
+
+// §10 (M18, 3/N) — posse de personagem e pity, em memória.
+export function createMemoryCharacterOwnershipRepository(
+  seed: Readonly<Record<string, readonly string[]>> = {},
+): CharacterOwnershipRepository {
+  const acquired = new Map<string, Set<string>>(
+    Object.entries(seed).map(([playerId, ids]) => [playerId, new Set(ids)]),
+  );
+  const pity = new Map<string, number>();
+  const pityKey = (playerId: string, bannerId: string): string => `${playerId}::${bannerId}`;
+
+  return {
+    async listAcquired(playerId) {
+      return [...(acquired.get(playerId) ?? [])];
+    },
+    async grant(playerId, characterId) {
+      const owned = acquired.get(playerId) ?? new Set<string>();
+      owned.add(characterId);
+      acquired.set(playerId, owned);
+    },
+    async getPity(playerId, bannerId) {
+      return pity.get(pityKey(playerId, bannerId)) ?? null;
+    },
+    async setPity(playerId, bannerId, rollsSinceNew) {
+      pity.set(pityKey(playerId, bannerId), rollsSinceNew);
     },
   };
 }

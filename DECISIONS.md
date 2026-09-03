@@ -4570,3 +4570,62 @@ deixaria inalcançável por qualquer caminho, sem erro nenhum.
 
 **Suíte: 115 arquivos, 1674 testes** (era 113/1650). `pnpm validate:data`: **27 schemas, 192
 arquivos** (era 26/183) — a trava de contagem reprovou e obrigou a atualização a ser consciente.
+
+
+### M18 — sub-sessão 3/N: posse, `POST /summon` e o buraco de §9.4
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em `0.18.0`,
+onde a 2/N o deixou. Toda a fatia é servidor.
+
+**A decisão de forma que atravessa tudo: o núcleo de história NÃO tem linha no banco.** Posse é
+a UNIÃO de duas coisas de naturezas diferentes — o núcleo, **derivado do catálogo**, e o
+adquirido, que é linha em `player_characters`. Guardar linhas para o núcleo seria uma cópia que
+pode divergir do dado e obrigaria um passo de concessão em toda conta nova; derivando, um
+personagem de história acrescentado amanhã **já é de todos**, que é exatamente o que "garantido a
+todo jogador" quer dizer (D14). A união vive numa função só (`summon/ownership.ts`), porque toda
+pergunta de posse no servidor tem de dar a mesma resposta — a alternativa, cada rota unindo por
+conta própria, é o modo de falha que M17 2/N encontrou em duas rotas de uma vez.
+
+**O buraco de §9.4 que a milestone existia para fechar era maior do que "falta uma checagem":**
+as duas checagens são DIFERENTES e as duas fazem falta. A que já existia diz que a instância de
+herói é sua; a nova diz que você **adquiriu quem ela representa**. Sem a segunda, um cliente
+adulterado que conseguisse criar uma instância jogaria com alguém que nunca puxou, e §9.4 ("o
+servidor recalcula a partir do banco") não pegaria, porque não havia o que consultar.
+
+**A checagem entrou nas DUAS rotas que montam batalha a partir de ids do cliente** (`/battles` e
+`/dungeons/:id/run`). Se só uma perguntasse, a que não pergunta viraria a porta.
+
+**E aqui a fatia quase entregou um verde vacuamente:** a suíte inteira passou na primeira execução
+depois de eu ligar o anti-cheat — porque **nenhum herói de fixture do projeto declara
+`characterId`**, então `unownedAmong` não alcançava ninguém e a checagem nova nunca rodou. Foi
+preciso acrescentar um herói COM personagem em cada um dos dois arquivos de teste para que a
+recusa fosse exercitada de verdade, **e o recíproco junto** (com o personagem concedido, o mesmo
+herói passa) — sem ele a asserção ficaria verde mesmo se a rota estivesse recusando por outro
+motivo. É a terceira vez nesta milestone que a lacuna é de eixo e não de profundidade.
+
+**Duas decisões pequenas de rota, ambas com o mesmo argumento — não cobrar o que não aconteceu:**
+o saldo é conferido **antes** de reservar o nonce (recusar por falta de moeda não pode queimar a
+chave de idempotência, senão o jogador que juntar a moeda vê um 409 sem ter invocado nada); e o
+`rollId` inclui o id do jogador, para que dois jogadores mandando o mesmo nonce não compartilhem
+resultado.
+
+**A idempotência reusa o `EconomyActionRecord` de M14 4/N** em vez de inventar mecanismo novo —
+`kind` ganhou `'summon'` e `'energy'`. O problema é literalmente o mesmo: reenvio de rede não pode
+cobrar duas vezes.
+
+**A compra de energia passa POR CIMA do teto de conta, e é decisão e não descuido:** o teto existe
+para limitar o farm de graça (§10, "energia de conta limita o farm diário"), e o sumidouro que
+D17 criou não teria função nenhuma se a compra fosse aparada por ele — quem está com a barra cheia
+é justamente quem quer comprar.
+
+#### Uma anomalia PRÉ-EXISTENTE encontrada e NÃO corrigida
+
+`apps/server/src/index.ts` — o ponto de entrada de produção — usa
+`createMemoryEconomyRepository()`. Materiais, inventário e limpezas de masmorra **se perdem a cada
+reinício do servidor**, desde M14 3/N. Não é regressão desta fatia e consertar exigiria escrever o
+`EconomyRepository` de Postgres inteiro, que é trabalho próprio. Fica **registrado com um
+comentário no próprio arquivo**, em vez de corrigido em silêncio junto de outra coisa. A posse que
+esta fatia criou já entra pelo repositório de Postgres.
+
+**Suíte: 116 arquivos, 1693 testes** (era 115/1674). `validate:data` inalterado em 27/192 — a
+fatia não autorou dado.

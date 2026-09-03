@@ -5,6 +5,7 @@ import { buildApp } from './app.js';
 import { createInMemoryRateLimiter } from './battle/rateLimit.js';
 import {
   createPostgresArenaDefenseRepository,
+  createPostgresCharacterOwnershipRepository,
   createPostgresHeroRepository,
   createPostgresPlayerRepository,
   createPostgresReplayRepository,
@@ -26,7 +27,12 @@ if (!ticketSecret) {
 
 const pool = new Pool({ connectionString });
 const app = buildApp({
-    economyRepository: createMemoryEconomyRepository(),
+  // ANOMALIA PRÉ-EXISTENTE, herdada de M14 e NÃO desta fatia: o repositório de economia é
+  // o de MEMÓRIA aqui, no ponto de entrada de produção — materiais, inventário e limpezas
+  // de masmorra se perdem a cada reinício. Registrado em DECISIONS.md (M18 3/N) em vez de
+  // corrigido em silêncio junto de outra coisa.
+  economyRepository: createMemoryEconomyRepository(),
+  ownershipRepository: createPostgresCharacterOwnershipRepository(pool),
   repository: createPostgresPlayerRepository(pool),
   heroRepository: createPostgresHeroRepository(pool),
   arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),

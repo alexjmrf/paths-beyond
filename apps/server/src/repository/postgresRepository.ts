@@ -4,6 +4,7 @@ import {
   DEFAULT_ARENA_MARKS,
   DEFAULT_ELO,
   DEFAULT_GOLD,
+  DEFAULT_PREMIUM,
   DEFAULT_STONES,
   type ArenaDefense,
   type ArenaDefenseRepository,
@@ -17,10 +18,12 @@ import {
   type StoredReplay,
   type DungeonRunRecord,
   type EconomyActionRecord,
+  type CharacterOwnershipRepository,
   type EconomyRepository,
 } from './types.js';
 
-const PLAYER_COLUMNS = 'id, token, display_name, elo, arena_marks, gold, stones, energy_stored, energy_as_of';
+const PLAYER_COLUMNS =
+  'id, token, display_name, elo, arena_marks, gold, stones, premium, energy_stored, energy_as_of';
 
 export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
   return {
@@ -36,8 +39,8 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
     },
     async createPlayer(input) {
       const result = await pool.query<PlayerRow>(
-        `INSERT INTO players (id, token, display_name, elo, arena_marks, gold, stones, energy_stored, energy_as_of)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${PLAYER_COLUMNS}`,
+        `INSERT INTO players (id, token, display_name, elo, arena_marks, gold, stones, premium, energy_stored, energy_as_of)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${PLAYER_COLUMNS}`,
         [
           input.id,
           input.token,
@@ -46,6 +49,7 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
           input.arenaMarks ?? DEFAULT_ARENA_MARKS,
           input.gold ?? DEFAULT_GOLD,
           input.stones ?? DEFAULT_STONES,
+          input.premium ?? DEFAULT_PREMIUM,
           input.energy?.stored ?? 0,
           input.energy?.asOfMs ?? 0,
         ],
@@ -65,6 +69,16 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
       if (!row) {
         throw new Error(`player not found: ${id}`);
       }
+      return rowToPlayer(row);
+    },
+    // §10/D17 (M18) — a moeda premium, em coluna própria.
+    async updatePremium(id, premium) {
+      const result = await pool.query<PlayerRow>(
+        `UPDATE players SET premium = $2 WHERE id = $1 RETURNING ${PLAYER_COLUMNS}`,
+        [id, premium],
+      );
+      const row = result.rows[0];
+      if (!row) throw new Error(`player not found: ${id}`);
       return rowToPlayer(row);
     },
     async updateWallet(id, wallet) {
@@ -121,6 +135,7 @@ interface PlayerRow {
   // precisão, então o tipo aqui é a união e a conversão acontece em `rowToPlayer`.
   readonly gold: number | string;
   readonly stones: number;
+  readonly premium: number;
   readonly energy_stored: number;
   readonly energy_as_of: number | string;
 }
@@ -134,6 +149,7 @@ function rowToPlayer(row: PlayerRow): Player {
     arenaMarks: row.arena_marks,
     gold: Number(row.gold),
     stones: row.stones,
+    premium: row.premium,
     // `energy_as_of` é bigint (instante em ms não cabe em integer): o driver devolve
     // string, então a conversão acontece aqui, na fronteira.
     energy: { stored: row.energy_stored, asOfMs: Number(row.energy_as_of) },
@@ -478,6 +494,48 @@ export function createPostgresEconomyRepository(pool: Pool): EconomyRepository {
         [action.nonce, action.playerId, action.kind, action.createdAt],
       );
       return action;
+    },
+  };
+}
+
+// §10 (M18, 3/N) — posse de personagem e pity.
+//
+// Só o ADQUIRIDO tem linha: o núcleo de história é derivado do catálogo (ver
+// `CharacterOwnershipRepository` em `types.ts`), e guardá-lo aqui seria uma cópia que pode
+// divergir do dado.
+export function createPostgresCharacterOwnershipRepository(pool: Pool): CharacterOwnershipRepository {
+  return {
+    async listAcquired(playerId) {
+      const result = await pool.query<{ character_id: string }>(
+        'SELECT character_id FROM player_characters WHERE player_id = $1 ORDER BY character_id',
+        [playerId],
+      );
+      return result.rows.map((row) => row.character_id);
+    },
+    async grant(playerId, characterId) {
+      // `ON CONFLICT DO NOTHING`: conceder duas vezes é inofensivo e acontece de verdade —
+      // a duplicata é o caminho normal, e uma corrida entre duas invocações não deve virar
+      // erro 500 para o jogador.
+      await pool.query(
+        `INSERT INTO player_characters (player_id, character_id) VALUES ($1, $2)
+         ON CONFLICT (player_id, character_id) DO NOTHING`,
+        [playerId, characterId],
+      );
+    },
+    async getPity(playerId, bannerId) {
+      const result = await pool.query<{ rolls_since_new: number }>(
+        'SELECT rolls_since_new FROM banner_pity WHERE player_id = $1 AND banner_id = $2',
+        [playerId, bannerId],
+      );
+      const row = result.rows[0];
+      return row ? row.rolls_since_new : null;
+    },
+    async setPity(playerId, bannerId, rollsSinceNew) {
+      await pool.query(
+        `INSERT INTO banner_pity (player_id, banner_id, rolls_since_new) VALUES ($1, $2, $3)
+         ON CONFLICT (player_id, banner_id) DO UPDATE SET rolls_since_new = EXCLUDED.rolls_since_new`,
+        [playerId, bannerId, rollsSinceNew],
+      );
     },
   };
 }

@@ -10,6 +10,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import type { ArenaDefense, StoredHero } from '../src/repository/types.js';
@@ -112,7 +113,17 @@ const catalog: ContentCatalog = {
 const ATTACKER_TOKEN = 'token-atacante';
 const DEFENDER_TOKEN = 'token-defensor';
 
-function buildTestApp(rateLimiter: RateLimiter = createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 })) {
+// §9.4 (M18, 3/N) — o herói do atacante que REPRESENTA um personagem. O `heroi-atacante`
+// não declara `characterId` (é ficha sintética, como todo herói deste arquivo desde M7), e
+// por isso a checagem de posse não o alcança — o que é correto e é justamente por que este
+// segundo existe: sem um herói com personagem, a checagem nova ficaria verde sem nunca ter
+// sido executada.
+const PERSONAGEM_ADQUIRIVEL = 'personagem-que-eu-nao-tenho';
+
+function buildTestApp(
+  rateLimiter: RateLimiter = createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+  ownershipRepository = createMemoryCharacterOwnershipRepository(),
+) {
   const repository = createMemoryPlayerRepository([
     { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
     { id: 'player-defensor', token: DEFENDER_TOKEN, displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
@@ -128,7 +139,15 @@ function buildTestApp(rateLimiter: RateLimiter = createInMemoryRateLimiter({ max
     hero: buildHero({ id: 'heroi-defensor', classId: weakClassDef.id }),
     equippedItems: [],
   };
-  const heroRepository = createMemoryHeroRepository([attackerHero, defenderHero]);
+  const heroPersonagem: StoredHero = {
+    ownerPlayerId: 'player-atacante',
+    hero: {
+      ...buildHero({ id: 'heroi-personagem', classId: strongClassDef.id }),
+      characterId: PERSONAGEM_ADQUIRIVEL,
+    },
+    equippedItems: [],
+  };
+  const heroRepository = createMemoryHeroRepository([attackerHero, defenderHero, heroPersonagem]);
 
   const defense: ArenaDefense = {
     ownerPlayerId: 'player-defensor',
@@ -141,6 +160,7 @@ function buildTestApp(rateLimiter: RateLimiter = createInMemoryRateLimiter({ max
 
   return buildApp({
     economyRepository: createMemoryEconomyRepository(),
+    ownershipRepository,
     repository,
     heroRepository,
     arenaDefenseRepository,
@@ -309,6 +329,40 @@ describe('POST /battles', () => {
       payload: { ...validBody, attackerHeroIds: ['heroi-defensor'] },
     });
     expect(response.statusCode).toBe(403);
+  });
+
+  // §9.4 (M18, 3/N) — a checagem de POSSE, que é diferente da de dono da instância acima.
+  // As duas fazem falta: aquela diz que a instância é sua, esta diz que você adquiriu quem
+  // ela representa. Sem esta, um cliente adulterado que conseguisse criar uma instância
+  // jogaria com um personagem que nunca puxou.
+  it('rejeita herói cujo PERSONAGEM o jogador não possui, ainda que a instância seja dele', async () => {
+    const app = buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/battles',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...validBody, attackerHeroIds: ['heroi-personagem'] },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error).toContain(PERSONAGEM_ADQUIRIVEL);
+  });
+
+  it('com o personagem adquirido, o mesmo herói passa — a recusa era da posse e de nada mais', async () => {
+    // O recíproco. Sem ele, a asserção acima ficaria verde mesmo se a rota estivesse
+    // recusando por outro motivo qualquer.
+    const ownership = createMemoryCharacterOwnershipRepository();
+    await ownership.grant('player-atacante', PERSONAGEM_ADQUIRIVEL);
+    const app = buildTestApp(undefined, ownership);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/battles',
+      headers: { 'x-player-token': ATTACKER_TOKEN },
+      payload: { ...validBody, attackerHeroIds: ['heroi-personagem'] },
+    });
+
+    expect(response.statusCode).toBe(200);
   });
 
   it('rejeita quando o defensor não tem uma defesa configurada', async () => {
@@ -637,7 +691,13 @@ describe('GET /me/heroes', () => {
     const app = buildTestApp();
     const meus = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-player-token': ATTACKER_TOKEN } });
     expect(meus.statusCode).toBe(200);
-    expect(meus.json().map((h: { hero: { id: string } }) => h.hero.id)).toEqual(['heroi-atacante']);
+    // M18 3/N acrescentou `heroi-personagem` ao atacante (o herói com `characterId`, sem o
+    // qual a checagem de posse ficaria verde sem nunca rodar). A propriedade medida aqui é
+    // a mesma: só os DELE, e nenhum do defensor.
+    expect(meus.json().map((h: { hero: { id: string } }) => h.hero.id).sort()).toEqual([
+      'heroi-atacante',
+      'heroi-personagem',
+    ]);
 
     const dele = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-player-token': DEFENDER_TOKEN } });
     expect(dele.json().map((h: { hero: { id: string } }) => h.hero.id)).toEqual(['heroi-defensor']);

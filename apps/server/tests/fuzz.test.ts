@@ -10,6 +10,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import type { ArenaDefense, StoredHero } from '../src/repository/types.js';
@@ -175,6 +176,7 @@ function buildFuzzApp() {
 
   const app = buildApp({
     economyRepository: createMemoryEconomyRepository(),
+    ownershipRepository: createMemoryCharacterOwnershipRepository(),
     repository,
     heroRepository,
     arenaDefenseRepository,

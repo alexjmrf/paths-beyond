@@ -9,6 +9,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 
@@ -58,6 +59,7 @@ function buildTestApp() {
   ]);
   return buildApp({
     economyRepository: createMemoryEconomyRepository(),
+    ownershipRepository: createMemoryCharacterOwnershipRepository(),
     repository,
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),

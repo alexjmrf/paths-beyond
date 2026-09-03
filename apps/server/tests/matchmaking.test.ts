@@ -8,6 +8,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
   createMemorySeasonRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
 } from '../src/repository/memoryRepository.js';
 import type { ArenaDefense, Player } from '../src/repository/types.js';
@@ -59,6 +60,7 @@ function buildTestApp(players: readonly Player[], defenses: readonly ArenaDefens
   const repository = createMemoryPlayerRepository(players);
   return buildApp({
     economyRepository: createMemoryEconomyRepository(),
+    ownershipRepository: createMemoryCharacterOwnershipRepository(),
     repository,
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(defenses),

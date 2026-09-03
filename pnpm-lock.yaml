@@ -72,6 +72,9 @@ importers:
       '@paths-beyond/data':
         specifier: workspace:*
         version: link:../../packages/data
+      '@paths-beyond/gacha':
+        specifier: workspace:*
+        version: link:../../packages/gacha
       fastify:
         specifier: ^5.11.0
         version: 5.11.0

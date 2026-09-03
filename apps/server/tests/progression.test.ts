@@ -5,6 +5,7 @@ import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
@@ -72,6 +73,7 @@ interface Harness {
   readonly app: ReturnType<typeof buildApp>;
   readonly heroRepository: ReturnType<typeof createMemoryHeroRepository>;
   readonly economyRepository: ReturnType<typeof createMemoryEconomyRepository>;
+  readonly ownershipRepository: ReturnType<typeof createMemoryCharacterOwnershipRepository>;
   now: number;
 }
 
@@ -120,10 +122,13 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
   ]);
 
   const economyRepository = createMemoryEconomyRepository();
+
+  const ownershipRepository = createMemoryCharacterOwnershipRepository();
   const harness: Harness = {
     now: SEXTA,
     heroRepository,
     economyRepository,
+    ownershipRepository,
     app: buildApp({
       repository: playerRepository,
       heroRepository,
@@ -131,6 +136,7 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
       replayRepository: createMemoryReplayRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
+      ownershipRepository,
       catalog,
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),

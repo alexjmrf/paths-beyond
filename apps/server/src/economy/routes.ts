@@ -28,7 +28,14 @@ type DungeonEncounterUnit = DungeonEncounter['units'][number];
 import type { FastifyPluginAsync } from 'fastify';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
 import type { RateLimiter } from '../battle/rateLimit.js';
-import type { EconomyRepository, HeroRepository, Player, PlayerRepository } from '../repository/types.js';
+import type {
+  CharacterOwnershipRepository,
+  EconomyRepository,
+  HeroRepository,
+  Player,
+  PlayerRepository,
+} from '../repository/types.js';
+import { ownedCharacterIds, unownedAmong } from '../summon/ownership.js';
 
 // §10 (M14, sub-sessão 3/N) — as rotas do farm.
 //
@@ -46,6 +53,8 @@ export interface EconomyRoutesOptions {
   readonly repository: PlayerRepository;
   readonly heroRepository: HeroRepository;
   readonly economyRepository: EconomyRepository;
+  // §9.4 (M18, 3/N) — posse de personagem, pelo mesmo motivo da arena.
+  readonly ownershipRepository: CharacterOwnershipRepository;
   readonly catalog: ContentCatalog;
   readonly rateLimiter: RateLimiter;
   readonly ticketSecret: string;
@@ -97,6 +106,14 @@ async function assembleDungeonBattle(
   for (const hero of stored) {
     if (hero.ownerPlayerId !== ownerPlayerId) return { error: 'esse herói não é seu' };
   }
+
+  // §9.4 (M18, 3/N) — a mesma checagem de posse da arena, e pelo mesmo motivo: a instância
+  // ser sua não diz que você adquiriu o personagem que ela representa. As duas rotas que
+  // montam batalha a partir de ids do cliente têm de perguntar isso, senão a que não
+  // pergunta vira a porta.
+  const owned = await ownedCharacterIds(opts.ownershipRepository, opts.catalog, ownerPlayerId);
+  const faltando = unownedAmong(stored, owned);
+  if (faltando.length > 0) return { error: `você não possui: ${faltando.join(', ')}` };
 
   const placements: Placement[] = [];
 
