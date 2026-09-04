@@ -3,5 +3,29 @@
   "name": "Aren",
   "classId": "class-espadachim",
   "acquisition": "story",
-  "fragmentMaterialId": "material-fragmento-hero-jogador"
+  "fragmentMaterialId": "material-fragmento-hero-jogador",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "sword",
+    "equipment": {
+      "weapon": "item-arma-espadachim",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-espadachim",
+      "skill-especial-espadachim"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-espadachim",
+        "conditions": []
+      }
+    ]
+  }
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { idSchema } from './shared.js';
+import { gearSlotSchema, idSchema, tacticsLineSchema, weaponTypeSchema } from './shared.js';
 
 // M17 (§8.1) — o ELENCO. É a lista fechada de personagens jogáveis, e ela existe porque
 // a árvore deixou de ser da classe: resolver a alocação de talentos de alguém exige a
@@ -22,6 +22,40 @@ import { idSchema } from './shared.js';
 // estado de conta, no servidor. O elenco é catálogo estático — o que existe no jogo, não o
 // que uma conta destravou. O que M18 acrescentou é a outra metade da pergunta, que É
 // estática: COMO um personagem entra no jogo (D14).
+// §10/D14 (M18, 6/N) — a FICHA INICIAL: com o que este personagem entra no jogo.
+//
+// Ela existe porque `POST /summon` concedia POSSE e mais nada — o personagem invocado não
+// virava herói nenhum, e o mesmo buraco valia para o núcleo de quatro numa conta nova.
+// Todo herói do projeto até esta fatia nasceu de seed de banco ou de fixture de teste.
+//
+// Mora no CATÁLOGO por causa da regra 4: nível, arma e skills iniciais são conteúdo, e
+// derivá-los por convenção de id dentro de `apps/server` seria o "conteúdo hardcoded" que
+// a regra proíbe. E é deliberadamente um subconjunto de `heroes.schema.ts`, não o `Hero`
+// inteiro: o que ela NÃO carrega é PROGRESSO — exp, awakening, imprint e talentos são
+// estado de conta, e um catálogo que os declarasse daria dois donos ao mesmo número.
+const startingHeroSchema = z
+  .object({
+    // O nível com que a party existe no conteúdo autorado hoje. Não é um número novo: é o
+    // mesmo com que os seis capítulos foram afinados (ver o teste em `packages/content`,
+    // que trava a ficha contra a vaga da campanha).
+    level: z.number().int().min(1).max(60),
+    weaponType: weaponTypeSchema,
+    // A arma é obrigatória — um herói desarmado não tem duelo a jogar (§6.1). Os outros
+    // cinco slots são opcionais e nulos por padrão: gear é o que o jogador farma (§10).
+    equipment: z.object({
+      weapon: idSchema,
+      helmet: idSchema.nullable(),
+      armor: idSchema.nullable(),
+      necklace: idSchema.nullable(),
+      ring: idSchema.nullable(),
+      boots: idSchema.nullable(),
+    }) satisfies z.ZodType<Record<z.infer<typeof gearSlotSchema>, string | null>>,
+    duelSkills: z.array(idSchema).min(1).max(5),
+    mapSkills: z.array(idSchema).max(2),
+    tacticsScript: z.array(tacticsLineSchema).max(6),
+  })
+  .strict();
+
 const characterSchema = z
   .object({
     id: idSchema,
@@ -39,6 +73,9 @@ const characterSchema = z
     // Obrigatório para os dois tipos: um personagem de história também tem imprint, e o
     // fragmento dele dropa na masmorra de Chefe desde M14.
     fragmentMaterialId: idSchema,
+    // Obrigatória, e sem padrão: um personagem sem ficha é posse sem herói para levar ao
+    // mapa — o jogador pagaria a moeda premium por uma linha no banco.
+    startingHero: startingHeroSchema,
   })
   .strict();
 

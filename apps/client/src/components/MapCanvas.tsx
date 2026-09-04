@@ -31,6 +31,8 @@ import { structureMarkFor } from '../data/structureMarks.js';
 import { terrainMarkFor } from '../data/terrainMarks.js';
 import { patternPrimitives } from '../data/tilePatterns.js';
 import { activeUnitRenderer, type UnitRenderInput, type UnitRenderState } from '../data/unitRenderer.js';
+import { audioDoJogo } from '../audio/motorCompartilhado.js';
+import { somDaBatida, type SomAgendado } from '../audio/sons.js';
 import { classDefForUnit, useBattleStore } from '../store/battleStore.js';
 
 // Tamanho do tile em escala 1. O tamanho real é este vezes a escala de UI (§11 — "fonte
@@ -258,7 +260,7 @@ export function MapCanvas() {
   // Só para resolver a CLASSE da unidade (nível 1 do glifo, D1): `BattleUnit` não carrega
   // `classId`, e D4 proíbe mexer em `packages/core` neste milestone.
   const mode = useBattleStore((s) => s.mode);
-  const campaignMapIndex = useBattleStore((s) => s.campaignMapIndex);
+  const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
 
   const theme = themeFor(colorblindMode);
   const tileSize = Math.round(BASE_TILE_SIZE * uiScale);
@@ -277,10 +279,12 @@ export function MapCanvas() {
       else if (kind === 'debuff') debuffs++;
     }
 
-    // Nível 1 do glifo (D1). Só na campanha: fora dela o `BattleSetup` vem pronto do servidor e
-    // `heroesByUnitId` não fala daquelas unidades — um id que por acaso coincidisse daria a
-    // classe ERRADA, que é pior que cair no perfil.
-    const classId = mode === 'campaign' ? classDefForUnit(campaignMapIndex, unit.unitId)?.id : undefined;
+    // Nível 1 do glifo (D1). M18 7/N — `heroesByUnitId` deixou de ser derivado do conteúdo
+    // local e passa a ser montado do roster do servidor toda vez que uma batalha nasce de
+    // um ticket. Com isso ele fala das unidades de QUALQUER modo, e a condição de campanha
+    // saiu: quem não está no mapa (inimigo, aliado de cenário, reforço) simplesmente não
+    // tem entrada, e o glifo cai no nível seguinte como sempre caiu.
+    const classId = classDefForUnit(heroesByUnitId, unit.unitId)?.id;
 
     return {
       unit: {
@@ -424,6 +428,7 @@ export function MapCanvas() {
   function playScenes(scenes: readonly AiScene[], onDone: () => void) {
     const porUnidade = new Map<string, FxSegment[]>();
     const floaters: FxFloater[] = [];
+    const sons: SomAgendado[] = [];
     let inicio = 0;
 
     const acrescentar = (unitId: string, segment: FxSegment) => {
@@ -436,7 +441,7 @@ export function MapCanvas() {
       const duracao =
         scene.kind === 'move'
           ? montarMovimento(scene, inicio, acrescentar)
-          : montarDuelo(scene, inicio, acrescentar, floaters);
+          : montarDuelo(scene, inicio, acrescentar, floaters, (som) => sons.push(som));
       // Cena sem imagem (a peça sumiu, o duelo não teve batida) não abre buraco no tempo.
       if (duracao <= 0) continue;
       inicio += duracao + SCENE_GAP_MS;
@@ -446,6 +451,9 @@ export function MapCanvas() {
     for (const [unitId, segments] of porUnidade) {
       tracks.push({ unitId, segments: [...segments].sort((a, b) => a.startMs - b.startMs) });
     }
+    // Uma chamada só, com a sequência inteira: é `tocarSequencia` que descarta o que viraria
+    // borrão quando várias unidades agem em fila.
+    audioDoJogo().tocarSequencia(sons);
     runFx(tracks, floaters, onDone);
   }
 
@@ -482,6 +490,10 @@ export function MapCanvas() {
     offsetMs: number,
     acrescentar: (unitId: string, segment: FxSegment) => void,
     floaters: FxFloater[],
+    // M24 — o som entra pela MESMA linha do tempo da animação, e não por um relógio próprio:
+    // é o que garante que a batida que se ouve é a que se vê, e que a pausa entre cenas
+    // (`SCENE_GAP_MS`) vale para os dois.
+    soar: (som: SomAgendado) => void = () => {},
   ): number {
     const unidade = (id: string) => scene.stateBefore.units.find((u) => u.unitId === id);
     const posicionar = (unit: BattleUnit) => ({ px: unit.pos.x * tileSize, py: unit.pos.y * tileSize });
@@ -497,7 +509,17 @@ export function MapCanvas() {
       if (beat.kind === 'death') {
         const queda = deathMotion(tileSize, weightFor(ator.unitType));
         acrescentar(ator.unitId, { startMs: cursor, motion: queda, origin: posicionar(ator), unit: ator });
+        const somDaMorte = somDaBatida('death');
+        if (somDaMorte) soar({ som: somDaMorte, atMs: cursor });
         cursor += queda.durationMs;
+        continue;
+      }
+
+      // A cura não tem animação (curar não sacode ninguém) e por isso não consome tempo: ela
+      // soa no instante em que aconteceu, dentro da troca.
+      if (beat.kind === 'heal') {
+        const somDaCura = somDaBatida('heal');
+        if (somDaCura) soar({ som: somDaCura, atMs: cursor });
         continue;
       }
 
@@ -513,6 +535,11 @@ export function MapCanvas() {
       // O tremor do alvo e o número saem no instante da BATIDA, e não no começo do golpe: imagem
       // e impacto chegando em momentos diferentes é o jeito mais barato de um golpe perder peso.
       const batida = cursor + golpe.durationMs * IMPACT_PEAK_AT;
+      // O som sai na BATIDA e não no começo do golpe, pelo mesmo motivo que o tremor e o
+      // número saem: imagem e impacto em instantes diferentes é o jeito mais barato de um
+      // golpe perder peso — e som fora de hora é pior que som nenhum.
+      const somDoGolpe = somDaBatida(beat.kind);
+      if (somDoGolpe) soar({ som: somDoGolpe, atMs: batida });
       acrescentar(alvo.unitId, {
         startMs: batida,
         motion: shakeMotion(tileSize, weightFor(alvo.unitType)),
@@ -661,7 +688,7 @@ export function MapCanvas() {
     colorblindMode,
     uiScale,
     mode,
-    campaignMapIndex,
+    heroesByUnitId,
     aiTurnReport,
   ]);
 

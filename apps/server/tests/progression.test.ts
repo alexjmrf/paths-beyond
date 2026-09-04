@@ -1,7 +1,8 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
-import { resolveAutoBattle, resolveHeroStatSheet, type Hero, type ItemInstance } from '@paths-beyond/core';
+import { RULES_VERSION, resolveAutoBattle, resolveHeroStatSheet, type Hero, type ItemInstance } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -83,7 +84,8 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
   const playerRepository = createMemoryPlayerRepository([
     {
       id: 'player-1',
-      token: TOKEN,
+      platformProvider: 'dev' as const,
+      platformId: TOKEN,
       displayName: 'Progressor',
       elo: 1200,
       arenaMarks: 0,
@@ -146,6 +148,7 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
       ticketSecret: TICKET_SECRET,
+      identityValidator: createDevIdentityValidator(),
       now: () => harness.now,
     }),
   };
@@ -153,12 +156,12 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
 }
 
 async function post(h: Harness, url: string, payload: Record<string, unknown>) {
-  const response = await h.app.inject({ method: 'POST', url, headers: { 'x-player-token': TOKEN }, payload });
+  const response = await h.app.inject({ method: 'POST', url, headers: { 'x-platform-ticket': `dev:${TOKEN}`}, payload });
   return { status: response.statusCode, body: response.json() as any };
 }
 
 async function economia(h: Harness) {
-  const response = await h.app.inject({ method: 'GET', url: '/me/economy', headers: { 'x-player-token': TOKEN } });
+  const response = await h.app.inject({ method: 'GET', url: '/me/economy', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
   return response.json() as any;
 }
 
@@ -171,6 +174,7 @@ async function farmar(h: Harness, dungeonId: string, heroIds = [HERO_COM_FRAGMEN
     nonce: ticket.body.nonce,
     heroIds,
     commands: jogada.commands,
+    rulesVersion: RULES_VERSION,
   });
   expect(run.body.outcome).toBe('victory');
   return run.body.rewards as { items: ItemInstance[]; materials: Record<string, number>; gold: number; stones: number };
@@ -182,7 +186,7 @@ describe('POST /heroes/:heroId/awaken', () => {
     const response = await h.app.inject({
       method: 'POST',
       url: '/heroes/heroi-fantasma/awaken',
-      headers: { 'x-player-token': TOKEN },
+      headers: { 'x-platform-ticket': `dev:${TOKEN}`},
       payload: { nonce: 'n1' },
     });
     expect(response.statusCode).toBe(403);

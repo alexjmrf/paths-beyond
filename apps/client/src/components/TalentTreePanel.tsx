@@ -90,7 +90,7 @@ function statDeltaRow(stat: StatKey, before: number, after: number) {
 // o nó apagado, e o motivo em português vindo do core sem reescrita.
 export function TalentTreePanel() {
   const battleState = useBattleStore((s) => s.battleState);
-  const campaignMapIndex = useBattleStore((s) => s.campaignMapIndex);
+  const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
   const talentEditorUnitId = useBattleStore((s) => s.talentEditorUnitId);
   const talentAllocationByUnit = useBattleStore((s) => s.talentAllocationByUnit);
   const lastTalentReason = useBattleStore((s) => s.lastTalentReason);
@@ -109,7 +109,7 @@ export function TalentTreePanel() {
   // §8.1 — a árvore é do PERSONAGEM. Uma unidade sem personagem (inimigo de fase, reforço
   // invocado) não tem árvore para abrir, e a tela diz isso em vez de mostrar um grafo vazio
   // que pareceria uma árvore sem talentos.
-  const tree = characterTreeForUnit(campaignMapIndex, talentEditorUnitId);
+  const tree = characterTreeForUnit(heroesByUnitId, talentEditorUnitId);
   if (!tree) {
     return (
       <div className="talent-tree-overlay">
@@ -284,7 +284,7 @@ export function TalentTreePanel() {
           <h3>Efeito total da build (delta sobre os stats atuais)</h3>
           <ul>{STAT_KEYS.map((stat) => statDeltaRow(stat, preview.statsBefore[stat], preview.statsAfter[stat]))}</ul>
           <p>
-            CP: {preview.cpBefore} → {preview.cpAfter} (
+            Poder de combate: {preview.cpBefore} → {preview.cpAfter} (
             {preview.cpAfter - preview.cpBefore >= 0 ? '+' : ''}
             {preview.cpAfter - preview.cpBefore})
           </p>

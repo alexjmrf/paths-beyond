@@ -70,6 +70,170 @@ stats base e skills ou vira só rótulo; se cada personagem tem árvore própria
 se o jogador escolhe uma coluna e a convergência é a exceção, ou se pode alternar livremente; e
 qual é o orçamento de pontos.
 
+## Em aberto (levantadas pelo usuário em 2026-09-03, ao definir plataforma alvo e sempre-online)
+
+> **Nada aqui é decidido, e nada aqui é trabalho do M18.** A milestone corrente segue como está
+> (regra de fluxo: um milestone por sessão, sem antecipar trabalho futuro). Esta seção existe para
+> que a próxima sessão que abrir um milestone novo **não desenhe contra estas duas definições**, e
+> para que ninguém releia o §2 de `01-fundacoes-tecnicas.md` ou o §9.4 de `07-pvp.md` como se eles
+> já cobrissem o cenário abaixo. Quando o usuário fechar cada item, a decisão vira spec e milestone
+> — não antes.
+
+### As duas definições que o usuário deu
+
+**1. A plataforma alvo é desktop: Steam, Epic e possivelmente launcher próprio. Web está fora.**
+Não é "web também" — é **sem build web**. Isso não invalida a stack (o argumento do §2 nunca foi
+distribuição, foi que o risco do projeto é simulação determinística e volume de dados, e isso segue
+verdadeiro), mas **muda o que o §2 precisa dizer**: ele hoje justifica a escolha sem nomear
+empacotamento nenhum, porque quando foi escrito o alvo era implicitamente o browser.
+
+**2. O jogo é sempre-online. Conexão é requisito para jogar, inclusive o conteúdo single.**
+Razão dada pelo usuário: com recursos e moeda, o servidor precisa rastrear corretamente o que está
+ou não sendo gasto. **Isto confirma o rumo que o projeto já vinha tomando por conta própria** — a
+4/N desta milestone levou a campanha inteira para o servidor pelo mesmo argumento, e a 3/N fechou a
+posse. O que muda é que isso deixa de ser anti-cheat e passa a ser **o modo de operação declarado**.
+
+### O que JÁ está certo, e não deve ser reaberto
+
+Verificado no código, não assumido. Quem for implementar sempre-online **não está começando do
+zero e não deve redesenhar isto**:
+
+- O servidor já é autoritativo sobre ouro, pedras, energia (`{stored, asOfMs}` derivado, sem tarefa
+  periódica), materiais, inventário, heróis, posse de personagem, campanha, masmorra, summon, loja e
+  recompensas — migrations `0007`–`0010`.
+- **Idempotência por nonce já existe e é genérica**: `economy_actions` (M14 4/N, com `summon` e
+  `energy` acrescentados na 3/N), `dungeon_runs` e `replays.nonce`. É exatamente a primitiva que
+  reconexão precisa. Não invente outra.
+- O padrão `ticket` → o cliente joga → `run` reexecuta e confere é o desenho certo para economia
+  server-authoritative, e já vale para arena, masmorra e campanha.
+- A união de posse mora numa função só (`summon/ownership.ts`), e as duas rotas que montam batalha a
+  partir de ids do cliente perguntam.
+
+### Os cinco itens em aberto
+
+**A. Empacotamento desktop: Electron ou Tauri.** O §2 diz "não usar engine pesada" e não nomeia
+shell — a decisão nunca foi tomada porque nunca precisou ser. **Recomendação: Electron**, e o
+argumento é do próprio projeto, não preferência. O servidor roda Node (V8); Electron embute
+Chromium (V8), com a versão congelada por nós. Tauri usa a webview do sistema — WebView2/V8 no
+Windows, mas **JavaScriptCore no macOS e no Linux/Steam Deck** —, o que significa comparar hash de
+replay **entre engines diferentes, em produção, a cada batalha**, já que o servidor re-simula tudo.
+O job `determinismo-navegadores` do CI prova que o core aguenta isso (é literalmente por isso que
+ele existe), então não é fatal; mas a falha, quando vier, se manifesta como *"ganhei e o servidor
+disse que perdi, e gastou minha energia"*. O preço do Electron é ~130MB de download, irrelevante
+numa loja de desktop. Toda a arquitetura de ponto fixo existe para eliminar divergência de runtime;
+Tauri a reintroduz de graça.
+**Nota histórica:** `HANDOFF.md` **removeu** um item "P3 — M9, shell desktop (Electron +
+steamworks.js)" em 2026-08-28, com a justificativa correta de que não era o escopo do M9 real. Esse
+motivo **venceu** — o item volta a ser escopo legítimo, agora como milestone própria.
+
+**B. `apps/client/src/logic/save.ts` é uma segunda fonte de verdade, e precisa deixar de ser.**
+Este é o único conflito *concreto* que sempre-online cria com o código de hoje. O `SaveGame` em
+`localStorage` guarda `campaignMapIndex`, `equippedByUnit` e `talentAllocationByUnit` — e os três
+também vivem no servidor (`heroes.equipped_items`, runs de campanha, roster). Foi correto quando
+escrito (M13 3/N, "progresso sobrevive a recarregar a página", cliente que ainda não falava com
+servidor nenhum); com sempre-online vira dessincronização, do tipo que chega como *"equipei o item e
+ele sumiu"* e é infernal de reproduzir. **A direção proposta: rebaixar o save local a cache +
+preferências** — ficam `uiScale`, `colorblindMode`, `instantResultMode` e `tacticsOverrides` como
+rascunho; saem os três campos de progresso, que passam a vir de `/me/economy`, `/me/heroes` e
+`/me/roster`. Quanto mais tarde, mais código de reconciliação se acumula defendendo uma divisão que
+não deveria existir. **Observação de sequenciamento:** a 6/N já adiou a campanha do cliente para a
+7/N porque faltam rotas de `tacticsScript` e `talents` — essas rotas são exatamente a metade que
+falta para o item B fechar. **As duas coisas são a mesma obra e provavelmente devem ser feitas
+juntas.**
+
+> **FECHADO pela M18 7/N (2026-09-03), e foi exatamente "a mesma obra".** As duas rotas entraram
+> (`PUT /heroes/:id/tactics` e `PUT /heroes/:id/talents`) e a campanha do cliente passou para o
+> fluxo de ticket. O save foi ALÉM da direção proposta aqui: além dos três campos de progresso,
+> saiu também `tacticsOverrides` — a proposta o mantinha como rascunho local, e ele deixou de
+> fazer sentido quando o script passou a ter rota própria. `SaveGame` v2 tem quatro campos
+> (`instantResultMode`, `colorblindMode`, `uiScale`, `pvpToken`), `reconcileSave` deixou de
+> existir, e um save v1 é migrado em vez de descartado. **Nenhuma outra parte de sempre-online foi
+> antecipada** — os itens A e C–G continuam abertos como estão.
+
+**C. Autenticação de verdade.** Hoje é `x-player-token`, um token opaco que o jogador **digita à mão
+numa caixa de texto** (stub declarado em M7, e correto como stub). Com sempre-online, economia e
+moeda comprável com dinheiro real, não serve. O caminho natural é identidade de plataforma: ticket
+de sessão da Steam validado no servidor contra a Steam Web API — sem senha, sem sistema de contas
+próprio, sem guardar credencial. Epic faz o equivalente via EOS; launcher próprio precisaria do seu.
+**Não existe rota de criação de conta no projeto** (a 6/N registra isso: o núcleo é derivado
+preguiçosamente em `GET /me/heroes`), então isto é milestone própria e não um ajuste.
+
+**D. A política de `rulesVersion` no rollout deixa de ser dívida e vira bloqueio.** Na web, todo
+mundo recarregava a versão nova. No desktop, jogadores rodam versões diferentes por dias (offline,
+build do Epic atrasada, launcher com update pendente) — e com sempre-online o mismatch não mata só a
+arena, **mata o jogo inteiro**, porque toda batalha faz round-trip. Hoje
+`apps/server/src/battle/routes.ts:312` devolve **409 seco**. Precisa de: um fluxo de atualização
+forçada com mensagem legível no cliente, e uma decisão sobre o servidor aceitar `N-1` durante a
+janela de rollout. **Item vizinho já registrado e ainda aberto:** `POST /dungeons/:id/run` reexecuta
+`commands` do cliente e **não tem campo `rulesVersion`** — não há o que validar (achado do M17 5/N,
+não é regressão).
+
+**E. Rate limiting existe, e o buraco é a COBERTURA — não a ausência.**
+
+> **Correção de 2026-09-03, no mesmo dia.** A primeira redação deste item dizia "rate limiting não
+> existe", e estava **errada**: `apps/server/src/battle/rateLimit.ts` implementa uma janela
+> deslizante em memória (`createInMemoryRateLimiter`), está ligada em `app.ts` e tem suíte própria
+> (`apps/server/tests/rateLimit.test.ts`). Corrigido antes de virar milestone para não mandar
+> ninguém reimplementar o que já passa em teste. O achado real é mais estreito e pior.
+
+Quem chama `tryConsume` hoje são **seis rotas, e todas são de batalha**: `/battles/ticket` e
+`/battles` (`battle/routes.ts:271,296`), `/campaign/:id/ticket` e `/campaign/:id/run`
+(`campaign/routes.ts:179,212`), `/dungeons/:id/ticket` e `/dungeons/:id/run`
+(`economy/routes.ts:258,308`).
+
+**As rotas que gastam moeda não estão entre elas.** `POST /summon`, `POST /shop/purchase`,
+`POST /energy/purchase`, `POST /rewards/:id/claim`, as quatro de progressão
+(`enhance`/`awaken`/`imprint`/`equip`), as de preparação e `GET /matchmaking/opponent` não
+consomem do limitador — `grep tryConsume` em `summon/`, `shop/`, `rewards/` e `matchmaking/`
+devolve **zero**. A idempotência por nonce protege o **reenvio da mesma** requisição; ela não
+protege contra mil requisições **diferentes**. Ou seja: exatamente as rotas que tocam a moeda
+comprável com dinheiro real são as que estão abertas.
+
+**E o limitador é EM MEMÓRIA**, o que significa que ele vale por processo. No dia em que houver
+mais de uma instância de servidor, o teto efetivo vira `N × maxRequests` e o limite deixa de
+significar o que diz. Não é defeito hoje (uma instância) — é um pré-requisito de escala que precisa
+estar decidido antes de escalar, e o `RateLimiter` já é uma interface, então trocar a
+implementação por uma compartilhada não mexe em nenhuma rota. O §2 da spec já prevê Redis na
+stack de servidor e ele nunca entrou; este é o primeiro consumidor com motivo real.
+
+### Duas coisas que não são arquitetura, e que o usuário precisa decidir cedo
+
+**F. Modelo de negócio.** Sempre-online + gacha + moeda premium + **jogo pago na Steam** é a
+combinação que aquela comunidade pune com mais força, e a janela de reembolso de 2h/14 dias
+transforma instabilidade de servidor no lançamento em reembolso em massa. Sempre-online + gacha +
+**F2P** é coerente e é o que o jogador daquele gênero espera. D15/D19 fecharam *que* o jogo é um
+gacha; **não fecharam se ele é pago ou F2P**, e isso muda o desenho da moeda premium. Decidir antes
+de autorar mais banner sai mais barato que depois.
+
+**G. Operação.** A partir do dia 1 isto deixa de ser publicar um jogo e passa a ser **operar um
+serviço**: Postgres, backup, monitoramento, alguém acordado quando cai. Não é crítica ao desenho —
+é a consequência que sempre-online traz junto. **E há uma anomalia pré-existente que sempre-online
+promove de "chata" a bloqueante:** `apps/server/src/index.ts` — o ponto de entrada de **produção** —
+usa `createMemoryEconomyRepository()` desde M14 3/N, então materiais, inventário e limpezas de
+masmorra **se perdem a cada reinício**. Está registrado na 3/N como achado não corrigido, com
+comentário no próprio arquivo. Escrever o `EconomyRepository` de Postgres é pré-requisito duro de
+qualquer lançamento sempre-online.
+
+> **CORREÇÃO E FECHAMENTO PARCIAL (M19, 2026-09-03).** Esta frase estava errada quando foi
+> escrita: `createPostgresEconomyRepository` **já existia** desde M14 3/N
+> (`postgresRepository.ts:345`). O que faltava era ligá-lo — e o M19 ligou. `index.ts` não
+> tem mais nenhum repositório de memória, e a persistência deixou de ser bloqueante.
+> **O que este item ainda cobre e continua aberto:** backup, monitoramento e plantão, que são
+> operação e não código. E o M19 encontrou, ao ligar, um defeito que ninguém tinha visto: a
+> constraint de `economy_actions` recusaria todo summon e toda compra de energia — ver a
+> seção "M19" ao fim deste arquivo.
+
+### Consequência para a spec, quando cada item fechar
+
+- **A** → `docs/spec/01-fundacoes-tecnicas.md` §2: a tabela de stack ganha linha de shell desktop, e
+  o "não usar engine pesada" passa a nomear a plataforma alvo em vez de deixá-la implícita.
+- **B, C, D, E** → `docs/spec/07-pvp.md` §9.4: a tabela de segurança ganha "sempre-online" como
+  requisito declarado, auth de plataforma no lugar do token digitado, e a política de versão no
+  rollout. Hoje §9.4 assume um cliente que pode estar desatualizado sem consequência.
+- **A–E** → `docs/spec/09-roadmap.md`: milestones novas depois do M18. O roadmap termina no M18 e
+  **nenhuma destas entradas deve ser escrita antes de o usuário definir a milestone**, que é como
+  M17 e M18 nasceram.
+
 ## Decididas
 
 - **2026-07-31 — `TalentAllocation = Record<TalentNodeId, rank>`** (ausência de chave = rank 0) — Contexto: `Hero.talents` (§4.2) referencia o tipo `TalentAllocation`, mas a spec nunca define seu shape. — Alternativas descartadas: árvores separadas (`{class: Record<Id,rank>, spec: Record<Id,rank>}`) — desnecessário porque `TalentNode.id` já é globalmente único e cada nó já carrega seu próprio `tree`. — Consequência: `packages/data/schemas/heroes.schema.ts` valida `talents` como `Record<string,int>=0`.
@@ -4791,3 +4955,1131 @@ fora e por acaso ainda é vencível.
 
 **Suíte: 119 arquivos, 1752 testes** (era 119/1735). `validate:data` inalterado em 29/204 — a fatia
 reautorou conteúdo, não acrescentou arquivos.
+
+
+### M18 — sub-sessão 6/N: a ficha inicial, e o cliente da aquisição
+
+`packages/core` **sem uma linha alterada** — `RULES_VERSION` fica em `0.18.0`.
+
+#### O critério de aceite 1 pedia uma coisa que não existia
+
+"O personagem invocado aparece no roster e **é jogável**." Até esta fatia `POST /summon`
+concedia POSSE e mais nada: não havia instância de herói para ele. E o buraco era maior do que o
+summon — **todo herói do projeto até aqui nasceu de seed de banco ou de fixture de teste**, então
+uma conta nova de verdade abriria o jogo sem ninguém para levar ao mapa, inclusive o núcleo de
+quatro que D14 garante a todo jogador.
+
+**Decisão do usuário: a ficha inicial é AUTORADA em `packages/data`**, como campo obrigatório do
+personagem (`startingHero`: nível, arma, `weaponType`, skills de duelo, skills de mapa, script
+tático). Descartado: derivar a ficha por convenção de id dentro de `apps/server`
+(`item-arma-<classe>`, `skill-ataque-<classe>`), que é o "conteúdo hardcoded" que a regra 4 proíbe
+— o servidor teria números de jogo escritos nele.
+
+**A ficha não carrega PROGRESSO, e o schema recusa quem tentar:** `exp`, `awakening`, `imprint` e
+`talents` são estado de conta. Um catálogo que os declarasse daria dois donos ao mesmo número, e o
+segundo dono nunca ganha.
+
+**O nível 10 não foi escolhido: foi LIDO.** É o nível com que os seis capítulos declaram as vagas
+do jogador, e foi contra ele que a campanha foi afinada (M12) e reafinada (5/N). Entregar o
+personagem em qualquer outro nível faria a prova da 5/N valer para um time que só existe no arquivo
+de conteúdo.
+
+#### A pergunta que a medição respondeu antes de virar pergunta
+
+A campanha autorada dá TALENTOS a dois membros do núcleo (Miron com a mão que alcança, Sylla com o
+fôlego de combate) e um script tático de duas linhas ao clérigo. Nada disso existe numa conta nova,
+e não há rota de talentos no servidor — então a pergunta era real: **o jogador que ainda não gastou
+um ponto tem campanha para jogar?**
+
+Medido antes de decidir: o piloto vence **os seis capítulos** com a party montada da ficha inicial,
+`talents: {}` e o script padrão. Por isso a ficha **não** carrega alocação de talento — ela seria
+uma resposta a um problema que não existe, e alocar é decisão do jogador (§8.2). A medição virou
+teste (`packages/content/tests/fichaInicial.test.ts`), ao lado da metade da FORMA, que trava só o
+que define o poder da referência: nível, tipo de arma e arma equipada.
+
+#### Onde a instância nasce
+
+Uma função só (`apps/server/src/summon/roster.ts`), pelo mesmo argumento de `ownership.ts`: os dois
+pontos que criam herói — a conta nova recebendo o núcleo e o `POST /summon` concedendo um
+adquirível — têm de produzir exatamente a mesma ficha, senão "o Aren invocado não é o Aren da
+campanha" (§9.1).
+
+**A materialização do núcleo é PREGUIÇOSA, em `GET /me/heroes`, e é decisão e não descuido:** não
+existe rota de criação de conta no projeto (os jogadores são semeados), então não há um "momento
+zero" onde pendurar a concessão. Derivar no primeiro acesso tem a mesma propriedade que fez
+`ownedCharacterIds` derivar o núcleo em vez de guardá-lo: um personagem de história acrescentado
+amanhã ganha instância sozinho, sem migração. O id do herói é derivado do par jogador+personagem
+(`<playerId>-<characterId>`) e não sorteado — um id sorteado deixaria a segunda chamada criar uma
+cópia.
+
+**A comparação é pelo PERSONAGEM, não pelo id do herói:** um herói vindo de seed continua sendo a
+instância daquele personagem, e criar outra ao lado daria dois Aren à mesma conta.
+
+#### A migração da campanha para o servidor foi ADIADA, com motivo medido
+
+O plano desta fatia previa mover a campanha do cliente para o fluxo de ticket que a 4/N construiu.
+A medição encontrou o que o plano não sabia: **o servidor não tem rota para `tacticsScript` nem
+para `talents`**. O editor de táticas (M6/M13) e a árvore de talentos (M17 4/N) editam a party
+LOCAL e remontam o mapa; jogando pelo servidor, ele reconstrói a batalha a partir do banco, então a
+edição local não chega nele — e faz o `POST /campaign/:id/run` reexecutar uma batalha DIFERENTE da
+que foi jogada, que é a divergência que §9.1 chama de bug crítico.
+
+**Decisão do usuário: a campanha do cliente vai para a 7/N, junto das duas rotas que faltam.**
+Descartado: migrar agora com as duas telas desligadas no modo campanha — fecharia a decisão da 4/N
+mais cedo ao preço de regredir o critério de aceite 1 do M17.
+
+#### Dois defeitos que só o navegador pegou
+
+**O `POST /rewards/:id/claim` ia sem corpo.** `request` declara `content-type: application/json` em
+toda chamada, e o Fastify recusa com **400** um POST que se diz JSON e chega vazio. O teste de store
+não pegava — um `fetch` de mentira aceita qualquer coisa —, e agora há uma asserção sobre o corpo da
+requisição, não só sobre a resposta.
+
+**Depois de invocar, o roster de HERÓIS ficava velho.** Os dois rosters são coisas diferentes (um
+diz quem o jogador tem, o outro quais instâncias ele leva ao mapa) e só o de personagens era relido:
+o invocado aparecia no elenco e continuava fora do time até o jogador reconectar — metade do
+critério 1 faltando na tela.
+
+#### O que ficou registrado sem ser consertado
+
+O painel de invocação não carrega sozinho ao conectar: é preciso um clique em "Atualizar". Não é
+defeito de correção e vale uma linha de conveniência quando a 7/N mexer no mesmo arquivo.
+
+**Suíte: 122 arquivos, 1831 testes** (era 119/1752). `validate:data` inalterado em 29/204 — a fatia
+acrescentou um campo obrigatório ao personagem, não arquivos. `pnpm balance -- --runs 10000`:
+**43,6%–57,3%** de winrate global (nenhuma acima de 65%) e **33,0%** de concentração de `spd` nas
+vencedoras (teto de 60%) — os dois critérios do M8 de pé.
+
+
+### M18 — sub-sessão 7/N: a campanha do cliente pelo servidor, e as duas rotas que faltavam
+
+**`RULES_VERSION` sobe para `0.19.0`** — a primeira mudança de regra desde a 2/N, e o oposto
+das seis fatias anteriores.
+
+#### Os tetos de §6.3 nunca tinham sido aplicados
+
+A spec diz "lista ordenada de até 6 linhas" e "2 condições no início, até 3 com talentos"
+desde M2. **Nada no projeto conferia nenhuma das duas coisas:** o schema de `packages/data`
+limitava a 6 linhas o que era AUTORADO, e o jogador editando pelo cliente não passava por
+trava alguma. Junto disso, `extraTacticsSlot` e `extraTacticsCondition` são resolvidos por
+`resolveTalentEffects` desde M17 e **não tinham um único consumidor** — o mesmo padrão de
+campo inerte que M10, M11 e M15 passaram o projeto corrigindo.
+
+`validateTacticsScript` (core) fecha os dois buracos de uma vez. Um script aceito ontem (5
+linhas sem talento de slot, 3 condições numa linha) é recusado hoje: é mudança de regra, e
+por isso o bump. **Não observável em `pnpm balance` nem no GOLDEN_HASH** — é validação de
+preparação, e `simulate` não a chama.
+
+**Decisão do usuário: o teto BASE de linhas é 4.** §6.3 escreve o base junto do teto para
+condições ("2… até 3") e não para linhas ("até 6"). Como o talento levanta o teto, 6 não
+podia ser o base — seria um efeito autorado nas nove árvores sem nada que ele pudesse fazer.
+Medido antes de perguntar: **cada árvore concede +1 slot, exceto a do Aren, que concede +2**.
+Com base 4, o Aren chega exatamente aos 6 da spec e os outros oito param em 5 — o número
+escrito vira o topo alcançável em vez de um limite solto. Descartados: base 3 (deixaria os 6
+inalcançáveis por qualquer personagem) e base 6 (mataria o efeito que M17 autorou nove vezes).
+
+#### As duas rotas, e por que elas não têm `nonce`
+
+`PUT /heroes/:id/tactics` e `PUT /heroes/:id/talents`. As outras rotas de progressão exigem
+nonce porque COBRAM recurso e um reenvio cobraria duas vezes; estas não cobram nada e são
+idempotentes por natureza (gravar o mesmo script duas vezes deixa o mesmo script). Exigir
+chave de idempotência de uma escrita idempotente só criaria 409 onde não há o que proteger.
+
+**O teto de táticas é MÓVEL e a rota resolve os talentos DAQUELE herói** para descobri-lo —
+é o primeiro lugar do projeto onde `extraTacticsSlot` muda alguma coisa, e tem teste que
+prova o antes-e-depois: o mesmo script é recusado, o jogador aloca o nó, e ele passa.
+
+**Herói inexistente e herói alheio devolvem o MESMO 403.** Distinguir os dois transformaria
+a rota num oráculo de quais ids existem no banco.
+
+#### O save encolheu, e um save antigo é MIGRADO
+
+Com a campanha no servidor, cada coisa que o save guardava ganhou dono melhor: capítulo
+limpo (`GET /campaign`), script (`PUT …/tactics`), talentos (`PUT …/talents`), equipamento
+(`POST …/equip`, que existe desde M14). Manter cópia local de qualquer uma seria manter duas
+verdades sobre o mesmo estado, e a do disco do jogador é a que não pode ser autoridade
+(§9.4). Sobrou o que o servidor não tem: preferências e token.
+
+**`SAVE_FORMAT_VERSION` foi a 2 e o v1 NÃO é descartado** — ele é lido, as preferências e o
+token são preservados e o progresso local é ignorado. Descartar apagaria o tamanho de fonte
+e o modo daltônico de quem já jogava por causa de uma mudança de arquitetura que não é dele.
+`reconcileSave` deixou de existir: não sobrou no save nada preso à regra nem ao conteúdo.
+
+#### O TABULEIRO VAZIO, medido antes de escolher
+
+Com o setup vindo do ticket, o cliente abre sem batalha nenhuma — e `battleState` não é
+opcional (quarenta lugares o leem). Em vez de torná-lo nulo e espalhar `?.` pelo cliente
+inteiro, a tela abre num tabuleiro real e vazio. **Medido:** `buildInitialState` sobre um
+setup sem unidades devolve `outcome: 'ongoing'`, zero unidades, zero iniciativa — nada
+acontece, nada é jogável e nenhum overlay de vitória dispara.
+
+**`heroesByUnitId` deixou de vir do conteúdo local e passa a ser montado do roster do
+servidor**, casando `BattleUnit.heroId` com o herói da conta. Efeito colateral bom: ele
+passou a valer em TODOS os modos, e o glifo por classe (M16/M17) deixou de ser exclusivo da
+campanha — a condição `mode === 'campaign'` que existia no `MapCanvas` saiu.
+
+#### O que ficou de fora, declarado
+
+**Desequipar item** continua sem rota (o servidor só tem `POST /equip`), e o inventário local
+da campanha (`equippedByUnit` + o catálogo inteiro como "inventário") **não foi migrado**.
+Ele não fica órfão como as táticas ficariam: equipar já tem caminho de servidor pela tela de
+farm desde M14 5/N. Fica registrado, não corrigido em silêncio.
+
+O botão "Testar" contra manequim (§11) segue não existindo, como desde M6.
+
+**Suíte: 125 arquivos, 1861 testes** (era 122/1831). `validate:data` inalterado em 29/204 — a
+fatia não autorou conteúdo. **Verificado no navegador, sem `curl`:** os seis capítulos com as
+vagas que 5/N deixou (1, 2, 3, 4, 4, 4), a recusa da segunda escolha num capítulo de uma vaga
+sem virar requisição, o capítulo 1 jogado de verdade, submetido, reexecutado pelo servidor
+("resolveu em 2 round(s)"), pago (+600 premium) e marcado como limpo na lista.
+
+
+### M18 — FECHADO (auditoria de aceite, 2026-09-03)
+
+Sete sub-sessões. **`RULES_VERSION` 0.17.0 → 0.19.0**, em dois bumps: `0.18.0` na 2/N (o
+fragmento de imprint passou a pertencer ao PERSONAGEM e não à instância de herói) e `0.19.0`
+na 7/N (os tetos do script tático de §6.3 passaram a ser aplicados).
+
+**`pnpm balance -- --runs 10000` reexecutado no fechamento: 43,6%–57,3% de winrate global e
+33,0% de concentração de `spd` nas vencedoras — os dois critérios do M8 de pé. A matriz bate
+BYTE A BYTE com a execução da 6/N**, o que é a prova de que o bump para `0.19.0` não tocou
+simulação (o validador de script é de preparação; `simulate` não o chama).
+
+**Os 5 critérios batem, e a auditoria está em `PROGRESS.md`** — cada um com o teste que o
+prova, mais as duas verificações de navegador (a aquisição na 6/N, a campanha na 7/N).
+
+#### O que a milestone descobriu que ninguém tinha ido procurar
+
+Vale registrar porque é o padrão que se repetiu em quase toda fatia: **a medição veio antes
+da pergunta, e quatro vezes ela achou coisa que nenhum schema pegaria.**
+
+1. **O fragmento de imprint estava quebrado fora da campanha** (2/N) — funcionava por
+   coincidência de autoria, porque todo herói da campanha tinha `id` e `characterId` iguais.
+2. **O capítulo 5 ficou sem desfecho possível** (5/N) — a condição `escort` nomeia a Wren, que
+   D14 tornou adquirível; quem não a puxasse não tinha a unidade que a vitória exige.
+3. **Posse não era a mesma coisa que ter o herói** (6/N) — `POST /summon` concedia posse e o
+   personagem não virava instância nenhuma; e todo herói do projeto até ali nascia de seed.
+4. **Os tetos de §6.3 nunca tinham sido aplicados** (7/N), e `extraTacticsSlot` /
+   `extraTacticsCondition` eram resolvidos desde M17 sem um único consumidor.
+
+Nenhum dos quatro estava no briefing. Os quatro apareceram porque alguma fatia mediu antes de
+escrever — o piloto jogando a campanha, o recíproco escrito junto da asserção, a conta nova
+sendo montada de verdade.
+
+#### Pendências fora de critério, registradas e não corrigidas
+
+- **Desequipar item não tem rota** (o servidor só tem `POST /equip`), e o inventário local da
+  campanha (`equippedByUnit` + o catálogo inteiro como "inventário") não foi migrado na 7/N.
+  Não fica órfão: equipar tem caminho de servidor desde M14 5/N.
+- **O botão "Testar" contra manequim configurável (§11)** nunca existiu, desde M6.
+- **`createMemoryEconomyRepository()` no `index.ts` de produção** — materiais, inventário e
+  limpezas se perdem a cada reinício, desde M14 3/N. Registrado com comentário no arquivo na
+  3/N; consertar é escrever o `EconomyRepository` de Postgres inteiro.
+- **`RunBody` de `/dungeons/:id/run` não tem `rulesVersion`** — herdado do M17 5/N.
+- **O painel de invocação não carrega sozinho ao conectar** (6/N): é preciso um clique em
+  "Atualizar".
+- **Como o torneio mede um pool que cresce** (D10, herdado): com 9 personagens ainda é
+  computável e foi medido como sempre. A pergunta vira real quando o pool passar de ~12.
+
+#### O que NÃO foi antecipado
+
+As duas definições que o usuário deu em 2026-09-03 (plataforma desktop e sempre-online) não
+entraram como trabalho. O **item B** da seção "Em aberto (2026-09-03)" fechou como
+consequência da 7/N — e o próprio item previa isso ("as duas coisas são a mesma obra"). Os
+itens A e C–G continuam abertos, e nenhum foi desenhado contra.
+
+
+## M19 — Persistência e operação do servidor
+
+### M19 — o servidor de produção passa a ser exercitado
+
+**Um erro meu, registrado porque muda como a próxima sessão deve começar:** eu abri esta
+sessão afirmando que "o roadmap acabou no M18" e propus uma milestone. **O roadmap já tinha
+M19–M24**, escritos junto do aviso de 2026-09-03 em `PROGRESS.md`. Eu tinha grepado os
+cabeçalhos numa sessão anterior, o resultado ficou na memória, e não reli — a entrada nova
+estava exatamente depois do ponto onde a lista antiga terminava. O que propus era um
+SUBCONJUNTO do M19 real, que também pede log estruturado e backup/restore exercitado. Corrigi
+o rumo assim que vi, removi a entrada duplicada que eu tinha acrescentado ao roadmap e
+implementei o escopo verdadeiro. **A lição operacional: `PROGRESS.md` e o roadmap são lidos do
+disco no começo de toda sessão, não da memória de sessão anterior.**
+
+A milestone não depende de nenhuma das definições em aberto (plataforma alvo, pago vs F2P). `packages/core` e
+`packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em `0.19.0`.
+
+#### A premissa da milestone estava desatualizada, e medir isso mudou o escopo
+
+O item G de "Em aberto (2026-09-03)" diz que "escrever o `EconomyRepository` de Postgres é
+pré-requisito duro de qualquer lançamento". **Ele já estava escrito** desde M14 3/N
+(`postgresRepository.ts:345`). O que faltava era outra coisa, e pior: ele nunca tinha sido
+LIGADO (`index.ts` usava o de memória) nem EXECUTADO por teste nenhum.
+
+Essa segunda metade é o achado. O projeto tinha 125 arquivos de teste e **nenhum tocava
+banco**: tudo rodava contra os repositórios de memória, que existem desde M7 justamente para
+o teste não precisar de Postgres. Produção era o único caminho sem prova.
+
+#### O preço já estava cobrado: o summon e a energia quebrariam em produção
+
+`economy_actions.kind` nasceu na migration 0008 (M14 4/N) com
+`CHECK IN ('enhance','awaken','imprint','equip')`. A M18 3/N acrescentou `'summon'` e
+`'energy'` — decisão certa, reusando o mecanismo de idempotência em vez de inventar outro — e
+mexeu só no TypeScript. Em memória um `Map` aceita qualquer string; no Postgres a constraint
+recusa.
+
+**Medido contra um Postgres real, não deduzido:** com a migration 0011 removida, a bateria
+reprova com `new row for relation "economy_actions" violates check constraint
+"economy_actions_kind_check"` nos kinds `summon` e `energy`. Ou seja: **os dois sumidouros da
+moeda premium — metade do que o M18 entregou — falhariam no primeiro dia de produção**, e a
+suíte continuaria verde.
+
+#### A correção é da RAIZ, não do sintoma
+
+Corrigir só a migration deixaria os dois lados livres para derivar de novo. `types.ts` passou
+a exportar `ECONOMY_ACTION_KINDS` como constante de runtime, com o tipo derivado dela, e
+`tests/migrations.test.ts` compara a constante com o `CHECK` lido do SQL — **sem banco
+nenhum**. É o teste que protege o laço local, onde `DATABASE_URL` não existe: mesmo que o
+bloco de Postgres fique pulado, essa deriva específica não volta. Confirmado removendo a 0011
+e vendo o teste reprovar.
+
+#### Três camadas de prova, e nenhuma basta sozinha
+
+- **`tests/migrations.test.ts`** — SQL contra TypeScript, sem banco. Pega deriva de
+  constraint; não pega comportamento.
+- **`tests/repositoryParity.test.ts`** — a MESMA bateria nos dois backends (24 asserções cada).
+  É a igualdade que é o resultado: um teste só do Postgres não pegaria uma memória que
+  divergiu, e um só da memória é o que já existia.
+- **`tests/producaoPostgres.test.ts`** — o app montado como em `index.ts`, todos os
+  repositórios de Postgres, exercitando `GET /me/heroes`, `POST /summon` e
+  `POST /energy/purchase`. O defeito encontrado não era de repositório e sim de INTEGRAÇÃO: a
+  constraint só falha quando uma ROTA grava.
+
+**Uma premissa minha estava errada e o teste a corrigiu:** escrevi o caso de reenvio de nonce
+esperando 409 e veio 400. A rota confere o saldo ANTES de reservar o nonce (decisão da M18
+3/N — recusar por falta de moeda não pode queimar a chave de idempotência), e com saldo para
+um summon só o reenvio nunca chegava ao 409. O teste passou a semear saldo para dois. O código
+estava certo; o teste é que media a coisa errada.
+
+#### Decisões de forma
+
+**Sem `DATABASE_URL`, o bloco de Postgres é PULADO e não falha.** O laço de trabalho local não
+deve exigir banco — é o que fez os repositórios de memória existirem em M7. Quem impede o
+"pula" de virar permanente é o CI, que agora sobe `postgres:16` como serviço e roda `migrate`
+antes de `pnpm test`. Sem o serviço, os arquivos novos seriam promessa e não prova.
+
+**Ids únicos por execução** (sufixo de tempo + aleatório) em vez de truncar tabelas: o CI roda
+a suíte inteira contra o mesmo banco, e um teste que exige banco vazio quebra o vizinho.
+
+#### Como rodar a metade de Postgres localmente
+
+```
+docker run -d --name paths-beyond-pg -e POSTGRES_USER=paths -e POSTGRES_PASSWORD=paths \
+  -e POSTGRES_DB=paths_beyond_test -p 5432:5432 postgres:16
+DATABASE_URL="postgres://paths:paths@localhost:5432/paths_beyond_test" pnpm --filter @paths-beyond/server run migrate
+DATABASE_URL="postgres://paths:paths@localhost:5432/paths_beyond_test" pnpm test
+```
+
+#### As outras duas metades do critério, que a proposta inicial não tinha
+
+**Log estruturado em toda rota.** O servidor era criado com `Fastify()` sem logger: **zero
+linhas de log de requisição**. Um hook `onResponse` no escopo RAIZ (e não dentro do escopo
+protegido) registra `reqId`, método, rota, `statusCode`, `playerId` e duração — no raiz porque
+é o que faz `/health` e as recusas por token ausente entrarem no log, que são as duas coisas
+que se olha quando o serviço parece morto. O nível separa falha nossa de recusa esperada: 5xx
+é `error`, 4xx é `warn`, porque saldo insuficiente e nonce repetido não devem acordar ninguém.
+**O log não carrega corpo nem token, e isso tem teste** — o token É a autenticação (§9.4), e
+log que o vaza é pior que log nenhum.
+
+**Backup/restore exercitado, não presumido.** `docs/operacao-servidor.md` traz o procedimento,
+e ele foi EXECUTADO ponta a ponta: linha canário inserida, `pg_dump -Fc`, banco novo,
+`pg_restore`, canário conferido do outro lado, e **a suíte inteira rodada contra o banco
+restaurado — 1924 testes passando**. É esse último passo que separa o documento de uma
+promessa: um restore que "termina sem erro" e deixa uma constraint para trás só é descoberto
+no dia em que ele é a única cópia que existe. O documento também registra o que o restore NÃO
+cobre — segredos, versão do conteúdo e a janela de perda entre dois dumps.
+
+**Suíte: 129 arquivos, 1924 testes com Postgres** (0 pulados); sem `DATABASE_URL`, 1895 passam
+e 29 pulam. Era 125/1861. `validate:data` inalterado em 29/204 — a milestone não autorou
+conteúdo.
+
+
+## M20 — Identidade de plataforma
+
+### M20 — o token digitado morreu
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em
+`0.19.0`. A milestone é servidor e cliente.
+
+#### O que estava errado, e por que só agora
+
+`x-player-token` era um token opaco que o jogador **digitava numa caixa de texto**, declarado
+como stub em M7 e correto como stub: enquanto o servidor só arbitrava arena, o pior que
+acontecia era alguém jogar a partida de outro. Depois do M14 e do M18 o mesmo token passou a
+ser a chave de uma conta com ouro, inventário, personagens e uma moeda que se compra com
+dinheiro — e ele era ao mesmo tempo o mecanismo de autenticação e o de personificação.
+
+O que entra é o ticket de sessão da plataforma. A propriedade que faz a troca valer não é
+criptográfica: é que **credencial nenhuma fica do nosso lado**. Não há senha para vazar nem
+token para adivinhar, e o que o cliente manda vale por segundos.
+
+#### As duas bifurcações que o roadmap deixou abertas, e como foram resolvidas
+
+**1. O comportamento preguiçoso da M18 6/N: SUBSTITUÍDO.** O roadmap mandava "substituir ou
+declarar oficial, com o motivo escrito". A criação virou explícita (`POST /accounts/session`)
+e `GET /me/heroes` voltou a ser leitura pura.
+
+O motivo: com sempre-online e dinheiro real, "quando a conta existe" precisa de uma resposta
+e um lugar só. Leitura que escreve não aparece como escrita em log nem em métrica, atrapalha
+rate limiting e transforma qualquer reprodução de bug numa mutação silenciosa. **A
+propriedade que a 6/N queria continua de pé** — `ensureOwnedHeroes` não foi apagado, só
+mudou de chamador: um personagem de história acrescentado amanhã é concedido no sign-in
+seguinte. Tem teste dos dois lados: o `GET` não materializa mais nada, e o sign-in de uma
+conta antiga concede o que faltava sem duplicar o que já havia.
+
+**2. `players.token`: REMOVIDA** (migration 0012), trocada por `platform_provider` +
+`platform_id` únicos juntos. Coluna que existe é coluna que uma rota volta a ler, e o
+critério é literal — nenhuma rota aceita mais o token digitado. **Custo pago e declarado no
+plano:** 16 arquivos de teste semeavam `token`.
+
+#### Autenticar NÃO cria conta
+
+Ticket válido de conta inexistente é 401, não um cadastro silencioso. É a mesma regra da
+decisão 1, aplicada ao outro lado: se o hook de auth criasse a conta, o "leitura que escreve"
+voltaria pela porta dos fundos, e toda rota protegida seria um ponto de criação.
+
+Consequência de forma: `accountRoutes` mora FORA do escopo protegido do `app.ts` (o sign-in
+não pode exigir conta — seria um ciclo) e registra o `authPlugin` no próprio sub-escopo para
+`/me/export` e `DELETE /me`. Um filho não herda hook de um tio, e o primeiro teste dessas duas
+rotas pegou isso com 401.
+
+#### A exclusão, e a ordem que não é estética
+
+`DELETE /me` varre sete repositórios e só então apaga o jogador. A ordem é imposta pelas
+chaves estrangeiras — e isso é uma propriedade boa: **esquecer uma tabela não deixa lixo em
+silêncio, deixa a exclusão inteira reprovar por integridade**.
+
+O teste contra Postgres não escreve a lista de tabelas à mão: ele a lê do catálogo do banco
+(`pg_constraint`), então uma tabela nova com FK para `players` entra na varredura sozinha.
+Método por repositório em vez de `ON DELETE CASCADE` porque os dois backends precisam da
+mesma semântica observável, e cascade só existiria no Postgres — a bateria de paridade do
+M19 não teria o que comparar.
+
+**Replay some dos DOIS lados.** Um replay guarda atacante e defensor; deixá-lo de pé
+manteria o id de quem pediu a exclusão registrado. O critério diz "todas as tabelas", e isso
+é o que ele significa.
+
+#### O validador é injetado, e o de dev nunca é o padrão
+
+Mesmo padrão de `now` e `newNonce` (M14/M15). O `index.ts` de produção **falha ao subir** sem
+`STEAM_WEB_API_KEY` e `STEAM_APP_ID`: um fallback permissivo seria uma porta aberta que
+ninguém veria. O validador de dev exige o prefixo `dev:` para nenhum ticket real ser
+confundido com um de mentira.
+
+**O que a suíte NÃO faz:** falar com a Steam. O que se testa é o contrato — o que se manda, o
+que se lê e o que se faz quando ela nega, com `fetch` falso. Três recusas têm teste próprio:
+resultado diferente de `OK`, erro HTTP (Steam fora do ar vira 401, não 500) e
+`ownersteamid` diferente de `steamid`, que é licença de outra conta (family sharing).
+
+#### O cliente
+
+A caixa de texto saiu. O ticket vem de `data/platformBridge.ts`, injetável pelo mesmo motivo
+que o validador é: **o shell desktop é M21**, e no navegador não existe Steam para pedir
+ticket. A ponte de desenvolvimento devolve `dev:<id>` com id ESTÁVEL entre recargas — uma
+identidade sorteada a cada carga criaria conta nova a cada F5, que não é o que o jogador terá.
+
+**Verificado no navegador:** um clique em "Entrar", sem digitar nada, criou a conta e trouxe
+os quatro do núcleo (`dev-wbsobanv-ally-arcanista`, `-ally-arqueiro`, `-ally-clerigo`,
+`-hero-jogador`), com ELO 1200.
+
+#### Fora de escopo, declarado
+
+A chamada real à Steam Web API (sem chave e sem shell até M21) e o launcher próprio. A ponte
+do cliente é a de desenvolvimento; trocá-la pela da Steam é trabalho do M21 e não muda mais
+nada no cliente — é o ponto de a costura existir.
+
+**Suíte: 131 arquivos, 1946 testes com Postgres** (0 pulados); sem `DATABASE_URL`, 1916
+passam e 30 pulam. Era 129/1924. `validate:data` inalterado em 29/204.
+
+
+## M21 — O shell desktop e o pipeline de release
+
+### M21 — sub-sessão 1/N: a decisão, o shell e o determinismo no runtime empacotado
+
+`packages/core` e `packages/data` **sem uma linha de `src` alterada** — `RULES_VERSION` fica
+em `0.19.0`. A única mudança em `packages/core` é de TESTE: o `GOLDEN_HASH` mudou de arquivo.
+
+#### O escopo foi partido, e a razão está escrita antes do trabalho
+
+O aceite do M21 tem cinco itens e **três não podem ser PROVADOS nesta máquina**: achievements
+concedendo na plataforma (exige App ID real, cliente Steam e módulo nativo), auto-update de
+uma versão para a seguinte (exige artefato publicado num host) e build produzida pelo CI (o
+workflow se escreve, mas não se executa daqui). Esta fatia entrega os dois que são
+integralmente prováveis aqui — e um deles é o que o roadmap chama de "a única prova que
+importa".
+
+#### A decisão de §2, com o argumento e não só o resultado
+
+Electron. O argumento é do próprio projeto: o servidor roda Node (V8) e **re-simula todo
+replay** (§9.4); Electron embute Chromium (V8) numa versão que nós congelamos, então cliente
+e servidor comparam hash na mesma engine. Tauri usaria a webview do sistema — **JavaScriptCore
+no macOS e no Linux/Steam Deck** — e reintroduziria em produção, a cada batalha, a divergência
+de runtime que a aritmética de ponto fixo e o job `determinismo-navegadores` existem para
+eliminar. O preço do Electron (~130 MB) é irrelevante numa loja de desktop.
+
+Ficou escrito também **o que o argumento não diz**: que Tauri é ruim. Ele é melhor para quase
+todo app que não compara hash de simulação entre a máquina do jogador e o servidor.
+
+#### O critério que o CI de hoje NÃO cobria
+
+`determinismo-navegadores` prova que o core dá o mesmo hash em Chromium, Firefox e WebKit **de
+teste**, rodados pelo Playwright. Ele não diz nada sobre o runtime do jogador: a versão de
+Chromium que o Electron embute, com as flags do Electron, dentro do processo que o instalador
+entrega.
+
+**Medido, e a medição roda no RENDERER de propósito.** Medir no processo principal seria medir
+o Node do Electron — o mesmo V8 do servidor por construção —, ou seja, responder a pergunta
+fácil e chamá-la de resposta. O jogo roda no renderer; é lá que o hash tem de bater:
+
+```
+{"runtime":"electron-renderer","electron":"33.4.11","chrome":"130.0.6723.191",
+ "v8":"13.0.245.25-electron.0","hash":"c3a404a0","esperado":"c3a404a0","ok":true}
+```
+
+**O `GOLDEN_HASH` mudou de lugar por causa disso.** Ele era uma constante dentro de
+`crossRuntime.test.ts`, e isso bastava enquanto os consumidores eram Node e os três
+navegadores — os dois rodam aquele arquivo. O shell mede o mesmo replay de fora do Vitest, e
+copiar o valor daria duas verdades sobre a mesma coisa: no dia em que divergissem, os dois
+testes ficariam verdes medindo hashes diferentes. Agora ele mora na FIXTURE, que já era
+compartilhada, e os três runtimes importam o mesmo valor.
+
+#### A ponte de plataforma ganhou o outro lado
+
+O M20 deixou `platformBridge` injetável e usou a de desenvolvimento, porque no navegador não
+existe Steam. O `preload` do Electron expõe `window.pathsBeyond` via `contextBridge`, e a
+escolha entre as duas pontes passou a ter teste — **errá-la é ruim nos dois sentidos**: cair
+na de dev dentro do shell publicado autenticaria todo mundo como a mesma pessoa de mentira, e
+exigir a real no navegador quebraria o laço de desenvolvimento inteiro.
+
+`contextIsolation`, `nodeIntegration: false` e `sandbox: true` são o que fazem o `preload`
+significar alguma coisa: sem eles o renderer alcançaria o `require` do Node e o módulo nativo
+direto, e a "ponte" seria decoração. **Falha do shell vira indisponibilidade, não tela
+quebrada** — Steam fechada e steamworks que não inicializa são a mesma coisa para o jogador.
+
+#### Um erro meu, e o estrago que ele fez antes de eu ver
+
+O primeiro `tsc -p` de `apps/desktop` rodou com `include: ["src"]` e um `rootDir` que não
+continha o core. O TypeScript **reprovou com TS6059 e emitiu assim mesmo**, espalhando 19
+arquivos `.js` compilados ao lado dos fontes de `packages/core`.
+
+O sintoma apareceu longe da causa: `crossRuntime.test.ts` passou a falhar com
+`expected 'c3a404a0' to be undefined`, porque o import de `./goldenReplay.js` passou a
+resolver o **`.js` real** em vez do `.ts`. Removidos os 19; o `include` do desktop agora lista
+só o que roda no processo principal, e `preload` e a medição do renderer são empacotados pelo
+Vite — que é o que já resolvia o core sem emitir nada no lugar errado.
+
+#### Fora desta fatia, declarado
+
+Empacotamento e instalador (2/N), achievements de plataforma (3/N) e auto-update (4/N). O
+`main.ts` responde ao pedido de ticket com a identidade de desenvolvimento: o módulo nativo
+da Steam entra na 3/N, e trocar quem responde **não muda uma linha do cliente** — que é o
+ponto de a costura existir antes da integração.
+
+**Suíte: 132 arquivos, 1952 testes** (era 131/1946); sem `DATABASE_URL`, 1922 passam e 30
+pulam. `validate:data` inalterado em 29/204.
+
+
+### M21 — sub-sessão 2/N: empacotamento e pipeline de release
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em
+`0.19.0`.
+
+#### Duas coisas que o empacotamento quebrava, medidas antes de escolher
+
+Rodei o build do cliente e li a saída, em vez de supor:
+
+1. **`index.html` referenciava `/assets/...`** — caminho absoluto. Sob `file://` no shell,
+   `/assets` aponta para a raiz do disco do jogador: a tela abre **em branco, sem erro
+   visível**. Resolvido com `base: './'` no Vite do cliente, que funciona nos dois mundos
+   (servidor e arquivo).
+2. **`const BASE = '/api'`** — o cliente sempre falou por caminho relativo e o Vite
+   encaminhava (M13 2/N). Empacotado não há proxy nenhum.
+
+#### A decisão sobre a URL da API
+
+**O shell informa, pelo `preload`.** Descartado: assar a URL em tempo de build. O motivo é
+concreto — um build por ambiente é um **binário por ambiente para assinar e publicar**, e a
+assinatura é o passo caro. Com a URL vindo do shell, o mesmo binário assinado aponta para
+produção ou staging por variável de ambiente.
+
+**Configuração ruim cai no caminho relativo, não vira URL malformada.** Uma URL quebrada
+falha com "fetch failed" e nenhuma pista; o relativo falha do jeito que já se conhece. Cinco
+formas de configuração ruim têm teste (vazia, só espaços, não-string, não-URL, esquema
+`file:`), e a barra final é removida porque `${BASE}${path}` produziria `//me/heroes` — que
+alguns servidores tratam como outra rota e outros como 404, e que só apareceria no build
+empacotado.
+
+#### O binário empacotado SE AUTOVERIFICA
+
+A 1/N mediu o determinismo rodando `electron dist/determinism.js` a partir do workspace, e
+isso já era mais do que o CI tinha. Mas o critério fala do runtime **empacotado**, e um
+script solto no repositório não é o que o jogador instala.
+
+`main.ts` ganhou a flag `--determinismo`: quem roda a medição passa a ser o executável que
+saiu do empacotamento — mesmo asar, mesmo Chromium, mesmas flags. Executado de verdade nesta
+fatia, a partir de `release/win-unpacked/Paths Beyond.exe`:
+
+```
+{"runtime":"electron-renderer","electron":"33.4.11","chrome":"130.0.6723.191",
+ "v8":"13.0.245.25-electron.0","hash":"c3a404a0","esperado":"c3a404a0","ok":true}
+```
+
+E o workflow de release roda essa autoverificação **em cada plataforma, antes de publicar o
+artefato**: se o hash divergir, é melhor não lançar do que lançar um cliente que perde
+partidas ganhas.
+
+#### O teste que roda a cada commit, e o que ele existe para pegar
+
+Produzir um instalador leva minutos e baixa centenas de MB. O erro mais provável, porém, é
+banal: **esquecer um diretório na lista `files`**. Quando isso acontece o build passa, o
+instalador é gerado, e o jogo abre em branco na máquina do jogador — sem erro no CI e sem
+pista no log. `tests/empacotamento.test.ts` lê a config como dado e afirma o que ela precisa
+conter (o cliente em `extraResources`, o `main` que existe, o `preload.cjs`, os três alvos) e
+que o HTML buildado usa caminho relativo.
+
+**O `appId` tem teste próprio** porque mudá-lo entre versões faz o sistema tratar a
+atualização como outro programa: dois ícones, duas pastas de dados, e o save do jogador
+"sumindo".
+
+#### Fora desta fatia, declarado
+
+- **Assinatura de código e notarização.** Não há certificados, e o electron-builder registra
+  o que aconteceu: `no signing info identified, signing is skipped`. O instalador sai **não
+  assinado** e o SmartScreen vai avisar. É pré-requisito de lançamento, não desta fatia.
+- **A execução do próprio CI.** O workflow está escrito; rodá-lo exige um push. macOS e Linux
+  ficam **configurados e não executados** — o que foi provado aqui é Windows.
+- Achievements de plataforma (3/N) e auto-update (4/N).
+
+**Provado localmente:** app desempacotado (`--dir`), instalador NSIS de **78,2 MB**
+(`Paths Beyond Setup 0.0.0.exe`), e a autoverificação rodando de dentro do empacotado.
+
+**Suíte: 134 arquivos, 1968 testes** (era 132/1952). `validate:data` inalterado em 29/204.
+
+---
+
+### M21 — sub-sessão 3/N: os achievements no espelho da plataforma
+
+`packages/core` **sem uma linha alterada** — `RULES_VERSION` fica em `0.19.0`. `packages/data`
+muda, mas em conteúdo autorado e não em regra: os 10 achievements ganham o nome que têm na
+plataforma.
+
+#### O que é provável nesta máquina, dito antes do trabalho
+
+Desbloquear de verdade exige **App ID de parceiro, o cliente da loja aberto e o módulo nativo
+compilado** — nenhum dos três existe aqui, e a 1/N já tinha registrado isso ao partir o
+escopo. O que esta fatia entrega é a costura inteira com a porta injetada, no mesmo padrão de
+`now`, `newNonce` e do validador de identidade do M20: trocar a porta de mentira pela real é
+uma linha, e é a única linha que falta.
+
+#### O espelho é DADO autorado, não derivado do `id`
+
+`achievements.schema.ts` ganha `platformId` (`^[A-Z0-9_]+$`), obrigatório. Derivar o nome do
+`id` seria adivinhar: quem define o *API name* de verdade é o backend de parceiro, digitado à
+mão, e discordar dele por uma letra dá uma conquista que **paga a moeda premium normalmente e
+nunca aparece no perfil** — sem erro em lugar nenhum. Sendo dado, ele passa pelo
+`validate:data` como todo o resto, e uma conquista nova não consegue nascer sem espelho.
+
+O formato recusa minúscula, hífen, espaço e acento — os quatro fáceis de escrever em
+português, e cujo sintoma só apareceria com o jogo publicado. `conquistasDePlataforma.test.ts`
+em `packages/content` fecha o que um schema de arquivo isolado não vê: **dois achievements com
+o mesmo espelho**, que passariam a validação individual e fariam limpar uma masmorra
+desbloquear a conquista de limpar quatro.
+
+**O evento não tem espelho, e a ausência é deliberada:** evento é janela de tempo (M18, 4/N) e
+conquista de plataforma não expira. Quem perdeu a janela não "perdeu uma conquista".
+
+#### A decisão que o usuário confirmou: espelha o CUMPRIDO, não o reivindicado
+
+`/me/rewards` passa a devolver, em cada conquista, `platform: { id, earned }`. `earned` é
+**cumprimento da condição**, não reivindicação da moeda: a conquista da plataforma diz o que o
+jogador FEZ; reivindicar é pegar o prêmio, que é outra coisa. Duas consequências que o teste
+trava:
+
+- quem cumpriu e nunca abriu a tela de prêmios já desbloqueia — que é a mesma retroatividade
+  que a 4/N desenhou para a moeda, e pelo mesmo motivo: a condição é conferida contra o estado
+  de agora, não por um contador que precisaria estar rodando desde antes;
+- quem **já reivindicou** continua com `earned: true`, embora `claimable` vire `false`. Sem
+  isso, quem pegou a moeda antes de a plataforma existir nunca veria a conquista no perfil.
+
+Quem calcula é o servidor, contra o banco. O cliente recebe a string pronta e a encaminha —
+regra 3 intacta, e ele nem precisa conhecer o catálogo de conquistas.
+
+#### Onde a sincronização dispara, e por que em dois lugares
+
+No **sign-in** e a cada leitura da tela de prêmios. Só na tela seria pouco: ela é opcional, e
+quem nunca a abre ficaria com o perfil vazio tendo limpado a campanha inteira. Só no sign-in
+seria pouco também: quem cumpre uma conquista durante a sessão teria de reconectar para
+vê-la. A requisição extra do sign-in **só existe dentro do shell** — no navegador a ponte não
+tem `syncAchievements`, e a função sai antes de fazer requisição nenhuma.
+
+Ser chamada duas vezes é seguro porque `sincronizarConquistas` pergunta antes de escrever: a
+segunda passada não faz chamada nenhuma à plataforma. Sem isso seriam dez chamadas a cada
+abertura do jogo, pelo resto da vida da conta.
+
+#### Os modos de falha que a sincronização trata, e por que nenhum derruba o jogo
+
+- **Plataforma ausente** (jogo aberto pelo executável direto, loja fechada, módulo nativo
+  faltando) é estado NORMAL: porta `null`, `indisponivel: true`, e o jogador continua jogando.
+- **Uma conquista recusada** (espelho autorado com nome que não existe no backend) entra em
+  `falhas` e **não leva as outras nove junto**.
+- **Não conseguir LER** o estado não impede de escrever: desbloquear é idempotente na
+  plataforma, e desistir por causa da pergunta deixaria a conquista de fora por um motivo que
+  não é o dela.
+- **Payload torto vindo do renderer** é descartado em `sincronizarPedidoDoRenderer` — o
+  renderer é o processo que carrega a página, e não pode derrubar o processo que segura a
+  janela. A validação mora em `achievements.ts` e não no `main.ts` porque o processo principal
+  não roda em `pnpm test`, e a validação de entrada é justamente o que precisa rodar.
+
+#### `steamworks.js` é `import` dinâmico dentro de `try`, e não dependência estática
+
+Ele é módulo nativo: não existe em toda plataforma, não compila em toda máquina, e no laço de
+desenvolvimento no navegador não faz sentido. Um `import` estático faria o processo principal
+**morrer na carga** em qualquer máquina sem ele — inclusive a do CI, que builda o instalador.
+O especificador fica numa variável de propósito, para o TypeScript não exigir os tipos de uma
+dependência opcional para compilar o shell. O App ID vem do ambiente pelo mesmo motivo que a
+URL da API veio na 2/N: o mesmo binário assinado aponta para o app de produção ou para o de
+teste sem rebuild.
+
+#### A ponte, provada dentro do Electron de verdade
+
+Teste unitário não pega o modo de falha mais bobo desta fatia: **o nome do canal de IPC
+digitado diferente nos dois lados**. `contextBridge` expõe, `ipcMain.handle` escuta, e se as
+duas strings não forem iguais nada acontece — sem erro. Provado por diagnóstico descartável
+(mesmo precedente do M9), carregando o `main.js` construído e chamando a ponte pelo renderer:
+
+```
+ponte exposta ao renderer: function
+resposta do processo principal: {"desbloqueadas":[],"jaEstavam":[],"falhas":[],"indisponivel":true}
+```
+
+`indisponivel: true` é o resultado HONESTO desta máquina: o caminho inteiro
+renderer → `preload` → IPC → processo principal → sincronização funciona, e a plataforma é que
+não está lá.
+
+#### O que falta para a conquista aparecer no perfil de um jogador de verdade
+
+Três coisas, nenhuma delas código deste repositório: **(1)** o App ID de parceiro em
+`PATHS_BEYOND_STEAM_APP_ID`; **(2)** `steamworks.js` entrando como dependência opcional do
+shell — ela não entra agora porque sem App ID ela só adicionaria um módulo nativo ao
+`pnpm install` e ao CI sem provar nada; **(3)** os 10 nomes de `platformId` registrados no
+backend de parceiro, iguais aos autorados. Enquanto isso, o binário empacotado roda com a
+porta `null`, que é o mesmo caminho de quem abre o jogo com a loja fechada.
+
+**Suíte: 137 arquivos, 1993 testes** (era 134/1968). `validate:data` inalterado em 29/204.
+
+---
+
+### M21 — sub-sessão 4/N: o auto-update, e o launcher que ficou para depois
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em
+`0.19.0`.
+
+#### Por que auto-update não é conveniência neste jogo
+
+O projeto é sempre-online: toda batalha faz round-trip, o servidor re-simula o replay e recusa
+`rulesVersion` que não é a dele (`battle/routes.ts:312`). Na web ninguém notava, porque todo
+mundo recarregava a página. No desktop, um jogador fica semanas na mesma versão — e o cliente
+velho não fica "um pouco desatualizado", ele **para de conseguir jogar**. Sem atualização
+automática, a única saída do jogador seria adivinhar que precisa baixar de novo.
+
+#### A pergunta do usuário: launcher próprio, como outros jogos?
+
+Analisada e **descartada por ora**, com os três argumentos:
+
+1. **O delta já existe.** O electron-builder gera `.blockmap` e o `electron-updater` baixa
+   diferencial; do lado da loja, o SteamPipe já entrega delta por chunk. "A loja recebe só
+   atualizações pequenas" **já é verdade** sem launcher nenhum.
+2. **Não há asset grande para gerenciar.** O conteúdo é JSON em `packages/data` — kilobytes. O
+   peso do download é o Chromium, que só muda quando NÓS subimos a versão do Electron.
+3. **Custaria o que a 3/N acabou de entregar.** Identidade de plataforma e achievements
+   dependem de o jogo ser o processo que a loja lançou; com launcher ele vira processo filho,
+   e overlay, ticket e conquistas passam a depender de o App ID vazar corretamente para o
+   filho. É o modo de falha clássico dos jogos com launcher.
+
+Some-se que o launcher é um segundo app para assinar, empacotar e **atualizar** — ele precisa
+de um atualizador próprio, que é exatamente o problema que o `electron-updater` resolve.
+
+**O gatilho para reabrir esta decisão está escrito:** se o download de conteúdo passar de
+alguns GB, ou se o jogo for para uma loja com revisão lenta, o launcher passa a valer.
+
+#### A decisão de canal: dentro da loja, quem atualiza é a loja
+
+Dois atualizadores mexendo no mesmo diretório de instalação é corrupção garantida — a
+verificação de arquivos da loja desfaz o que o nosso baixou, e o nosso rebaixa de novo.
+`decidirVerificacao` recusa em três casos, cada um com teste: **fora do pacote** (o laço de
+desenvolvimento não tem binário para trocar), **dentro da loja** (o mesmo App ID que a 3/N
+usa como sinal) e **desligado por configuração** (a saída de emergência para prender uma
+máquina numa versão sem recompilar).
+
+#### As regras que estragariam o jogo em silêncio, e por isso têm teste
+
+- **`pronta` é absorvente.** O binário já está no disco e já foi conferido por sha512; a
+  verificação seguinte falhando por rede não pode fazer a tela esquecer que há o que instalar
+  — o jogador clicaria em nada.
+- **Erro de atualização vira ESTADO, nunca exceção.** O `electron-updater` emite `error` **e**
+  rejeita a promise; uma rejeição não tratada derrubaria o processo que segura a janela.
+- **Instalar é ao SAIR, e o "reiniciar agora" é do jogador.** Reiniciar sozinho fecharia o
+  jogo com uma batalha em curso — e a batalha está no servidor, então ele perderia o que
+  estava ganhando.
+- **O botão só age se há o que instalar.** Um botão que fecha o jogo sem trocar nada é a pior
+  coisa que um botão pode fazer.
+- **A tela mostra três fases e esconde as outras cinco.** "Falha ao verificar atualização" no
+  meio de uma campanha só assusta: o jogador não tem o que fazer com isso, e o shell tenta de
+  novo sozinho.
+
+#### O erro que só apareceu rodando o binário
+
+`import { autoUpdater } from 'electron-updater'` **compila e falha na carga**: o pacote é
+CommonJS, o shell é ESM, e o import nomeado dá `Named export 'autoUpdater' not found`. O app
+simplesmente não abria — nem em modo `--determinismo`. Custou uma rodada de empacotamento e
+instalação para aparecer, porque o TypeScript aceita a forma que o runtime recusa. **O job que
+já existia desde a 2/N é o que pega isso**: o workflow de release roda o binário empacotado
+com `--determinismo` em cada plataforma, e ele teria falhado antes de qualquer publicação.
+Corrigido com import default. O hash do runtime empacotado continua `c3a404a0, ok: true`
+depois do updater entrar.
+
+#### A config que falha em silêncio (o mesmo padrão da 2/N)
+
+**Sem o bloco `publish`, o electron-builder não emite `latest.yml`** — tudo compila, o
+instalador sai, o jogador instala, e a atualização nunca acontece porque o `electron-updater`
+não tem o que ler. Três testes de config: o bloco existe, a URL é HTTPS (o sha512 protege o
+que se baixou, mas quem escolhe a versão é esse endereço) e `electron-updater` é dependência
+de **runtime** — como devDependency, o build passa e o app quebra na máquina do jogador.
+
+O `release.yml` passa a subir `latest*.yml` e `.blockmap` junto dos instaladores. A URL padrão
+usa o domínio `updates.pathsbeyond.example`: `.example` é reservado pela RFC 2606 exatamente
+para isto — um placeholder que **nunca** pode resolver para a máquina de um estranho.
+
+#### A PROVA, de ponta a ponta, com host de verdade
+
+Autorizada pelo usuário, inclusive a instalação nesta máquina. Dois instaladores NSIS
+(`0.0.1` e `0.0.2`), o diretório de release servido em `http://127.0.0.1:8321/`, a 0.0.1
+instalada de verdade em `%LOCALAPPDATA%\Programs`, e o registro que o próprio app escreve:
+
+```
+{"evento":"inicio","versao":"0.0.1","empacotado":true}
+{"evento":"atualizacao","fase":"verificando"}
+{"evento":"atualizacao","fase":"disponivel","versao":"0.0.2"}
+{"evento":"atualizacao","fase":"baixando","versao":"0.0.2","porcento":100}
+{"evento":"atualizacao","fase":"pronta","versao":"0.0.2"}
+```
+
+Fechado o jogo, o instalador rodou sozinho; reaberto:
+
+```
+{"evento":"inicio","versao":"0.0.2","empacotado":true}
+{"evento":"atualizacao","fase":"sem-atualizacao"}
+```
+
+**Uma versão foi para a seguinte, sem ninguém baixar nada à mão.** Antes disso, com o servidor
+fora do ar, o mesmo binário registrou `{"fase":"erro","mensagem":"net::ERR_CONNECTION_REFUSED"}`
+e **continuou rodando** — que é a outra metade da prova. Máquina devolvida ao estado anterior:
+jogo desinstalado, dados de app removidos, `version` de volta em `0.0.0`.
+
+#### O registro em ARQUIVO, e por que ele não é só console
+
+Um app empacotado de janela no Windows não tem console para onde escrever — foi assim que
+esta fatia descobriu que o `console.log` do processo principal não chegava a lugar nenhum. O
+registro vai para `userData`, junto do save: é o diretório que se pede ao jogador quando ele
+abre um chamado, e "por que este jogador não atualizou?" é uma pergunta que se faz depois, com
+o jogo já fechado.
+
+#### Fora desta fatia, declarado
+
+- **Assinatura de código.** Segue não existindo, e para auto-update ela pesa mais do que para
+  instalação: o SmartScreen avisa a cada atualização baixada. É pré-requisito de lançamento.
+- **macOS.** O `autoUpdater` do macOS **exige** binário assinado e notarizado; sem certificado
+  não há como provar aquele lado. Windows foi provado aqui; Linux (AppImage) fica configurado
+  e não executado, como na 2/N.
+
+**Suíte: 139 arquivos, 2015 testes** (era 137/1993). `validate:data` inalterado em 29/204.
+
+---
+
+## M22 — Sempre-online: versão, reconexão e cobertura
+
+### M22 — as três decisões, e o que cada buraco custava
+
+`packages/core` ganhou um módulo novo (`rulesVersionCompat.ts`) e **nenhuma regra de jogo
+mudou** — `RULES_VERSION` fica em `0.19.0`. `packages/data` intocado.
+
+#### (1) Versão — `N-1` NÃO é aceito, e o argumento é do projeto
+
+Decisão do usuário, tomada antes do código. **O servidor re-simula o replay e compara hash**,
+e `rulesVersion` só muda quando uma fórmula muda (regra 11). Aceitar o cliente de ontem seria
+manter dois motores de regra vivos ao mesmo tempo, e o resultado de uma partida passaria a
+depender de qual deles rodou. A resposta certa para a janela de rollout não é aceitar o
+cliente velho — é mandar atualizar, e é isso que a tela do cliente faz.
+
+**O 409 seco virou dado.** O corpo do erro carrega `code`, `reason`, `expected` e `received`
+além da frase. A frase é para log e para humano; quem precisa DECIDIR é o cliente, e decidir
+por mensagem é decidir por algo que muda de redação sem ninguém perceber — a tela pararia de
+aparecer em silêncio. O código vem do core, então quem recusa e quem reconhece a recusa leem
+a mesma constante.
+
+**`reason: 'missing'` é distinto de `'different'`** porque as duas telas dizem coisas
+diferentes: um cliente que não manda a versão é anterior à checagem.
+
+**Três rotas e não duas.** O roadmap listou `/dungeons/:id/run` (buraco do M17 5/N);
+`/campaign/:id/run` tem o mesmo buraco e não estava lá porque nasceu no M18 4/N, **depois** de
+o roadmap ser escrito. As três reexecutam comandos do cliente contra o motor deste servidor.
+
+**A checagem vem antes do limitador e antes de qualquer cobrança:** um cliente desatualizado
+não consegue jogar, e responder 429 a ele o deixaria com um erro que não explica nada em vez
+da tela que manda atualizar.
+
+#### (2) Reconexão — o nonce já protegia a carteira; faltava proteger a RUN
+
+O buraco, em uma frase: o servidor **debitava a energia, resolvia a batalha, e a conexão
+caía** antes de a resposta chegar. O reenvio levava `409 esta run já foi resolvida` — do
+ponto de vista do jogador, a run comeu a energia e sumiu.
+
+A primitiva certa já existia (nonce em `replays`, `dungeon_runs`, `economy_actions`); o que
+faltava era **guardar a RESPOSTA** e devolvê-la no reenvio. Migration `0013`,
+`IdempotencyRepository` nos dois repositórios, e um **hook** (`idempotency.ts`) em vez de um
+`if` por rota: são nove rotas com nonce em cinco arquivos, e a próxima nasce amanhã. Escrito
+por rota, o comportamento existe onde alguém lembrou de escrever.
+
+Regras que o teste trava:
+- **só resposta de SUCESSO é guardada** — recusa por energia, por cota ou por versão precisa
+  poder ser tentada de novo depois que o jogador resolver o problema; congelá-la naquele
+  nonce transformaria um problema temporário em permanente;
+- **mesmo nonce em outra rota é 409** — repetir a resposta de uma masmorra para um pedido de
+  invocação seria responder outra pergunta;
+- **o que já foi repetido não é regravado**, senão o armazém guardaria a repetição por cima
+  do original.
+
+**O que este hook não resolve, dito com todas as letras:** duas requisições SIMULTÂNEAS com o
+mesmo nonce podem passar as duas pela consulta antes de qualquer uma gravar. Contra isso quem
+protege são as chaves primárias que já existem, e elas continuam no lugar. O problema desta
+fatia é o reenvio SEQUENCIAL de quem perdeu a conexão.
+
+**No cliente, o nonce passou a sobreviver ao processo.** Ele vinha do ticket e vivia numa
+variável da store: uma queda (ou o jogo fechando) levava junto a única chave capaz de
+recuperar uma run já cobrada. Agora vai para `localStorage` antes de a requisição sair, e o
+sign-in reenvia o que ficou pendente. **Falha de rede mantém o pedido guardado; resposta do
+servidor — mesmo recusando — o limpa**, porque aí o desfecho é conhecido.
+
+#### (3) Cobertura de rate limit — as rotas abertas eram as que gastam dinheiro real
+
+`tryConsume` era chamado por seis rotas e **as seis eram de batalha**. `POST /summon`,
+`POST /shop/purchase`, `POST /energy/purchase`, `POST /rewards/:id/claim` e as quatro de
+progressão não consumiam nada. O nonce não cobre isso: ele protege contra reenviar a MESMA
+requisição, não contra mandar mil DIFERENTES.
+
+**Virou hook, e é isso que faz "toda rota" ser verdade.** `registerRateLimit` cobra de toda
+requisição que MUDA estado (POST/PUT/PATCH/DELETE) dentro do escopo protegido. Leitura não
+consome: limitar `GET` tornaria a tela do jogador refém do limite que existe para proteger a
+carteira dele. A chave é o jogador e não o IP — vários jogadores atrás do mesmo provedor não
+podem se derrubar entre si.
+
+**Ordem entre os dois hooks, e ela é decisão:** idempotência ANTES do limitador. O reenvio de
+quem caiu é respondido do armazém e nem chega ao limitador — cobrar cota de uma requisição já
+resolvida seria punir o jogador pela queda da internet dele.
+
+**`DELETE /me` escapou, e foi o teste que contou.** `accountRoutes` vive fora do escopo
+protegido (é ela que cria a conta) e tem escopo autenticado próprio, que não herda o hook do
+tio. A rota que apaga o jogador de sete repositórios era a única sem cota. O limitador passou
+a ser registrado lá também.
+
+#### O limitador compartilhado: Postgres, e por quê
+
+O §2 previu Redis e ele nunca entrou no projeto. **Postgres é dependência real desde o M19,
+sobe no CI, e permite PROVAR** o limite valendo entre duas instâncias — uma implementação
+Redis que ninguém consegue exercitar aqui seria código que se supõe funcionar. Em memória o
+limitador conta por PROCESSO: com duas instâncias o teto vira o dobro, com dez vira dez vezes,
+e um teto que se multiplica com a escala é um teto que não existe.
+
+**A troca não exigiu tocar em nenhuma rota** — nenhuma rota chama o limitador; quem chama é o
+hook. `tryConsume` passou a aceitar retorno assíncrono, e é o hook que espera.
+
+**O defeito que o banco real revelou.** A primeira versão contava e inseria em uma instrução
+só, com CTE, supondo que isso bastasse para ser atômico. Não basta: as CTEs leem o mesmo
+instantâneo, então requisições simultâneas contam zero cada uma e passam todas — **medido:
+teto de 5, e 10 passaram**. Corrigido com `pg_advisory_xact_lock` por chave dentro de uma
+transação, que serializa o mesmo jogador sem fazer dois jogadores esperarem um pelo outro.
+Isso só apareceu porque o teste roda contra Postgres de verdade; em memória a suposição
+parecia certa.
+
+**Provado nesta máquina**, com `postgres:16` em contêiner: `26 arquivos, 290 testes, nenhum
+pulado` (sem `DATABASE_URL` são 4 pulados). O contêiner foi removido e o Docker encerrado ao
+fim.
+
+---
+
+## M23 — A primeira sessão de um jogador de verdade
+
+### M23 — a introdução contextual, e a corrente provada sem tocar no banco
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em
+`0.19.0`.
+
+#### O que os testes existentes NÃO provavam
+
+Todo teste de ponta a ponta até aqui parte de conta **semeada**: um repositório de memória
+montado com o jogador pronto, energia cheia e `premium: 5000` — números que nenhum jogador
+recebe. `primeiraSessao.test.ts` começa com a lista de jogadores **vazia** e faz tudo por
+HTTP: sign-in cria a conta e entrega o núcleo, o capítulo 1 paga a moeda, a moeda banca a
+invocação, a masmorra derruba o item, o item é equipado, o talento é alocado, e a arena é
+jogada contra a defesa de **outra conta também criada do zero**. Se a corrente tiver um elo
+que só funciona com o banco preparado à mão, ela arrebenta ali.
+
+**Três coisas que só apareceram porque o teste é honesto:**
+
+1. **O capítulo 1 tem UMA vaga.** A campanha é por vagas desde o M18 5/N: a primeira batalha
+   do jogo é um herói contra o cenário, e o jogador não escolhe mais que isso.
+2. **A primeira batalha é vencida em 65% das vezes** — medido, 39 vitórias em 60 execuções,
+   com a IA de mapa jogando pelo jogador. A seed sai do nonce do ticket, então cada tentativa
+   é uma batalha diferente. **Repetir é de graça** (a campanha não cobra energia e a derrota
+   não tira nada), e o teste faz o que o jogador faz: tenta de novo, afirmando no caminho que
+   a derrota não pagou nada. Um humano lendo o preview decide melhor que a IA, então 65% é o
+   piso e não o teto — mas **1 em 3 jogadores novos perde a primeira batalha do jogo**, e
+   isso fica registrado como achado para o usuário decidir (mexer nos números é mudança de
+   balanceamento, e a regra 10 exige `pnpm balance` e a decisão dele).
+3. **Só uma das quatro masmorras abertas a uma conta nova dá equipamento** (`focus: 'gear'`).
+   As outras pagam ouro, pedras e material — quem quiser equipar precisa saber escolher a
+   certa, e nada na tela dizia isso.
+
+#### A introdução: contextual, e por que ela não é um tutorial
+
+A forma vem do roadmap e não de mim: cada conceito é explicado **no ponto em que aparece pela
+primeira vez**, e não num paredão de texto inicial. Um paredão é lido por ninguém, e quem o
+lê não retém — o conceito só faz sentido com a tela dele na frente.
+
+Cinco gatilhos, cada um no lugar onde a dúvida nasce: o **preview de duelo** (é ali que
+"duelo automático" deixa de ser abstrato), o **painel de recursos** (AP e PP são duas siglas
+que a tela mostrava sem explicar), o **editor de táticas** (é onde o jogador descobre que
+programa a unidade antes em vez de comandá-la durante), a **invocação** (moeda premium,
+banner e o contador de garantia de uma vez) e a **arena** (assíncrona: você enfrenta a defesa
+que a pessoa deixou, não a pessoa).
+
+**O tamanho do texto é travado por teste** (320 caracteres): passar disso é o paredão que a
+milestone existe para não ter, montado aos poucos.
+
+**Uma caixa por vez** — a store recusa disparar a segunda enquanto a primeira está aberta,
+senão duas dicas simultâneas viram o mesmo paredão por acidente. E o cartão fica **ao lado**
+do que explica, não por cima: um modal obrigaria a fechar antes de olhar a tela descrita.
+
+#### Onde a introdução mora, e por quê
+
+**Save local, v3.** É estado de apresentação: o servidor não precisa saber quais caixas de
+texto alguém fechou, e guardá-lo lá custaria rota e coluna para algo que, se perder, no pior
+caso mostra uma dica de novo. Fica ao lado de `uiScale` e `colorblindMode` — que é
+exatamente o que o save passou a ser depois do M18 7/N.
+
+**Save v2 sobe para v3 com a lista VAZIA**, e isso é decisão: a alternativa seria marcar tudo
+como visto para não incomodar quem já joga. Ela esconderia a introdução justamente de quem
+pode ter aprendido errado, e o custo de errar para este lado é uma caixa fechada uma vez.
+**Ids desconhecidos sobrevivem à leitura** — o save pode vir de uma versão mais nova, e
+descartá-los faria o jogador rever aqui uma dica que ele dispensou lá.
+
+#### A varredura de jargão
+
+"Nenhuma tela exige conhecimento que o jogo não deu" é critério de COMPREENSÃO, e quem julga
+é o usuário. O que dá para travar por teste é o caso mecânico — sigla e termo de dentro do
+projeto vazando para a tela — e foram quatro: `CP` (em duas telas), `Imprint` como rótulo de
+botão, `a3 i1` como resumo de herói e `Valor: 3` sem dizer que é recurso do mapa. Viraram
+"poder de combate", "vínculo", "despertar 3 · vínculo 1" e "Valor — recurso do mapa", com
+`title` explicando cada um. `semJargao.test.ts` reprova se um termo novo escapar.
+
+#### O que NÃO está fechado, e é do usuário
+
+O critério 3 do M23 é explícito: **validado pelo usuário observando alguém que nunca viu o
+jogo, com o veredito sendo dele** — mesmo precedente do critério 2 do M16. Nada neste
+documento substitui isso, e a milestone não se fecha sozinha.
+
+---
+
+## M24 — Áudio
+
+### M24 — som sintetizado, e a leitura de impacto que faltava
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em
+`0.19.0`.
+
+#### A decisão: oscilador, não arquivo
+
+**Escolhida pelo usuário, com o precedente do M16.** O projeto decidiu linguagem visual
+programática e proibiu imagem no repositório; som gerado por oscilador segue a mesma regra
+pelo mesmo motivo: não pesa no download (o Electron já custa ~130 MB), não precisa de licença
+nem de pipeline de asset, e **é testável** — dá para afirmar forma de onda, ganho e instante,
+coisa que um `.ogg` não permite (e que eu não teria como julgar de qualquer modo).
+
+**O preço, dito de frente:** som sintetizado tem teto de qualidade. Isto é arcade, não
+orquestra. Se um dia a direção pedir trilha gravada, a troca é do motor (`audio.ts`), não dos
+chamadores — e o teste de assets é o lugar onde a decisão será reaberta de propósito.
+
+**Por que o som importa neste jogo em particular:** o duelo é automático, o jogador decide
+antes e ASSISTE. O M16 construiu peso e timing no visual (`motion.ts`); som é a outra metade
+da mesma leitura — sem ele, um golpe de 40 e um de 4 têm a mesma presença.
+
+#### A sincronia é ESTRUTURAL, e não um segundo relógio
+
+O som entra pela mesma linha do tempo da animação: `montarDuelo` já calcula o instante da
+batida (`cursor + duração × IMPACT_PEAK_AT`), e é nesse instante que o golpe soa. Um relógio
+próprio para o áudio precisaria ser mantido em sincronia com o da animação por disciplina —
+e sairia de sincronia no primeiro ajuste de timing.
+
+Pelo mesmo motivo, **`PAUSA_MINIMA_MS` é o mesmo número que `SCENE_GAP_MS`** (90ms), e o
+teste trava isso: dois números para a mesma pausa divergiriam, e o áudio deixaria de
+acompanhar a animação sem nada ficar vermelho.
+
+#### Duas batidas novas em `motion.ts`, e nenhuma muda desenho
+
+`DuelBeat.kind` ganhou `counter` e `heal`. O contra-ataque **já era animado** como o golpe que
+ele é (mesmo caminho de impacto) e continua sendo — o que muda é que agora ele tem som
+próprio, porque "bati" e "apanhei de volta" precisam soar diferente. A cura **não tem
+animação** (curar não sacode ninguém) e não consome tempo na linha: a batida existe só para o
+som ter onde cair. Sem ela, "curei 80" e "não aconteceu nada" soariam igual.
+
+#### O anti-borrão, e por que ele é por tipo
+
+Várias unidades agindo em fila, três trocas por duelo, golpes caindo em décimos de segundo:
+tocados todos, viram um chiado em que nenhum é audível — o oposto de leitura de impacto.
+`semBorrao` descarta o som IGUAL que chega antes da pausa mínima, e **vence o primeiro** (é
+ele que já está tocando quando o segundo chega). A regra é por tipo de propósito: um golpe não
+pode silenciar a morte que aconteceu junto, porque são informações diferentes e a morte é a
+que o jogador precisa ouvir.
+
+#### Detalhes que só aparecem no alto-falante de outra pessoa
+
+- **O envelope cai até zero.** Cortar um oscilador em amplitude cheia produz um clique que se
+  ouve em todo som e não pertence a nenhum deles.
+- **O relógio do WebAudio é em segundos** e as durações do projeto estão em milissegundos:
+  trocar as unidades dá um som de 90 segundos e nada mais audível depois dele. Tem teste.
+- **Ganho acima de 1 satura**; o volume vindo do save é limitado à faixa antes de multiplicar,
+  porque o save é disco do jogador e pode ter sido editado à mão.
+- **O contexto nasce no primeiro som pedido**, e não na carga do módulo: a política de
+  autoplay recusa um `AudioContext` criado antes do primeiro gesto, e o sintoma seria "o jogo
+  não tem som", sem erro nenhum.
+
+#### Os dois controles, e onde eles moram
+
+Volume de efeitos e de música separados — quem joga ouvindo podcast desliga a música e
+continua precisando ouvir o golpe. Persistidos no **save v4**, ao lado de `uiScale` e
+`colorblindMode`, que é exatamente onde o roadmap mandou pô-los. Save v3 sobe para v4 com os
+volumes PADRÃO: migrar para mudo faria quem já jogava abrir o jogo achando que o som quebrou.
+
+#### O teste de assets NÃO precisou de ajuste — e ganhou uma regra
+
+O critério de aceite previa que um asset de áudio pudesse conflitar com
+`semAssetsRaster.test.ts` ("se ele precisar de ajuste, o ajuste é declarado e não silencioso").
+**Não precisou:** não há um arquivo de som no repositório. O que se acrescentou foi a trava do
+outro lado — o teste agora reprova `.mp3`, `.ogg`, `.wav` e companhia, e também `data:audio`
+em base64 no código, pelo mesmo argumento que já valia para imagem: base64 é o mesmo arquivo
+com outro nome.
+
+#### O que este milestone NÃO afirma
+
+Se o jogo soa BEM. Isso é julgamento do usuário, como a estética sempre foi neste projeto
+(critério 2 do M16, critério 3 do M23). O que os 18 testes afirmam é que o som certo toca no
+instante certo, com o ganho certo, e que ele não vira borrão.
+
+**Suíte: 152 arquivos, 2121 testes.** `validate:data` inalterado em 29/204.

@@ -8,6 +8,36 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    # M19 — um Postgres de VERDADE no CI.
+    #
+    # Até aqui nenhum teste do projeto tocava banco: tudo rodava contra os repositórios de
+    # memória, e produção era o único caminho sem prova. O preço já estava cobrado e ninguém
+    # tinha visto — a cláusula CHECK de `economy_actions` derivou do TypeScript e recusaria
+    # todo summon e toda compra de energia em produção.
+    #
+    # `repositoryParity.test.ts` roda a mesma bateria nos dois backends e se PULA sozinho sem
+    # `DATABASE_URL`, para o laço local não exigir banco. Este serviço é o que impede esse
+    # "pula" de virar permanente.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: paths
+          POSTGRES_PASSWORD: paths
+          POSTGRES_DB: paths_beyond_test
+        ports:
+          - 5432:5432
+        # Sem o health check o job corre para o `migrate` antes de o banco aceitar conexão.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://paths:paths@localhost:5432/paths_beyond_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +56,9 @@ jobs:
 
       - name: Lint (Math.random check in core)
         run: pnpm lint
+
+      - name: Migrar o banco de teste
+        run: pnpm --filter @paths-beyond/server run migrate
 
       - name: Test
         run: pnpm test
@@ -52,3 +85,28 @@ jobs:
         run: pnpm browsers:install
       - name: Determinismo entre engines
         run: pnpm test:browser
+
+  # M21, 1/N — o determinismo DENTRO do runtime empacotado.
+  #
+  # O job acima roda a suíte em Node (V8) e o `determinismo-navegadores` roda em Chromium,
+  # Firefox e WebKit de teste. **Nenhum dos dois diz nada sobre o runtime que o jogador vai
+  # ter**: a versão de Chromium que o Electron embute, com as flags do Electron, dentro do
+  # processo que o instalador entrega. Como o servidor re-simula todo replay (§9.4), uma
+  # divergência ali chega ao jogador como "ganhei e o servidor disse que perdi".
+  #
+  # `xvfb-run` porque o Electron precisa de um display mesmo com a janela `show: false`.
+  determinismo-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Habilitar corepack
+        run: corepack enable
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+      - name: Construir o shell
+        run: pnpm --filter @paths-beyond/desktop run build
+      - name: Determinismo no runtime empacotado
+        run: xvfb-run --auto-servernum pnpm --filter @paths-beyond/desktop run determinismo

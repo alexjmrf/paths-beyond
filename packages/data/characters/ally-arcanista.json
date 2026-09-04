@@ -3,5 +3,29 @@
   "name": "Vesper",
   "classId": "class-arcanista",
   "acquisition": "story",
-  "fragmentMaterialId": "material-fragmento-ally-arcanista"
+  "fragmentMaterialId": "material-fragmento-ally-arcanista",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "arcane",
+    "equipment": {
+      "weapon": "item-arma-arcanista",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-arcanista",
+      "skill-especial-arcanista"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-arcanista",
+        "conditions": []
+      }
+    ]
+  }
 }

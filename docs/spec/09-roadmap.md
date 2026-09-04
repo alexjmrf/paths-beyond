@@ -181,6 +181,175 @@ e os dois sumidouros gastam; `pnpm balance` reexecutado com os dois critérios d
 
 ---
 
+> **M19–M24 foram PROPOSTAS pelo agente em 2026-09-03**, a pedido do usuário, depois de uma auditoria
+> do repositório (não da documentação). **Elas precisam ser ratificadas pelo usuário antes de
+> qualquer uma ser aberta** — M17 e M18 nasceram os dois de "definido pelo usuário", e esta seção não
+> muda essa regra. As decisões que as sustentam estão em `DECISIONS.md`, seção "Em aberto (levantadas
+> pelo usuário em 2026-09-03, ao definir plataforma alvo e sempre-online)", itens A–G.
+>
+> **O diagnóstico que ordena estas seis, em uma frase:** o jogo está **completo o bastante em
+> mecânica para ser testado e incompleto o bastante em infraestrutura para ser impossível de
+> publicar** — 1.831 testes, 8 pacotes, motor determinístico validado em três engines, e ao mesmo
+> tempo nenhuma conta de verdade jamais existiu, nenhum dado sobrevive a um reinício do servidor e
+> nenhuma build jamais foi instalada em máquina nenhuma. As milestones anteriores construíram o
+> JOGO; estas seis constroem o PRODUTO, e a ordem não é gosto: cada uma torna a seguinte testável
+> de verdade, e as duas primeiras são pré-requisito de qualquer teste com um jogador real.
+
+### M19 — Persistência e operação do servidor
+**A milestone que existe porque hoje o servidor de produção perde dados do jogador a cada
+reinício.** `apps/server/src/index.ts` monta `createMemoryEconomyRepository()` — materiais,
+inventário e limpezas de masmorra vivem em RAM desde M14 3/N, enquanto todos os outros sete
+repositórios já são de Postgres. Não é achado novo (a 3/N o registrou e pôs comentário no arquivo);
+o que mudou é que sempre-online promove isso de anomalia a **bloqueio duro**, porque o servidor
+deixou de ser um validador de PvP e passou a ser a única fonte de verdade que existe. **A boa
+notícia é que a parte cara já está feita:** a migration `0007_pve_economy.sql` já criou
+`player_materials`, `player_items`, `dungeon_clears`, `dungeon_entries` e `dungeon_runs` — o schema
+existe, falta a implementação do repositório. Junto entra o que faltava para o serviço ser
+operável: o servidor inteiro tem **uma única linha de log**, o que significa que uma falha em
+produção hoje é invisível. Entram logging estruturado por requisição, erro com contexto, e o
+procedimento de backup/restore exercitado de verdade e não presumido.
+**Aceite:** `apps/server/src/index.ts` não instancia **nenhum** repositório de memória; um teste de
+integração prova que material, item de inventário e limpeza de masmorra sobrevivem a reiniciar o
+processo; toda rota emite log estruturado com id de jogador e desfecho; um restore a partir de
+backup é executado e documentado, com a suíte passando contra o banco restaurado; `pnpm test` segue
+verde e o repositório de memória continua existindo **para os testes e o `devServer`**, que é o uso
+para o qual ele foi escrito.
+
+---
+
+### M20 — Identidade de plataforma
+**Hoje o jogador digita o próprio identificador numa caixa de texto.** `x-player-token` é um token
+opaco declarado como stub em M7, e era a decisão certa enquanto o servidor só arbitrava arena. Com
+sempre-online, economia real e uma moeda que se compra com dinheiro, ele é ao mesmo tempo o
+mecanismo de autenticação e o mecanismo de personificação: quem souber o token de alguém É essa
+pessoa. Entra identidade de plataforma — ticket de sessão da Steam validado no servidor contra a
+Steam Web API, o equivalente da Epic via EOS — que tem a propriedade de não guardar credencial
+nenhuma do nosso lado. **E entra o ciclo de vida de conta, que não existe:** o projeto nunca teve
+rota de criação; a 6/N resolveu isso derivando o núcleo preguiçosamente em `GET /me/heroes`, o que
+foi a decisão certa para aquela fatia e não é uma resposta para "o que acontece quando alguém
+compra o jogo". Entram também exclusão e exportação de conta, que deixam de ser opcionais quando
+existe conta de verdade.
+**Aceite:** um jogador novo chega do zero pela identidade da plataforma, sem digitar nada, e recebe
+o núcleo de quatro; nenhuma rota aceita mais o token digitado; existe criação de conta explícita e
+o comportamento preguiçoso da 6/N ou é substituído ou é declarado como o caminho oficial, com o
+motivo escrito; exclusão de conta remove o jogador de todas as tabelas e é testada; a suíte de
+servidor roda sem depender da Steam (o validador é injetado, no mesmo padrão de `now` e `newNonce`).
+
+---
+
+### M21 — O shell desktop e o pipeline de release
+**A primeira vez que o jogo vira uma coisa que se instala.** O §2 de
+`01-fundacoes-tecnicas.md` diz "não usar engine pesada" e nunca nomeou empacotamento, porque quando
+foi escrito o alvo era implicitamente o browser; com desktop declarado, a escolha de shell passa a
+ser normativa. **A recomendação registrada é Electron, e o argumento é do próprio projeto:** o
+servidor roda Node (V8) e re-simula todo replay; Electron embute Chromium (V8) numa versão que nós
+congelamos, então cliente e servidor comparam hash na mesma engine. Tauri usaria a webview do
+sistema — JavaScriptCore no macOS e no Linux/Steam Deck — e reintroduziria em produção exatamente a
+divergência de runtime que o ponto fixo e o job `determinismo-navegadores` existem para eliminar.
+Junto entram Steamworks e o pipeline: os **10 achievements já autorados** em
+`packages/data/achievements/` ganham espelho na plataforma, e o CI passa a produzir um instalável.
+**Nota de escopo:** `HANDOFF.md` já teve um item "shell desktop (Electron + steamworks.js)",
+removido em 2026-08-28 por não ser o escopo do M9 real — o motivo da remoção venceu.
+**Aceite:** existe build instalável para as plataformas alvo, produzida pelo CI e não à mão; o teste
+de determinismo roda **dentro do runtime empacotado** e o hash bate com o do servidor, o que é a
+única prova que importa (o job atual prova navegadores, não o shell); auto-update funciona de uma
+versão para a seguinte; os 10 achievements do catálogo concedem na plataforma e continuam
+retroativos como a 4/N os desenhou; a decisão Electron vs Tauri está escrita em §2 com o argumento,
+não só com o resultado.
+
+---
+
+### M22 — Sempre-online: versão, reconexão e cobertura
+**A milestone que faz sempre-online não parecer quebrado.** Três buracos, todos conhecidos e todos
+registrados. **(1) Versão:** `battle/routes.ts:312` devolve um **409 seco** em mismatch de
+`rulesVersion`; na web isso nunca aparecia porque todo mundo recarregava, no desktop jogadores rodam
+versões diferentes por dias, e com sempre-online o mismatch não mata só a arena — mata o jogo
+inteiro, porque toda batalha faz round-trip. Precisa de tela de atualização acionável e de uma
+decisão sobre aceitar `N-1` na janela de rollout. Junto fecha o vizinho já registrado no M17 5/N:
+`POST /dungeons/:id/run` reexecuta `commands` do cliente e **não tem campo `rulesVersion`**, então
+não há o que validar. **(2) Reconexão:** a primitiva certa já existe e é genérica — o nonce de
+`economy_actions`, `dungeon_runs` e `replays` —, mas o cliente não guarda o nonce em voo, então uma
+queda de conexão no meio de uma run pode comer energia já debitada. **(3) Cobertura de rate limit:**
+`tryConsume` é chamado por seis rotas e **todas são de batalha**; `POST /summon`,
+`POST /shop/purchase`, `POST /energy/purchase`, `POST /rewards/:id/claim` e as quatro de progressão
+não consomem do limitador. O nonce protege contra reenviar a **mesma** requisição, não contra mil
+**diferentes** — ou seja, as rotas que tocam a moeda comprável com dinheiro real são justamente as
+abertas. O limitador é em memória, portanto por processo: o `RateLimiter` já é interface, e trocar
+por uma implementação compartilhada (o §2 já prevê Redis e ele nunca entrou) não mexe em rota
+nenhuma.
+**Aceite:** mismatch de versão produz tela acionável no cliente e nunca um erro cru, com a política
+`N-1` decidida e escrita; `POST /dungeons/:id/run` valida `rulesVersion` como `/battles` já faz;
+derrubar a conexão no meio de uma run e reconectar não cobra duas vezes nem perde a run, provado por
+teste; **toda** rota que debita recurso consome do limitador, com um teste que falha se uma rota
+nova esquecer; existe implementação compartilhada do `RateLimiter` e a troca não exigiu tocar em
+nenhuma rota.
+
+---
+
+### M23 — A primeira sessão de um jogador de verdade
+**Ninguém nunca jogou este jogo sem saber como ele funciona.** Todo teste de ponta a ponta até aqui
+partiu de conta semeada, fixture ou `devServer`; com M20, contas novas passam a existir de verdade,
+e esta é a milestone que descobre o que um estranho não entende. O jogo tem duelo automático com
+scripts táticos programados antes do combate, economia de AP/PP que dura a batalha inteira,
+assistência por adjacência, árvore por personagem e gacha — **é muita regra para descobrir sozinho**,
+e o pilar "legibilidade tática" de §1.1 exige que o jogador consiga prever o resultado antes de
+confirmar. Esta milestone é o teste desse pilar com alguém que não escreveu a spec. Segue o
+precedente do critério 2 do M16: **estética e compreensão são julgadas pelo usuário, não
+autocertificadas pelo agente.**
+**Aceite:** uma conta criada do zero joga o capítulo 1, faz o primeiro summon, equipa, aloca talento
+e entra na arena **sem ninguém tocar no banco** e sem instrução fora do jogo; a introdução explica
+duelo, AP/PP e script tático no ponto em que cada um aparece pela primeira vez, e não num paredão de
+texto inicial; **validado pelo usuário observando alguém que nunca viu o jogo**, com o veredito
+sendo dele; nenhuma tela exige conhecimento que o jogo não deu.
+
+---
+
+### M24 — Áudio
+**O projeto tem zero som — nenhum arquivo, nenhuma biblioteca, nenhuma chamada.** Não é omissão de
+autoria, é ausência de camada: `grep` por `Audio`, `howler` ou `WebAudio` em `apps/client/src`
+devolve nada. Para um jogo tático em que o duelo é automático e o jogador assiste ao resultado da
+decisão que tomou antes, o som não é enfeite — é metade da leitura de impacto que M16 construiu no
+visual com peso e timing (`motion.ts`). Entram camada de áudio, mixagem por categoria e os
+controles, que caem exatamente no lugar certo: depois da 7/N, o save local é **só preferências de
+apresentação**, que é precisamente o que volume é.
+**Aceite:** golpe, contra-ataque, morte, cura e as transições de turno têm som, sincronizados com as
+batidas que `motion.ts` já define; existem controles separados de música e efeitos, persistidos no
+`SaveGame` v2 ao lado de `uiScale` e `colorblindMode`; o áudio respeita as pausas entre cenas
+(`SCENE_GAP_MS`) em vez de virar borrão quando várias unidades agem em sequência; nenhum asset de
+áudio quebra o teste `semAssetsRaster.test.ts`, que é sobre imagem — se ele precisar de ajuste, o
+ajuste é declarado e não silencioso.
+
+---
+
+### Horizonte — o que NÃO virou milestone, e por quê
+
+Quatro frentes reais que **não foram escritas como milestone de propósito**, porque cada uma depende
+de uma decisão do usuário que ainda está aberta. Escrever critério de aceite para elas agora seria
+inventar a decisão junto.
+
+- **Arte 2.5D / 3D.** Aberta desde 2026-08-28, em `DECISIONS.md`: o usuário declarou querer sprite
+  2.5D ou 3D, e o critério 1 do M16 ("nenhum arquivo de imagem entra no repositório") ainda está
+  escrito como definitivo. **A costura já existe** (`UnitRenderer`, M16 1/N, com teste de contrato
+  provando que é trocável), então isto é uma camada por cima e não uma reescrita — mas o tamanho da
+  milestone depende inteiramente de qual das duas direções é escolhida.
+- **Volume de conteúdo.** Seis capítulos, sete mapas, nove personagens e 41 inimigos são um
+  **piloto jogável, não um jogo publicável**. Quanto conteúdo entra depende do modelo de negócio,
+  que é o item F.
+- **Localização.** A UI é português cru no código (`Esperar`, `Descansar (+1 AP +1 PP)` direto no
+  JSX). Não há camada de i18n. Para uma loja global isso é trabalho próprio, e o custo cresce a cada
+  tela nova — vale decidir cedo **se** haverá outro idioma, mesmo que a implementação venha tarde.
+- **Monetização real.** §15 declara integração de pagamento fora de escopo e D15/D19 fecharam *que*
+  o jogo é um gacha — mas **não** se ele é pago ou F2P (item F). Sempre-online + gacha + moeda
+  premium + jogo pago na Steam é a combinação que aquela comunidade pune com mais força; F2P é o que
+  o gênero espera. A decisão muda o desenho da moeda, o volume de conteúdo exigido e a página da
+  loja, e sai mais barata agora do que depois de mais banner autorado.
+
+**Uma pendência de processo, que não é milestone e é do usuário:** a árvore tem **47 arquivos não
+commitados** cobrindo as sub-sessões 6/N e 7/N, e o último commit é o da 5/N. Duas sub-sessões
+inteiras de trabalho existem só na máquina local. Nenhum roadmap conserta isso.
+
+---
+
 ## 15. Decisões em aberto (registrar em `DECISIONS.md` ao resolver)
 
 - **`MAX_TROCAS = 3`** é um chute inicial. Com 2, o duelo vira "quem bate primeiro"; com 4+, o preview fica ilegível e `spd` volta a dominar. Teste 3 antes de mexer.

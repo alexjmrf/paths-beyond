@@ -1,7 +1,8 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
-import { resolveAutoBattle, type Hero } from '@paths-beyond/core';
+import { RULES_VERSION, resolveAutoBattle, type Hero } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -56,7 +57,8 @@ function buildHarness(options: { now?: number; elo?: number } = {}): Harness {
   const playerRepository = createMemoryPlayerRepository([
     {
       id: 'player-1',
-      token: TOKEN,
+      platformProvider: 'dev' as const,
+      platformId: TOKEN,
       displayName: 'Herói',
       elo: options.elo ?? 1200,
       arenaMarks: 0,
@@ -86,18 +88,19 @@ function buildHarness(options: { now?: number; elo?: number } = {}): Harness {
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
       ticketSecret: TICKET_SECRET,
+      identityValidator: createDevIdentityValidator(),
       now: () => options.now ?? DENTRO,
     }),
   };
 }
 
 async function post(h: Harness, url: string, payload: Record<string, unknown> = {}) {
-  const response = await h.app.inject({ method: 'POST', url, headers: { 'x-player-token': TOKEN }, payload });
+  const response = await h.app.inject({ method: 'POST', url, headers: { 'x-platform-ticket': `dev:${TOKEN}`}, payload });
   return { status: response.statusCode, body: response.json() as any };
 }
 
 async function get(h: Harness, url: string) {
-  const response = await h.app.inject({ method: 'GET', url, headers: { 'x-player-token': TOKEN } });
+  const response = await h.app.inject({ method: 'GET', url, headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
   return { status: response.statusCode, body: response.json() as any };
 }
 
@@ -114,6 +117,10 @@ async function jogarCapitulo(h: Harness, chapterId = CAPITULO) {
     nonce: ticket.body.nonce,
     heroIds,
     commands: jogada.commands,
+    // M22 1/N — a submissão manda a versão de regras com que o cliente jogou, como
+    // `/battles` sempre fez. Sem ela o servidor recusa: um cliente que não a manda é um
+    // cliente anterior à checagem.
+    rulesVersion: RULES_VERSION,
   });
 }
 
@@ -171,6 +178,7 @@ describe('POST /campaign/:id/run — a fonte "avanço de história"', () => {
       nonce: ticket.body.nonce,
       heroIds,
       commands: [],
+      rulesVersion: RULES_VERSION,
     });
 
     expect(semJogar.status).toBe(200);
@@ -254,6 +262,40 @@ describe('GET /me/rewards e POST /rewards/:id/claim', () => {
 
     expect(conquista.claimable).toBe(true);
     expect(body.account.chaptersCleared).toBe(1);
+  });
+
+  // §9.4 (M21, 3/N) — o que o shell precisa para espelhar na plataforma.
+  it('a conquista carrega o espelho da plataforma, e `earned` é CUMPRIMENTO e não reivindicação', async () => {
+    const h = buildHarness();
+
+    const { body: antes } = await get(h, '/me/rewards');
+    const naoCumprida = antes.rewards.find((r: any) => r.id === 'achievement-primeiro-passo');
+    // O espelho vem sempre: o cliente não conhece o catálogo de conquistas, ele só
+    // encaminha a string para a plataforma.
+    expect(naoCumprida.platform).toEqual({ id: 'ACH_PRIMEIRO_PASSO', earned: false });
+
+    await jogarCapitulo(h);
+    const { body: depois } = await get(h, '/me/rewards');
+    // Cumpriu e ainda NÃO reivindicou: a plataforma já desbloqueia. A conquista diz o que o
+    // jogador fez; reivindicar é só pegar a moeda.
+    expect(depois.rewards.find((r: any) => r.id === 'achievement-primeiro-passo').platform.earned).toBe(true);
+
+    await post(h, '/rewards/achievement-primeiro-passo/claim');
+    const { body: reivindicada } = await get(h, '/me/rewards');
+    const conquista = reivindicada.rewards.find((r: any) => r.id === 'achievement-primeiro-passo');
+    // E continua cumprida depois de reivindicada — `claimable` vira `false` e `earned` não.
+    // Sem isso, quem reivindicou antes de a plataforma existir nunca a veria no perfil.
+    expect(conquista.claimable).toBe(false);
+    expect(conquista.platform.earned).toBe(true);
+  });
+
+  it('o evento não tem espelho de plataforma — evento expira, conquista não', async () => {
+    const h = buildHarness();
+    const { body } = await get(h, '/me/rewards');
+
+    for (const premio of body.rewards.filter((r: any) => r.kind === 'event')) {
+      expect(premio.platform, premio.id).toBeUndefined();
+    }
   });
 
   it('reivindicar paga a moeda, e reivindicar de novo é 409', async () => {

@@ -62,6 +62,17 @@ interface RewardView {
   // cumpri" de "perdi a janela", e derivar isso lá exigiria o relógio do cliente — que é
   // justamente o que não decide nada neste projeto.
   readonly windowOpen?: boolean;
+  // §9.4 (M21, 3/N) — só em conquista: o espelho na plataforma e se ela está CUMPRIDA.
+  //
+  // **`earned` é cumprimento, não reivindicação** (decisão do usuário): a conquista da
+  // plataforma diz o que o jogador FEZ; reivindicar é só pegar a moeda. Quem cumpriu e
+  // ainda não passou na tela de prêmios já a desbloqueia — que é a mesma retroatividade
+  // que a 4/N do M18 desenhou para a moeda.
+  //
+  // Vem calculado do servidor e não derivado no cliente pelo mesmo motivo de sempre: quem
+  // sabe se a condição está cumprida é quem tem o banco. O cliente só encaminha a string
+  // para a plataforma.
+  readonly platform?: { readonly id: string; readonly earned: boolean };
 }
 
 export const rewardsRoutes: FastifyPluginAsync<RewardsRoutesOptions> = async (fastify, opts) => {
@@ -77,15 +88,22 @@ export const rewardsRoutes: FastifyPluginAsync<RewardsRoutesOptions> = async (fa
     const account = await snapshot(opts, player.id, player.elo);
     const claimed = new Set(await opts.rewardsRepository.listClaims(player.id));
 
-    const achievements: RewardView[] = Object.values(opts.catalog.achievements).map((achievement) => ({
-      id: achievement.id,
-      kind: 'achievement',
-      name: achievement.name,
-      description: achievement.description,
-      premium: achievement.premium,
-      claimed: claimed.has(achievement.id),
-      claimable: !claimed.has(achievement.id) && meetsCondition(achievement.condition, account),
-    }));
+    const achievements: RewardView[] = Object.values(opts.catalog.achievements).map((achievement) => {
+      const met = meetsCondition(achievement.condition, account);
+      return {
+        id: achievement.id,
+        kind: 'achievement',
+        name: achievement.name,
+        description: achievement.description,
+        premium: achievement.premium,
+        claimed: claimed.has(achievement.id),
+        claimable: !claimed.has(achievement.id) && met,
+        // Uma conquista já reivindicada continua cumprida: o que ela conta aconteceu, e
+        // pegar a moeda não desfaz. Sem isso, quem reivindicasse antes de a plataforma
+        // estar disponível nunca a veria no perfil.
+        platform: { id: achievement.platformId, earned: met || claimed.has(achievement.id) },
+      };
+    });
 
     const events: RewardView[] = Object.values(opts.catalog.events).map((event) => {
       const open = isWithinWindow(event, nowMs);

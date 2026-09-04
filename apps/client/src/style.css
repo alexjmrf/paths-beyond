@@ -1357,3 +1357,220 @@ button.targeting {
   height: 62%;
   display: block;
 }
+
+/* §10 (M18, 6/N) — a tela de aquisição. Mesma caixa e mesma linguagem do painel de
+   masmorras: é mais uma superfície de conta, não um lugar novo do jogo. */
+.summon-panel {
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.summon-panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.summon-panel h3 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.summon-panel button {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.summon-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.summon-premium,
+.summon-pity,
+.summon-pool {
+  margin: 0.25rem 0;
+  color: #d1d5db;
+}
+
+/* O pity é a informação que a tela existe para mostrar (D18): destacado, não escondido
+   numa linha de rodapé. */
+.summon-pity strong {
+  color: #fbbf24;
+}
+
+.summon-banner {
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #1f2937;
+}
+
+.summon-result {
+  margin: 0.5rem 0 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  background: #111827;
+}
+
+.summon-roster,
+.summon-rewards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.summon-roster li,
+.summon-rewards li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #111827;
+}
+
+.summon-roster li.locked,
+.summon-rewards li.locked {
+  opacity: 0.6;
+}
+
+.summon-character-name,
+.summon-reward-name {
+  flex: 1 1 auto;
+}
+
+.summon-rewards button,
+.summon-roster .pve-locked {
+  margin-left: auto;
+}
+
+/* M21 4/N — o aviso de atualização. Faixa fina no topo, acima do cabeçalho: ela precisa ser
+   vista sem competir com a tela do jogo, e some sozinha quando não há o que dizer. */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.9rem;
+  background: #1f2937;
+  border-bottom: 1px solid #374151;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+}
+
+.update-banner button {
+  padding: 0.2rem 0.7rem;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background: #374151;
+  color: #f9fafb;
+  cursor: pointer;
+}
+
+.update-banner button:hover {
+  background: #4b5563;
+}
+
+/* M22 1/N — a tela de atualização obrigatória. Cobre o jogo inteiro de propósito: depois de
+   um mismatch de versão, nenhuma batalha vai ser aceita, e deixar o jogador clicando seria
+   deixá-lo montar time para levar o mesmo erro no fim. */
+.version-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 7, 18, 0.88);
+}
+
+.version-gate-card {
+  max-width: 32rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: #111827;
+  color: #e5e7eb;
+  line-height: 1.5;
+}
+
+.version-gate-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.version-gate-detalhe {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.version-gate-card button {
+  margin-top: 0.5rem;
+  padding: 0.4rem 1rem;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background: #374151;
+  color: #f9fafb;
+  cursor: pointer;
+}
+
+/* M23 1/N — a introdução contextual. Cartão no canto inferior direito, e não modal: o texto
+   só faz sentido com a tela que ele explica à vista, e um modal obrigaria a fechar antes de
+   olhar. */
+.introducao {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 900;
+  max-width: 22rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #4b5563;
+  border-left: 3px solid #60a5fa;
+  border-radius: 6px;
+  background: #111827;
+  color: #e5e7eb;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  line-height: 1.45;
+}
+
+.introducao h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  color: #93c5fd;
+}
+
+.introducao p {
+  margin: 0 0 0.7rem;
+  font-size: 0.85rem;
+}
+
+.introducao button {
+  padding: 0.25rem 0.9rem;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background: #374151;
+  color: #f9fafb;
+  cursor: pointer;
+}
+
+/* M24 — os dois controles de volume, na mesma faixa das outras preferências. */
+.volume-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.volume-control input[type='range'] {
+  width: 6rem;
+}

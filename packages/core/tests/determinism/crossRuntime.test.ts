@@ -16,20 +16,10 @@ import { describe, expect, it } from 'vitest';
 import { simulate } from '../../src/battle/simulate.js';
 import { canonicalize, fnv1a32, hashState } from '../../src/determinism/hash.js';
 import { fpMul } from '../../src/math/fixed.js';
-import { buildGoldenReplay } from './goldenReplay.js';
+import { GOLDEN_HASH, buildGoldenReplay } from './goldenReplay.js';
 
-// Hash congelado do estado final do replay canônico.
-//
-// Mudou? Então uma regra de simulação mudou. As únicas reações corretas são:
-//   (a) foi intencional → suba RULES_VERSION e atualize esta constante no mesmo commit;
-//   (b) não foi intencional → você acabou de encontrar uma regressão. Não atualize o valor.
-// Atualizar esta constante para "fazer o teste passar" desliga a única defesa que o
-// projeto tem contra divergência silenciosa de PvP.
-// M10, sub-sessão 1/N: mudou de '6249029d' — skill.effects passou a ser aplicado dentro
-// do duelo (era inerte desde M2), e o replay canônico já exercitava exatamente isso
-// (`heavyBlow.effects` aplica `effect-bleed` no defensor). Intencional: RULES_VERSION
-// subiu no mesmo commit (packages/core/src/rulesVersion.ts).
-const GOLDEN_HASH = 'c3a404a0';
+// O hash congelado mora na FIXTURE (M21 1/N): Node, os três navegadores e o shell desktop
+// comparam o MESMO valor, e um valor copiado seria duas verdades sobre a mesma coisa.
 
 describe('determinismo entre runtimes (§3.3)', () => {
   it('o replay canônico produz o hash congelado', () => {

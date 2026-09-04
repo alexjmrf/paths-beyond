@@ -191,4 +191,22 @@
 // antiga é recusado pelo schema em vez de validar sem efeito. Não observável em
 // `pnpm balance` (o torneio não faz imprint) nem no GOLDEN_HASH (o replay canônico monta
 // `BattleUnit` direto).
-export const RULES_VERSION = '0.18.0';
+// M18, sub-sessão 7/N: **os tetos do script tático de §6.3 passam a ser aplicados.** "Até 6
+// linhas" e "2 condições, até 3 com talentos" estavam escritos na spec desde M2 e nunca
+// foram conferidos em lugar nenhum — o schema de `packages/data` limitava a 6 linhas o que
+// era AUTORADO, e o jogador editando pelo cliente não passava por trava alguma. Um script
+// que era aceito ontem (5 linhas sem talento de slot, 3 condições numa linha) é recusado
+// hoje, e é isso que faz disto uma mudança de regra e não uma adição.
+//
+// Junto vem o primeiro CONSUMIDOR de `extraTacticsSlot` e `extraTacticsCondition`: os dois
+// efeitos são resolvidos por `resolveTalentEffects` desde M17 e não faziam nada. Um nó de
+// talento que concede slot deixou de ser ponto morto.
+//
+// O teto base de linhas (4) é decisão do usuário e não sai da spec, que só escreve o topo;
+// ver DECISIONS.md. Com os +2 slots da árvore do Aren ele chega exatamente aos 6 de §6.3.
+//
+// **Não observável em `pnpm balance` nem no GOLDEN_HASH:** `validateTacticsScript` é
+// validação de PREPARAÇÃO e `simulate` não a chama — nenhuma batalha muda de resultado, e
+// os scripts autorados no conteúdo (máximo de 2 linhas) passam todos. O que muda é o que o
+// jogador pode SALVAR, que é onde a regra faltava.
+export const RULES_VERSION = '0.19.0';

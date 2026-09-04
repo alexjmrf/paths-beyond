@@ -17,6 +17,15 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const EXTENSOES_DE_IMAGEM = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.ico', '.svg', '.avif'];
+// M24 — o mesmo critério, agora para SOM.
+//
+// **O teste não precisou de ajuste, e essa é a notícia.** O critério de aceite do M24 previa
+// que um asset de áudio pudesse conflitar com este arquivo ("se ele precisar de ajuste, o
+// ajuste é declarado e não silencioso"). Não precisou: o som do jogo é sintetizado por
+// oscilador (`apps/client/src/audio/`), pela mesma razão que a arte é desenhada por código.
+// O que se acrescenta aqui é a trava do outro lado — a decisão vira regra em vez de ficar
+// dependendo de ninguém trazer um `.ogg` depois.
+const EXTENSOES_DE_AUDIO = ['.mp3', '.ogg', '.wav', '.m4a', '.flac', '.aac', '.opus', '.mid', '.midi'];
 const EXTENSOES_DE_CODIGO = ['.ts', '.tsx', '.css', '.html'];
 
 // Não são o código do projeto: dependências, saída de build e artefatos de ferramenta.
@@ -56,5 +65,23 @@ describe('M16 — zero assets de imagem no repositório (critério de aceite 1)'
       EXTENSOES_DE_CODIGO.includes(extname(caminho)),
     );
     expect(codigo.length).toBeGreaterThan(10);
+  });
+
+  // M24 — a mesma regra, para som.
+  it('nenhum arquivo de ÁUDIO versionado — o som é sintetizado', () => {
+    const audios = arquivosDe(repoRoot, (caminho) => EXTENSOES_DE_AUDIO.includes(extname(caminho).toLowerCase()));
+    expect(audios).toEqual([]);
+  });
+
+  it('nenhum áudio embutido em base64 no código do cliente', () => {
+    // Mesmo argumento do base64 de imagem: é o mesmo arquivo com outro nome, e escaparia de
+    // uma varredura de extensão.
+    const codigo = arquivosDe(join(repoRoot, 'apps', 'client', 'src'), (caminho) =>
+      EXTENSOES_DE_CODIGO.includes(extname(caminho)),
+    );
+    const suspeitos = codigo.filter((relativo) =>
+      /data:audio\/[a-z.+-]+;base64,/i.test(readFileSync(join(repoRoot, relativo), 'utf8')),
+    );
+    expect(suspeitos).toEqual([]);
   });
 });

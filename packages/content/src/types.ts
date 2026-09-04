@@ -139,6 +139,19 @@ export interface CharacterContent {
   // afinada); `summon` é adquirível por banner.
   readonly acquisition: 'story' | 'summon';
   readonly fragmentMaterialId: Id;
+  // §10/D14 (M18, 6/N) — com o que o jogador RECEBE este personagem, no núcleo de uma conta
+  // nova ou saindo do banner. É um subconjunto de `Hero` de propósito: o que ela não
+  // carrega é progresso (exp, awakening, imprint, talentos), que é estado de conta.
+  readonly startingHero: StartingHeroContent;
+}
+
+export interface StartingHeroContent {
+  readonly level: number;
+  readonly weaponType: Hero['weaponType'];
+  readonly equipment: Hero['equipment'];
+  readonly duelSkills: readonly Id[];
+  readonly mapSkills: readonly Id[];
+  readonly tacticsScript: Hero['tacticsScript'];
 }
 
 // §10 (M18, 2/N) — o BANNER. Espelho de `packages/data/schemas/banners.schema.ts`.
@@ -198,6 +211,11 @@ export interface AchievementContent {
   readonly name: string;
   readonly description: string;
   readonly premium: number;
+  // §9.4 (M21, 3/N) — o nome desta conquista na plataforma (o *API name* da Steam). Autorado
+  // em `packages/data`, não derivado do `id`: quem o define de verdade é o backend de
+  // parceiro, e discordar dele por uma letra dá uma conquista que paga a moeda e nunca
+  // aparece no perfil.
+  readonly platformId: string;
   readonly condition: RewardCondition;
 }
 

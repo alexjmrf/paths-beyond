@@ -1,6 +1,14 @@
 export type { Id } from './types.js';
 
 export { RULES_VERSION } from './rulesVersion.js';
+// §3.3/§9.4 (M22, 1/N) — a política de compatibilidade de versão, uma só para servidor e
+// cliente: quem recusa e quem reconhece a recusa leem o mesmo módulo.
+export {
+  RULES_VERSION_MISMATCH_CODE,
+  checkRulesVersion,
+  isRulesVersionMismatch,
+  type RulesVersionMismatch,
+} from './rulesVersionCompat.js';
 
 // §3.3 — hash canônico. Existia só como import relativo dentro de
 // packages/core/tests/determinism/ (M8 sub-sessão 7); M9 precisa dele fora do pacote
@@ -24,6 +32,20 @@ export type { EffectApplication, LethalUses, ReactionTrigger, SkillDef } from '.
 
 export { evaluateCondition } from './tactics/evaluateCondition.js';
 export { selectTacticsAction } from './tactics/selectTacticsAction.js';
+// §6.3 (M18, 7/N) — os tetos do script tático, aplicados pela primeira vez. Validação de
+// preparação, como `validateColumnAllocation`: não é chamada por `simulate`.
+export {
+  BASE_TACTICS_CONDITIONS,
+  BASE_TACTICS_LINES,
+  MAX_TACTICS_CONDITIONS,
+  MAX_TACTICS_LINES,
+  validateTacticsScript,
+} from './tactics/validateTacticsScript.js';
+export type {
+  TacticsValidationIssue,
+  TacticsValidationResult,
+  ValidateTacticsScriptInput,
+} from './tactics/validateTacticsScript.js';
 export type {
   Condition,
   ConditionContext,

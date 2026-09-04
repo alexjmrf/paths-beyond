@@ -3,5 +3,30 @@
   "name": "Miron",
   "classId": "class-clerigo",
   "acquisition": "story",
-  "fragmentMaterialId": "material-fragmento-ally-clerigo"
+  "fragmentMaterialId": "material-fragmento-ally-clerigo",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "holy",
+    "equipment": {
+      "weapon": "item-arma-clerigo",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-guardiao",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-clerigo",
+      "skill-especial-clerigo",
+      "skill-cura-clerigo"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-clerigo",
+        "conditions": []
+      }
+    ]
+  }
 }

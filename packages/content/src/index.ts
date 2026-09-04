@@ -3,6 +3,7 @@ export type { ParsedContentFiles } from './buildCatalog.js';
 export { loadCatalogFromDisk } from './loadCatalogFromDisk.js';
 export { toSummonBlueprintPlacements } from './summonPlacements.js';
 export { toEncounterPlacements } from './encounterPlacements.js';
+export { toStartingHero } from './startingHero.js';
 export type { ContentLayout, LoadCatalogFromDiskOptions } from './loadCatalogFromDisk.js';
 export type {
   AchievementContent,
@@ -22,5 +23,6 @@ export type {
   DungeonEncounter,
   Encounter,
   EncounterUnitContent,
+  StartingHeroContent,
   SummonBlueprintContent,
 } from './types.js';

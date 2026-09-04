@@ -481,6 +481,50 @@ describe('coreografia do duelo', () => {
     expect(beats.map((b) => `${b.actorId}->${b.targetId}:${b.damage}`)).toEqual(['A->D:120', 'D->A:45']);
   });
 
+  // M24 — as duas batidas que entraram para o ÁUDIO.
+  it('o contra-ataque é `counter`, e não um golpe qualquer', () => {
+    // Som diferente para evento diferente: quem ouve precisa distinguir "bati" de "apanhei
+    // de volta". Visualmente ele continua sendo o mesmo impacto de antes.
+    const beats = duelBeats(
+      duelo({ trocas: [{ trocaNumber: 1, firstMoverId: 'A', actions: [acao('A', 'D', 120, 45)] }] }) as never,
+    );
+
+    expect(beats.map((b) => b.kind)).toEqual(['strike', 'counter']);
+  });
+
+  it('a cura vira batida sem virar animação', () => {
+    // Curar não sacode ninguém — a batida existe para o som ter um instante ao qual se
+    // pendurar. Sem ela, "curei 80" e "não aconteceu nada" soariam igual.
+    const comCura = {
+      ...acao('A', 'D', 0),
+      heal: 80,
+    };
+    const beats = duelBeats(
+      duelo({ trocas: [{ trocaNumber: 1, firstMoverId: 'A', actions: [comCura] }] }) as never,
+    );
+
+    expect(beats).toEqual([{ actorId: 'A', targetId: 'A', damage: 0, kind: 'heal' }]);
+  });
+
+  it('a cura de emergência da REAÇÃO também soa, e é do reagente', () => {
+    // §6.4 — a reação com a tag `heal` cura quem reagiu em vez de contra-atacar.
+    const comReacaoDeCura = {
+      ...acao('A', 'D', 100),
+      reaction: {
+        skillId: 'skill-cura',
+        lineIndex: 0,
+        counterDamage: null,
+        healDone: 60,
+        trigger: 'onAttacked' as const,
+      },
+    };
+    const beats = duelBeats(
+      duelo({ trocas: [{ trocaNumber: 1, firstMoverId: 'A', actions: [comReacaoDeCura] }] }) as never,
+    );
+
+    expect(beats.map((b) => `${b.kind}:${b.actorId}`)).toEqual(['strike:A', 'heal:D']);
+  });
+
   it('quem chega a zero de HP morre no fim, e só quem chega', () => {
     const beats = duelBeats(duelo({ finalHpDefender: 0 }) as never);
     expect(beats[beats.length - 1]).toEqual({ actorId: 'D', targetId: 'D', damage: 0, kind: 'death' });

@@ -3,6 +3,7 @@
   "name": "Conquista de Teste",
   "description": "Limpe uma masmorra.",
   "premium": 100,
+  "platformId": "ACH_TESTE",
   "condition": {
     "kind": "dungeonsCleared",
     "atLeast": 1

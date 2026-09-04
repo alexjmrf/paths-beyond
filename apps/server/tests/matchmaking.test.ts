@@ -1,6 +1,7 @@
 import type { ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -74,12 +75,13 @@ function buildTestApp(players: readonly Player[], defenses: readonly ArenaDefens
     catalog: emptyCatalog,
     shopCatalog: {},
     ticketSecret: TICKET_SECRET,
+    identityValidator: createDevIdentityValidator(),
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
   });
 }
 
 describe('GET /matchmaking/opponent', () => {
-  const self: Player = { id: 'player-eu', token: SELF_TOKEN, displayName: 'Eu', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+  const self: Player = { id: 'player-eu', platformProvider: 'dev' as const, platformId: SELF_TOKEN, displayName: 'Eu', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
 
   it('rejeita sem autenticação', async () => {
     const app = buildTestApp([self], []);
@@ -89,49 +91,49 @@ describe('GET /matchmaking/opponent', () => {
 
   it('404 quando não há nenhum outro jogador', async () => {
     const app = buildTestApp([self], []);
-    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-player-token': SELF_TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-platform-ticket': `dev:${SELF_TOKEN}`} });
     expect(response.statusCode).toBe(404);
   });
 
   it('404 quando o único candidato próximo de ELO não tem defesa configurada', async () => {
-    const noDefense: Player = { id: 'player-sem-defesa', token: 'tok2', displayName: 'Sem Defesa', elo: 1210, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+    const noDefense: Player = { id: 'player-sem-defesa', platformProvider: 'dev' as const, platformId: 'tok2', displayName: 'Sem Defesa', elo: 1210, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
     const app = buildTestApp([self, noDefense], []);
-    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-player-token': SELF_TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-platform-ticket': `dev:${SELF_TOKEN}`} });
     expect(response.statusCode).toBe(404);
   });
 
   it('404 quando o único candidato com defesa está fora da faixa de ELO', async () => {
-    const farAway: Player = { id: 'player-longe', token: 'tok3', displayName: 'Longe', elo: 3000, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+    const farAway: Player = { id: 'player-longe', platformProvider: 'dev' as const, platformId: 'tok3', displayName: 'Longe', elo: 3000, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
     const defense: ArenaDefense = { ownerPlayerId: 'player-longe', mapId: 'mapa-1', units: [] };
     const app = buildTestApp([self, farAway], [defense]);
-    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-player-token': SELF_TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-platform-ticket': `dev:${SELF_TOKEN}`} });
     expect(response.statusCode).toBe(404);
   });
 
   it('encontra um oponente dentro da faixa de ELO com defesa configurada', async () => {
-    const nearby: Player = { id: 'player-perto', token: 'tok4', displayName: 'Perto', elo: 1250, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+    const nearby: Player = { id: 'player-perto', platformProvider: 'dev' as const, platformId: 'tok4', displayName: 'Perto', elo: 1250, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
     const defense: ArenaDefense = { ownerPlayerId: 'player-perto', mapId: 'mapa-1', units: [] };
     const app = buildTestApp([self, nearby], [defense]);
-    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-player-token': SELF_TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-platform-ticket': `dev:${SELF_TOKEN}`} });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ playerId: 'player-perto', displayName: 'Perto', elo: 1250, mapId: 'mapa-1' });
   });
 
   it('nunca escolhe o próprio chamador como oponente', async () => {
     const app = buildTestApp([self], [{ ownerPlayerId: 'player-eu', mapId: 'mapa-1', units: [] }]);
-    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-player-token': SELF_TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-platform-ticket': `dev:${SELF_TOKEN}`} });
     expect(response.statusCode).toBe(404);
   });
 
   it('entre vários candidatos válidos, escolhe o mais próximo em ELO (desempate determinístico)', async () => {
-    const closer: Player = { id: 'player-mais-perto', token: 'tok5', displayName: 'Mais Perto', elo: 1220, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
-    const farther: Player = { id: 'player-mais-longe', token: 'tok6', displayName: 'Mais Longe', elo: 1350, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+    const closer: Player = { id: 'player-mais-perto', platformProvider: 'dev' as const, platformId: 'tok5', displayName: 'Mais Perto', elo: 1220, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+    const farther: Player = { id: 'player-mais-longe', platformProvider: 'dev' as const, platformId: 'tok6', displayName: 'Mais Longe', elo: 1350, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
     const defenses: ArenaDefense[] = [
       { ownerPlayerId: 'player-mais-perto', mapId: 'mapa-1', units: [] },
       { ownerPlayerId: 'player-mais-longe', mapId: 'mapa-1', units: [] },
     ];
     const app = buildTestApp([self, closer, farther], defenses);
-    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-player-token': SELF_TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/matchmaking/opponent', headers: { 'x-platform-ticket': `dev:${SELF_TOKEN}`} });
     expect(response.statusCode).toBe(200);
     expect(response.json().playerId).toBe('player-mais-perto');
   });

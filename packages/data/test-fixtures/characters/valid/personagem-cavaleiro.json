@@ -3,5 +3,29 @@
   "name": "Cavaleiro de Teste",
   "classId": "class-cavaleiro",
   "acquisition": "story",
-  "fragmentMaterialId": "material-fragmento-personagem-cavaleiro"
+  "fragmentMaterialId": "material-fragmento-personagem-cavaleiro",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "sword",
+    "equipment": {
+      "weapon": "item-arma-espadachim",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-espadachim",
+      "skill-especial-espadachim"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-espadachim",
+        "conditions": []
+      }
+    ]
+  }
 }

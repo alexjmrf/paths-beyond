@@ -3,5 +3,29 @@
   "name": "Soldado de Teste",
   "classId": "class-soldado",
   "acquisition": "summon",
-  "fragmentMaterialId": "material-fragmento-personagem-soldado"
+  "fragmentMaterialId": "material-fragmento-personagem-soldado",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "sword",
+    "equipment": {
+      "weapon": "item-arma-espadachim",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-espadachim",
+      "skill-especial-espadachim"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-espadachim",
+        "conditions": []
+      }
+    ]
+  }
 }

@@ -120,8 +120,13 @@ export function DungeonPanel() {
                       onChange={() => togglePveHero(entry.hero.id)}
                     />
                     {entry.hero.id}{' '}
-                    <span className="hint">
-                      (a{entry.hero.awakening} i{entry.hero.imprint}
+                    {/* M23 3/N — "a3 i1" era ilegível para quem chega: as duas letras são
+                        despertar e vínculo, que são justamente os dois botões ao lado. */}
+                    <span
+                      className="hint"
+                      title="Despertar sobe o teto do herói com materiais; vínculo usa fragmentos do próprio personagem."
+                    >
+                      (despertar {entry.hero.awakening} · vínculo {entry.hero.imprint}
                       {power !== null ? ` · poder ${power}` : ''})
                     </span>
                   </label>
@@ -130,7 +135,7 @@ export function DungeonPanel() {
                       Despertar
                     </button>
                     <button type="button" onClick={() => void imprintHero(entry.hero.id)} disabled={pve.busy}>
-                      Imprint
+                      Vínculo
                     </button>
                   </span>
                 </li>

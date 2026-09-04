@@ -2,6 +2,7 @@ import { RULES_VERSION, type Hero } from '@paths-beyond/core';
 import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -58,8 +59,8 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
     };
 
     const repository = createMemoryPlayerRepository([
-      { id: 'player-real-atacante', token: 'token-real-atacante', displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
-      { id: 'player-real-defensor', token: 'token-real-defensor', displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+      { id: 'player-real-atacante', platformProvider: 'dev' as const, platformId: 'token-real-atacante', displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+      { id: 'player-real-defensor', platformProvider: 'dev' as const, platformId: 'token-real-defensor', displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
     ]);
     const heroRepository = createMemoryHeroRepository([
       { ownerPlayerId: 'player-real-atacante', hero: attackerHero, equippedItems: [] },
@@ -78,13 +79,14 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
       catalog,
       shopCatalog: {},
       ticketSecret: TICKET_SECRET,
+      identityValidator: createDevIdentityValidator(),
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
     });
 
     const saveDefense = await app.inject({
       method: 'PUT',
       url: '/me/defense',
-      headers: { 'x-player-token': 'token-real-defensor' },
+      headers: { 'x-platform-ticket': 'dev:token-real-defensor'},
       payload: {
         mapId,
         units: [{ heroId: defenderHero.id, pos: { x: 5, y: 5 }, height: 0, aiArchetype: 'aggressive' }],
@@ -95,7 +97,7 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
     const createBattle = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': 'token-real-atacante' },
+      headers: { 'x-platform-ticket': 'dev:token-real-atacante'},
       payload: {
         attackerHeroIds: [attackerHero.id],
         defenderPlayerId: 'player-real-defensor',

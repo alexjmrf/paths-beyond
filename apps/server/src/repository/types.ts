@@ -36,9 +36,17 @@ export const DEFAULT_PVE_ACCOUNT = {
   energy: { stored: 0, asOfMs: 0 },
 } as const;
 
+// §9.4 (M20) — a lista de providers, em constante de runtime pelo mesmo motivo que
+// `ECONOMY_ACTION_KINDS` virou uma no M19: o `CHECK` da migration e o TypeScript precisam de
+// uma fonte só, e `tests/migrations.test.ts` amarra as duas.
+export const IDENTITY_PROVIDERS = ['steam', 'epic', 'dev'] as const;
+
 export interface Player {
   readonly id: string;
-  readonly token: string;
+  // §9.4 (M20) — a identidade da plataforma substituiu o token digitado. O par
+  // (provider, platformId) é a chave da conta; credencial nenhuma é guardada.
+  readonly platformProvider: (typeof IDENTITY_PROVIDERS)[number];
+  readonly platformId: string;
   readonly displayName: string;
   readonly elo: number;
   // §10 — "marcas de arena" é a moeda da loja de PvP (venda gear de set específico e
@@ -58,11 +66,13 @@ export interface Player {
 }
 
 export interface PlayerRepository {
-  getPlayerByToken(token: string): Promise<Player | null>;
+  // §9.4 (M20) — a busca por identidade de plataforma no lugar da busca por token.
+  getPlayerByPlatformIdentity(provider: string, platformId: string): Promise<Player | null>;
   getPlayerById(id: string): Promise<Player | null>;
   createPlayer(input: {
     id: string;
-    token: string;
+    platformProvider: (typeof IDENTITY_PROVIDERS)[number];
+    platformId: string;
     displayName: string;
     elo?: number;
     arenaMarks?: number;
@@ -80,6 +90,10 @@ export interface PlayerRepository {
   // `updateArenaMarks`: nenhum fluxo mexe nas duas coisas ao mesmo tempo. Summon e energia
   // extra tocam só esta; farmar e forjar tocam só aquela.
   updatePremium(id: string, premium: number): Promise<Player>;
+  // §9.4 (M20) — exclusão de conta. Apaga o jogador e TUDO que o referencia; com chave
+  // estrangeira, esquecer uma tabela não deixa lixo, deixa a exclusão falhar. Devolve
+  // `false` se não havia o que apagar.
+  deletePlayer(id: string): Promise<boolean>;
   updateEnergy(id: string, energy: EnergyState): Promise<Player>;
   // Candidatos de matchmaking dentro de uma faixa de ELO, excluindo o próprio chamador —
   // "quem tem defesa configurada" é filtrado depois, na rota (cruza com
@@ -118,6 +132,11 @@ export interface StoredHero {
 }
 
 export interface HeroRepository {
+  // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
+  // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE
+  // CASCADE` no banco porque os dois backends precisam da MESMA semântica observável, e
+  // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
+  deleteHeroesByOwner(ownerPlayerId: string): Promise<void>;
   getHeroById(heroId: string): Promise<StoredHero | null>;
   getHeroesByIds(heroIds: readonly string[]): Promise<readonly StoredHero[]>;
   // §9.1 (M13, sub-sessão 2/N) — o roster do jogador. `POST /battles` sempre exigiu
@@ -147,6 +166,11 @@ export interface ArenaDefense {
 }
 
 export interface ArenaDefenseRepository {
+  // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
+  // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE
+  // CASCADE` no banco porque os dois backends precisam da MESMA semântica observável, e
+  // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
+  deleteDefenseByOwner(ownerPlayerId: string): Promise<void>;
   getDefenseByOwner(ownerPlayerId: string): Promise<ArenaDefense | null>;
   saveDefense(defense: ArenaDefense): Promise<ArenaDefense>;
 }
@@ -169,6 +193,11 @@ export interface StoredReplay {
 }
 
 export interface ReplayRepository {
+  // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
+  // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE
+  // CASCADE` no banco porque os dois backends precisam da MESMA semântica observável, e
+  // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
+  deleteReplaysOfPlayer(playerId: string): Promise<void>;
   getByNonce(nonce: string): Promise<StoredReplay | null>;
   save(replay: StoredReplay): Promise<StoredReplay>;
 }
@@ -194,13 +223,24 @@ export interface DungeonRunRecord {
 // §10 (M14, 4/N) — as ações de progressão que cobram recurso. Uma chave de idempotência
 // por ação, pelo mesmo motivo do nonce da batalha: reenvio de rede não pode cobrar duas
 // vezes.
+// M19 — os kinds viraram uma CONSTANTE, e o tipo é derivado dela.
+//
+// Antes era uma união escrita à mão aqui e uma cláusula `CHECK` escrita à mão na migration
+// 0008, e as duas derivaram: M18 3/N acrescentou `summon` e `energy` de um lado só. Em
+// memória um `Map` aceita qualquer string, então a suíte inteira ficou verde enquanto o
+// Postgres recusaria as duas ações que gastam a moeda premium.
+//
+// Uma constante em tempo de execução é o que permite a `tests/migrations.test.ts` comparar
+// os dois lados. O tipo continua estreito porque sai dela.
+export const ECONOMY_ACTION_KINDS = ['enhance', 'awaken', 'imprint', 'equip', 'summon', 'energy'] as const;
+
 export interface EconomyActionRecord {
   readonly nonce: string;
   readonly playerId: string;
   // M18 3/N acrescentou `summon` e `energy`: são ações que cobram recurso, e reusar este
   // mecanismo é melhor que inventar outro — reenvio de rede não pode cobrar duas vezes, e
   // o problema é literalmente o mesmo.
-  readonly kind: 'enhance' | 'awaken' | 'imprint' | 'equip' | 'summon' | 'energy';
+  readonly kind: (typeof ECONOMY_ACTION_KINDS)[number];
   readonly createdAt: string; // ISO 8601
 }
 
@@ -227,6 +267,11 @@ export interface EconomyActionRecord {
 // (`requiresClearOf`) — e misturar capítulo nele faria um capítulo limpo destravar uma
 // masmorra por acidente.
 export interface RewardsRepository {
+  // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
+  // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE
+  // CASCADE` no banco porque os dois backends precisam da MESMA semântica observável, e
+  // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
+  deletePlayerData(playerId: string): Promise<void>;
   listClaims(playerId: string): Promise<readonly string[]>;
   // Devolve `false` se já estava reivindicado. É a checagem e a escrita numa operação só,
   // porque separá-las deixaria a fresta em que duas requisições simultâneas pagam duas
@@ -240,6 +285,11 @@ export interface RewardsRepository {
 }
 
 export interface CharacterOwnershipRepository {
+  // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
+  // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE
+  // CASCADE` no banco porque os dois backends precisam da MESMA semântica observável, e
+  // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
+  deletePlayerData(playerId: string): Promise<void>;
   // Só o que foi ADQUIRIDO. Quem chama une com o núcleo do catálogo (`ownedCharacterIds`).
   listAcquired(playerId: string): Promise<readonly string[]>;
   grant(playerId: string, characterId: string): Promise<void>;
@@ -249,6 +299,11 @@ export interface CharacterOwnershipRepository {
 }
 
 export interface EconomyRepository {
+  // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
+  // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE
+  // CASCADE` no banco porque os dois backends precisam da MESMA semântica observável, e
+  // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
+  deletePlayerData(playerId: string): Promise<void>;
   // Materiais e fragmentos, por jogador.
   getMaterials(playerId: string): Promise<Readonly<Record<string, number>>>;
   setMaterials(playerId: string, materials: Readonly<Record<string, number>>): Promise<Readonly<Record<string, number>>>;
@@ -278,4 +333,33 @@ export interface EconomyRepository {
 
   getAction(nonce: string): Promise<EconomyActionRecord | null>;
   saveAction(action: EconomyActionRecord): Promise<EconomyActionRecord>;
+}
+
+// §9.4 (M22, sub-sessão 2/N) — a RESPOSTA guardada por nonce.
+//
+// O nonce já existia em três lugares (`replays`, `dungeon_runs`, `economy_actions`) e já
+// impedia a segunda cobrança. O que ele NÃO fazia é devolver o que aconteceu na primeira:
+// o reenvio levava `409 nonce já utilizado`, e do ponto de vista do jogador a run tinha
+// sumido levando a energia junto — ele pagou, o servidor resolveu, e a resposta se perdeu
+// no cabo.
+//
+// Guardar a resposta transforma o reenvio em REPETIÇÃO da primeira: mesmo status, mesmo
+// corpo, nenhuma cobrança nova. É o que a reconexão precisa, e é genérico de propósito —
+// toda rota que aceita nonce ganha isso sem escrever uma linha.
+export interface StoredResponse {
+  readonly nonce: string;
+  readonly playerId: string;
+  // Método + rota (`POST /dungeons/:id/run`). Guardado para recusar o mesmo nonce usado em
+  // outra rota: repetir a resposta de uma masmorra para um pedido de invocação seria
+  // responder outra pergunta.
+  readonly route: string;
+  readonly status: number;
+  readonly body: unknown;
+  readonly createdAt: string; // ISO 8601
+}
+
+export interface IdempotencyRepository {
+  get(playerId: string, nonce: string): Promise<StoredResponse | null>;
+  save(entry: StoredResponse): Promise<void>;
+  deletePlayerData(playerId: string): Promise<void>;
 }

@@ -38,7 +38,12 @@ export function InitiativePanel() {
           );
         })}
       </ol>
-      <p className="valor">Valor: {battleState.valor}</p>
+      {/* M23 3/N — "nenhuma tela exige conhecimento que o jogo não deu". `Valor: 3` não
+          dizia nada a quem chega: o número é recurso do MAPA (§5.6), ganho ao capturar e
+          gasto em habilidades de Valor, e sem isso ele parecia um placar. */}
+      <p className="valor" title="Recurso do mapa inteiro. Você ganha capturando objetivos e gasta em habilidades de Valor.">
+        Valor: {battleState.valor} <span className="hint">— recurso do mapa</span>
+      </p>
       <p className="outcome">Resultado: {battleState.outcome}</p>
     </aside>
   );

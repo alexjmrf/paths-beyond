@@ -3,5 +3,29 @@
   "name": "Nyra",
   "classId": "class-lanceiro",
   "acquisition": "summon",
-  "fragmentMaterialId": "material-fragmento-ally-lanceiro"
+  "fragmentMaterialId": "material-fragmento-ally-lanceiro",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "spear",
+    "equipment": {
+      "weapon": "item-arma-lanceiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-lanceiro",
+      "skill-especial-lanceiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-lanceiro",
+        "conditions": []
+      }
+    ]
+  }
 }

@@ -3,6 +3,7 @@ import type { ClassDef, GridMap, Hero, Replay, SkillDef, StatSheet, Terrain } fr
 import type { ArenaMap, ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -167,8 +168,8 @@ const defenderConfigs: readonly { playerId: string; hero: Hero; defense: ArenaDe
 
 function buildFuzzApp() {
   const repository = createMemoryPlayerRepository([
-    { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
-    ...defenderConfigs.map((d) => ({ id: d.playerId, token: `token-${d.playerId}`, displayName: d.playerId, elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT })),
+    { id: 'player-atacante', platformProvider: 'dev' as const, platformId: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+    ...defenderConfigs.map((d) => ({ id: d.playerId, platformProvider: 'dev' as const, platformId: d.playerId, displayName: d.playerId, elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT })),
   ]);
 
   const heroRepository = createMemoryHeroRepository([
@@ -190,6 +191,7 @@ function buildFuzzApp() {
     catalog,
     shopCatalog: {},
     ticketSecret: TICKET_SECRET,
+    identityValidator: createDevIdentityValidator(),
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 5000, windowMs: 60_000 }),
   });
 
@@ -236,7 +238,7 @@ describe('fuzz: servidor vs. core local em 1000 partidas (critério de aceite ra
       const response = await app.inject({
         method: 'POST',
         url: '/battles',
-        headers: { 'x-player-token': ATTACKER_TOKEN },
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
         payload: { attackerHeroIds, defenderPlayerId: defender.playerId, commands, rulesVersion: RULES_VERSION, nonce },
       });
       expect(response.statusCode).toBe(200);
@@ -245,7 +247,7 @@ describe('fuzz: servidor vs. core local em 1000 partidas (critério de aceite ra
       const replayResponse = await app.inject({
         method: 'GET',
         url: `/battles/${nonce}`,
-        headers: { 'x-player-token': ATTACKER_TOKEN },
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       });
       expect(replayResponse.statusCode).toBe(200);
       const replay = replayResponse.json();
@@ -294,7 +296,7 @@ describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério 
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: forgedPayload,
     });
     expect(response.statusCode).toBe(200);
@@ -302,7 +304,7 @@ describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério 
     const replayResponse = await app.inject({
       method: 'GET',
       url: '/battles/fuzz-anti-cheat-1',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
     });
     const replay = replayResponse.json();
     const attackerUnit = replay.initialState.units.find((u: { heroId: string }) => u.heroId === attackerRoster[0]!.id);

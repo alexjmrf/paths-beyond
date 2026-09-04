@@ -15,7 +15,6 @@ export function PvpPanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const commandCount = useBattleStore((s) => s.commandLog.length);
 
-  const setPvpToken = useBattleStore((s) => s.setPvpToken);
   const connectPvp = useBattleStore((s) => s.connectPvp);
   const togglePvpHero = useBattleStore((s) => s.togglePvpHero);
   const findPvpOpponent = useBattleStore((s) => s.findPvpOpponent);
@@ -33,21 +32,13 @@ export function PvpPanel() {
 
       {!pvp.me ? (
         <div className="pvp-login">
-          <label>
-            Token do jogador
-            <input
-              type="text"
-              value={pvp.token}
-              placeholder="x-player-token"
-              onChange={(event) => setPvpToken(event.target.value)}
-            />
-          </label>
           <button type="button" onClick={() => void connectPvp()} disabled={pvp.busy}>
-            Conectar
+            Entrar
           </button>
-          {/* A auth do servidor é um token opaco (stub de M7): o cliente não inventa um
-              sistema de contas que §9 não especifica. */}
-          <p className="hint">Auth de M7: token opaco enviado no header `x-player-token`.</p>
+          {/* §9.4 (M20) — não há mais o que digitar: quem diz quem você é é a plataforma. O
+              ticket vem de `data/platformBridge.ts`, que no navegador é a ponte de
+              desenvolvimento e no shell desktop (M21) será a da Steam. */}
+          <p className="hint">Identidade da plataforma — nada a digitar.</p>
         </div>
       ) : (
         <>

@@ -3,5 +3,30 @@
   "name": "Bardan",
   "classId": "class-couracado",
   "acquisition": "summon",
-  "fragmentMaterialId": "material-fragmento-ally-couracado"
+  "fragmentMaterialId": "material-fragmento-ally-couracado",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "axe",
+    "equipment": {
+      "weapon": "item-arma-couracado",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-couracado",
+      "skill-especial-couracado",
+      "skill-ultimo-suspiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-couracado",
+        "conditions": []
+      }
+    ]
+  }
 }

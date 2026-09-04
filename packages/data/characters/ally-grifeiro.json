@@ -3,5 +3,29 @@
   "name": "Kaia",
   "classId": "class-grifeiro",
   "acquisition": "summon",
-  "fragmentMaterialId": "material-fragmento-ally-grifeiro"
+  "fragmentMaterialId": "material-fragmento-ally-grifeiro",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "spear",
+    "equipment": {
+      "weapon": "item-arma-grifeiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-grifeiro",
+      "skill-especial-grifeiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-grifeiro",
+        "conditions": []
+      }
+    ]
+  }
 }

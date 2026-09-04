@@ -11,7 +11,7 @@ import {
 import { toSummonBlueprintPlacements, type ContentCatalog } from '@paths-beyond/content';
 import type { FastifyPluginAsync } from 'fastify';
 import { computeEloUpdate } from '../matchmaking/elo.js';
-import type { RateLimiter } from './rateLimit.js';
+import { rejectOnRulesVersion } from '../version.js';
 import { ownedCharacterIds, unownedAmong } from '../summon/ownership.js';
 import { deriveSeed, generateNonce } from './ticket.js';
 import type {
@@ -59,7 +59,6 @@ export interface BattleRoutesOptions {
   readonly arenaDefenseRepository: ArenaDefenseRepository;
   readonly replayRepository: ReplayRepository;
   readonly catalog: ContentCatalog;
-  readonly rateLimiter: RateLimiter;
   // §9.4 (M13, sub-sessão 2/N) — segredo do HMAC que deriva a seed do nonce. Sem ele
   // o cliente poderia procurar um nonce que produzisse uma seed favorável.
   readonly ticketSecret: string;
@@ -249,6 +248,12 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
   // como montar `attackerHeroIds`: os ids do jogador só existiam em seed de banco.
   fastify.get('/me/heroes', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    // §9.4 (M20) — esta rota VOLTOU a ser só leitura.
+    //
+    // A M18 6/N materializava aqui o núcleo de quatro, porque não havia rota de criação de
+    // conta. Agora há (`POST /accounts/session`), e a materialização mora nela: com
+    // sempre-online e dinheiro real, "quando a conta existe" precisa de uma resposta e um
+    // lugar só, e um `GET` que escreve não aparece como escrita em log nem em métrica.
     const heroes = await opts.heroRepository.listHeroesByOwner(request.player.id);
     // Devolve o `Hero` inteiro (é dele mesmo) — o cliente precisa de classe e nome pra
     // montar o time; stats resolvidos continuam sendo assunto do servidor (§9.4).
@@ -258,10 +263,6 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
   fastify.post('/battles/ticket', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const attacker = request.player;
-
-    if (!opts.rateLimiter.tryConsume(attacker.id)) {
-      return reply.code(429).send({ error: 'muitas tentativas de batalha em pouco tempo' });
-    }
 
     const body = request.body as CreateBattleBody;
     const assembled = await assembleArenaBattle(opts, attacker.id, body.attackerHeroIds ?? [], body.defenderPlayerId);
@@ -283,10 +284,10 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
 
     const body = request.body as CreateBattleBody;
 
-    // §9.4 — "rate limiting": checado antes de qualquer trabalho, por jogador.
-    if (!opts.rateLimiter.tryConsume(attacker.id)) {
-      return reply.code(429).send({ error: 'muitas tentativas de batalha em pouco tempo' });
-    }
+    // §9.4 — "rate limiting". M22 3/N: deixou de ser chamada de rota e virou hook
+    // (`registerRateLimit`), porque escrito por rota o limite existe só onde alguém lembrou
+    // de escrever — e as rotas que gastam a moeda comprável com dinheiro real eram as que
+    // ninguém lembrou.
 
     // §9.4 — "nonce por partida": sem nonce, ou nonce já usado, rejeita — previne reenvio
     // da mesma requisição rodar a batalha (e mexer no ELO) mais de uma vez.
@@ -300,9 +301,11 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
     // §9.4 — "versionamento: rulesVersion no replay; recusar replays de versão
     // diferente." Checado antes de qualquer outra coisa: uma versão de regras errada
     // invalida a requisição inteira, não só o resultado.
-    if (body.rulesVersion !== RULES_VERSION) {
-      return reply.code(409).send({ error: `rulesVersion incompatível (esperado ${RULES_VERSION})` });
-    }
+    //
+    // M22 1/N: a comparação virou `rejectOnRulesVersion` — mesma decisão de antes, agora
+    // compartilhada com as outras duas rotas que reexecutam comandos, e com corpo de erro
+    // que o cliente consegue LER para mostrar a tela de atualização.
+    if (rejectOnRulesVersion(reply, body.rulesVersion)) return reply;
 
     const assembled = await assembleArenaBattle(opts, attacker.id, body.attackerHeroIds ?? [], body.defenderPlayerId);
     if (!assembled.ok) return reply.code(assembled.code).send({ error: assembled.error });

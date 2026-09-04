@@ -1,7 +1,8 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
-import { resolveAutoBattle, type Hero } from '@paths-beyond/core';
+import { RULES_VERSION, resolveAutoBattle, type Hero } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -69,7 +70,8 @@ function buildHarness(options: { energy?: number } = {}): Harness {
   const playerRepository = createMemoryPlayerRepository([
     {
       id: 'player-farmer',
-      token: TOKEN,
+      platformProvider: 'dev' as const,
+      platformId: TOKEN,
       displayName: 'Farmer',
       elo: 1200,
       arenaMarks: 0,
@@ -132,6 +134,7 @@ function buildHarness(options: { energy?: number } = {}): Harness {
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
       ticketSecret: TICKET_SECRET,
+      identityValidator: createDevIdentityValidator(),
       now: () => harness.now,
       // M15 4/N — o nonce do ticket vira a SEED da batalha (`deriveSeed`), e
       // `generateNonce` é `crypto.randomUUID`: sem fixar, um teste que afirma "este time
@@ -160,7 +163,7 @@ async function pedirTicket(h: Harness, dungeonId: string, heroIds: readonly stri
   const response = await h.app.inject({
     method: 'POST',
     url: `/dungeons/${dungeonId}/ticket`,
-    headers: { 'x-player-token': TOKEN },
+    headers: { 'x-platform-ticket': `dev:${TOKEN}`},
     payload: { heroIds },
   });
   return { status: response.statusCode, body: response.json() };
@@ -174,14 +177,16 @@ async function rodar(
   const response = await h.app.inject({
     method: 'POST',
     url: `/dungeons/${dungeonId}/run`,
-    headers: { 'x-player-token': TOKEN },
-    payload,
+    headers: { 'x-platform-ticket': `dev:${TOKEN}`},
+    // M22 1/N — a versão de regras entra por padrão, como o cliente passa a mandar; um teste
+    // que queira mandar outra (ou nenhuma) sobrescreve, porque o payload vem depois.
+    payload: { rulesVersion: RULES_VERSION, ...payload },
   });
   return { status: response.statusCode, body: response.json() };
 }
 
 async function economia(h: Harness) {
-  const response = await h.app.inject({ method: 'GET', url: '/me/economy', headers: { 'x-player-token': TOKEN } });
+  const response = await h.app.inject({ method: 'GET', url: '/me/economy', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
   return response.json();
 }
 
@@ -224,7 +229,7 @@ describe('GET /me/economy', () => {
 describe('GET /dungeons', () => {
   it('lista as masmorras com a disponibilidade já resolvida', async () => {
     const h = buildHarness();
-    const response = await h.app.inject({ method: 'GET', url: '/dungeons', headers: { 'x-player-token': TOKEN } });
+    const response = await h.app.inject({ method: 'GET', url: '/dungeons', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
     const body = response.json();
     expect(body.dungeons.length).toBe(Object.keys(catalog.dungeons).length);
 
@@ -365,7 +370,7 @@ describe('varredura (decisão do usuário: limpar à mão antes)', () => {
     const h = buildHarness();
     await jogarEVencer(h, NORMAL);
 
-    const listagem = await h.app.inject({ method: 'GET', url: '/dungeons', headers: { 'x-player-token': TOKEN } });
+    const listagem = await h.app.inject({ method: 'GET', url: '/dungeons', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
     expect(listagem.json().dungeons.find((d: any) => d.id === NORMAL).sweepAvailable).toBe(true);
 
     const varredura = await rodar(h, NORMAL, {
@@ -439,7 +444,7 @@ describe('trava de tempo da dificuldade alta', () => {
     await jogarEVencer(h, NORMAL);
     await jogarEVencer(h, ELITE);
 
-    const listagem = await h.app.inject({ method: 'GET', url: '/dungeons', headers: { 'x-player-token': TOKEN } });
+    const listagem = await h.app.inject({ method: 'GET', url: '/dungeons', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
     const elite = listagem.json().dungeons.find((d: any) => d.id === ELITE);
     expect(elite.entriesLeft).toBe(catalog.dungeons[ELITE]!.entryLimit!.maxEntries - 1);
   });

@@ -1,5 +1,6 @@
 import {
   RULES_VERSION,
+  buildBattleSetupFromHeroes,
   applyCommandAndAdvance,
   buildInitialState,
   computeReachableTiles,
@@ -21,6 +22,7 @@ import {
   type MapAiArchetype,
   type ReachableTile,
   type BattleSetup,
+  type Hero,
   type TacticsScript,
   type TalentAllocation,
   type ColumnTalentTree,
@@ -42,17 +44,33 @@ import {
   type OpponentInfo,
   type PlayerInfo,
   type RosterEntry,
+  type BannerView,
+  type CampaignChapter,
+  type CampaignRunResponse,
+  type CampaignTicket,
+  type CharacterRosterEntry,
+  type RewardView,
+  type SummonResponse,
 } from '../data/api.js';
 import { narrateAiTurns } from '../data/aiNarration.js';
-import { campaignMaps } from '../data/campaign.js';
 import { catalog } from '../data/catalog.js';
+import { espelharConquistas, sincronizarConquistasDaConta } from '../data/platformAchievements.js';
+import { audioDoJogo, definirVolumesDoJogo } from '../audio/motorCompartilhado.js';
+import { VOLUMES_PADRAO } from '../audio/sons.js';
+import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
+import {
+  marcarIntroducaoVista,
+  proximaIntroducao,
+  type GatilhoDeIntroducao,
+  type Introducao,
+} from '../logic/introducao.js';
+import { platformBridge } from '../data/platformBridge.js';
 import { DEFAULT_UI_SCALE, isSupportedUiScale } from '../data/overlayTheme.js';
 import { readBuildCodeFor } from '../logic/buildCode.js';
 import {
   browserSaveStorage,
   clearSave,
   loadSave,
-  reconcileSave,
   serializeSave,
   writeSave,
   SAVE_FORMAT_VERSION,
@@ -65,29 +83,65 @@ import {
 // batalha; a semente real por partida é trabalho de uma fatia futura (persistência/save).
 const BATTLE_SEED = 42;
 
-// O `BattleSetup` do capítulo com os scripts táticos que o jogador editou na preparação
-// aplicados POR CIMA. Existe por causa do replay: `Replay.initialState` é um setup, e
-// reproduzir é `buildInitialState(setup) + comandos`. Se a edição de táticas vivesse só no
-// `battleState` (como vivia desde M6), o replay reproduziria a batalha com o script
-// ORIGINAL e mostraria duelos que não aconteceram. Editar reconstrói o estado do zero —
-// legítimo porque a edição só é permitida antes do primeiro comando, quando não há nada a
-// perder, e determinístico porque o dreno inicial de IA roda de novo igual.
-function setupWithTactics(mapIndex: number, overrides: Readonly<Record<string, TacticsScript>>): BattleSetup {
-  const content = campaignMaps[mapIndex];
-  if (!content) throw new Error(`mapa de campanha ${mapIndex} não existe`);
-  if (Object.keys(overrides).length === 0) return content.setup;
+// §10/§9.4 (M18, sub-sessão 7/N) — o TABULEIRO VAZIO.
+//
+// A campanha deixou de ser montada no cliente: o `BattleSetup` de todo capítulo vem do
+// `POST /campaign/:id/ticket`, como o da masmorra e o do PvP já vinham. Isso deixou o
+// cliente sem batalha nenhuma no instante em que ele abre — e `battleState` não é opcional
+// (quarenta lugares o leem, do canvas aos painéis).
+//
+// Em vez de tornar o estado nulo e espalhar `?.` pelo cliente inteiro, a tela abre num
+// tabuleiro real e VAZIO: o grid do primeiro capítulo, sem uma única unidade. Medido antes
+// de escolher — `buildInitialState` sobre um setup sem unidades devolve `outcome: 'ongoing'`
+// com zero unidades e zero iniciativa, ou seja, nada acontece, nada é jogável e nenhum
+// overlay de vitória dispara. É o que a tela deve mostrar enquanto o jogador escolhe o
+// capítulo.
+let setupVazioMemo: BattleSetup | null = null;
 
-  return {
-    ...content.setup,
-    units: content.setup.units.map((unit) => {
-      const script = overrides[unit.unitId];
-      return script ? { ...unit, tacticsScript: script } : unit;
-    }),
-  };
+function setupVazio(): BattleSetup {
+  if (setupVazioMemo) return setupVazioMemo;
+  const primeiro = catalog.encounters[0];
+  const arenaMap = primeiro ? catalog.maps[primeiro.mapId] : undefined;
+  if (!arenaMap) throw new Error('catálogo sem mapa para o tabuleiro vazio');
+
+  setupVazioMemo = buildBattleSetupFromHeroes({
+    placements: [],
+    map: arenaMap.grid,
+    permadeath: 'casual',
+    winCondition: arenaMap.winCondition,
+    effectDefs: catalog.effects,
+    initialValor: arenaMap.initialValor,
+    valorSkills: catalog.valorSkills,
+    itemSets: catalog.itemSets,
+    skillsCatalog: catalog.skills,
+    weaponDuelRanges: catalog.weaponDuelRanges,
+    baselineReactionSkillIds: catalog.baselineReactionSkillIds,
+    characterTalentTrees: catalog.characterTalentTrees,
+  });
+  return setupVazioMemo;
 }
 
-function buildMapState(mapIndex: number, overrides: Readonly<Record<string, TacticsScript>> = {}): BattleState {
-  return buildInitialState(setupWithTactics(mapIndex, overrides), BATTLE_SEED);
+function tabuleiroVazio(): BattleState {
+  return buildInitialState(setupVazio(), BATTLE_SEED);
+}
+
+// Quem é cada unidade do tabuleiro, para as telas que abrem sobre uma PESSOA (talentos,
+// equipamento, táticas). `BattleUnit` carrega `heroId` e mais nada de identidade — ele é
+// estado de batalha resolvido —, então a ponte é o roster que o servidor devolveu.
+//
+// Antes isto vinha de `data/campaign.ts`, montado do conteúdo local. Com a batalha vindo do
+// servidor, o conteúdo local não sabe quem está no tabuleiro: só a conta sabe.
+export function heroesPorUnidade(
+  setup: BattleSetup,
+  roster: readonly RosterEntry[],
+): Readonly<Record<string, Hero>> {
+  const porHeroId = new Map(roster.map((entry) => [entry.hero.id, entry.hero] as const));
+  const porUnidade: Record<string, Hero> = {};
+  for (const unit of setup.units) {
+    const hero = porHeroId.get(unit.heroId);
+    if (hero) porUnidade[unit.unitId] = hero;
+  }
+  return porUnidade;
 }
 
 // A árvore de talentos de um herói vem da SUA classe real (`ClassDef.talentTree`,
@@ -95,9 +149,12 @@ function buildMapState(mapIndex: number, overrides: Readonly<Record<string, Tact
 // `heroesByUnitId` (montado em `data/campaign.ts` ao resolver `Hero[]` →
 // `buildBattleSetupFromHeroes`) é o único jeito de saber a classe de uma unidade, já
 // que `BattleUnit` (core) não carrega `classId` — só o estado de batalha resolvido.
-export function classDefForUnit(campaignMapIndex: number, unitId: string): ClassDef | undefined {
-  const heroId = campaignMaps[campaignMapIndex]?.heroesByUnitId[unitId]?.classId;
-  return heroId ? catalog.classes[heroId] : undefined;
+export function classDefForUnit(
+  heroesByUnitId: Readonly<Record<string, Hero>>,
+  unitId: string,
+): ClassDef | undefined {
+  const classId = heroesByUnitId[unitId]?.classId;
+  return classId ? catalog.classes[classId] : undefined;
 }
 
 // §11/§09-roadmap (M13, sub-sessão 3/N) — "progresso sobrevive a recarregar a página".
@@ -109,68 +166,45 @@ const saveStorage: SaveStorage | null = browserSaveStorage();
 // não mais da classe dela. `heroesByUnitId` continua sendo o caminho porque `BattleUnit`
 // (core) não carrega `characterId` — ele é estado de batalha resolvido, e quem é aquela
 // pessoa é assunto do conteúdo que montou a batalha.
-export function characterTreeForUnit(campaignMapIndex: number, unitId: string): ColumnTalentTree | undefined {
-  const characterId = campaignMaps[campaignMapIndex]?.heroesByUnitId[unitId]?.characterId;
+export function characterTreeForUnit(
+  heroesByUnitId: Readonly<Record<string, Hero>>,
+  unitId: string,
+): ColumnTalentTree | undefined {
+  const characterId = heroesByUnitId[unitId]?.characterId;
   return characterId ? catalog.characterTalentTrees[characterId] : undefined;
 }
 
 // O despertar do herói entra na validação porque `minAwakening` é gate de nó (§10, M14):
 // sem ele a tela ofereceria um nó avançado que o motor recusaria depois.
-function awakeningForUnit(campaignMapIndex: number, unitId: string): number {
-  return campaignMaps[campaignMapIndex]?.heroesByUnitId[unitId]?.awakening ?? 0;
+function awakeningForUnit(heroesByUnitId: Readonly<Record<string, Hero>>, unitId: string): number {
+  return heroesByUnitId[unitId]?.awakening ?? 0;
 }
 
-function allocationIsValidFor(campaignMapIndex: number, unitId: string, allocation: TalentAllocation): boolean {
-  const tree = characterTreeForUnit(campaignMapIndex, unitId);
-  // Unidade de outro capítulo: a árvore dela não é resolvível a partir do capítulo
-  // corrente, então não há o que afirmar — a alocação fica como está.
-  if (!tree) return true;
-  return validateColumnAllocation({
-    tree,
-    allocation,
-    awakening: awakeningForUnit(campaignMapIndex, unitId),
-  }).valid;
-}
-
-function loadReconciledSave(storage: SaveStorage | null): SaveGame | null {
-  const save = loadSave(storage);
-  if (!save) return null;
-  return reconcileSave(save, {
-    rulesVersion: RULES_VERSION,
-    chapterCount: campaignMaps.length,
-    itemExists: (itemId) => catalog.items[itemId] !== undefined,
-    allocationIsValid: (unitId, allocation) => allocationIsValidFor(save.campaignMapIndex, unitId, allocation),
-  });
-}
-
-// A hidratação é SÍNCRONA, no boot do módulo: o catálogo já é síncrono (`data/catalog.ts`)
-// e a batalha é remontada do setup, então não há estado de carregamento — sem isso a tela
-// abriria no capítulo 1 e saltaria para o capítulo salvo um quadro depois.
-const restoredSave = loadReconciledSave(saveStorage);
+// A hidratação é SÍNCRONA, no boot do módulo. **M18 7/N: sem reconciliação**, porque não
+// sobrou no save nada preso à regra nem ao conteúdo — só preferências e token. O que era
+// reconciliado (capítulo, táticas, equipamento, talentos) agora mora no servidor, e quem
+// concilia com a `rulesVersion` é ele, pelo 409 do replay.
+const restoredSave = loadSave(saveStorage);
 
 export function saveProjection(state: {
-  readonly campaignMapIndex: number;
-  readonly campaignComplete: boolean;
-  readonly tacticsOverrides: Readonly<Record<string, TacticsScript>>;
-  readonly equippedByUnit: Readonly<Record<string, Partial<Record<GearSlot, Id>>>>;
-  readonly talentAllocationByUnit: Readonly<Record<string, TalentAllocation>>;
   readonly instantResultMode: boolean;
   readonly colorblindMode: boolean;
   readonly uiScale: number;
   readonly pvp: PvpSession;
+  readonly introducoesVistas: readonly string[];
+  readonly volumeEfeitos: number;
+  readonly volumeMusica: number;
 }): SaveGame {
   return {
     v: SAVE_FORMAT_VERSION,
     rulesVersion: RULES_VERSION,
-    campaignMapIndex: state.campaignMapIndex,
-    campaignComplete: state.campaignComplete,
-    tacticsOverrides: state.tacticsOverrides,
-    equippedByUnit: state.equippedByUnit,
-    talentAllocationByUnit: state.talentAllocationByUnit,
     instantResultMode: state.instantResultMode,
     colorblindMode: state.colorblindMode,
     uiScale: state.uiScale,
     pvpToken: state.pvp.token,
+    introducoesVistas: state.introducoesVistas,
+    volumeEfeitos: state.volumeEfeitos,
+    volumeMusica: state.volumeMusica,
   };
 }
 
@@ -310,14 +344,82 @@ const EMPTY_PVE: PveSession = {
   busy: false,
 };
 
+// §10/§9.4 (M18, sub-sessão 7/N) — a sessão de CAMPANHA. Ela é nova porque a campanha
+// deixou de ser local: até aqui o capítulo era montado do conteúdo, o progresso morava no
+// `localStorage` e nenhum servidor via nada. A 4/N inverteu isso (o servidor é autoritativo
+// sobre progressão, como em todo gacha comercial) e esta é a outra metade.
+//
+// Do ponto de vista do cliente, a campanha virou o que a masmorra já era: pedir um ticket,
+// jogar a camada de grid, submeter os comandos. A diferença é a ESCOLHA DE VAGA (D16) — o
+// capítulo declara quantas, e quem as preenche é o jogador.
+export interface CampaignSession {
+  readonly chapters: readonly CampaignChapter[];
+  readonly selectedChapterId: string | null;
+  readonly selectedHeroIds: readonly string[];
+  readonly ticket: CampaignTicket | null;
+  readonly lastRun: CampaignRunResponse | null;
+  readonly premiumOnFirstClear: number;
+  readonly status: string | null;
+  readonly error: string | null;
+  readonly busy: boolean;
+}
+
+const EMPTY_CAMPAIGN: CampaignSession = {
+  chapters: [],
+  selectedChapterId: null,
+  selectedHeroIds: [],
+  ticket: null,
+  lastRun: null,
+  premiumOnFirstClear: 0,
+  status: null,
+  error: null,
+  busy: false,
+};
+
+// §10/D14/D17/D18 (M18, sub-sessão 6/N) — a sessão de AQUISIÇÃO. Mora ao lado das de PvP e
+// de farm, pelo mesmo motivo das duas: é rede e estado de tela, sem uma linha de regra
+// (regra 3). Quem sorteia é `packages/gacha`, no servidor; quem conta o pity é a conta.
+//
+// `premium` é guardado aqui e não no `PveSession` de propósito: as três moedas de lá vêm de
+// `GET /me/economy` e a premium não — ela chega em toda resposta que a movimenta (summon,
+// prêmio, compra de energia), e é o valor devolvido pelo servidor que manda.
+export interface SummonSession {
+  readonly premium: number;
+  readonly banners: readonly BannerView[];
+  readonly characters: readonly CharacterRosterEntry[];
+  readonly rewards: readonly RewardView[];
+  // A última rolagem, para a tela poder mostrar o que saiu. Não é histórico: o servidor é
+  // quem guarda o que aconteceu, e um histórico de cliente divergiria dele no primeiro
+  // reenvio de rede.
+  readonly lastResult: SummonResponse | null;
+  readonly status: string | null;
+  readonly error: string | null;
+  readonly busy: boolean;
+}
+
+const EMPTY_SUMMON: SummonSession = {
+  premium: 0,
+  banners: [],
+  characters: [],
+  rewards: [],
+  lastResult: null,
+  status: null,
+  error: null,
+  busy: false,
+};
+
 interface BattleStore {
   readonly battleState: BattleState;
   readonly selectedUnitId: string | null;
   readonly reachableTiles: readonly ReachableTile[];
+  // §1.1 (M23, 1/N) — a introdução contextual.
+  readonly introducaoAtual: Introducao | null;
+  readonly introducoesVistas: readonly string[];
+  // §11 (M24) — volume de efeitos e de música, separados.
+  readonly volumeEfeitos: number;
+  readonly volumeMusica: number;
   readonly duelPreview: DuelPreview | null;
   readonly lastCommandReason: string | null;
-  readonly campaignMapIndex: number;
-  readonly campaignComplete: boolean;
   readonly tacticsEditorUnitId: string | null;
   readonly inventory: readonly ItemInstance[];
   readonly equippedByUnit: Readonly<Record<string, Partial<Record<GearSlot, Id>>>>;
@@ -363,6 +465,11 @@ interface BattleStore {
   readonly mode: 'campaign' | 'pvp' | 'dungeon';
   readonly pvp: PvpSession;
   readonly pve: PveSession;
+  readonly summon: SummonSession;
+  readonly campaign: CampaignSession;
+  // Quem é cada unidade do tabuleiro atual. Preenchido sempre que uma batalha nasce de um
+  // ticket, a partir do roster do servidor — ver `heroesPorUnidade`.
+  readonly heroesByUnitId: Readonly<Record<string, Hero>>;
 
   selectUnit: (unitId: string | null) => void;
   moveSelectedUnitTo: (destination: Coord) => void;
@@ -371,8 +478,14 @@ interface BattleStore {
   previewEngage: (targetId: string) => void;
   confirmEngage: () => void;
   cancelEngage: () => void;
-  advanceToNextMap: () => void;
-  retryCurrentMap: () => void;
+  refreshCampaign: () => Promise<void>;
+  selectChapter: (chapterId: string) => void;
+  toggleCampaignHero: (heroId: string) => void;
+  enterChapter: (chapterId: string) => Promise<void>;
+  submitCampaignRun: () => Promise<void>;
+  exitCampaign: () => void;
+  saveHeroTactics: (heroId: string, script: TacticsScript) => Promise<void>;
+  saveHeroTalents: (heroId: string, allocation: TalentAllocation) => Promise<void>;
   openTacticsEditor: (unitId: string) => void;
   closeTacticsEditor: () => void;
   updateUnitTacticsScript: (unitId: string, script: TacticsScript) => void;
@@ -388,6 +501,9 @@ interface BattleStore {
   // escolher uma das duas árvores (que não existem mais). `fromRow: 1` é o reset inteiro.
   resetTalentTree: (unitId: string, fromRow: number) => void;
   loadBuildCode: (unitId: string, code: string) => void;
+  dispararIntroducao: (gatilho: GatilhoDeIntroducao) => void;
+  fecharIntroducao: () => void;
+  definirVolume: (categoria: 'efeitos' | 'musica', valor: number) => void;
   toggleInstantResultMode: () => void;
   setBoardAnimating: (value: boolean) => void;
   toggleColorblindMode: () => void;
@@ -420,6 +536,10 @@ interface BattleStore {
   equipInventoryItem: (heroId: string, itemId: string) => Promise<void>;
   awakenHero: (heroId: string) => Promise<void>;
   imprintHero: (heroId: string) => Promise<void>;
+  refreshSummon: () => Promise<void>;
+  rollSummon: (bannerId: string) => Promise<void>;
+  claimReward: (rewardId: string) => Promise<void>;
+  purchaseEnergy: () => Promise<void>;
   openReplayViewer: () => void;
   closeReplayViewer: () => void;
   seekReplay: (step: number) => void;
@@ -512,25 +632,49 @@ function describeApiError(error: unknown): string {
   return error instanceof Error ? error.message : 'erro desconhecido';
 }
 
+// §8.2 (M18, 7/N) — toda escrita de alocação vai junto para o servidor.
+//
+// O clique continua sendo local e imediato (a árvore responde na hora, como desde M6), e o
+// PUT sai atrás. Não é otimismo cego: a MESMA `validateColumnAllocation` do core já rodou
+// aqui antes do `set`, então o que sobe é o que o servidor aceitaria — e quando não for, a
+// mensagem dele aparece na sessão de campanha em vez de sumir.
+//
+// Uma requisição por clique é barato de propósito: a rota não cobra recurso e é idempotente
+// (gravar a mesma alocação duas vezes deixa a mesma alocação), então não há o que proteger
+// com nonce nem o que juntar num botão de "salvar" que o jogador possa esquecer de apertar.
+function persistirAlocacao(
+  get: () => BattleStore,
+  unitId: string,
+  allocation: TalentAllocation,
+): void {
+  const hero = get().heroesByUnitId[unitId];
+  if (!hero) return;
+  void get().saveHeroTalents(hero.id, allocation);
+}
+
 export const useBattleStore = create<BattleStore>((set, get) => ({
   // O capítulo salvo é remontado do setup — a batalha em si não é persistida (decisão do
   // usuário): recarregar no meio de um capítulo recomeça o capítulo, com as táticas
   // preparadas de pé.
-  battleState: buildMapState(restoredSave?.campaignMapIndex ?? 0, restoredSave?.tacticsOverrides ?? {}),
+  battleState: tabuleiroVazio(),
   selectedUnitId: null,
   reachableTiles: [],
   duelPreview: null,
   lastCommandReason: null,
-  campaignMapIndex: restoredSave?.campaignMapIndex ?? 0,
-  campaignComplete: restoredSave?.campaignComplete ?? false,
   tacticsEditorUnitId: null,
   inventory: Object.values(catalog.items),
-  equippedByUnit: restoredSave?.equippedByUnit ?? {},
+  equippedByUnit: {},
   inventoryUnitId: null,
-  talentAllocationByUnit: restoredSave?.talentAllocationByUnit ?? {},
+  talentAllocationByUnit: {},
   talentEditorUnitId: null,
   lastTalentReason: null,
   instantResultMode: restoredSave?.instantResultMode ?? false,
+  // §1.1 (M23, 1/N) — a introdução contextual. `introducaoAtual` é a caixa na tela agora;
+  // `introducoesVistas` é o que já foi dispensado, e sobrevive no save.
+  introducaoAtual: null,
+  introducoesVistas: restoredSave?.introducoesVistas ?? [],
+  volumeEfeitos: restoredSave?.volumeEfeitos ?? VOLUMES_PADRAO.efeitos,
+  volumeMusica: restoredSave?.volumeMusica ?? VOLUMES_PADRAO.musica,
   boardAnimating: false,
   aiTurnReport: null,
   colorblindMode: restoredSave?.colorblindMode ?? false,
@@ -538,10 +682,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   targetingMode: null,
   commandLog: [],
   replayViewer: null,
-  tacticsOverrides: restoredSave?.tacticsOverrides ?? {},
+  tacticsOverrides: {},
   mode: 'campaign',
   pvp: { ...EMPTY_PVP, token: restoredSave?.pvpToken ?? '' },
   pve: EMPTY_PVE,
+  summon: EMPTY_SUMMON,
+  campaign: EMPTY_CAMPAIGN,
+  heroesByUnitId: {},
 
   selectUnit: (unitId) => {
     if (!unitId) {
@@ -630,6 +777,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       duelPreview: { nextState: result.state, duelResult: result.duelResult, command, aiSteps: result.aiSteps },
       lastCommandReason: null,
     });
+    // §1.1 (M23, 1/N) — o preview é o momento em que "duelo automático" deixa de ser
+    // abstrato: o jogador vê o resultado ANTES de confirmar, que é o pilar de §1.1 em ação.
+    // A explicação cabe aqui e não antes, quando ela seria texto sobre nada.
+    get().dispararIntroducao('preview-de-duelo');
   },
 
   confirmEngage: () => {
@@ -650,49 +801,208 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ duelPreview: null });
   },
 
-  // §09-roadmap.md (M6) — "campanha de 3 mapas jogável ponta a ponta". Sem persistência
-  // entre mapas ainda (decisão desta fatia, ver DECISIONS.md): cada mapa novo é montado
-  // do zero via `buildMapState`, o herói do jogador não carrega HP/AP/PP do mapa anterior.
-  advanceToNextMap: () => {
-    const { campaignMapIndex } = get();
-    const nextIndex = campaignMapIndex + 1;
-    if (nextIndex >= campaignMaps.length) {
-      set({ campaignComplete: true });
+  // §10/§9.4 (M18, 7/N) — a campanha pelo servidor. Os capítulos e o que já foi limpo vêm
+  // dele; o roster vem junto porque escolher quem preenche a vaga exige saber quem o
+  // jogador tem, e as duas listas mudam pelas mesmas ações (invocar, limpar capítulo).
+  refreshCampaign: async () => {
+    const { pvp } = get();
+    if (!pvp.token) {
+      set((s) => ({ campaign: { ...s.campaign, error: 'conecte-se com um token antes' } }));
       return;
     }
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null } }));
+    try {
+      const [lista, roster] = await Promise.all([api.campaign(pvp.token), api.roster(pvp.token)]);
+      set((s) => ({
+        campaign: {
+          ...s.campaign,
+          chapters: lista.chapters,
+          premiumOnFirstClear: lista.premiumOnFirstClear,
+          busy: false,
+        },
+        pvp: { ...s.pvp, roster },
+      }));
+    } catch (error) {
+      set((s) => ({ campaign: { ...s.campaign, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  selectChapter: (chapterId) => {
+    const { campaign } = get();
+    const capitulo = campaign.chapters.find((c) => c.id === chapterId);
+    if (!capitulo) return;
+    // Trocar de capítulo APARA a seleção em vez de zerá-la: quem escolheu quatro e clicou
+    // num capítulo de duas vagas não quer recomeçar a escolha, quer as duas primeiras.
     set({
-      campaignMapIndex: nextIndex,
-      battleState: buildMapState(nextIndex),
-      commandLog: [],
-      tacticsOverrides: {},
-      replayViewer: null,
-      selectedUnitId: null,
-      reachableTiles: [],
-      duelPreview: null,
-      lastCommandReason: null,
+      campaign: {
+        ...campaign,
+        selectedChapterId: chapterId,
+        selectedHeroIds: campaign.selectedHeroIds.slice(0, capitulo.slots),
+        error: null,
+      },
     });
   },
 
-  retryCurrentMap: () => {
-    const { campaignMapIndex } = get();
-    set({
-      // Reiniciar preserva os overrides: o jogador ajustou o script justamente porque
-      // perdeu, e obrigá-lo a reconfigurar tudo a cada tentativa seria hostil.
-      battleState: buildMapState(campaignMapIndex, get().tacticsOverrides),
+  // D16 — o capítulo declara VAGAS e o jogador leva quem tem. As duas recusas aqui são as
+  // que o servidor faria de qualquer jeito (400 por excesso de heróis, 400 por posse); a
+  // tela as faz antes para o jogador não descobrir por erro de rede. Quem decide continua
+  // sendo o servidor (§9.4).
+  toggleCampaignHero: (heroId) => {
+    const { campaign, pvp } = get();
+    if (campaign.selectedHeroIds.includes(heroId)) {
+      set({
+        campaign: {
+          ...campaign,
+          selectedHeroIds: campaign.selectedHeroIds.filter((id) => id !== heroId),
+          error: null,
+        },
+      });
+      return;
+    }
+    // Herói que não está no roster do servidor não é do jogador — e a campanha checa posse
+    // desde a 4/N.
+    if (!pvp.roster.some((entry) => entry.hero.id === heroId)) return;
+
+    const capitulo = campaign.chapters.find((c) => c.id === campaign.selectedChapterId);
+    const vagas = capitulo?.slots ?? 0;
+    if (campaign.selectedHeroIds.length >= vagas) {
+      set({ campaign: { ...campaign, error: `este capítulo tem ${vagas} vaga(s)` } });
+      return;
+    }
+    set({ campaign: { ...campaign, selectedHeroIds: [...campaign.selectedHeroIds, heroId], error: null } });
+  },
+
+  // O ticket traz o `BattleSetup` MONTADO PELO SERVIDOR, e é ele que vira o tabuleiro. O
+  // cliente não monta mais a batalha de campanha: §9.1 chama de bug crítico a divergência
+  // entre o que o cliente jogou e o que o servidor reexecuta, e duas montagens são duas
+  // chances de divergir.
+  enterChapter: async (chapterId) => {
+    const { pvp, campaign } = get();
+    if (!pvp.token) {
+      set((s) => ({ campaign: { ...s.campaign, error: 'conecte-se com um token antes' } }));
+      return;
+    }
+    if (campaign.selectedHeroIds.length === 0) {
+      set((s) => ({ campaign: { ...s.campaign, error: 'escolha ao menos um herói para a vaga' } }));
+      return;
+    }
+
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: 'pedindo o capítulo…' } }));
+    try {
+      const ticket = await api.requestCampaignTicket(pvp.token, chapterId, campaign.selectedHeroIds);
+      set((s) => ({
+        mode: 'campaign',
+        battleState: buildInitialState(ticket.setup, ticket.seed),
+        heroesByUnitId: heroesPorUnidade(ticket.setup, s.pvp.roster),
+        commandLog: [],
+        replayViewer: null,
+        selectedUnitId: null,
+        reachableTiles: [],
+        duelPreview: null,
+        targetingMode: null,
+        lastCommandReason: null,
+        aiTurnReport: null,
+        campaign: { ...s.campaign, ticket, selectedChapterId: chapterId, lastRun: null, busy: false, status: null },
+      }));
+    } catch (error) {
+      set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
+    }
+  },
+
+  // §9.4 — o desfecho NUNCA vem do cliente: ele manda os comandos e o servidor reexecuta.
+  // Quem marca "capítulo limpo" e paga a moeda premium é ele.
+  submitCampaignRun: async () => {
+    const { pvp, campaign, commandLog } = get();
+    if (!campaign.ticket) return;
+
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: 'enviando comandos…' } }));
+    const corpoDoCapitulo = {
+      nonce: campaign.ticket.nonce,
+      heroIds: campaign.selectedHeroIds,
+      commands: commandLog,
+    };
+    guardarPedido({ rota: 'campaign-run', chapterId: campaign.ticket.chapterId, corpo: corpoDoCapitulo });
+    try {
+      const run = await api.submitCampaignRun(pvp.token, campaign.ticket.chapterId, corpoDoCapitulo);
+      limparPedido();
+      set((s) => ({
+        campaign: { ...s.campaign, lastRun: run, busy: false, status: `servidor resolveu: ${run.outcome}` },
+      }));
+      // O capítulo pode ter virado "limpo" e a moeda pode ter sido paga: a lista é relida
+      // para a tela não mostrar um estado que o servidor já mudou.
+      await get().refreshCampaign();
+    } catch (error) {
+      if (error instanceof ApiError) limparPedido();
+      set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
+    }
+  },
+
+  exitCampaign: () => {
+    set((s) => ({
+      battleState: tabuleiroVazio(),
+      heroesByUnitId: {},
       commandLog: [],
       replayViewer: null,
       selectedUnitId: null,
       reachableTiles: [],
       duelPreview: null,
+      targetingMode: null,
       lastCommandReason: null,
-    });
+      campaign: { ...s.campaign, ticket: null, status: null, error: null },
+    }));
+  },
+
+  // §6.3 (M18, 7/N) — o script tático passa a ser do SERVIDOR. Antes ele era editado no
+  // `battleState` local e o mapa era remontado; com a batalha vindo do ticket, uma edição
+  // que não chega ao servidor faz o `run` reexecutar uma batalha diferente da jogada.
+  saveHeroTactics: async (heroId, script) => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null } }));
+    try {
+      const { hero } = await api.saveTactics(pvp.token, heroId, script);
+      set((s) => ({
+        campaign: { ...s.campaign, busy: false, status: 'táticas salvas' },
+        pvp: {
+          ...s.pvp,
+          roster: s.pvp.roster.map((entry) => (entry.hero.id === heroId ? { ...entry, hero } : entry)),
+        },
+      }));
+    } catch (error) {
+      set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
+    }
+  },
+
+  // §8.2 — mesma história dos talentos. A validação do core roda dos DOIS lados: aqui para
+  // o botão não oferecer o ilegal, e no servidor porque é ele quem decide (§9.4).
+  saveHeroTalents: async (heroId, allocation) => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null } }));
+    try {
+      const { hero } = await api.saveTalents(pvp.token, heroId, allocation);
+      set((s) => ({
+        campaign: { ...s.campaign, busy: false, status: 'talentos salvos' },
+        pvp: {
+          ...s.pvp,
+          roster: s.pvp.roster.map((entry) => (entry.hero.id === heroId ? { ...entry, hero } : entry)),
+        },
+      }));
+    } catch (error) {
+      set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
+    }
   },
 
   // §11 — "Editor de táticas: Drag & drop das linhas, condições em dropdown, e botão
   // 'Testar'." Editar o script não é uma ação de batalha (não existe BattleCommand pra
   // isso — configurar táticas é trabalho de fora do combate no jogo real), então isso
   // atualiza a unidade direto no battleState em vez de passar por applyCommandAndAdvance.
-  openTacticsEditor: (unitId) => set({ tacticsEditorUnitId: unitId }),
+  openTacticsEditor: (unitId) => {
+    // É aqui que o jogador descobre que PROGRAMA a unidade antes, em vez de comandá-la
+    // durante o duelo.
+    get().dispararIntroducao('script-tatico');
+    set({ tacticsEditorUnitId: unitId });
+  },
   closeTacticsEditor: () => set({ tacticsEditorUnitId: null }),
 
   // M13, sub-sessão 1/N — a edição fica travada depois do primeiro comando do mapa
@@ -703,22 +1013,33 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // dos dois, e a reprodução mostraria uma batalha que não aconteceu. A janela de edição é
   // a preparação do capítulo, antes de qualquer unidade agir.
   updateUnitTacticsScript: (unitId, script) => {
-    const { commandLog, campaignMapIndex, tacticsOverrides } = get();
+    const { commandLog, heroesByUnitId, campaign } = get();
     if (commandLog.length > 0) {
       set({ lastCommandReason: 'táticas só podem ser editadas antes do primeiro comando do mapa' });
       return;
     }
 
-    // Não basta trocar o script no `battleState`: o replay parte do SETUP, então o
-    // override entra no setup e a batalha é remontada com ele.
-    const overrides = { ...tacticsOverrides, [unitId]: script };
-    set({
-      tacticsOverrides: overrides,
-      battleState: buildMapState(campaignMapIndex, overrides),
-      selectedUnitId: null,
-      reachableTiles: [],
-      lastCommandReason: null,
-    });
+    // §6.3 (M18, 7/N) — o script deixou de ser estado local. Quem monta a batalha é o
+    // servidor, a partir do herói que ELE tem: editar só o `battleState` daqui faria o
+    // `POST /campaign/:id/run` reexecutar uma batalha com o script antigo, e o desfecho
+    // divergiria do que o jogador viu (§9.1).
+    const hero = heroesByUnitId[unitId];
+    if (!hero) {
+      set({ lastCommandReason: 'esta unidade não é um herói seu' });
+      return;
+    }
+
+    void (async () => {
+      await get().saveHeroTactics(hero.id, script);
+      // Reentrar no capítulo é o que faz o tabuleiro refletir o script novo — e é legítimo
+      // exatamente porque a edição só é permitida antes do primeiro comando: não há
+      // batalha a perder. É o mesmo movimento que `buildMapState` fazia localmente até
+      // aqui, agora com o servidor como fonte.
+      const { campaign: depois } = get();
+      if (depois.error === null && campaign.ticket) await get().enterChapter(campaign.ticket.chapterId);
+    })();
+
+    set({ selectedUnitId: null, reachableTiles: [], lastCommandReason: null });
   },
 
   // §11 — "Inventário: filtro por set/slot/substat, comparação lado a lado, ganho de
@@ -768,8 +1089,8 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   closeTalentEditor: () => set({ talentEditorUnitId: null }),
 
   allocateTalent: (unitId, nodeId) => {
-    const { talentAllocationByUnit, campaignMapIndex } = get();
-    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    const { talentAllocationByUnit, heroesByUnitId } = get();
+    const tree = characterTreeForUnit(heroesByUnitId, unitId);
     if (!tree) {
       set({ lastTalentReason: 'esta unidade não é um personagem do elenco' });
       return;
@@ -779,7 +1100,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const result = validateColumnAllocation({
       tree,
       allocation: nextAllocation,
-      awakening: awakeningForUnit(campaignMapIndex, unitId),
+      awakening: awakeningForUnit(heroesByUnitId, unitId),
     });
     if (!result.valid) {
       set({ lastTalentReason: result.issues[0]?.reason ?? 'alocação inválida' });
@@ -789,11 +1110,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: nextAllocation },
       lastTalentReason: null,
     });
+    persistirAlocacao(get, unitId, nextAllocation);
   },
 
   deallocateTalent: (unitId, nodeId) => {
-    const { talentAllocationByUnit, campaignMapIndex } = get();
-    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    const { talentAllocationByUnit, heroesByUnitId } = get();
+    const tree = characterTreeForUnit(heroesByUnitId, unitId);
     if (!tree) return;
     const current = talentAllocationByUnit[unitId] ?? {};
     const currentRank = current[nodeId] ?? 0;
@@ -803,7 +1125,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const result = validateColumnAllocation({
       tree,
       allocation: nextAllocation,
-      awakening: awakeningForUnit(campaignMapIndex, unitId),
+      awakening: awakeningForUnit(heroesByUnitId, unitId),
     });
     if (!result.valid) {
       // A saída não é um beco: o painel oferece o reset a partir da linha, que é como se
@@ -815,19 +1137,21 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: nextAllocation },
       lastTalentReason: null,
     });
+    persistirAlocacao(get, unitId, nextAllocation);
   },
 
   resetTalentTree: (unitId, fromRow) => {
-    const { talentAllocationByUnit, campaignMapIndex } = get();
-    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    const { talentAllocationByUnit, heroesByUnitId } = get();
+    const tree = characterTreeForUnit(heroesByUnitId, unitId);
     if (!tree) return;
     const next = resetFromRow(tree, talentAllocationByUnit[unitId] ?? {}, fromRow);
     set({ talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: next }, lastTalentReason: null });
+    persistirAlocacao(get, unitId, next);
   },
 
   loadBuildCode: (unitId, code) => {
-    const { campaignMapIndex } = get();
-    const tree = characterTreeForUnit(campaignMapIndex, unitId);
+    const { heroesByUnitId } = get();
+    const tree = characterTreeForUnit(heroesByUnitId, unitId);
     if (!tree) {
       set({ lastTalentReason: 'esta unidade não é um personagem do elenco' });
       return;
@@ -836,7 +1160,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       tree.characterId,
       tree,
       code,
-      awakeningForUnit(campaignMapIndex, unitId),
+      awakeningForUnit(heroesByUnitId, unitId),
     );
     if (!lido.ok) {
       set({ lastTalentReason: lido.reason });
@@ -847,6 +1171,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       talentAllocationByUnit: { ...talentAllocationByUnit, [unitId]: lido.talents },
       lastTalentReason: null,
     });
+    persistirAlocacao(get, unitId, lido.talents);
   },
 
   // §11 (acessibilidade) — "modo resultado instantâneo (pula animações) — essencial pra
@@ -861,7 +1186,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // `BattleSetup` do capítulo, não um snapshot do meio da batalha: reproduzir é sempre
   // partir do começo e reaplicar.
   buildReplay: () => {
-    const { campaignMapIndex, commandLog, tacticsOverrides, mode, pvp } = get();
+    const { commandLog, mode, pvp, campaign } = get();
     // Em PvP o setup e a seed são os do ticket — do servidor, não do catálogo local.
     if (mode === 'pvp' && pvp.ticket) {
       return {
@@ -871,12 +1196,150 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         commands: commandLog,
       };
     }
+    // M18 7/N — a campanha também vem de ticket agora: o setup e a seed são os do
+    // servidor, e não os de um catálogo local que ele não consultaria.
+    if (campaign.ticket) {
+      return {
+        rulesVersion: campaign.ticket.rulesVersion,
+        seed: campaign.ticket.seed,
+        initialState: campaign.ticket.setup,
+        commands: commandLog,
+      };
+    }
+    // Sem ticket não há batalha: o tabuleiro vazio é o que a tela mostra entre capítulos, e
+    // reproduzir o nada é um replay de zero comandos sobre zero unidades.
     return {
       rulesVersion: RULES_VERSION,
       seed: BATTLE_SEED,
-      initialState: setupWithTactics(campaignMapIndex, tacticsOverrides),
+      initialState: setupVazio(),
       commands: commandLog,
     };
+  },
+
+  // §10 (M18, 6/N) — a tela de aquisição lê as TRÊS superfícies de uma vez. Separá-las em
+  // três botões faria o jogador ver saldo velho ao lado de pity novo: a moeda premium é a
+  // mesma nas três respostas, e a última a chegar mandaria.
+  refreshSummon: async () => {
+    const { pvp } = get();
+    if (!pvp.token) {
+      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      return;
+    }
+    set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
+    try {
+      // A tela de invocação traz moeda premium, banner e o contador de garantia de uma vez.
+      get().dispararIntroducao('primeiro-summon');
+      const [roster, banners, rewards] = await Promise.all([
+        api.characterRoster(pvp.token),
+        api.banners(pvp.token),
+        api.rewards(pvp.token),
+      ]);
+      set((s) => ({
+        summon: {
+          ...s.summon,
+          premium: roster.premium,
+          characters: roster.characters,
+          banners: banners.banners,
+          rewards: rewards.rewards,
+          busy: false,
+        },
+      }));
+      // A lista já está na mão: espelhar aqui não custa requisição, e cobre o jogador que
+      // cumpriu uma conquista DURANTE a sessão sem precisar reconectar para ela aparecer.
+      void espelharConquistas(rewards.rewards);
+    } catch (error) {
+      set((s) => ({ summon: { ...s.summon, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  rollSummon: async (bannerId) => {
+    const { pvp, summon } = get();
+    if (!pvp.token) {
+      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      return;
+    }
+    const banner = summon.banners.find((candidate) => candidate.id === bannerId);
+    if (!banner) {
+      set((s) => ({ summon: { ...s.summon, error: 'banner desconhecido' } }));
+      return;
+    }
+    // A recusa por saldo é do SERVIDOR (§9.4 — quem decide é ele), e mesmo assim a tela
+    // tem de impedir que ela vire requisição: o mesmo contrato da defesa de arena em M15
+    // 3/N. Aqui há uma razão a mais — o nonce é a chave de idempotência, e queimar um
+    // nonce num 400 é a fresta que a 3/N fechou do outro lado.
+    if (summon.premium < banner.premiumCost) {
+      set((s) => ({ summon: { ...s.summon, error: `moeda premium insuficiente: ${banner.premiumCost} necessária(s)` } }));
+      return;
+    }
+
+    set((s) => ({ summon: { ...s.summon, busy: true, error: null, status: 'invocando…' } }));
+    try {
+      const resultado = await api.summon(pvp.token, bannerId);
+      set((s) => ({
+        summon: { ...s.summon, lastResult: resultado, premium: resultado.premium, busy: false, status: null },
+      }));
+      // Relê tudo: o personagem que acabou de sair tem de aparecer possuído sem recarregar
+      // a página, e o pity mudou. O saldo já veio na resposta e é o que vale até lá.
+      await get().refreshSummon();
+
+      // E o roster de HERÓIS junto, quando saiu personagem novo. Os dois rosters são
+      // coisas diferentes (um diz quem o jogador tem, o outro quais instâncias ele leva ao
+      // mapa) e só o primeiro é relido acima — sem isto, o invocado aparece no elenco e
+      // continua fora do time até o jogador reconectar, que é metade do critério de aceite
+      // 1 faltando na tela. Visto no navegador nesta fatia, não suposto.
+      if (resultado.outcome.kind === 'character') {
+        const heroes = await api.roster(pvp.token);
+        set((s) => ({ pvp: { ...s.pvp, roster: heroes } }));
+      }
+    } catch (error) {
+      set((s) => ({ summon: { ...s.summon, busy: false, status: null, error: describeApiError(error) } }));
+    }
+  },
+
+  claimReward: async (rewardId) => {
+    const { pvp, summon } = get();
+    if (!pvp.token) {
+      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      return;
+    }
+    // Quem decide se a condição está cumprida é `rewards/conditions.ts`, no servidor; o
+    // que a tela sabe é o `claimable` que ele já respondeu. Mandar mesmo assim seria pedir
+    // um 403 previsível.
+    const premio = summon.rewards.find((candidate) => candidate.id === rewardId);
+    if (!premio?.claimable) {
+      set((s) => ({ summon: { ...s.summon, error: 'este prêmio não está disponível' } }));
+      return;
+    }
+
+    set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
+    try {
+      const resposta = await api.claimReward(pvp.token, rewardId);
+      set((s) => ({
+        summon: { ...s.summon, premium: resposta.premium, busy: false, status: `+${resposta.premiumAwarded} premium` },
+      }));
+      await get().refreshSummon();
+    } catch (error) {
+      set((s) => ({ summon: { ...s.summon, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  // D17 — o segundo sumidouro. Fica nesta sessão e não na de farm porque quem paga é a
+  // moeda premium; o que ele devolve (energia) é da outra, e por isso a conta de PvE é
+  // relida em seguida.
+  purchaseEnergy: async () => {
+    const { pvp } = get();
+    if (!pvp.token) {
+      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      return;
+    }
+    set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
+    try {
+      const resposta = await api.purchaseEnergy(pvp.token);
+      set((s) => ({ summon: { ...s.summon, premium: resposta.premium, busy: false, status: 'energia comprada' } }));
+      await get().refreshPve();
+    } catch (error) {
+      set((s) => ({ summon: { ...s.summon, busy: false, error: describeApiError(error) } }));
+    }
   },
 
   openReplayViewer: () => {
@@ -1002,15 +1465,29 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 
   setPvpToken: (token) => set((s) => ({ pvp: { ...s.pvp, token, error: null } })),
 
+  // §9.4 (M20) — conectar deixou de ser "digite seu token".
+  //
+  // O ticket vem da PLATAFORMA (`data/platformBridge.ts`) e o sign-in é explícito: é ele que
+  // cria a conta na primeira vez e entrega o núcleo de quatro. O jogador não digita nada — e
+  // é isso que o critério de aceite do M20 pede.
   connectPvp: async () => {
     const { pvp } = get();
-    if (!pvp.token) {
-      set({ pvp: { ...pvp, error: 'informe o token do jogador' } });
-      return;
-    }
     set({ pvp: { ...pvp, busy: true, error: null, status: 'conectando…' } });
     try {
-      const [me, roster] = await Promise.all([api.me(pvp.token), api.roster(pvp.token)]);
+      const ticket = await platformBridge.requestSessionTicket();
+      if (!ticket) {
+        set((s) => ({
+          pvp: { ...s.pvp, busy: false, status: null, error: 'plataforma indisponível — abra o jogo por ela' },
+        }));
+        return;
+      }
+
+      // O sign-in vem PRIMEIRO: sem conta, toda rota protegida devolve 401 (a autenticação
+      // não cria conta pela porta dos fundos — decisão do M20).
+      await api.session(ticket);
+      set((s) => ({ pvp: { ...s.pvp, token: ticket } }));
+
+      const [me, roster] = await Promise.all([api.me(ticket), api.roster(ticket)]);
       set((s) => ({
         pvp: {
           ...s.pvp,
@@ -1023,6 +1500,43 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           status: `conectado como ${me.displayName}`,
         },
       }));
+      // §9.4 (M21, 3/N) — as conquistas cumpridas vão para a plataforma no SIGN-IN, e não
+      // só na tela de prêmios: aquela tela é opcional, e quem nunca a abre ficaria com o
+      // perfil vazio tendo limpado a campanha inteira. Fora do shell a função sai antes de
+      // fazer requisição nenhuma, e falhar nunca derruba a conexão.
+      void sincronizarConquistasDaConta(ticket);
+
+      // M22 2/N — a RECONEXÃO. Se o jogo caiu no meio de uma submissão, o pedido ficou
+      // guardado com o nonce; reenviá-lo agora devolve a run original (o servidor guarda a
+      // resposta por nonce) em vez de cobrar de novo. Falhar aqui não pode impedir o
+      // sign-in: o pedido continua guardado para a próxima tentativa.
+      try {
+        const recuperado = await reenviarPedidoPendente(ticket);
+        if (recuperado) {
+          set((s) =>
+            recuperado.pedido.rota === 'arena-battle'
+              ? {
+                  pvp: {
+                    ...s.pvp,
+                    outcome: recuperado.resposta as BattleOutcomeResponse,
+                    status: 'batalha de arena recuperada depois da reconexão',
+                  },
+                }
+              : recuperado.pedido.rota === 'dungeon-run'
+              ? { pve: { ...s.pve, lastRun: recuperado.resposta as DungeonRunResponse, status: 'run recuperada depois da reconexão' } }
+              : {
+                  campaign: {
+                    ...s.campaign,
+                    lastRun: recuperado.resposta as CampaignRunResponse,
+                    status: 'capítulo recuperado depois da reconexão',
+                  },
+                },
+          );
+        }
+      } catch {
+        // Servidor fora do ar ou recusa: a próxima conexão tenta de novo.
+      }
+
       // A defesa vem junto do login: o jogador precisa ver o que está defendendo por ele
       // ANTES de decidir atacar alguém. Erro aqui não derruba a conexão — `loadDefense`
       // trata o 404 como estado normal e o resto vira mensagem na própria tela.
@@ -1189,6 +1703,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     }),
 
   findPvpOpponent: async () => {
+    // A arena é assíncrona: o jogador não enfrenta a pessoa, enfrenta a defesa que ela
+    // deixou salva. Sem isso dito, "oponente" promete uma coisa que não acontece.
+    get().dispararIntroducao('primeira-arena');
     const { pvp } = get();
     set({ pvp: { ...pvp, busy: true, error: null, status: 'procurando oponente…' } });
     try {
@@ -1233,18 +1750,25 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const { pvp, commandLog } = get();
     if (!pvp.ticket || !pvp.opponent) return;
     set({ pvp: { ...pvp, busy: true, error: null, status: 'enviando comandos…' } });
+    // M22 (auditoria) — a arena guarda o pedido como a masmorra e o capítulo: ela resolve no
+    // servidor, grava replay e mexe no ELO, então cair aqui deixava o jogador sem saber se a
+    // partida valeu, com o ELO já mudado do outro lado.
+    const corpoDaArena = {
+      attackerHeroIds: pvp.selectedHeroIds,
+      defenderPlayerId: pvp.opponent.playerId,
+      commands: commandLog,
+      rulesVersion: pvp.ticket.rulesVersion,
+      nonce: pvp.ticket.nonce,
+    };
+    guardarPedido({ rota: 'arena-battle', corpo: corpoDaArena });
     try {
-      const outcome = await api.submitBattle(pvp.token, {
-        attackerHeroIds: pvp.selectedHeroIds,
-        defenderPlayerId: pvp.opponent.playerId,
-        commands: commandLog,
-        rulesVersion: pvp.ticket.rulesVersion,
-        nonce: pvp.ticket.nonce,
-      });
+      const outcome = await api.submitBattle(pvp.token, corpoDaArena);
+      limparPedido();
       set((s) => ({
         pvp: { ...s.pvp, outcome, busy: false, status: `servidor resolveu: ${outcome.result.outcome}` },
       }));
     } catch (error) {
+      if (error instanceof ApiError) limparPedido();
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
     }
   },
@@ -1273,10 +1797,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   exitPvp: () => {
-    const { campaignMapIndex, tacticsOverrides } = get();
     set({
       mode: 'campaign',
-      battleState: buildMapState(campaignMapIndex, tacticsOverrides),
+      battleState: tabuleiroVazio(),
+      heroesByUnitId: {},
       commandLog: [],
       replayViewer: null,
       selectedUnitId: null,
@@ -1354,19 +1878,26 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const { pvp, pve, commandLog } = get();
     if (!pve.ticket || !pve.activeDungeonId) return;
     set({ pve: { ...pve, busy: true, error: null, status: 'enviando comandos…' } });
+    // M22 2/N — o pedido é guardado ANTES de sair. A energia é debitada no servidor, e uma
+    // queda de conexão depois disso deixaria o jogador sem a run e sem a energia; com o
+    // nonce em disco, reconectar reenvia o mesmo pedido e recebe a run original de volta.
+    const corpoDaRun = {
+      nonce: pve.ticket.nonce,
+      heroIds: pve.selectedHeroIds,
+      commands: commandLog,
+    };
+    guardarPedido({ rota: 'dungeon-run', dungeonId: pve.activeDungeonId, corpo: corpoDaRun });
     try {
-      const run = await api.submitDungeonRun(pvp.token, pve.activeDungeonId, {
-        nonce: pve.ticket.nonce,
-        heroIds: pve.selectedHeroIds,
-        commands: commandLog,
-      });
+      const run = await api.submitDungeonRun(pvp.token, pve.activeDungeonId, corpoDaRun);
+      limparPedido();
       // A run acabou: o `battleState` da masmorra não vale mais nada, e ficar nele deixaria
       // o painel preso na visão de batalha — sem lista de masmorras e sem inventário, que é
       // justamente o próximo passo do ciclo (achado da verificação em navegador).
-      const { campaignMapIndex, tacticsOverrides } = get();
+
       set((s) => ({
         mode: 'campaign',
-        battleState: buildMapState(campaignMapIndex, tacticsOverrides),
+        battleState: tabuleiroVazio(),
+        heroesByUnitId: {},
         commandLog: [],
         selectedUnitId: null,
         reachableTiles: [],
@@ -1383,6 +1914,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       }));
       await get().refreshPve();
     } catch (error) {
+      // O servidor RESPONDEU (mesmo que recusando): o desfecho é conhecido e não há o que
+      // reenviar. Falha de rede não cai aqui com `ApiError`, e o pedido fica guardado — que
+      // é justamente o caso de quem perdeu a conexão.
+      if (error instanceof ApiError) limparPedido();
       set((s) => ({ pve: { ...s.pve, busy: false, status: null, error: describeApiError(error) } }));
     }
   },
@@ -1402,10 +1937,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   exitDungeon: () => {
-    const { campaignMapIndex, tacticsOverrides } = get();
     set((s) => ({
       mode: 'campaign',
-      battleState: buildMapState(campaignMapIndex, tacticsOverrides),
+      battleState: tabuleiroVazio(),
+      heroesByUnitId: {},
       commandLog: [],
       replayViewer: null,
       selectedUnitId: null,
@@ -1481,6 +2016,38 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   toggleInstantResultMode: () => set((s) => ({ instantResultMode: !s.instantResultMode })),
+
+  // §1.1 (M23, 1/N) — cada conceito é explicado no ponto em que APARECE pela primeira vez.
+  // Quem dispara é a tela que o mostra; quem decide se há algo a mostrar é `introducao.ts`.
+  dispararIntroducao: (gatilho) => {
+    const { introducaoAtual, introducoesVistas } = get();
+    // Uma caixa por vez: duas ao mesmo tempo seria o paredão de texto que a milestone
+    // existe para não ter, montado por acidente.
+    if (introducaoAtual) return;
+
+    const introducao = proximaIntroducao(gatilho, introducoesVistas);
+    if (introducao) set({ introducaoAtual: introducao });
+  },
+
+  // §11 (M24) — os dois controles de volume. Aplicados no motor NA HORA (o jogador precisa
+  // ouvir o que está ajustando) e gravados no save pela mesma projeção de sempre.
+  definirVolume: (categoria, valor) => {
+    const limitado = Math.max(0, Math.min(1, valor));
+    set(categoria === 'efeitos' ? { volumeEfeitos: limitado } : { volumeMusica: limitado });
+    const { volumeEfeitos, volumeMusica } = get();
+    definirVolumesDoJogo({ efeitos: volumeEfeitos, musica: volumeMusica });
+  },
+
+  // Fechar é o que marca como vista: enquanto ela estiver na tela, o jogador ainda não leu.
+  fecharIntroducao: () => {
+    const { introducaoAtual, introducoesVistas } = get();
+    if (!introducaoAtual) return;
+    set({
+      introducaoAtual: null,
+      introducoesVistas: marcarIntroducaoVista(introducoesVistas, introducaoAtual.gatilho),
+    });
+  },
+
   setBoardAnimating: (value) => set({ boardAnimating: value }),
 
   toggleColorblindMode: () => set((s) => ({ colorblindMode: !s.colorblindMode })),
@@ -1501,9 +2068,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     clearSave(saveStorage);
     lastPersisted = null;
     set({
-      campaignMapIndex: 0,
-      campaignComplete: false,
-      battleState: buildMapState(0),
+      battleState: tabuleiroVazio(),
+      heroesByUnitId: {},
+      campaign: EMPTY_CAMPAIGN,
+      summon: EMPTY_SUMMON,
       tacticsOverrides: {},
       equippedByUnit: {},
       talentAllocationByUnit: {},
@@ -1526,6 +2094,26 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 // espalhar "salvar" por todos eles garantiria esquecer um. A projeção é pequena, então
 // comparar o JSON gravado é mais barato do que comparar campo a campo — e é exatamente o
 // que decide se houve mudança digna de escrita.
+// §11 (M24) — os volumes do save valem desde o primeiro som, e não só depois de o jogador
+// mexer no controle. O motor ainda não existe neste ponto (ele nasce no primeiro som pedido,
+// por causa da política de autoplay): o módulo guarda o valor e o aplica quando criar.
+definirVolumesDoJogo({
+  efeitos: useBattleStore.getState().volumeEfeitos,
+  musica: useBattleStore.getState().volumeMusica,
+});
+
+// §11 (M24) — a TRANSIÇÃO DE TURNO, que é o único som que não sai de uma cena de batalha.
+//
+// Ela é assinada aqui, e não no `MapCanvas`, porque quem sabe que o round virou é o estado —
+// o tabuleiro só desenha o que ele diz. Assinar no componente daria um som por montagem de
+// componente, e não um por round.
+let ultimoRound = useBattleStore.getState().battleState.round;
+useBattleStore.subscribe((state) => {
+  if (state.battleState.round === ultimoRound) return;
+  ultimoRound = state.battleState.round;
+  audioDoJogo().tocar('turno');
+});
+
 let lastPersisted: string | null = saveStorage ? serializeSave(saveProjection(useBattleStore.getState())) : null;
 
 if (saveStorage) {

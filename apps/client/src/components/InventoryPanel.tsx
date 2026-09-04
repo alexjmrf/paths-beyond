@@ -146,8 +146,10 @@ export function InventoryPanel() {
               {preview.damageAfter - preview.damageBefore >= 0 ? '+' : ''}
               {preview.damageAfter - preview.damageBefore})
             </p>
-            <p>
-              CP: {preview.cpBefore} → {preview.cpAfter} (
+            {/* M23 3/N — "CP" é sigla de dentro do projeto. O número ao lado dele é
+                comparação de poder, e é assim que ele passa a se apresentar. */}
+            <p title="Poder de combate: um resumo dos stats do herói, usado para comparar equipamentos rapidamente.">
+              Poder de combate: {preview.cpBefore} → {preview.cpAfter} (
               {preview.cpAfter - preview.cpBefore >= 0 ? '+' : ''}
               {preview.cpAfter - preview.cpBefore})
             </p>

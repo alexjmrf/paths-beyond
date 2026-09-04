@@ -3,5 +3,29 @@
   "name": "Rurik",
   "classId": "class-guerreiro",
   "acquisition": "summon",
-  "fragmentMaterialId": "material-fragmento-ally-guerreiro"
+  "fragmentMaterialId": "material-fragmento-ally-guerreiro",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "axe",
+    "equipment": {
+      "weapon": "item-arma-guerreiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-guerreiro",
+      "skill-especial-guerreiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-guerreiro",
+        "conditions": []
+      }
+    ]
+  }
 }

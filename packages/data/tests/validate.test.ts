@@ -20,6 +20,7 @@ import buildSchema from '../schemas/builds.schema.js';
 import weaponDuelRangesSchema from '../schemas/weapon-duel-ranges.schema.js';
 import compSchema from '../schemas/comps.schema.js';
 import encounterSchema from '../schemas/encounters.schema.js';
+import characterSchema from '../schemas/characters.schema.js';
 import { findJsonFiles, validateDataset, validateFiles } from '../validate.js';
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,6 +67,11 @@ describe.each([
   ['weapon-duel-ranges', weaponDuelRangesSchema],
   ['comps', compSchema],
   ['encounters', encounterSchema],
+  // M18 6/N — as fixtures de personagem existiam desde M17 2/N e NUNCA foram exercitadas:
+  // o `describe.each` não as listava, e uma pasta `invalid` sequer existia. A ficha
+  // inicial entrou como campo obrigatório nesta fatia, e um schema que ninguém testa é
+  // um schema que aceita o que ele não deveria sem nada ficar vermelho.
+  ['characters', characterSchema],
 ] as const)('%s.schema.ts against packages/data/test-fixtures/%s', (type, schema) => {
   it('accepts the valid fixture(s)', () => {
     const files = findJsonFiles(join(packageRoot, 'test-fixtures', type, 'valid'));

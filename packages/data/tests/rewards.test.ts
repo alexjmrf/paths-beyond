@@ -14,6 +14,7 @@ function achievement(overrides: Record<string, unknown> = {}) {
     name: 'Conquista de Teste',
     description: 'Faça alguma coisa.',
     premium: 100,
+    platformId: 'ACH_TESTE',
     condition: { kind: 'dungeonsCleared', atLeast: 1 },
     ...overrides,
   };
@@ -69,6 +70,35 @@ describe('achievements.schema', () => {
     const semCondicao = achievement();
     delete (semCondicao as Record<string, unknown>).condition;
     expect(achievementSchema.safeParse(semCondicao).success).toBe(false);
+  });
+
+  // §9.4 (M21, 3/N) — o ESPELHO na plataforma.
+  //
+  // O nome que a Steam conhece é digitado no backend de parceiro, e é ele que o
+  // `SetAchievement` recebe. Derivá-lo do `id` seria adivinhar: uma letra fora do lugar
+  // produz uma conquista que nunca dispara, sem erro em lugar nenhum. Por isso ele é
+  // AUTORADO, e por isso é obrigatório — um achievement sem espelho é um achievement que
+  // paga moeda e não aparece no perfil do jogador.
+  it('exige `platformId`, e no formato que a plataforma aceita', () => {
+    const semEspelho = achievement();
+    delete (semEspelho as Record<string, unknown>).platformId;
+    expect(achievementSchema.safeParse(semEspelho).success).toBe(false);
+
+    // Maiúsculas, dígitos e `_`. O que a Steam recusa — minúscula, hífen, espaço, acento —
+    // o schema recusa antes, porque lá o erro só apareceria com o jogo publicado.
+    expect(achievementSchema.safeParse(achievement({ platformId: 'ACH_MAOS_A_OBRA' })).success).toBe(true);
+    expect(achievementSchema.safeParse(achievement({ platformId: 'ACH_2' })).success).toBe(true);
+    expect(achievementSchema.safeParse(achievement({ platformId: 'ach_minuscula' })).success).toBe(false);
+    expect(achievementSchema.safeParse(achievement({ platformId: 'ACH-HIFEN' })).success).toBe(false);
+    expect(achievementSchema.safeParse(achievement({ platformId: 'ACH ESPACO' })).success).toBe(false);
+    expect(achievementSchema.safeParse(achievement({ platformId: 'ACH_VÍNCULO' })).success).toBe(false);
+    expect(achievementSchema.safeParse(achievement({ platformId: '' })).success).toBe(false);
+  });
+
+  // O evento NÃO tem espelho, e a ausência é deliberada: evento é janela de tempo, e uma
+  // conquista de plataforma não expira. Quem perdeu a janela não "perdeu uma conquista".
+  it('o evento não tem `platformId` — conquista de plataforma não expira', () => {
+    expect(eventSchema.safeParse(evento({ platformId: 'ACH_EVENTO' })).success).toBe(false);
   });
 });
 

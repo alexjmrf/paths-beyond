@@ -440,7 +440,11 @@ export interface DuelChoreographyInput {
       readonly actorId: string;
       readonly targetId: string;
       readonly damage: number;
-      readonly reaction: { readonly counterDamage: number | null } | null;
+      // §6.5.3 (M24) — a cura que o ator aplicou nesta ação, e a da reação de cura. Elas não
+      // viram animação (curar não sacode ninguém), mas viram SOM: sem isso, "curei" e "não
+      // aconteceu nada" soam igual.
+      readonly heal?: number;
+      readonly reaction: { readonly counterDamage: number | null; readonly healDone?: number | null } | null;
     }[];
   }[];
   readonly finalHpAttacker: number;
@@ -451,7 +455,10 @@ export interface DuelBeat {
   readonly actorId: string;
   readonly targetId: string;
   readonly damage: number;
-  readonly kind: 'strike' | 'death';
+  // M24 — `counter` e `heal` entraram para o ÁUDIO, e não mudam desenho nenhum: o
+  // contra-ataque é animado como o golpe que ele é (mesmo caminho de impacto), e a cura não
+  // tem animação — ela existe aqui para ter um instante ao qual pendurar o som.
+  readonly kind: 'strike' | 'counter' | 'heal' | 'death';
 }
 
 // O duelo já aconteceu inteiro no core antes do primeiro quadro (§6: até 3 trocas, resolvidas
@@ -466,11 +473,21 @@ export function duelBeats(result: DuelChoreographyInput): readonly DuelBeat[] {
       if (acao.damage > 0) {
         beats.push({ actorId: acao.actorId, targetId: acao.targetId, damage: acao.damage, kind: 'strike' });
       }
+      // §6.5.3 (M24) — auto-cura do ator. Não desenha nada; existe para o som ter onde cair.
+      if ((acao.heal ?? 0) > 0) {
+        beats.push({ actorId: acao.actorId, targetId: acao.actorId, damage: 0, kind: 'heal' });
+      }
       // §6.4 — a reação é do ALVO contra quem bateu, e vem depois do golpe que a disparou.
       // Desenhá-la no mesmo sentido faria o contra-ataque parecer parte do ataque.
       const contra = acao.reaction?.counterDamage ?? 0;
       if (contra > 0) {
-        beats.push({ actorId: acao.targetId, targetId: acao.actorId, damage: contra, kind: 'strike' });
+        beats.push({ actorId: acao.targetId, targetId: acao.actorId, damage: contra, kind: 'counter' });
+      }
+      // §6.4 — "Cura de emergência": a reação com a tag `heal` cura o reagente em vez de
+      // contra-atacar, e é simétrica ao contra-ataque.
+      const curaDaReacao = acao.reaction?.healDone ?? 0;
+      if (curaDaReacao > 0) {
+        beats.push({ actorId: acao.targetId, targetId: acao.targetId, damage: 0, kind: 'heal' });
       }
     }
   }

@@ -20,6 +20,8 @@ import {
   type DungeonRunRecord,
   type EconomyActionRecord,
   type EconomyRepository,
+  type IdempotencyRepository,
+  type StoredResponse,
 } from './types.js';
 
 // Conta nova começa com a barra de energia CHEIA — quem chama passa o teto vindo do
@@ -31,8 +33,10 @@ export function createMemoryPlayerRepository(seed: readonly Player[] = []): Play
   const byId = new Map<string, Player>(seed.map((player) => [player.id, player]));
 
   return {
-    async getPlayerByToken(token) {
-      return [...byId.values()].find((p) => p.token === token) ?? null;
+    async getPlayerByPlatformIdentity(provider, platformId) {
+      return (
+        [...byId.values()].find((p) => p.platformProvider === provider && p.platformId === platformId) ?? null
+      );
     },
     async getPlayerById(id) {
       return byId.get(id) ?? null;
@@ -78,6 +82,9 @@ export function createMemoryPlayerRepository(seed: readonly Player[] = []): Play
       byId.set(id, updated);
       return updated;
     },
+    async deletePlayer(id) {
+      return byId.delete(id);
+    },
     async updateEnergy(id, energy) {
       const existing = byId.get(id);
       if (!existing) throw new Error(`player not found: ${id}`);
@@ -120,6 +127,11 @@ export function createMemoryHeroRepository(seed: readonly StoredHero[] = []): He
       byId.set(input.hero.id, input);
       return input;
     },
+    async deleteHeroesByOwner(ownerPlayerId) {
+      for (const [id, stored] of [...byId.entries()]) {
+        if (stored.ownerPlayerId === ownerPlayerId) byId.delete(id);
+      }
+    },
   };
 }
 
@@ -133,6 +145,9 @@ export function createMemoryArenaDefenseRepository(seed: readonly ArenaDefense[]
     async saveDefense(defense) {
       byOwner.set(defense.ownerPlayerId, defense);
       return defense;
+    },
+    async deleteDefenseByOwner(ownerPlayerId) {
+      byOwner.delete(ownerPlayerId);
     },
   };
 }
@@ -162,6 +177,14 @@ export function createMemoryReplayRepository(seed: readonly StoredReplay[] = [])
     async save(replay) {
       byNonce.set(replay.nonce, replay);
       return replay;
+    },
+    // Apaga o replay em que o jogador esteve de QUALQUER lado. O critério do M20 é
+    // literal ("remove o jogador de todas as tabelas"), e um replay guarda o id dos dois
+    // lados — deixá-lo de pé manteria o id de quem pediu a exclusão registrado.
+    async deleteReplaysOfPlayer(playerId) {
+      for (const [nonce, replay] of [...byNonce.entries()]) {
+        if (replay.attackerPlayerId === playerId || replay.defenderPlayerId === playerId) byNonce.delete(nonce);
+      }
     },
   };
 }
@@ -247,6 +270,20 @@ export function createMemoryEconomyRepository(): EconomyRepository {
       actions.set(action.nonce, action);
       return action;
     },
+    async deletePlayerData(playerId) {
+      materials.delete(playerId);
+      items.delete(playerId);
+      clears.delete(playerId);
+      for (const chave of [...entries.keys()]) {
+        if (chave.startsWith(`${playerId}:`)) entries.delete(chave);
+      }
+      for (const [nonce, run] of [...runs.entries()]) {
+        if (run.playerId === playerId) runs.delete(nonce);
+      }
+      for (const [nonce, action] of [...actions.entries()]) {
+        if (action.playerId === playerId) actions.delete(nonce);
+      }
+    },
   };
 }
 
@@ -274,6 +311,12 @@ export function createMemoryCharacterOwnershipRepository(
     },
     async setPity(playerId, bannerId, rollsSinceNew) {
       pity.set(pityKey(playerId, bannerId), rollsSinceNew);
+    },
+    async deletePlayerData(playerId) {
+      acquired.delete(playerId);
+      for (const chave of [...pity.keys()]) {
+        if (chave.startsWith(`${playerId}::`)) pity.delete(chave);
+      }
     },
   };
 }
@@ -309,6 +352,31 @@ export function createMemoryRewardsRepository(): RewardsRepository {
       if (cleared.has(chapterId)) return false;
       cleared.add(chapterId);
       return true;
+    },
+    async deletePlayerData(playerId) {
+      claims.delete(playerId);
+      chapters.delete(playerId);
+    },
+  };
+}
+
+// §9.4 (M22, 2/N) — a resposta guardada por nonce, em memória.
+export function createMemoryIdempotencyRepository(): IdempotencyRepository {
+  const porJogador = new Map<string, Map<string, StoredResponse>>();
+
+  return {
+    async get(playerId, nonce) {
+      return porJogador.get(playerId)?.get(nonce) ?? null;
+    },
+    async save(entry) {
+      const doJogador = porJogador.get(entry.playerId) ?? new Map<string, StoredResponse>();
+      // Primeira escrita vence: se duas chegaram, a resposta canônica é a que foi entregue
+      // primeiro, e sobrescrever daria duas verdades sobre a mesma requisição.
+      if (!doJogador.has(entry.nonce)) doJogador.set(entry.nonce, entry);
+      porJogador.set(entry.playerId, doJogador);
+    },
+    async deletePlayerData(playerId) {
+      porJogador.delete(playerId);
     },
   };
 }

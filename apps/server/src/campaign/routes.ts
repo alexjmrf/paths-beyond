@@ -14,7 +14,7 @@ import {
   type Encounter,
 } from '@paths-beyond/content';
 import type { FastifyPluginAsync } from 'fastify';
-import type { RateLimiter } from '../battle/rateLimit.js';
+import { rejectOnRulesVersion } from '../version.js';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
 import type {
   CharacterOwnershipRepository,
@@ -51,7 +51,6 @@ export interface CampaignRoutesOptions {
   readonly ownershipRepository: CharacterOwnershipRepository;
   readonly rewardsRepository: RewardsRepository;
   readonly catalog: ContentCatalog;
-  readonly rateLimiter: RateLimiter;
   readonly ticketSecret: string;
   readonly now: () => number;
   readonly newNonce?: () => string;
@@ -61,6 +60,10 @@ interface RunBody {
   readonly nonce?: string;
   readonly heroIds?: readonly string[];
   readonly commands?: readonly BattleCommand[];
+  // M22 1/N — mesmo campo, mesmo motivo de `/dungeons/:id/run`: esta rota também reexecuta
+  // comandos do cliente. Ela nasceu no M18 4/N, depois de o roadmap do M22 ser escrito, e
+  // por isso o buraco não estava listado lá — é o mesmo buraco.
+  readonly rulesVersion?: string;
 }
 
 // `catalog.encounters` é uma LISTA e não um índice por id (é assim desde M12): a busca é
@@ -176,9 +179,6 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const player = request.player;
 
-    if (!opts.rateLimiter.tryConsume(player.id)) {
-      return reply.code(429).send({ error: 'rate limit exceeded' });
-    }
 
     const chapterId = (request.params as { id: string }).id;
     const encounter = findChapter(opts.catalog, chapterId);
@@ -209,9 +209,10 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     const body = request.body as RunBody;
     if (!body.nonce) return reply.code(400).send({ error: 'nonce é obrigatório' });
 
-    if (!opts.rateLimiter.tryConsume(player.id)) {
-      return reply.code(429).send({ error: 'rate limit exceeded' });
-    }
+    // Antes do limitador, pelo mesmo motivo da masmorra: quem não consegue jogar precisa da
+    // resposta que explica por quê.
+    if (rejectOnRulesVersion(reply, body.rulesVersion)) return reply;
+
 
     const assembled = await assembleChapterBattle(opts, encounter, body.heroIds ?? [], player.id);
     if ('error' in assembled) return reply.code(400).send({ error: assembled.error });

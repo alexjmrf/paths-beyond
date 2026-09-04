@@ -1,6 +1,7 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -44,7 +45,8 @@ function buildHarness(options: { premium?: number } = {}): Harness {
   const playerRepository = createMemoryPlayerRepository([
     {
       id: 'player-1',
-      token: TOKEN,
+      platformProvider: 'dev' as const,
+      platformId: TOKEN,
       displayName: 'Invocador',
       elo: 1200,
       arenaMarks: 0,
@@ -75,18 +77,33 @@ function buildHarness(options: { premium?: number } = {}): Harness {
       shopCatalog: {},
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
       ticketSecret: TICKET_SECRET,
+      identityValidator: createDevIdentityValidator(),
       now: () => AGORA,
     }),
   };
 }
 
 async function post(h: Harness, url: string, payload: Record<string, unknown>) {
-  const response = await h.app.inject({ method: 'POST', url, headers: { 'x-player-token': TOKEN }, payload });
+  const response = await h.app.inject({ method: 'POST', url, headers: { 'x-platform-ticket': `dev:${TOKEN}`}, payload });
+  return { status: response.statusCode, body: response.json() as any };
+}
+
+// §9.4 (M20) — o sign-in explícito. A M18 6/N materializava o núcleo dentro de
+// `GET /me/heroes`; o M20 tirou a escrita do `GET` e a pôs aqui, que é onde a conta nasce.
+// Os testes abaixo continuam afirmando exatamente a mesma coisa sobre o NÚCLEO — o que
+// mudou é por qual porta ele chega.
+async function sessao(h: Harness) {
+  const response = await h.app.inject({
+    method: 'POST',
+    url: '/accounts/session',
+    headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+    payload: {},
+  });
   return { status: response.statusCode, body: response.json() as any };
 }
 
 async function get(h: Harness, url: string) {
-  const response = await h.app.inject({ method: 'GET', url, headers: { 'x-player-token': TOKEN } });
+  const response = await h.app.inject({ method: 'GET', url, headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
   return { status: response.statusCode, body: response.json() as any };
 }
 
@@ -268,5 +285,105 @@ describe('POST /energy/purchase (D17)', () => {
 
     const player = await h.playerRepository.getPlayerById('player-1');
     expect(player?.premium).toBe(premiumCost);
+  });
+});
+
+// §10/D14 (M18, sub-sessão 6/N) — POSSE não é a mesma coisa que ter o herói.
+//
+// Até esta fatia `POST /summon` concedia posse e mais nada: o personagem invocado não
+// virava instância nenhuma, e o critério de aceite 1 pede que ele seja JOGÁVEL. O mesmo
+// buraco valia para o núcleo — todo herói do projeto até aqui nasceu de seed de banco ou
+// de fixture, e uma conta nova de verdade abriria o jogo sem ninguém para levar ao mapa.
+describe('M18 6/N — o personagem possuído vira herói jogável', () => {
+  it('uma conta NOVA recebe uma instância para cada personagem do núcleo', async () => {
+    const h = buildHarness();
+    await sessao(h);
+    const { status, body } = await get(h, '/me/heroes');
+
+    expect(status).toBe(200);
+    expect(body.map((entry: any) => entry.hero.characterId).sort()).toEqual([...NUCLEO].sort());
+  });
+
+  it('a instância sai da FICHA do catálogo, não de convenção do servidor', async () => {
+    const h = buildHarness();
+    await sessao(h);
+    const { body } = await get(h, '/me/heroes');
+
+    for (const entry of body) {
+      const ficha = catalog.characters[entry.hero.characterId]!.startingHero;
+      expect({
+        level: entry.hero.level,
+        weaponType: entry.hero.weaponType,
+        equipment: entry.hero.equipment,
+        duelSkills: entry.hero.duelSkills,
+      }).toEqual({
+        level: ficha.level,
+        weaponType: ficha.weaponType,
+        equipment: ficha.equipment,
+        duelSkills: ficha.duelSkills,
+      });
+      // Progresso é da conta, não do catálogo: ninguém nasce desperto.
+      expect({ exp: entry.hero.exp, awakening: entry.hero.awakening, imprint: entry.hero.imprint }).toEqual({
+        exp: 0,
+        awakening: 0,
+        imprint: 0,
+      });
+      // A arma da ficha chega EQUIPADA, e não só nomeada: sem o item resolvido o herói
+      // entraria no mapa desarmado.
+      expect(entry.equippedItems.map((item: any) => item.id)).toContain(ficha.equipment.weapon);
+    }
+  });
+
+  // M20 — a idempotência que importa mudou de rota junto com a escrita: dois sign-ins não
+  // podem dar dois núcleos.
+  it('assinar duas vezes não duplica ninguém', async () => {
+    const h = buildHarness();
+    await sessao(h);
+    const primeira = await get(h, '/me/heroes');
+    await sessao(h);
+    const segunda = await get(h, '/me/heroes');
+
+    expect(segunda.body.map((e: any) => e.hero.id)).toEqual(primeira.body.map((e: any) => e.hero.id));
+    expect(segunda.body).toHaveLength(NUCLEO.length);
+  });
+
+  it('o invocado ganha instância na hora, e ela aparece no roster de heróis', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await sessao(h);
+    const { body } = await post(h, '/summon', { nonce: 'n-1', bannerId: BANNER });
+    expect(body.outcome.kind).toBe('character');
+
+    const heroes = await get(h, '/me/heroes');
+    const puxado = heroes.body.find((e: any) => e.hero.characterId === body.outcome.characterId);
+
+    expect(puxado, 'invocado sem instância de herói').toBeDefined();
+    expect(heroes.body).toHaveLength(NUCLEO.length + 1);
+  });
+
+  it('a DUPLICATA não cria uma segunda instância — ela vira fragmento', async () => {
+    const h = buildHarness({ premium: CUSTO * 2 });
+    await sessao(h);
+    for (const id of ADQUIRIVEIS) await h.ownershipRepository.grant('player-1', id);
+    const antes = (await get(h, '/me/heroes')).body.length;
+
+    const { body } = await post(h, '/summon', { nonce: 'n-dup', bannerId: BANNER });
+    expect(body.outcome.kind).toBe('duplicate');
+
+    expect((await get(h, '/me/heroes')).body).toHaveLength(antes);
+  });
+
+  it('o herói do invocado passa na checagem de posse — ele é jogável de verdade', async () => {
+    // O recíproco do anti-cheat da 3/N, e a metade do critério 1 que "aparece no roster"
+    // não cobre: a instância só vale se o servidor a aceitar numa batalha.
+    const h = buildHarness({ premium: CUSTO });
+    const { body } = await post(h, '/summon', { nonce: 'n-1', bannerId: BANNER });
+
+    const heroes = await get(h, '/me/heroes');
+    const puxado = heroes.body.find((e: any) => e.hero.characterId === body.outcome.characterId);
+
+    const ticket = await post(h, '/campaign/encounter-campanha-1/ticket', { heroIds: [puxado.hero.id] });
+
+    expect(ticket.status).toBe(200);
+    expect(ticket.body.setup.units.some((u: any) => u.unitId === `player-${puxado.hero.id}`)).toBe(true);
   });
 });

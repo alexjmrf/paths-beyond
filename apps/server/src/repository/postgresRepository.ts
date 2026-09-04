@@ -1,5 +1,6 @@
 import type { BattleCommand, BattleResult, BattleSetup, EnergyState, EntryLimitState, Hero, ItemInstance } from '@paths-beyond/core';
 import type { Pool } from 'pg';
+import type { RateLimiter, RateLimiterOptions } from '../battle/rateLimit.js';
 import {
   DEFAULT_ARENA_MARKS,
   DEFAULT_ELO,
@@ -21,15 +22,20 @@ import {
   type CharacterOwnershipRepository,
   type RewardsRepository,
   type EconomyRepository,
+  type IdempotencyRepository,
+  type StoredResponse,
 } from './types.js';
 
 const PLAYER_COLUMNS =
-  'id, token, display_name, elo, arena_marks, gold, stones, premium, energy_stored, energy_as_of';
+  'id, platform_provider, platform_id, display_name, elo, arena_marks, gold, stones, premium, energy_stored, energy_as_of';
 
 export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
   return {
-    async getPlayerByToken(token) {
-      const result = await pool.query<PlayerRow>(`SELECT ${PLAYER_COLUMNS} FROM players WHERE token = $1`, [token]);
+    async getPlayerByPlatformIdentity(provider, platformId) {
+      const result = await pool.query<PlayerRow>(
+        `SELECT ${PLAYER_COLUMNS} FROM players WHERE platform_provider = $1 AND platform_id = $2`,
+        [provider, platformId],
+      );
       const row = result.rows[0];
       return row ? rowToPlayer(row) : null;
     },
@@ -40,11 +46,12 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
     },
     async createPlayer(input) {
       const result = await pool.query<PlayerRow>(
-        `INSERT INTO players (id, token, display_name, elo, arena_marks, gold, stones, premium, energy_stored, energy_as_of)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${PLAYER_COLUMNS}`,
+        `INSERT INTO players (id, platform_provider, platform_id, display_name, elo, arena_marks, gold, stones, premium, energy_stored, energy_as_of)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING ${PLAYER_COLUMNS}`,
         [
           input.id,
-          input.token,
+          input.platformProvider,
+          input.platformId,
           input.displayName,
           input.elo ?? DEFAULT_ELO,
           input.arenaMarks ?? DEFAULT_ARENA_MARKS,
@@ -91,6 +98,14 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
       if (!row) throw new Error(`player not found: ${id}`);
       return rowToPlayer(row);
     },
+    // §9.4 (M20) — a exclusão do jogador vem POR ÚLTIMO na orquestração da rota: as tabelas
+    // que o referenciam têm chave estrangeira, então apagar aqui antes das outras falharia
+    // por integridade. É uma propriedade boa — esquecer uma tabela não deixa lixo em
+    // silêncio, deixa a exclusão inteira reprovar.
+    async deletePlayer(id) {
+      const result = await pool.query('DELETE FROM players WHERE id = $1', [id]);
+      return (result.rowCount ?? 0) > 0;
+    },
     async updateEnergy(id, energy) {
       const result = await pool.query<PlayerRow>(
         `UPDATE players SET energy_stored = $2, energy_as_of = $3 WHERE id = $1 RETURNING ${PLAYER_COLUMNS}`,
@@ -127,7 +142,8 @@ export function createPostgresPlayerRepository(pool: Pool): PlayerRepository {
 
 interface PlayerRow {
   readonly id: string;
-  readonly token: string;
+  readonly platform_provider: string;
+  readonly platform_id: string;
   readonly display_name: string;
   readonly elo: number;
   readonly arena_marks: number;
@@ -144,7 +160,8 @@ interface PlayerRow {
 function rowToPlayer(row: PlayerRow): Player {
   return {
     id: row.id,
-    token: row.token,
+    platformProvider: row.platform_provider as 'steam' | 'epic' | 'dev',
+    platformId: row.platform_id,
     displayName: row.display_name,
     elo: row.elo,
     arenaMarks: row.arena_marks,
@@ -205,6 +222,9 @@ export function createPostgresHeroRepository(pool: Pool): HeroRepository {
       );
       return input;
     },
+    async deleteHeroesByOwner(ownerPlayerId) {
+      await pool.query('DELETE FROM heroes WHERE owner_player_id = $1', [ownerPlayerId]);
+    },
     async updateHero(input) {
       await pool.query('UPDATE heroes SET hero = $2, equipped_items = $3 WHERE hero_id = $1', [
         input.hero.id,
@@ -235,6 +255,9 @@ export function createPostgresArenaDefenseRepository(pool: Pool): ArenaDefenseRe
       );
       const row = result.rows[0];
       return row ? rowToArenaDefense(row) : null;
+    },
+    async deleteDefenseByOwner(ownerPlayerId) {
+      await pool.query('DELETE FROM arena_defenses WHERE owner_player_id = $1', [ownerPlayerId]);
     },
     async saveDefense(defense) {
       await pool.query(
@@ -282,6 +305,11 @@ export function createPostgresReplayRepository(pool: Pool): ReplayRepository {
       const result = await pool.query<ReplayRow>(`SELECT ${REPLAY_COLUMNS} FROM replays WHERE nonce = $1`, [nonce]);
       const row = result.rows[0];
       return row ? rowToStoredReplay(row) : null;
+    },
+    async deleteReplaysOfPlayer(playerId) {
+      // Dos DOIS lados: um replay guarda atacante e defensor, e deixá-lo de pé manteria o id
+      // de quem pediu a exclusão registrado.
+      await pool.query('DELETE FROM replays WHERE attacker_player_id = $1 OR defender_player_id = $1', [playerId]);
     },
     async save(replay) {
       // nonce é chave primária — INSERT simples (nunca update): um nonce reutilizado é
@@ -496,6 +524,30 @@ export function createPostgresEconomyRepository(pool: Pool): EconomyRepository {
       );
       return action;
     },
+    async deletePlayerData(playerId) {
+      // Numa transação: meia exclusão deixaria a conta num estado que nenhum código sabe
+      // ler, e é exatamente o caso em que ninguém volta para conferir.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const [tabela, coluna] of [
+          ['player_materials', 'player_id'],
+          ['player_items', 'owner_player_id'],
+          ['dungeon_clears', 'player_id'],
+          ['dungeon_entries', 'player_id'],
+          ['dungeon_runs', 'player_id'],
+          ['economy_actions', 'player_id'],
+        ] as const) {
+          await client.query(`DELETE FROM ${tabela} WHERE ${coluna} = $1`, [playerId]);
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
   };
 }
 
@@ -530,6 +582,10 @@ export function createPostgresCharacterOwnershipRepository(pool: Pool): Characte
       );
       const row = result.rows[0];
       return row ? row.rolls_since_new : null;
+    },
+    async deletePlayerData(playerId) {
+      await pool.query('DELETE FROM player_characters WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM banner_pity WHERE player_id = $1', [playerId]);
     },
     async setPity(playerId, bannerId, rollsSinceNew) {
       await pool.query(
@@ -569,6 +625,10 @@ export function createPostgresRewardsRepository(pool: Pool): RewardsRepository {
       );
       return result.rows.map((row) => row.chapter_id);
     },
+    async deletePlayerData(playerId) {
+      await pool.query('DELETE FROM player_claims WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM campaign_clears WHERE player_id = $1', [playerId]);
+    },
     async markChapterCleared(playerId, chapterId) {
       const result = await pool.query(
         `INSERT INTO campaign_clears (player_id, chapter_id) VALUES ($1, $2)
@@ -576,6 +636,115 @@ export function createPostgresRewardsRepository(pool: Pool): RewardsRepository {
         [playerId, chapterId],
       );
       return (result.rowCount ?? 0) > 0;
+    },
+  };
+}
+
+// §9.4 (M22, 2/N) — a resposta guardada por nonce, em Postgres.
+export function createPostgresIdempotencyRepository(pool: Pool): IdempotencyRepository {
+  return {
+    async get(playerId, nonce) {
+      const result = await pool.query<{
+        player_id: string;
+        nonce: string;
+        route: string;
+        status: number;
+        body: unknown;
+        created_at: Date;
+      }>(
+        'SELECT player_id, nonce, route, status, body, created_at FROM idempotent_responses WHERE player_id = $1 AND nonce = $2',
+        [playerId, nonce],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      return {
+        playerId: row.player_id,
+        nonce: row.nonce,
+        route: row.route,
+        status: row.status,
+        body: row.body,
+        createdAt: row.created_at.toISOString(),
+      };
+    },
+    async save(entry) {
+      // `ON CONFLICT DO NOTHING`: a primeira escrita vence, e duas requisições simultâneas
+      // não conseguem gravar duas respostas para o mesmo nonce.
+      await pool.query(
+        `INSERT INTO idempotent_responses (player_id, nonce, route, status, body)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (player_id, nonce) DO NOTHING`,
+        [entry.playerId, entry.nonce, entry.route, entry.status, JSON.stringify(entry.body)],
+      );
+    },
+    async deletePlayerData(playerId) {
+      await pool.query('DELETE FROM idempotent_responses WHERE player_id = $1', [playerId]);
+    },
+  };
+}
+
+// §9.4 (M22, sub-sessão 3/N) — o LIMITADOR COMPARTILHADO.
+//
+// O de memória (`battle/rateLimit.ts`) conta por processo: com duas instâncias atrás de um
+// balanceador, o teto real vira o dobro do declarado. Este conta no banco, que é o mesmo
+// para todos os processos.
+//
+// **A troca não exigiu tocar em nenhuma rota**, e isso é consequência da 3/N: nenhuma rota
+// chama o limitador — quem chama é o hook `registerRateLimit`.
+//
+// O relógio é o do BANCO, e não o `now` injetado das opções: com vários processos, cada um
+// com o seu relógio, a janela só é a mesma se o tempo vier de um lugar só.
+export function createPostgresRateLimiter(pool: Pool, options: RateLimiterOptions): RateLimiter {
+  const janelaSegundos = options.windowMs / 1000;
+  // A limpeza é oportunista e rara: a consulta de contagem já ignora o que está fora da
+  // janela (é o índice que a torna barata), então linha velha é desperdício de espaço, não
+  // de corretude. Varrer a cada requisição custaria mais que o problema que resolve.
+  let desdeALimpeza = 0;
+  const LIMPAR_A_CADA = 500;
+
+  return {
+    async tryConsume(key) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // **O lock consultivo por CHAVE, e por que ele é necessário.** A primeira versão
+        // deste limitador contava e inseria numa instrução só, com CTE, supondo que isso
+        // bastasse. Não basta: as CTEs leem o mesmo instantâneo, então vinte requisições
+        // simultâneas contam ZERO cada uma e passam todas. **Medido contra Postgres de
+        // verdade nesta fatia: teto de 5, e 10 passaram.**
+        //
+        // O lock é por jogador e dura a transação: dois jogadores nunca esperam um pelo
+        // outro, e o mesmo jogador é serializado — que é exatamente o que "cota por conta"
+        // quer dizer.
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+
+        const contagem = await client.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM rate_limit_hits
+            WHERE key = $1 AND at > now() - make_interval(secs => $2::double precision)`,
+          [key, janelaSegundos],
+        );
+
+        const permitido = (contagem.rows[0]?.n ?? 0) < options.maxRequests;
+        if (permitido) {
+          await client.query('INSERT INTO rate_limit_hits (key, at) VALUES ($1, now())', [key]);
+        }
+
+        await client.query('COMMIT');
+
+        if (++desdeALimpeza >= LIMPAR_A_CADA) {
+          desdeALimpeza = 0;
+          await pool.query(
+            'DELETE FROM rate_limit_hits WHERE at < now() - make_interval(secs => $1::double precision)',
+            [janelaSegundos],
+          );
+        }
+
+        return permitido;
+      } catch (erro) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw erro;
+      } finally {
+        client.release();
+      }
     },
   };
 }

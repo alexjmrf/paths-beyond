@@ -1,30 +1,29 @@
-import { RULES_VERSION, type TacticsScript, type TalentAllocation } from '@paths-beyond/core';
+import { RULES_VERSION } from '@paths-beyond/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { campaignMaps } from '../src/data/campaign.js';
 import { DEFAULT_UI_SCALE, UI_SCALES } from '../src/data/overlayTheme.js';
 import {
   SAVE_FORMAT_VERSION,
   SAVE_STORAGE_KEY,
   parseSave,
-  reconcileSave,
   serializeSave,
-  type SaveEnvironment,
   type SaveGame,
 } from '../src/logic/save.js';
 
-// M13, sub-sessão 3/N — o critério de aceite que faltava em M13: "progresso sobrevive a
-// recarregar a página".
+// §11/§09-roadmap (M13, sub-sessão 3/N) — "progresso sobrevive a recarregar a página".
 //
-// O cliente não entra em `pnpm test` desde M6 (não há renderização a testar sem browser), e
-// a verificação da UI continua sendo o roteiro real de navegador. O que este arquivo trava é
-// a parte que o roteiro não consegue provar de forma barata e repetível: que o save
-// sobrevive a JSON corrompido, a uma `rulesVersion` antiga e a conteúdo que mudou embaixo
-// dele — e que recarregar devolve o jogador ao capítulo em que ele estava, com o que ele
-// tinha configurado.
+// **M18, sub-sessão 7/N: este arquivo encolheu junto com o save.** Ele testava capítulo
+// alcançado, scripts táticos preparados, equipamento e alocação de talentos — as quatro
+// coisas que o cliente guardava porque a campanha era jogada nele. Com a campanha passando
+// pelo servidor, cada uma ganhou dono melhor (`GET /campaign`, `PUT /heroes/:id/tactics`,
+// `PUT /heroes/:id/talents`, `POST /heroes/:id/equip`), e testar aqui uma cópia local delas
+// seria testar a segunda verdade que a fatia existiu para apagar.
+//
+// O que sobrou é o que o servidor não tem: preferências de apresentação e o token. E a
+// migração do save antigo, que é a parte nova — v1 não é descartado.
 //
 // O store é importado dinamicamente nos testes de hidratação porque ele lê o save UMA vez,
-// no boot do módulo (é o que evita a tela abrir no capítulo 1 e saltar): para simular
-// "recarregar a página" é preciso semear o armazenamento e só então importar o módulo.
+// no boot do módulo: para simular "recarregar a página" é preciso semear o armazenamento e
+// só então importar o módulo.
 
 class FakeStorage {
   private readonly entries = new Map<string, string>();
@@ -43,186 +42,121 @@ class FakeStorage {
   }
 }
 
-// Um script de tática REAL da campanha (§6.3, autorado em `packages/data`), não um objeto
-// inventado: é ele que passa pelo parser variante a variante.
-const realScript: TacticsScript = campaignMaps[0]!.setup.units[0]!.tacticsScript;
-
 const baseSave: SaveGame = {
   v: SAVE_FORMAT_VERSION,
   rulesVersion: RULES_VERSION,
-  campaignMapIndex: 2,
-  campaignComplete: false,
-  tacticsOverrides: { 'unidade-a': realScript },
-  equippedByUnit: { 'unidade-a': { weapon: 'item-x', boots: 'item-y' } },
-  talentAllocationByUnit: { 'unidade-a': { 'no-1': 2 } },
   instantResultMode: true,
   colorblindMode: true,
   uiScale: 1.5,
   pvpToken: 'token-de-teste',
+  // M23 1/N — v3: quais dicas da introdução contextual o jogador já dispensou.
+  introducoesVistas: ['preview-de-duelo'],
+  // M24 — v4: os dois volumes.
+  volumeEfeitos: 0.4,
+  volumeMusica: 0.2,
 };
 
-const permissiveEnv: SaveEnvironment = {
-  rulesVersion: RULES_VERSION,
-  chapterCount: campaignMaps.length,
-  itemExists: () => true,
-  allocationIsValid: () => true,
+// Um save na forma ANTIGA, como um jogador de M13–M18 6/N tem no disco agora.
+const saveV1 = {
+  v: 1,
+  rulesVersion: '0.18.0',
+  campaignMapIndex: 3,
+  campaignComplete: false,
+  tacticsOverrides: { 'unidade-a': [{ enabled: true, skillId: 'skill-x', conditions: [] }] },
+  equippedByUnit: { 'unidade-a': { weapon: 'item-x' } },
+  talentAllocationByUnit: { 'unidade-a': { 'no-1': 2 } },
+  instantResultMode: true,
+  colorblindMode: true,
+  uiScale: 1.5,
+  pvpToken: 'token-antigo',
 };
 
-describe('formato do save', () => {
-  it('faz round-trip de um save completo, com script de tática real', () => {
+describe('parseSave — o save é dado do disco do jogador', () => {
+  it('lê de volta o que serializou', () => {
     expect(parseSave(serializeSave(baseSave))).toEqual(baseSave);
   });
 
-  it('o script que volta do disco é aceito pelo motor como setup de batalha', () => {
-    const restored = parseSave(serializeSave(baseSave));
-    // Igualdade estrutural com o script autorado: se o parser tivesse perdido uma condition
-    // (ou um campo dela), a unidade entraria no capítulo com uma tática diferente da que o
-    // jogador preparou — em silêncio.
-    expect(restored?.tacticsOverrides['unidade-a']).toEqual(realScript);
-  });
-
   it.each([
-    ['JSON corrompido', '{não é json'],
-    ['string vazia', ''],
-    ['array no lugar do objeto', '[]'],
-    ['versão de formato desconhecida', JSON.stringify({ ...baseSave, v: SAVE_FORMAT_VERSION + 1 })],
-    ['capítulo negativo', JSON.stringify({ ...baseSave, campaignMapIndex: -1 })],
-    ['capítulo fracionário', JSON.stringify({ ...baseSave, campaignMapIndex: 1.5 })],
-    ['campo obrigatório ausente', JSON.stringify({ v: SAVE_FORMAT_VERSION, rulesVersion: RULES_VERSION })],
-    ['rank de talento negativo', JSON.stringify({ ...baseSave, talentAllocationByUnit: { u: { n: -1 } } })],
-    ['slot de equipamento inexistente', JSON.stringify({ ...baseSave, equippedByUnit: { u: { chapeu: 'i' } } })],
-    [
-      'condition de tipo inexistente',
-      JSON.stringify({
-        ...baseSave,
-        tacticsOverrides: { u: [{ enabled: true, skillId: 's', conditions: [{ t: 'inventada' }] }] },
-      }),
-    ],
-    [
-      'condition com campo do tipo errado',
-      JSON.stringify({
-        ...baseSave,
-        tacticsOverrides: { u: [{ enabled: true, skillId: 's', conditions: [{ t: 'selfHpBelow', pct: 'metade' }] }] },
-      }),
-    ],
-    [
-      'troca fora de 1..3',
-      JSON.stringify({
-        ...baseSave,
-        tacticsOverrides: { u: [{ enabled: true, skillId: 's', conditions: [{ t: 'trocaAtLeast', n: 4 }] }] },
-      }),
-    ],
-    [
-      'unitType inexistente em targetIsType',
-      JSON.stringify({
-        ...baseSave,
-        tacticsOverrides: { u: [{ enabled: true, skillId: 's', conditions: [{ t: 'targetIsType', type: 'dragão' }] }] },
-      }),
-    ],
-  ])('descarta save inválido: %s', (_caso, raw) => {
-    expect(parseSave(raw)).toBeNull();
+    ['nulo', null],
+    ['vazio', ''],
+    ['JSON quebrado', '{'],
+    ['não é objeto', '[]'],
+    ['versão do futuro', JSON.stringify({ ...baseSave, v: 99 })],
+    ['sem rulesVersion', JSON.stringify({ ...baseSave, rulesVersion: undefined })],
+    ['instantResultMode com tipo errado', JSON.stringify({ ...baseSave, instantResultMode: 'sim' })],
+    ['token com tipo errado', JSON.stringify({ ...baseSave, pvpToken: 42 })],
+    ['colorblindMode com tipo errado', JSON.stringify({ ...baseSave, colorblindMode: 'sim' })],
+    ['uiScale com tipo errado', JSON.stringify({ ...baseSave, uiScale: 'grande' })],
+  ])('rejeita save %s', (_rotulo, raw) => {
+    expect(parseSave(raw as string | null)).toBeNull();
   });
 
-  // As preferências de acessibilidade (M13 4/N) entraram DEPOIS de o formato v1 existir.
-  // O save gravado antes delas não pode ser jogado fora: seria perder capítulo,
-  // equipamento e talentos por causa de uma preferência nova.
-  it('save anterior às preferências de acessibilidade carrega, com os defaults', () => {
-    const { colorblindMode, uiScale, ...semAcessibilidade } = baseSave;
-    void colorblindMode;
-    void uiScale;
+  // A regra que separa os dois tratamentos, desde M13 4/N: **erro de TIPO é formato
+  // malformado e rejeita; valor fora de faixa é preferência recuperável e cai no default.**
+  it('escala fora da lista oferecida cai no default em vez de invalidar o save', () => {
+    const lido = parseSave(JSON.stringify({ ...baseSave, uiScale: 3.7 }));
 
-    const parsed = parseSave(JSON.stringify(semAcessibilidade));
-    expect(parsed).not.toBeNull();
-    expect(parsed?.campaignMapIndex).toBe(baseSave.campaignMapIndex);
-    expect(parsed?.equippedByUnit).toEqual(baseSave.equippedByUnit);
-    expect(parsed?.colorblindMode).toBe(false);
-    expect(parsed?.uiScale).toBe(DEFAULT_UI_SCALE);
+    expect(lido).not.toBeNull();
+    expect(lido!.uiScale).toBe(DEFAULT_UI_SCALE);
+    expect(lido!.pvpToken).toBe(baseSave.pvpToken);
   });
 
-  it('escala fora da lista cai no default sem invalidar o save', () => {
-    const parsed = parseSave(JSON.stringify({ ...baseSave, uiScale: 3.7 }));
-    expect(parsed?.uiScale).toBe(DEFAULT_UI_SCALE);
-    expect(parsed?.campaignMapIndex).toBe(baseSave.campaignMapIndex);
+  it('save sem as preferências de acessibilidade (anterior a M13 4/N) continua válido', () => {
+    const semPreferencias = { ...baseSave, colorblindMode: undefined, uiScale: undefined };
+    const lido = parseSave(JSON.stringify(semPreferencias));
+
+    expect(lido?.colorblindMode).toBe(false);
+    expect(lido?.uiScale).toBe(DEFAULT_UI_SCALE);
   });
 
-  it('mas erro de TIPO na preferência é formato malformado e rejeita', () => {
-    expect(parseSave(JSON.stringify({ ...baseSave, uiScale: 'grande' }))).toBeNull();
-    expect(parseSave(JSON.stringify({ ...baseSave, colorblindMode: 'sim' }))).toBeNull();
-  });
-
-  it('todas as escalas oferecidas atravessam o save', () => {
+  it('toda escala oferecida na tela sobrevive à ida e volta', () => {
     for (const scale of UI_SCALES) {
       expect(parseSave(serializeSave({ ...baseSave, uiScale: scale }))?.uiScale).toBe(scale);
     }
   });
+});
 
-  it('aceita `not` aninhado, que é a única condition recursiva (§6.3)', () => {
-    const script: TacticsScript = [
-      { enabled: true, skillId: 's', conditions: [{ t: 'not', c: { t: 'not', c: { t: 'isAttacker' } } }] },
-    ];
-    const parsed = parseSave(serializeSave({ ...baseSave, tacticsOverrides: { u: script } }));
-    expect(parsed?.tacticsOverrides.u).toEqual(script);
+// M18 7/N — a parte nova. Descartar o v1 apagaria o tamanho de fonte, o modo daltônico e o
+// token de quem já jogava, por causa de uma mudança de arquitetura que não é dele.
+describe('parseSave — a migração do save v1', () => {
+  it('aceita um save v1 e o devolve como v2', () => {
+    const lido = parseSave(JSON.stringify(saveV1));
+
+    expect(lido).not.toBeNull();
+    expect(lido!.v).toBe(SAVE_FORMAT_VERSION);
   });
 
-  it('rejeita `not` cujo interior é inválido', () => {
-    const raw = JSON.stringify({
-      ...baseSave,
-      tacticsOverrides: { u: [{ enabled: true, skillId: 's', conditions: [{ t: 'not', c: { t: 'inventada' } }] }] },
-    });
-    expect(parseSave(raw)).toBeNull();
+  it('preserva o que continua significando a mesma coisa: preferências e token', () => {
+    const lido = parseSave(JSON.stringify(saveV1))!;
+
+    expect(lido.instantResultMode).toBe(true);
+    expect(lido.colorblindMode).toBe(true);
+    expect(lido.uiScale).toBe(1.5);
+    expect(lido.pvpToken).toBe('token-antigo');
+  });
+
+  it('NÃO carrega o progresso local para dentro do formato novo', () => {
+    // Quem guarda capítulo, táticas, equipamento e talentos agora é o servidor. Trazer a
+    // cópia do disco do jogador seria deixá-la disputar autoridade com a conta (§9.4).
+    const lido = parseSave(JSON.stringify(saveV1))! as unknown as Record<string, unknown>;
+
+    for (const campo of ['campaignMapIndex', 'campaignComplete', 'tacticsOverrides', 'equippedByUnit', 'talentAllocationByUnit']) {
+      expect(lido[campo], campo).toBeUndefined();
+    }
+  });
+
+  it('um v1 malformado continua sendo rejeitado', () => {
+    expect(parseSave(JSON.stringify({ ...saveV1, pvpToken: 42 }))).toBeNull();
   });
 });
 
-describe('reconciliação com o mundo atual', () => {
-  it('`rulesVersion` antiga descarta só as táticas — capítulo, itens e talentos ficam', () => {
-    const velho: SaveGame = { ...baseSave, rulesVersion: '0.0.1-antiga' };
-    const reconciled = reconcileSave(velho, permissiveEnv);
 
-    expect(reconciled.tacticsOverrides).toEqual({});
-    expect(reconciled.campaignMapIndex).toBe(2);
-    expect(reconciled.equippedByUnit).toEqual(baseSave.equippedByUnit);
-    expect(reconciled.talentAllocationByUnit).toEqual(baseSave.talentAllocationByUnit);
-    expect(reconciled.rulesVersion).toBe(RULES_VERSION);
-  });
+// Cada teste abaixo reimporta o store, e com ele o catálogo inteiro de `packages/data`. Sob
+// a suíte completa isso passa dos 5s padrão do Vitest — é custo de arnês, não do produto:
+// rodando só o pacote do cliente cada um leva menos de um segundo.
+const HIDRATACAO_TIMEOUT = 30_000;
 
-  it('mesma `rulesVersion` preserva as táticas', () => {
-    expect(reconcileSave(baseSave, permissiveEnv).tacticsOverrides).toEqual(baseSave.tacticsOverrides);
-  });
-
-  it('capítulo fora de faixa é clampado no último que ainda existe', () => {
-    const reconciled = reconcileSave({ ...baseSave, campaignMapIndex: 99 }, { ...permissiveEnv, chapterCount: 4 });
-    expect(reconciled.campaignMapIndex).toBe(3);
-  });
-
-  it('item que saiu do catálogo some do slot, o resto do equipamento fica', () => {
-    const reconciled = reconcileSave(baseSave, { ...permissiveEnv, itemExists: (id) => id !== 'item-x' });
-    expect(reconciled.equippedByUnit['unidade-a']).toEqual({ boots: 'item-y' });
-  });
-
-  it('alocação que a árvore atual não aceita mais é zerada; a válida é preservada', () => {
-    const save: SaveGame = {
-      ...baseSave,
-      talentAllocationByUnit: { quebrada: { 'no-1': 3 }, intacta: { 'no-2': 1 } },
-    };
-    const reconciled = reconcileSave(save, {
-      ...permissiveEnv,
-      allocationIsValid: (unitId) => unitId !== 'quebrada',
-    });
-    expect(reconciled.talentAllocationByUnit).toEqual({ quebrada: {}, intacta: { 'no-2': 1 } });
-  });
-
-  it('preferências e token atravessam a reconciliação intactos', () => {
-    const reconciled = reconcileSave({ ...baseSave, rulesVersion: '0.0.1-antiga' }, permissiveEnv);
-    expect(reconciled.instantResultMode).toBe(true);
-    expect(reconciled.pvpToken).toBe('token-de-teste');
-    // Acessibilidade não é progresso nem regra: nada do mundo pode desligá-la.
-    expect(reconciled.colorblindMode).toBe(true);
-    expect(reconciled.uiScale).toBe(1.5);
-  });
-});
-
-// "Recarregar a página" = semear o armazenamento e importar o store do zero.
-describe('o store restaura o progresso ao abrir', () => {
+describe('o store restaura as preferências ao abrir', () => {
   let storage: FakeStorage;
 
   beforeEach(() => {
@@ -239,226 +173,212 @@ describe('o store restaura o progresso ao abrir', () => {
     return await import('../src/store/battleStore.js');
   }
 
-  it('sem save, abre no capítulo 1', async () => {
-    const { useBattleStore } = await importStore();
-    expect(useBattleStore.getState().campaignMapIndex).toBe(0);
-    expect(useBattleStore.getState().campaignComplete).toBe(false);
+  // M18 7/N — o que "abrir o jogo" significa mudou: não há mais capítulo montado na
+  // abertura, porque a batalha vem do servidor. A tela abre num tabuleiro vazio e o jogador
+  // escolhe o capítulo.
+  it(
+    'sem save, abre num tabuleiro vazio e sem capítulo escolhido',
+    async () => {
+      const { useBattleStore } = await importStore();
+      const state = useBattleStore.getState();
+
+      expect(state.battleState.units).toHaveLength(0);
+      expect(state.battleState.outcome).toBe('ongoing');
+      expect(state.campaign.ticket).toBeNull();
+      expect(state.campaign.chapters).toEqual([]);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    'as preferências de acessibilidade voltam no store',
+    async () => {
+      storage.setItem(SAVE_STORAGE_KEY, serializeSave({ ...baseSave, colorblindMode: true, uiScale: 1.75 }));
+
+      const { useBattleStore } = await importStore();
+      const state = useBattleStore.getState();
+
+      expect(state.colorblindMode).toBe(true);
+      expect(state.uiScale).toBe(1.75);
+      expect(state.instantResultMode).toBe(true);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    'o token do PvP volta: redigitá-lo a cada recarga seria hostil',
+    async () => {
+      storage.setItem(SAVE_STORAGE_KEY, serializeSave(baseSave));
+
+      const { useBattleStore } = await importStore();
+
+      expect(useBattleStore.getState().pvp.token).toBe('token-de-teste');
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    'um save v1 no disco hidrata o store sem quebrar nada',
+    async () => {
+      storage.setItem(SAVE_STORAGE_KEY, JSON.stringify(saveV1));
+
+      const { useBattleStore } = await importStore();
+      const state = useBattleStore.getState();
+
+      expect(state.pvp.token).toBe('token-antigo');
+      expect(state.colorblindMode).toBe(true);
+      expect(state.battleState.units).toHaveLength(0);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    'save corrompido não derruba o boot: começa do zero',
+    async () => {
+      storage.setItem(SAVE_STORAGE_KEY, '{ isto não é json');
+
+      const { useBattleStore } = await importStore();
+
+      expect(useBattleStore.getState().colorblindMode).toBe(false);
+      expect(useBattleStore.getState().uiScale).toBe(DEFAULT_UI_SCALE);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    'mudar uma preferência grava o save sozinho',
+    async () => {
+      const { useBattleStore } = await importStore();
+
+      useBattleStore.getState().toggleColorblindMode();
+
+      expect(parseSave(storage.getItem(SAVE_STORAGE_KEY))?.colorblindMode).toBe(true);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    '"Apagar progresso" limpa o que estava salvo e volta ao tabuleiro vazio',
+    async () => {
+      storage.setItem(SAVE_STORAGE_KEY, serializeSave(baseSave));
+      const { useBattleStore } = await importStore();
+      expect(useBattleStore.getState().pvp.token).toBe('token-de-teste');
+
+      useBattleStore.getState().clearProgress();
+      const state = useBattleStore.getState();
+
+      expect(state.pvp.token).toBe('');
+      expect(state.campaign.chapters).toEqual([]);
+      expect(state.battleState.units).toHaveLength(0);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  // §11 (acessibilidade) — apagar o progresso não pode desligar o modo daltônico: quem
+  // precisa dele precisa dele sempre, e recomeçar não é uma escolha de apresentação.
+  it(
+    '"Apagar progresso" NÃO desliga a acessibilidade',
+    async () => {
+      storage.setItem(SAVE_STORAGE_KEY, serializeSave({ ...baseSave, colorblindMode: true, uiScale: 1.75 }));
+      const { useBattleStore } = await importStore();
+
+      useBattleStore.getState().clearProgress();
+
+      expect(useBattleStore.getState().colorblindMode).toBe(true);
+      expect(useBattleStore.getState().uiScale).toBe(1.75);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+
+  it(
+    'escala não oferecida é ignorada pelo store',
+    async () => {
+      const { useBattleStore } = await importStore();
+
+      useBattleStore.getState().setUiScale(9);
+
+      expect(useBattleStore.getState().uiScale).toBe(DEFAULT_UI_SCALE);
+    },
+    HIDRATACAO_TIMEOUT,
+  );
+});
+
+// §1.1 (M23, sub-sessão 1/N) — a migração para v3, e o que ela decide sobre quem já jogava.
+describe('save v3 — as introduções vistas', () => {
+  it('save v2 sobe para v3 com a lista VAZIA — quem já jogava vê a introdução uma vez', () => {
+    // A alternativa seria marcar tudo como visto para não incomodar quem já conhece o jogo.
+    // Ela esconderia a introdução justamente de quem pode ter aprendido errado, e o custo de
+    // errar para o outro lado é uma caixa de texto fechada uma vez.
+    const v2 = JSON.stringify({
+      v: 2,
+      rulesVersion: RULES_VERSION,
+      instantResultMode: false,
+      colorblindMode: false,
+      uiScale: 1,
+      pvpToken: 'token',
+    });
+
+    const lido = parseSave(v2);
+
+    expect(lido?.v).toBe(SAVE_FORMAT_VERSION);
+    expect(lido?.introducoesVistas).toEqual([]);
+    // E o que já era verdade continua: preferências e token sobrevivem à migração.
+    expect(lido?.pvpToken).toBe('token');
   });
 
-  it('com save, abre no capítulo salvo e com o mapa daquele capítulo montado', async () => {
-    const chapter = campaignMaps.length - 1;
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({ ...baseSave, campaignMapIndex: chapter, tacticsOverrides: {} }),
-    );
+  it('preserva id desconhecido — o save pode vir de uma versão mais nova', () => {
+    const doFuturo = JSON.stringify({ ...baseSave, introducoesVistas: ['dica-do-futuro'] });
 
-    const { useBattleStore } = await importStore();
-    const state = useBattleStore.getState();
-
-    expect(state.campaignMapIndex).toBe(chapter);
-    // Não basta o índice: o `battleState` tem que ser o do capítulo salvo, e não o do 1
-    // com um rótulo diferente.
-    expect(state.battleState.map.width).toBe(campaignMaps[chapter]!.setup.map.width);
-    expect(state.battleState.map.height).toBe(campaignMaps[chapter]!.setup.map.height);
-    expect(state.battleState.units.map((u) => u.unitId).sort()).toEqual(
-      campaignMaps[chapter]!.setup.units.map((u) => u.unitId).sort(),
-    );
-    expect(state.instantResultMode).toBe(true);
-    expect(state.pvp.token).toBe('token-de-teste');
+    expect(parseSave(doFuturo)?.introducoesVistas).toEqual(['dica-do-futuro']);
   });
 
-  it('as táticas preparadas voltam aplicadas nas unidades do mapa, não só no save', async () => {
-    const unit = campaignMaps[0]!.setup.units.find((u) => u.side === 'player')!;
-    const editado: TacticsScript = [{ enabled: true, skillId: 'skill-ataque-basico', conditions: [{ t: 'isAttacker' }] }];
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({ ...baseSave, campaignMapIndex: 0, tacticsOverrides: { [unit.unitId]: editado } }),
-    );
+  it('rejeita `introducoesVistas` com tipo errado, como qualquer outro campo malformado', () => {
+    expect(parseSave(JSON.stringify({ ...baseSave, introducoesVistas: 'preview-de-duelo' }))).toBeNull();
+    expect(parseSave(JSON.stringify({ ...baseSave, introducoesVistas: [1, 2] }))).toBeNull();
+  });
+});
 
-    const { useBattleStore } = await importStore();
-    const restored = useBattleStore.getState().battleState.units.find((u) => u.unitId === unit.unitId);
+// §11 (M24) — o volume atravessando o save, que é o critério de aceite 2 ("persistidos no
+// save ao lado de `uiScale` e `colorblindMode`").
+describe('save v4 — os volumes', () => {
+  it('lê de volta os dois volumes', () => {
+    const lido = parseSave(serializeSave(baseSave));
 
-    expect(restored?.tacticsScript).toEqual(editado);
+    expect(lido?.volumeEfeitos).toBe(0.4);
+    expect(lido?.volumeMusica).toBe(0.2);
   });
 
-  it('equipamento e talentos salvos voltam no store', async () => {
-    const itemId = Object.keys((await import('../src/data/catalog.js')).catalog.items)[0]!;
-    const allocation: TalentAllocation = {};
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({
-        ...baseSave,
-        campaignMapIndex: 0,
-        tacticsOverrides: {},
-        equippedByUnit: { 'unidade-a': { weapon: itemId } },
-        talentAllocationByUnit: { 'unidade-a': allocation },
-      }),
-    );
+  it('save v3 sobe para v4 com o volume PADRÃO — quem já jogava não abre o jogo mudo', () => {
+    const v3 = JSON.stringify({
+      v: 3,
+      rulesVersion: RULES_VERSION,
+      instantResultMode: false,
+      colorblindMode: false,
+      uiScale: 1,
+      pvpToken: 'token',
+      introducoesVistas: ['preview-de-duelo'],
+    });
 
-    const { useBattleStore } = await importStore();
-    const state = useBattleStore.getState();
-    expect(state.equippedByUnit['unidade-a']).toEqual({ weapon: itemId });
-    expect(state.talentAllocationByUnit['unidade-a']).toEqual(allocation);
+    const lido = parseSave(v3);
+
+    expect(lido?.v).toBe(SAVE_FORMAT_VERSION);
+    expect(lido?.volumeEfeitos).toBeGreaterThan(0);
+    // E o que já era verdade continua atravessando: as dicas dispensadas não voltam.
+    expect(lido?.introducoesVistas).toEqual(['preview-de-duelo']);
   });
 
-  it('save no formato de talento ANTIGO devolve os pontos e mantém o resto do progresso', async () => {
-    // §8.2 (M17, 4/N) — a decisão do usuário para o save gravado antes deste milestone:
-    // **devolver os pontos**. D5 do briefing diz que não há caminho de migração, e o formato
-    // de nó mudou junto com a árvore — `talent-clerigo-foco-em-equipe` era um nó da árvore de
-    // CLASSE e não existe em árvore nenhuma hoje.
-    //
-    // O teste passa pelo store de verdade, e não por `reconcileSave` com um callback de
-    // mentira, porque o que está sendo afirmado é a ligação: que `allocationIsValidFor` vá
-    // buscar a árvore do PERSONAGEM daquela unidade e recuse o nó antigo. Com a árvore da
-    // classe (a forma anterior) esta alocação era válida.
-    const capitulo = 1; // o primeiro em que Miron entra na party
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({
-        ...baseSave,
-        campaignMapIndex: capitulo,
-        tacticsOverrides: {},
-        talentAllocationByUnit: { 'ally-clerigo': { 'talent-clerigo-foco-em-equipe': 1 } },
-      }),
-    );
+  it('volume fora da faixa cai no padrão em vez de estourar o alto-falante', () => {
+    // O save é disco do jogador e pode ter sido editado à mão. Valor fora de faixa é
+    // preferência recuperável — a mesma regra que `uiScale` segue desde M13 4/N.
+    const absurdo = JSON.stringify({ ...baseSave, volumeEfeitos: 12, volumeMusica: -3 });
+    const lido = parseSave(absurdo);
 
-    const { useBattleStore } = await importStore();
-    const state = useBattleStore.getState();
-
-    expect(state.talentAllocationByUnit['ally-clerigo']).toEqual({});
-    // O que NÃO se perde junto: o capítulo alcançado. Zerar a árvore é devolver os pontos,
-    // não recomeçar o jogo.
-    expect(state.campaignMapIndex).toBe(capitulo);
+    expect(lido?.volumeEfeitos).toBeGreaterThan(0);
+    expect(lido?.volumeEfeitos).toBeLessThanOrEqual(1);
+    expect(lido?.volumeMusica).toBeGreaterThanOrEqual(0);
   });
 
-  it('alocação na forma NOVA sobrevive à recarga', async () => {
-    // O recíproco do teste acima, e ele importa: sem esta metade, um `allocationIsValidFor`
-    // que recusasse tudo passaria no teste anterior e apagaria a build de todo mundo.
-    const valida = {
-      'talent-miron-imposicao-de-maos': 1,
-      'talent-miron-oracao-constante': 1,
-      'talent-miron-mao-que-alcanca': 1,
-    };
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({
-        ...baseSave,
-        campaignMapIndex: 1,
-        tacticsOverrides: {},
-        talentAllocationByUnit: { 'ally-clerigo': valida },
-      }),
-    );
-
-    const { useBattleStore } = await importStore();
-    expect(useBattleStore.getState().talentAllocationByUnit['ally-clerigo']).toEqual(valida);
-  });
-
-  it('save de `rulesVersion` antiga mantém o capítulo e larga as táticas', async () => {
-    const unit = campaignMaps[0]!.setup.units.find((u) => u.side === 'player')!;
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({
-        ...baseSave,
-        rulesVersion: '0.0.1-antiga',
-        campaignMapIndex: 1,
-        tacticsOverrides: { [unit.unitId]: [] },
-      }),
-    );
-
-    const { useBattleStore } = await importStore();
-    const state = useBattleStore.getState();
-    expect(state.campaignMapIndex).toBe(1);
-    expect(state.tacticsOverrides).toEqual({});
-  });
-
-  it('campanha concluída sobrevive à recarga (e a saída é `clearProgress`)', async () => {
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({
-        ...baseSave,
-        campaignMapIndex: campaignMaps.length - 1,
-        campaignComplete: true,
-        tacticsOverrides: {},
-      }),
-    );
-
-    const { useBattleStore } = await importStore();
-    // Antes da persistência, recarregar era o que recomeçava a campanha; agora a tela de
-    // "Campanha concluída" volta a cada recarga e cobre o cabeçalho inteiro, então o
-    // painel dela precisa ter a própria saída.
-    expect(useBattleStore.getState().campaignComplete).toBe(true);
-
-    useBattleStore.getState().clearProgress();
-    expect(useBattleStore.getState().campaignComplete).toBe(false);
-    expect(useBattleStore.getState().campaignMapIndex).toBe(0);
-  });
-
-  it('as preferências de acessibilidade voltam no store', async () => {
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({ ...baseSave, campaignMapIndex: 0, tacticsOverrides: {}, colorblindMode: true, uiScale: 1.75 }),
-    );
-
-    const { useBattleStore } = await importStore();
-    expect(useBattleStore.getState().colorblindMode).toBe(true);
-    expect(useBattleStore.getState().uiScale).toBe(1.75);
-  });
-
-  it('"Apagar progresso" NÃO desliga a acessibilidade', async () => {
-    storage.setItem(
-      SAVE_STORAGE_KEY,
-      serializeSave({ ...baseSave, campaignMapIndex: 2, tacticsOverrides: {}, colorblindMode: true, uiScale: 1.5 }),
-    );
-
-    const { useBattleStore } = await importStore();
-    useBattleStore.getState().clearProgress();
-
-    const state = useBattleStore.getState();
-    expect(state.campaignMapIndex).toBe(0);
-    // Apagar progresso é sobre progresso. Desligar o modo daltônico de quem depende dele
-    // seria hostil — e o save regravado tem que continuar carregando a preferência.
-    expect(state.colorblindMode).toBe(true);
-    expect(state.uiScale).toBe(1.5);
-    expect(parseSave(storage.getItem(SAVE_STORAGE_KEY))?.colorblindMode).toBe(true);
-  });
-
-  it('escala não oferecida é ignorada pelo store', async () => {
-    const { useBattleStore } = await importStore();
-    useBattleStore.getState().setUiScale(1.5);
-    useBattleStore.getState().setUiScale(9);
-    expect(useBattleStore.getState().uiScale).toBe(1.5);
-  });
-
-  it('save corrompido não derruba o boot: começa do zero', async () => {
-    storage.setItem(SAVE_STORAGE_KEY, '{isto não é json');
-    const { useBattleStore } = await importStore();
-    expect(useBattleStore.getState().campaignMapIndex).toBe(0);
-  });
-
-  it('avançar de capítulo grava o save sozinho', async () => {
-    const { useBattleStore } = await importStore();
-    expect(storage.getItem(SAVE_STORAGE_KEY)).toBeNull();
-
-    useBattleStore.getState().advanceToNextMap();
-
-    const gravado = parseSave(storage.getItem(SAVE_STORAGE_KEY));
-    expect(gravado?.campaignMapIndex).toBe(1);
-    expect(gravado?.rulesVersion).toBe(RULES_VERSION);
-  });
-
-  it('"Apagar progresso" volta ao capítulo 1 e limpa o que estava salvo', async () => {
-    storage.setItem(SAVE_STORAGE_KEY, serializeSave({ ...baseSave, campaignMapIndex: 3, tacticsOverrides: {} }));
-
-    const { useBattleStore } = await importStore();
-    expect(useBattleStore.getState().campaignMapIndex).toBe(3);
-
-    useBattleStore.getState().clearProgress();
-
-    const state = useBattleStore.getState();
-    expect(state.campaignMapIndex).toBe(0);
-    expect(state.equippedByUnit).toEqual({});
-    expect(state.talentAllocationByUnit).toEqual({});
-    expect(state.pvp.token).toBe('');
-    expect(parseSave(storage.getItem(SAVE_STORAGE_KEY))?.campaignMapIndex).toBe(0);
+  it('volume com TIPO errado é formato malformado e rejeita', () => {
+    expect(parseSave(JSON.stringify({ ...baseSave, volumeEfeitos: 'alto' }))).toBeNull();
   });
 });

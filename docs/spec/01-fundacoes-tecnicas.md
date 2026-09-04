@@ -11,8 +11,36 @@
 | Testes | **Vitest** | Mesma toolchain. |
 | Validação de dados | **Zod** | Valida os JSON de conteúdo em build-time e runtime. |
 | Servidor (M7+) | **Node + Fastify**, Postgres, Redis | Reaproveita o core para validar PvP. |
+| Shell desktop (M21+) | **Electron** | Ver abaixo: a escolha é sobre ENGINE, não sobre tamanho de download. |
 
 **Não usar** engine pesada (Unity/Godot). O risco do projeto é a simulação determinística e o volume de dados, não a renderização.
+
+**A plataforma alvo é desktop — Steam, Epic e possivelmente launcher próprio. Não há build web.**
+Isso não invalida nenhuma linha da tabela acima: o argumento delas nunca foi distribuição, foi que
+o risco do projeto é simulação determinística e volume de dados. O que muda é que o empacotamento
+deixa de ser implícito.
+
+### Electron e não Tauri — o argumento, e não só o resultado
+
+A decisão é sobre **qual engine de JavaScript roda na máquina do jogador**, e ela importa aqui mais
+do que importaria em quase qualquer outro projeto:
+
+- O servidor roda **Node (V8)** e **re-simula todo replay** (§9.4). Cliente e servidor comparando
+  hash só é seguro se comparam na mesma engine.
+- **Electron embute Chromium (V8)**, numa versão que nós congelamos e atualizamos quando quisermos.
+  A engine do jogador é a engine que testamos.
+- **Tauri usa a webview do SISTEMA**: WebView2/V8 no Windows, mas **JavaScriptCore no macOS e no
+  Linux/Steam Deck**. Isso reintroduz em produção, a cada batalha, exatamente a divergência de
+  runtime que a aritmética de ponto fixo (§3.2) e o job `determinismo-navegadores` existem para
+  eliminar.
+- O job de CI prova que o core aguenta três engines, então a divergência **não é fatal** — mas o
+  modo de falha, quando vier, chega como *"ganhei e o servidor disse que perdi, e gastou minha
+  energia"*, que é o pior formato possível para um bug de simulação.
+- O preço do Electron é ~130 MB de download. Numa loja de desktop isso é irrelevante, e é o preço
+  de eliminar uma classe inteira de bug.
+
+**O que este argumento NÃO diz:** que Tauri é ruim. Ele é a escolha melhor para quase todo app que
+não compara hash de simulação entre máquina do jogador e servidor. Este compara.
 
 ### 2.1 Estrutura do monorepo
 

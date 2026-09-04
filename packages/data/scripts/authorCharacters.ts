@@ -97,6 +97,14 @@ interface CharacterSpec {
   // garantido; Wren (só no 5), Bardan (só no 6) e os três que não aparecem em capítulo
   // nenhum são adquiríveis.
   readonly acquisition: 'story' | 'summon';
+  // §10/D14 (M18, 6/N) — os três campos que a FICHA INICIAL não consegue derivar do slug.
+  // O resto dela (arma, skills de duelo, tática) segue a convenção de id da classe, e
+  // derivar aqui é legítimo pelo mesmo motivo que `fragmentMaterialId`: o gerador é quem
+  // autora. O que NÃO se deriva é a arma empunhada (a classe permite uma lista), o colar
+  // com que a party existe no conteúdo autorado, e a skill fora do par ataque/especial.
+  readonly weaponType: 'sword' | 'axe' | 'spear' | 'bow' | 'arcane' | 'nature' | 'holy';
+  readonly necklace: string;
+  readonly extraDuelSkills?: readonly string[];
   readonly rows: readonly RowSpec[];
 }
 
@@ -118,6 +126,16 @@ const AWAKENING_AVANCADO = 5;
 // precedente do enum de stats em `schemas/shared.ts`. O valor é normativo na spec, não um
 // detalhe de implementação do motor, e `packages/content` valida os dois lados juntos.
 const TALENT_POINT_BUDGET = 9;
+
+// §10/D16 (M18, 6/N) — o nível com que o jogador RECEBE um personagem, seja o núcleo numa
+// conta nova ou um invocado no banner.
+//
+// Não é um número novo e não foi escolhido: é LIDO do conteúdo como ele já está autorado.
+// Os seis capítulos declaram as vagas do jogador em nível 10 e foi contra isso que a
+// campanha foi afinada (M12) e reafinada (M18 5/N, com o piloto vencendo os seis só com o
+// núcleo). Entregar o personagem em qualquer outro nível faria a prova da 5/N valer para
+// um time que só existe no arquivo de conteúdo — `packages/content` trava as duas pontas.
+const STARTING_LEVEL = 10;
 
 // ---------------------------------------------------------------------------
 // O elenco (D6/D7/D8 — fechado, nove, e `ally-mensageira`/`ally-couracado` incluídos)
@@ -145,6 +163,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'aren',
     classId: 'class-espadachim',
     acquisition: 'story',
+    weaponType: 'sword',
+    necklace: 'item-colar-forca',
     rows: [
       {
         a: { slug: 'fio-agressivo', effects: [pct('atk', 50), pct('def', -30)] },
@@ -198,6 +218,9 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'miron',
     classId: 'class-clerigo',
     acquisition: 'story',
+    weaponType: 'holy',
+    necklace: 'item-colar-guardiao',
+    extraDuelSkills: ['skill-cura-clerigo'],
     rows: [
       {
         a: { slug: 'imposicao-de-maos', effects: [harder('skill-cura-clerigo', 1200), pct('atk', 45)] },
@@ -243,6 +266,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'sylla',
     classId: 'class-arqueiro',
     acquisition: 'story',
+    weaponType: 'bow',
+    necklace: 'item-colar-forca',
     rows: [
       {
         a: { slug: 'olho-de-agulha', effects: [pct('atk', 45), pct('def', -25)] },
@@ -291,6 +316,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'vesper',
     classId: 'class-arcanista',
     acquisition: 'story',
+    weaponType: 'arcane',
+    necklace: 'item-colar-forca',
     rows: [
       {
         a: { slug: 'chama-crescente', maxRank: 2, effects: [pct('atk', 50), pct('def', -30)] },
@@ -333,6 +360,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'wren',
     classId: 'class-druida',
     acquisition: 'summon',
+    weaponType: 'nature',
+    necklace: 'item-colar-guardiao',
     rows: [
       {
         a: { slug: 'raizes-profundas', maxRank: 3, effects: [pct('hp', 40), flat('atk', 3), flat('spd', -1)] },
@@ -370,6 +399,9 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'bardan',
     classId: 'class-couracado',
     acquisition: 'summon',
+    weaponType: 'axe',
+    necklace: 'item-colar-forca',
+    extraDuelSkills: ['skill-ultimo-suspiro'],
     rows: [
       {
         a: { slug: 'aco-pesado', effects: [pct('def', 50), flat('spd', -5)] },
@@ -423,6 +455,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'kaia',
     classId: 'class-grifeiro',
     acquisition: 'summon',
+    weaponType: 'spear',
+    necklace: 'item-colar-forca',
     rows: [
       {
         a: { slug: 'mergulho', maxRank: 2, effects: [pct('atk', 45), pct('def', -25)] },
@@ -464,6 +498,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'rurik',
     classId: 'class-guerreiro',
     acquisition: 'summon',
+    weaponType: 'axe',
+    necklace: 'item-colar-forca',
     rows: [
       {
         a: { slug: 'furia', maxRank: 2, effects: [pct('atk', 50), pct('def', -30)] },
@@ -509,6 +545,8 @@ const ELENCO: readonly CharacterSpec[] = [
     slug: 'nyra',
     classId: 'class-lanceiro',
     acquisition: 'summon',
+    weaponType: 'spear',
+    necklace: 'item-colar-forca',
     rows: [
       {
         a: { slug: 'estocada', effects: [pct('atk', 45), pct('def', -25)] },
@@ -562,6 +600,33 @@ export function generateCharacter(spec: CharacterSpec) {
     // uma convenção de nome é legítima. `packages/gacha` não pode derivar o mesmo id
     // (regra 4), e por isso o banner o declara.
     fragmentMaterialId: `material-fragmento-${spec.id}`,
+    startingHero: startingHero(spec),
+  };
+}
+
+// A ficha inicial. Tudo que segue convenção de id sai do slug da CLASSE — que é onde a
+// arma e as duas skills do projeto sempre moraram (`item-arma-espadachim`,
+// `skill-ataque-espadachim`) — e o que não segue vem declarado no spec.
+function startingHero(spec: CharacterSpec) {
+  const classe = spec.classId.replace(/^class-/, '');
+  const especial = `skill-especial-${classe}`;
+
+  return {
+    level: STARTING_LEVEL,
+    weaponType: spec.weaponType,
+    equipment: {
+      weapon: `item-arma-${classe}`,
+      helmet: null,
+      armor: null,
+      necklace: spec.necklace,
+      ring: null,
+      boots: null,
+    },
+    duelSkills: [`skill-ataque-${classe}`, especial, ...(spec.extraDuelSkills ?? [])],
+    mapSkills: [],
+    // A mesma linha única que as vagas da campanha declaram: usar a especial quando der.
+    // Editar o script é do jogador (§6.3), e a ficha só entrega o ponto de partida.
+    tacticsScript: [{ enabled: true, skillId: especial, conditions: [] }],
   };
 }
 

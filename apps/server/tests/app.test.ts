@@ -2,6 +2,7 @@ import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
 import type { ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -59,7 +60,7 @@ const emptyCatalog: ContentCatalog = {
 
 function buildTestApp() {
   const repository = createMemoryPlayerRepository([
-    { id: 'player-1', token: 'valid-token', displayName: 'Vanguard', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+    { id: 'player-1', platformProvider: 'dev' as const, platformId: 'valid-token', displayName: 'Vanguard', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
   ]);
   return buildApp({
     economyRepository: createMemoryEconomyRepository(),
@@ -73,6 +74,7 @@ function buildTestApp() {
     catalog: emptyCatalog,
     shopCatalog: {},
     ticketSecret: TICKET_SECRET,
+    identityValidator: createDevIdentityValidator(),
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
   });
 }
@@ -103,7 +105,7 @@ describe('GET /me', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/me',
-      headers: { 'x-player-token': 'does-not-exist' },
+      headers: { 'x-platform-ticket': 'dev:does-not-exist'},
     });
 
     expect(response.statusCode).toBe(401);
@@ -115,13 +117,14 @@ describe('GET /me', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/me',
-      headers: { 'x-player-token': 'valid-token' },
+      headers: { 'x-platform-ticket': 'dev:valid-token'},
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       id: 'player-1',
-      token: 'valid-token',
+      platformProvider: 'dev' as const,
+      platformId: 'valid-token',
       displayName: 'Vanguard',
       elo: 1200,
       arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT, ...DEFAULT_PVE_ACCOUNT,

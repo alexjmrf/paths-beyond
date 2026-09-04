@@ -2,6 +2,7 @@ import type { Hero, ItemInstance } from '@paths-beyond/core';
 import type { ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -142,6 +143,7 @@ function buildTestApp(players: readonly Player[], heroes: readonly StoredHero[],
     catalog: emptyCatalog,
     shopCatalog,
     ticketSecret: TICKET_SECRET,
+    identityValidator: createDevIdentityValidator(),
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
   }), heroRepository };
 }
@@ -154,9 +156,9 @@ describe('GET /shop/catalog', () => {
   });
 
   it('lista as ofertas com item e preço', async () => {
-    const buyer: Player = { id: 'player-comprador', token: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100, ...DEFAULT_PVE_ACCOUNT };
+    const buyer: Player = { id: 'player-comprador', platformProvider: 'dev' as const, platformId: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100, ...DEFAULT_PVE_ACCOUNT };
     const { app } = buildTestApp([buyer], []);
-    const response = await app.inject({ method: 'GET', url: '/shop/catalog', headers: { 'x-player-token': TOKEN } });
+    const response = await app.inject({ method: 'GET', url: '/shop/catalog', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([
       { id: 'offer-espada', itemId: 'item-espada-loja', slot: 'weapon', priceMarks: 50 },
@@ -166,7 +168,7 @@ describe('GET /shop/catalog', () => {
 });
 
 describe('POST /shop/purchase', () => {
-  const buyer: Player = { id: 'player-comprador', token: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100, ...DEFAULT_PVE_ACCOUNT };
+  const buyer: Player = { id: 'player-comprador', platformProvider: 'dev' as const, platformId: TOKEN, displayName: 'Comprador', elo: 1200, arenaMarks: 100, ...DEFAULT_PVE_ACCOUNT };
   const hero: StoredHero = { ownerPlayerId: 'player-comprador', hero: buildHero(), equippedItems: [oldWeapon] };
 
   it('rejeita sem autenticação', async () => {
@@ -178,7 +180,7 @@ describe('POST /shop/purchase', () => {
   it('rejeita oferta desconhecida', async () => {
     const { app } = buildTestApp([buyer], [hero]);
     const response = await app.inject({
-      method: 'POST', url: '/shop/purchase', headers: { 'x-player-token': TOKEN },
+      method: 'POST', url: '/shop/purchase', headers: { 'x-platform-ticket': `dev:${TOKEN}`},
       payload: { heroId: hero.hero.id, offerId: 'oferta-que-nao-existe' },
     });
     expect(response.statusCode).toBe(404);
@@ -188,18 +190,18 @@ describe('POST /shop/purchase', () => {
     const outroHero: StoredHero = { ownerPlayerId: 'outro-jogador', hero: buildHero({ id: 'heroi-alheio' }), equippedItems: [] };
     const { app } = buildTestApp([buyer], [outroHero]);
     const response = await app.inject({
-      method: 'POST', url: '/shop/purchase', headers: { 'x-player-token': TOKEN },
+      method: 'POST', url: '/shop/purchase', headers: { 'x-platform-ticket': `dev:${TOKEN}`},
       payload: { heroId: 'heroi-alheio', offerId: 'offer-espada' },
     });
     expect(response.statusCode).toBe(403);
   });
 
   it('rejeita quando o jogador não tem marcas suficientes', async () => {
-    const pobre: Player = { id: 'player-pobre', token: 'token-pobre', displayName: 'Pobre', elo: 1200, arenaMarks: 10, ...DEFAULT_PVE_ACCOUNT };
+    const pobre: Player = { id: 'player-pobre', platformProvider: 'dev' as const, platformId: 'token-pobre', displayName: 'Pobre', elo: 1200, arenaMarks: 10, ...DEFAULT_PVE_ACCOUNT };
     const heroDoPobre: StoredHero = { ownerPlayerId: 'player-pobre', hero: buildHero({ id: 'heroi-pobre' }), equippedItems: [] };
     const { app } = buildTestApp([pobre], [heroDoPobre]);
     const response = await app.inject({
-      method: 'POST', url: '/shop/purchase', headers: { 'x-player-token': 'token-pobre' },
+      method: 'POST', url: '/shop/purchase', headers: { 'x-platform-ticket': 'dev:token-pobre'},
       payload: { heroId: 'heroi-pobre', offerId: 'offer-espada' },
     });
     expect(response.statusCode).toBe(400);
@@ -208,7 +210,7 @@ describe('POST /shop/purchase', () => {
   it('compra com sucesso: debita marcas e equipa o item novo no lugar do antigo do mesmo slot', async () => {
     const { app, heroRepository } = buildTestApp([buyer], [hero]);
     const response = await app.inject({
-      method: 'POST', url: '/shop/purchase', headers: { 'x-player-token': TOKEN },
+      method: 'POST', url: '/shop/purchase', headers: { 'x-platform-ticket': `dev:${TOKEN}`},
       payload: { heroId: hero.hero.id, offerId: 'offer-espada' },
     });
     expect(response.statusCode).toBe(200);
@@ -218,7 +220,7 @@ describe('POST /shop/purchase', () => {
     expect(body.equippedItems).toHaveLength(1); // trocou, não acumulou
     expect(body.equippedItems[0].id).toBe('item-espada-loja');
 
-    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-player-token': TOKEN } });
+    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
     expect(meResponse.json().arenaMarks).toBe(50);
 
     const stored = await heroRepository.getHeroById(hero.hero.id);
@@ -228,7 +230,7 @@ describe('POST /shop/purchase', () => {
   it('comprar um item de slot diferente não remove o já equipado', async () => {
     const { app } = buildTestApp([buyer], [hero]);
     const response = await app.inject({
-      method: 'POST', url: '/shop/purchase', headers: { 'x-player-token': TOKEN },
+      method: 'POST', url: '/shop/purchase', headers: { 'x-platform-ticket': `dev:${TOKEN}`},
       payload: { heroId: hero.hero.id, offerId: 'offer-colar' },
     });
     expect(response.statusCode).toBe(200);

@@ -10,3 +10,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# M21 — o bundle da medição de determinismo do shell é artefato de build, como `dist/`.
+dist-renderer/
+
+# M21 2/N — os artefatos do empacotamento (app desempacotado e instaladores).
+release/

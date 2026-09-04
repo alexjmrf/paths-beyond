@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useBattleStore } from '../store/battleStore.js';
 
 // Mesma regra de `applyRest` em packages/core/src/battle/commands.ts: não pode ter
@@ -15,8 +16,16 @@ export function ResourcePanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
+  const dispararIntroducao = useBattleStore((s) => s.dispararIntroducao);
 
   const playerUnits = battleState.units.filter((u) => u.side === 'player' && u.hp > 0);
+
+  // §1.1 (M23, 1/N) — AP e PP são duas siglas que a tela mostra sem explicar. A dica sai
+  // quando há exército de verdade na tabela: com o tabuleiro vazio (fora de batalha) ela
+  // seria texto sobre nada.
+  useEffect(() => {
+    if (playerUnits.length > 0) dispararIntroducao('recursos-ap-pp');
+  }, [playerUnits.length, dispararIntroducao]);
 
   return (
     <section className="resource-panel">

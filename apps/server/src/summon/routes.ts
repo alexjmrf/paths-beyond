@@ -6,10 +6,12 @@ import { deriveSeed } from '../battle/ticket.js';
 import type {
   CharacterOwnershipRepository,
   EconomyRepository,
+  HeroRepository,
   Player,
   PlayerRepository,
 } from '../repository/types.js';
 import { ownedCharacterIds, storyCharacterIds } from './ownership.js';
+import { buildStoredHero } from './roster.js';
 
 // §10 (M18, sub-sessão 3/N) — a aquisição de personagens.
 //
@@ -27,6 +29,7 @@ export interface SummonRoutesOptions {
   readonly repository: PlayerRepository;
   readonly economyRepository: EconomyRepository;
   readonly ownershipRepository: CharacterOwnershipRepository;
+  readonly heroRepository: HeroRepository;
   readonly catalog: ContentCatalog;
   readonly ticketSecret: string;
   readonly now: () => number;
@@ -145,6 +148,10 @@ export const summonRoutes: FastifyPluginAsync<SummonRoutesOptions> = async (fast
 
     if (result.outcome.kind === 'character') {
       await opts.ownershipRepository.grant(player.id, result.outcome.characterId);
+      // §10/D14 (M18, 6/N) — posse E instância, na mesma requisição. Conceder sem criar o
+      // herói entregaria ao jogador um nome no roster e nada para levar ao mapa, que é
+      // metade do critério de aceite 1 faltando. A ficha vem do catálogo (regra 4).
+      await opts.heroRepository.createHero(buildStoredHero(opts.catalog, player.id, result.outcome.characterId));
       return {
         outcome: result.outcome,
         premium: updatedPlayer.premium,

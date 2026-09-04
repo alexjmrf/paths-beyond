@@ -27,7 +27,7 @@ import {
 type DungeonEncounterUnit = DungeonEncounter['units'][number];
 import type { FastifyPluginAsync } from 'fastify';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
-import type { RateLimiter } from '../battle/rateLimit.js';
+import { rejectOnRulesVersion } from '../version.js';
 import type {
   CharacterOwnershipRepository,
   EconomyRepository,
@@ -56,7 +56,6 @@ export interface EconomyRoutesOptions {
   // §9.4 (M18, 3/N) — posse de personagem, pelo mesmo motivo da arena.
   readonly ownershipRepository: CharacterOwnershipRepository;
   readonly catalog: ContentCatalog;
-  readonly rateLimiter: RateLimiter;
   readonly ticketSecret: string;
   // Injetado pelos testes, como em `season/routes.ts` e no rate limiter: sem isso a trava
   // de tempo e a regeneração de energia só seriam testáveis esperando o relógio andar.
@@ -74,6 +73,9 @@ interface RunBody {
   readonly heroIds?: readonly string[];
   readonly commands?: readonly BattleCommand[];
   readonly auto?: boolean;
+  // M22 1/N — o campo que faltava. O ticket já devolvia `rulesVersion` desde o M14 3/N e a
+  // submissão não a mandava de volta, então não havia o que validar (registrado no M17 5/N).
+  readonly rulesVersion?: string;
 }
 
 // A energia guardada é sempre reapurada contra o agora antes de qualquer decisão: o valor
@@ -255,9 +257,6 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const player = request.player;
 
-    if (!opts.rateLimiter.tryConsume(player.id)) {
-      return reply.code(429).send({ error: 'rate limit exceeded' });
-    }
 
     const dungeonId = (request.params as { id: string }).id;
     const dungeon = opts.catalog.dungeons[dungeonId];
@@ -301,13 +300,15 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
     const body = request.body as RunBody;
     if (!body.nonce) return reply.code(400).send({ error: 'nonce é obrigatório' });
 
+    // M22 1/N — a versão ANTES do limitador de requisições: um cliente desatualizado não
+    // consegue jogar, e responder 429 a ele o deixaria com um erro que não explica nada em
+    // vez da tela que manda atualizar.
+    if (rejectOnRulesVersion(reply, body.rulesVersion)) return reply;
+
     // Idempotência (mesma defesa de `POST /battles`): reenviar não paga duas vezes.
     const already = await opts.economyRepository.getRun(body.nonce);
     if (already) return reply.code(409).send({ error: 'esta run já foi resolvida', run: already });
 
-    if (!opts.rateLimiter.tryConsume(player.id)) {
-      return reply.code(429).send({ error: 'rate limit exceeded' });
-    }
 
     const clears = new Set(await opts.economyRepository.listClears(player.id));
     if (dungeon.requiresClearOf && !clears.has(dungeon.requiresClearOf)) {

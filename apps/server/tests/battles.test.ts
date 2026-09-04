@@ -3,6 +3,7 @@ import type { ClassDef, GridMap, Hero, SkillDef, StatSheet, Terrain } from '@pat
 import type { ArenaMap, ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter, type RateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -129,8 +130,8 @@ function buildTestApp(
   ownershipRepository = createMemoryCharacterOwnershipRepository(),
 ) {
   const repository = createMemoryPlayerRepository([
-    { id: 'player-atacante', token: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
-    { id: 'player-defensor', token: DEFENDER_TOKEN, displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+    { id: 'player-atacante', platformProvider: 'dev' as const, platformId: ATTACKER_TOKEN, displayName: 'Atacante', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+    { id: 'player-defensor', platformProvider: 'dev' as const, platformId: DEFENDER_TOKEN, displayName: 'Defensor', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
   ]);
 
   const attackerHero: StoredHero = {
@@ -175,6 +176,7 @@ function buildTestApp(
     shopCatalog: {},
     rateLimiter,
     ticketSecret: TICKET_SECRET,
+    identityValidator: createDevIdentityValidator(),
   });
 }
 
@@ -190,7 +192,7 @@ describe('PUT /me/defense', () => {
     const response = await app.inject({
       method: 'PUT',
       url: '/me/defense',
-      headers: { 'x-player-token': DEFENDER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
       payload: { mapId: 'mapa-teste', units: [{ heroId: 'heroi-atacante', pos: { x: 0, y: 0 }, height: 0, aiArchetype: 'hold-position' }] },
     });
     expect(response.statusCode).toBe(403);
@@ -201,7 +203,7 @@ describe('PUT /me/defense', () => {
     const response = await app.inject({
       method: 'PUT',
       url: '/me/defense',
-      headers: { 'x-player-token': DEFENDER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
       payload: { mapId: 'mapa-teste', units: [{ heroId: 'heroi-defensor', pos: { x: 3, y: 3 }, height: 0, aiArchetype: 'aggressive' }] },
     });
     expect(response.statusCode).toBe(200);
@@ -224,7 +226,7 @@ describe('GET /me/defense', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/me/defense',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
     });
     expect(response.statusCode).toBe(404);
   });
@@ -235,14 +237,14 @@ describe('GET /me/defense', () => {
     await app.inject({
       method: 'PUT',
       url: '/me/defense',
-      headers: { 'x-player-token': DEFENDER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
       payload: { mapId: 'mapa-teste', units },
     });
 
     const response = await app.inject({
       method: 'GET',
       url: '/me/defense',
-      headers: { 'x-player-token': DEFENDER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ownerPlayerId: 'player-defensor', mapId: 'mapa-teste', units });
@@ -253,7 +255,7 @@ describe('GET /me/defense', () => {
     await app.inject({
       method: 'PUT',
       url: '/me/defense',
-      headers: { 'x-player-token': DEFENDER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
       payload: {
         mapId: 'mapa-teste',
         units: [{ heroId: 'heroi-defensor', pos: { x: 3, y: 3 }, height: 0, aiArchetype: 'aggressive' }],
@@ -263,7 +265,7 @@ describe('GET /me/defense', () => {
     const doAtacante = await app.inject({
       method: 'GET',
       url: '/me/defense',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
     });
     expect(doAtacante.statusCode).toBe(404);
   });
@@ -292,7 +294,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, rulesVersion: 'versao-errada' },
     });
     expect(response.statusCode).toBe(409);
@@ -314,7 +316,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, rulesVersion: '0.17.0' },
     });
 
@@ -330,7 +332,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, attackerHeroIds: ['heroi-defensor'] },
     });
     expect(response.statusCode).toBe(403);
@@ -345,7 +347,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, attackerHeroIds: ['heroi-personagem'] },
     });
 
@@ -363,7 +365,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, attackerHeroIds: ['heroi-personagem'] },
     });
 
@@ -375,7 +377,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, defenderPlayerId: 'ninguem' },
     });
     expect(response.statusCode).toBe(404);
@@ -386,7 +388,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
     expect(response.statusCode).toBe(200);
@@ -401,7 +403,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
     const body = response.json();
@@ -409,7 +411,7 @@ describe('POST /battles', () => {
     expect(body.elo.attacker).toBeGreaterThan(1200);
     expect(body.elo.defender).toBeLessThan(1200);
 
-    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-player-token': ATTACKER_TOKEN } });
+    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`} });
     expect(meResponse.json().elo).toBe(body.elo.attacker);
   });
 
@@ -418,7 +420,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
     const body = response.json();
@@ -428,7 +430,7 @@ describe('POST /battles', () => {
     expect(body.arenaMarks.defender).toBeGreaterThan(0);
     expect(body.arenaMarks.attacker).toBeGreaterThan(body.arenaMarks.defender);
 
-    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-player-token': ATTACKER_TOKEN } });
+    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`} });
     expect(meResponse.json().arenaMarks).toBe(body.arenaMarks.attacker);
   });
 
@@ -446,7 +448,7 @@ describe('POST /battles', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: withoutNonce,
     });
     expect(response.statusCode).toBe(400);
@@ -457,7 +459,7 @@ describe('POST /battles', () => {
     const first = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
     expect(first.statusCode).toBe(200);
@@ -465,7 +467,7 @@ describe('POST /battles', () => {
     const second = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
     expect(second.statusCode).toBe(409);
@@ -477,7 +479,7 @@ describe('POST /battles', () => {
     const first = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
     expect(first.statusCode).toBe(200);
@@ -485,7 +487,7 @@ describe('POST /battles', () => {
     const second = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...validBody, nonce: 'nonce-teste-2' },
     });
     expect(second.statusCode).toBe(429);
@@ -506,7 +508,7 @@ describe('GET /battles/:nonce', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/battles/nao-existe',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
     });
     expect(response.statusCode).toBe(404);
   });
@@ -516,14 +518,14 @@ describe('GET /battles/:nonce', () => {
     await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: validBody,
     });
 
     const asAttacker = await app.inject({
       method: 'GET',
       url: `/battles/${validBody.nonce}`,
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
     });
     expect(asAttacker.statusCode).toBe(200);
     expect(asAttacker.json()).toMatchObject({ nonce: validBody.nonce, attackerPlayerId: 'player-atacante', defenderPlayerId: 'player-defensor' });
@@ -531,7 +533,7 @@ describe('GET /battles/:nonce', () => {
     const asDefender = await app.inject({
       method: 'GET',
       url: `/battles/${validBody.nonce}`,
-      headers: { 'x-player-token': DEFENDER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
     });
     expect(asDefender.statusCode).toBe(200);
   });
@@ -554,7 +556,7 @@ describe('POST /battles/ticket', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/battles/ticket',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: ticketBody,
     });
 
@@ -577,7 +579,7 @@ describe('POST /battles/ticket', () => {
     const alheio = await app.inject({
       method: 'POST',
       url: '/battles/ticket',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...ticketBody, attackerHeroIds: ['heroi-defensor'] },
     });
     expect(alheio.statusCode).toBe(403);
@@ -585,7 +587,7 @@ describe('POST /battles/ticket', () => {
     const semDefesa = await app.inject({
       method: 'POST',
       url: '/battles/ticket',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...ticketBody, defenderPlayerId: 'player-atacante' },
     });
     expect(semDefesa.statusCode).toBe(404);
@@ -600,7 +602,7 @@ describe('POST /battles/ticket', () => {
       await app.inject({
         method: 'POST',
         url: '/battles/ticket',
-        headers: { 'x-player-token': ATTACKER_TOKEN },
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
         payload: ticketBody,
       })
     ).json();
@@ -608,7 +610,7 @@ describe('POST /battles/ticket', () => {
     const battle = await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...ticketBody, nonce: ticket.nonce, rulesVersion: RULES_VERSION, commands: [] },
     });
 
@@ -622,7 +624,7 @@ describe('POST /battles/ticket', () => {
       await app.inject({
         method: 'POST',
         url: '/battles/ticket',
-        headers: { 'x-player-token': ATTACKER_TOKEN },
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
         payload: ticketBody,
       })
     ).json();
@@ -630,7 +632,7 @@ describe('POST /battles/ticket', () => {
     await app.inject({
       method: 'POST',
       url: '/battles',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: { ...ticketBody, nonce: ticket.nonce, rulesVersion: RULES_VERSION, commands: [] },
     });
 
@@ -638,7 +640,7 @@ describe('POST /battles/ticket', () => {
       await app.inject({
         method: 'GET',
         url: `/battles/${ticket.nonce}`,
-        headers: { 'x-player-token': ATTACKER_TOKEN },
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       })
     ).json();
 
@@ -653,7 +655,7 @@ describe('POST /battles/ticket', () => {
         await app.inject({
           method: 'POST',
           url: '/battles/ticket',
-          headers: { 'x-player-token': ATTACKER_TOKEN },
+          headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
           payload: ticketBody,
         })
       ).json();
@@ -671,7 +673,7 @@ describe('POST /battles/ticket', () => {
     const primeiro = await app.inject({
       method: 'POST',
       url: '/battles/ticket',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: ticketBody,
     });
     expect(primeiro.statusCode).toBe(200);
@@ -679,7 +681,7 @@ describe('POST /battles/ticket', () => {
     const segundo = await app.inject({
       method: 'POST',
       url: '/battles/ticket',
-      headers: { 'x-player-token': ATTACKER_TOKEN },
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: ticketBody,
     });
     expect(segundo.statusCode).toBe(429);
@@ -694,7 +696,7 @@ describe('GET /me/heroes', () => {
 
   it('lista só os heróis do próprio jogador', async () => {
     const app = buildTestApp();
-    const meus = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-player-token': ATTACKER_TOKEN } });
+    const meus = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`} });
     expect(meus.statusCode).toBe(200);
     // M18 3/N acrescentou `heroi-personagem` ao atacante (o herói com `characterId`, sem o
     // qual a checagem de posse ficaria verde sem nunca rodar). A propriedade medida aqui é
@@ -704,7 +706,7 @@ describe('GET /me/heroes', () => {
       'heroi-personagem',
     ]);
 
-    const dele = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-player-token': DEFENDER_TOKEN } });
+    const dele = await app.inject({ method: 'GET', url: '/me/heroes', headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`} });
     expect(dele.json().map((h: { hero: { id: string } }) => h.hero.id)).toEqual(['heroi-defensor']);
   });
 });

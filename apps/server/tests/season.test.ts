@@ -1,6 +1,7 @@
 import type { ContentCatalog } from '@paths-beyond/content';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
@@ -65,7 +66,7 @@ describe('ensureCurrentSeason', () => {
   it('sem temporada nenhuma, cria a #1 sem tocar ELO de ninguém', async () => {
     const seasonRepository = createMemorySeasonRepository();
     const playerRepository = createMemoryPlayerRepository([
-      { id: 'player-1', token: 't1', displayName: 'Um', elo: 1600, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+      { id: 'player-1', platformProvider: 'dev' as const, platformId: 't1', displayName: 'Um', elo: 1600, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
     ]);
     const now = 1_000_000;
 
@@ -80,7 +81,7 @@ describe('ensureCurrentSeason', () => {
   it('com a temporada atual ainda válida, não cria nada nem toca ELO', async () => {
     const existing: Season = { id: 's1', seasonNumber: 1, startedAt: '2026-01-01T00:00:00.000Z', endsAt: '2026-01-15T00:00:00.000Z' };
     const seasonRepository = createMemorySeasonRepository([existing]);
-    const playerRepository = createMemoryPlayerRepository([{ id: 'player-1', token: 't1', displayName: 'Um', elo: 1600, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT }]);
+    const playerRepository = createMemoryPlayerRepository([{ id: 'player-1', platformProvider: 'dev' as const, platformId: 't1', displayName: 'Um', elo: 1600, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT }]);
     const stillWithinWindow = new Date('2026-01-10T00:00:00.000Z').getTime();
 
     const season = await ensureCurrentSeason({ seasonRepository, playerRepository, now: () => stillWithinWindow });
@@ -93,9 +94,9 @@ describe('ensureCurrentSeason', () => {
     const existing: Season = { id: 's1', seasonNumber: 1, startedAt: '2026-01-01T00:00:00.000Z', endsAt: '2026-01-15T00:00:00.000Z' };
     const seasonRepository = createMemorySeasonRepository([existing]);
     const players: Player[] = [
-      { id: 'player-alto', token: 't1', displayName: 'Alto', elo: 1600, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT }, // 1200 + (1600-1200)*0.5 = 1400
-      { id: 'player-baixo', token: 't2', displayName: 'Baixo', elo: 1000, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT }, // 1200 + (1000-1200)*0.5 = 1100
-      { id: 'player-na-media', token: 't3', displayName: 'NaMedia', elo: DEFAULT_ELO, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
+      { id: 'player-alto', platformProvider: 'dev' as const, platformId: 't1', displayName: 'Alto', elo: 1600, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT }, // 1200 + (1600-1200)*0.5 = 1400
+      { id: 'player-baixo', platformProvider: 'dev' as const, platformId: 't2', displayName: 'Baixo', elo: 1000, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT }, // 1200 + (1000-1200)*0.5 = 1100
+      { id: 'player-na-media', platformProvider: 'dev' as const, platformId: 't3', displayName: 'NaMedia', elo: DEFAULT_ELO, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
     ];
     const playerRepository = createMemoryPlayerRepository(players);
     const afterExpiry = new Date('2026-01-16T00:00:00.000Z').getTime();
@@ -136,13 +137,14 @@ function buildTestApp(players: readonly Player[], seasons: readonly Season[], no
     catalog: emptyCatalog,
     shopCatalog: {},
     ticketSecret: TICKET_SECRET,
+    identityValidator: createDevIdentityValidator(),
     rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
     now,
   });
 }
 
 describe('GET /season/current', () => {
-  const self: Player = { id: 'player-1', token: 'valid-token', displayName: 'Vanguard', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
+  const self: Player = { id: 'player-1', platformProvider: 'dev' as const, platformId: 'valid-token', displayName: 'Vanguard', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT };
 
   it('rejeita sem autenticação', async () => {
     const app = buildTestApp([self], []);
@@ -152,7 +154,7 @@ describe('GET /season/current', () => {
 
   it('com auth, cria a temporada #1 sob demanda e devolve seus dados', async () => {
     const app = buildTestApp([self], [], () => 1_000_000);
-    const response = await app.inject({ method: 'GET', url: '/season/current', headers: { 'x-player-token': 'valid-token' } });
+    const response = await app.inject({ method: 'GET', url: '/season/current', headers: { 'x-platform-ticket': 'dev:valid-token'} });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       seasonNumber: 1,
@@ -163,8 +165,8 @@ describe('GET /season/current', () => {
 
   it('duas chamadas seguidas dentro da mesma janela devolvem a mesma temporada (idempotente)', async () => {
     const app = buildTestApp([self], [], () => 1_000_000);
-    const first = await app.inject({ method: 'GET', url: '/season/current', headers: { 'x-player-token': 'valid-token' } });
-    const second = await app.inject({ method: 'GET', url: '/season/current', headers: { 'x-player-token': 'valid-token' } });
+    const first = await app.inject({ method: 'GET', url: '/season/current', headers: { 'x-platform-ticket': 'dev:valid-token'} });
+    const second = await app.inject({ method: 'GET', url: '/season/current', headers: { 'x-platform-ticket': 'dev:valid-token'} });
     expect(first.json()).toEqual(second.json());
   });
 });

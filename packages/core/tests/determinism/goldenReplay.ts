@@ -116,6 +116,26 @@ function buildSetup(units: readonly BattleUnit[]): BattleSetup {
  * script de duas linhas, reação com PP, triângulo de armas, assistência de aliado
  * adjacente, crítico, variância de dano e aplicação de debuff.
  */
+// Hash congelado do estado final do replay canônico.
+//
+// **Mora AQUI, junto da fixture, desde M21 1/N.** Antes era uma constante dentro de
+// `crossRuntime.test.ts`, e isso bastava enquanto os consumidores eram Node e os três
+// navegadores — os dois rodam aquele arquivo. O shell desktop mede o mesmo replay de fora do
+// Vitest, e um segundo lugar com o valor copiado seria duas verdades sobre a mesma coisa: no
+// dia em que divergissem, os dois testes ficariam verdes medindo hashes diferentes.
+//
+// Mudou? Então uma regra de simulação mudou. As únicas reações corretas são:
+//   (a) foi intencional → suba RULES_VERSION e atualize esta constante no mesmo commit;
+//   (b) não foi intencional → você acabou de encontrar uma regressão. Não atualize o valor.
+// Atualizar para "fazer o teste passar" desliga a única defesa que o projeto tem contra
+// divergência silenciosa de PvP.
+//
+// M10, sub-sessão 1/N: mudou de '6249029d' — skill.effects passou a ser aplicado dentro do
+// duelo (era inerte desde M2), e o replay canônico já exercitava exatamente isso
+// (`heavyBlow.effects` aplica `effect-bleed` no defensor). Intencional: RULES_VERSION subiu
+// no mesmo commit.
+export const GOLDEN_HASH = 'c3a404a0';
+
 export function buildGoldenReplay(): Replay {
   const swordsman = buildUnit({
     unitId: 'espadachim', heroId: 'h-espada', side: 'player',
