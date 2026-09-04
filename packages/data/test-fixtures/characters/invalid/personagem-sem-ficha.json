@@ -1,0 +1,7 @@
+{
+  "id": "personagem-sem-ficha",
+  "name": "Sem Ficha",
+  "classId": "class-soldado",
+  "acquisition": "summon",
+  "fragmentMaterialId": "material-fragmento-personagem-sem-ficha"
+}
