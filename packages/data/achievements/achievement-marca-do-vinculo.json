@@ -3,6 +3,7 @@
   "name": "Marca do Vínculo",
   "description": "Leve algum herói a imprint 1.",
   "premium": 200,
+  "platformId": "ACH_MARCA_DO_VINCULO",
   "condition": {
     "kind": "heroImprint",
     "atLeast": 1

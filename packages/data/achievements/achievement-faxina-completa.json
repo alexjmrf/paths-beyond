@@ -3,6 +3,7 @@
   "name": "Faxina Completa",
   "description": "Limpe quatro masmorras à mão.",
   "premium": 400,
+  "platformId": "ACH_FAXINA_COMPLETA",
   "condition": {
     "kind": "dungeonsCleared",
     "atLeast": 4

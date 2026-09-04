@@ -3,6 +3,7 @@
   "name": "Desperto",
   "description": "Leve algum herói a awakening 3.",
   "premium": 400,
+  "platformId": "ACH_DESPERTO",
   "condition": {
     "kind": "heroAwakening",
     "atLeast": 3

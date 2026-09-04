@@ -3,6 +3,7 @@
   "name": "Mãos à Obra",
   "description": "Limpe uma masmorra à mão.",
   "premium": 150,
+  "platformId": "ACH_MAOS_A_OBRA",
   "condition": {
     "kind": "dungeonsCleared",
     "atLeast": 1

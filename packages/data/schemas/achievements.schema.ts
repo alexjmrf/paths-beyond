@@ -33,6 +33,21 @@ const achievementSchema = z
     // Quanto de moeda premium a conquista paga. Inteiro e positivo: uma conquista que paga
     // zero é decoração, e o schema não deve deixar isso passar como se fosse fonte.
     premium: z.number().int().positive(),
+    // §9.4 (M21, 3/N) — o nome desta conquista NA PLATAFORMA (o *API name* da Steam), que é
+    // o que `SetAchievement` recebe.
+    //
+    // **Autorado e não derivado do `id`.** O nome vive no backend de parceiro, digitado à
+    // mão; se ele e este campo discordarem por uma letra, a conquista paga a moeda premium
+    // normalmente e nunca aparece no perfil do jogador — sem erro em lugar nenhum. Sendo
+    // dado, ele é conferido pelo `validate:data` como todo o resto, e uma conquista nova não
+    // consegue nascer sem espelho.
+    //
+    // O formato é o que a plataforma aceita: maiúscula, dígito e `_`. Acento e hífen —
+    // fáceis de escrever em português — são recusados aqui, porque lá o sintoma só
+    // apareceria com o jogo publicado.
+    platformId: z
+      .string()
+      .regex(/^[A-Z0-9_]+$/, 'platformId aceita apenas A-Z, 0-9 e _'),
     condition: conditionSchema,
   })
   .strict();

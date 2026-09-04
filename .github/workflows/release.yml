@@ -1,0 +1,94 @@
+name: Release
+
+# M21, sub-sessão 2/N — o instalável é produzido pelo CI, não à mão.
+#
+# O critério do M21 é literal nisso, e a razão não é cerimônia: um instalador construído na
+# máquina de alguém carrega o que aquela máquina tinha — versão de Node, variável de
+# ambiente, dependência instalada por engano. O que o jogador recebe precisa sair de um lugar
+# reproduzível.
+#
+# Dispara por TAG (`v*`), e não a cada push: instalador é entrega, não resultado de build.
+
+on:
+  push:
+    tags: ['v*']
+  # Permite ensaiar o pipeline inteiro sem criar tag — o primeiro uso real dele é sempre um
+  # ensaio, e descobrir um erro de config só na hora do lançamento é o pior momento possível.
+  workflow_dispatch:
+
+jobs:
+  empacotar:
+    strategy:
+      # `fail-fast: false` de propósito: se o build do macOS quebrar, ainda se quer saber se
+      # Windows e Linux estão bem. Um relatório parcial é mais útil que um cancelamento.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            alvo: nsis
+          - os: macos-latest
+            alvo: dmg
+          - os: ubuntu-latest
+            alvo: AppImage
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Habilitar corepack
+        run: corepack enable
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      # O cliente é outro pacote do workspace e entra no instalador por `extraResources`.
+      # Sem este passo o app abre em branco — falha silenciosa que só aparece na máquina de
+      # quem instalou, e que `apps/desktop/tests/empacotamento.test.ts` existe para pegar.
+      - name: Construir o cliente
+        run: pnpm --filter @paths-beyond/client run build
+
+      - name: Construir o shell
+        run: pnpm --filter @paths-beyond/desktop run build
+
+      - name: Empacotar
+        run: pnpm --filter @paths-beyond/desktop exec electron-builder --publish never
+
+      # A autoverificação do binário EMPACOTADO, na plataforma em que ele foi empacotado.
+      # É o mesmo hash que o servidor compara a cada batalha (§9.4): se ele divergir aqui, o
+      # artefato não deve ser publicado — é melhor não lançar do que lançar um cliente que
+      # perde partidas ganhas.
+      - name: Determinismo dentro do artefato (Windows)
+        if: matrix.os == 'windows-latest'
+        run: '& "apps/desktop/release/win-unpacked/Paths Beyond.exe" --determinismo'
+        shell: pwsh
+
+      - name: Determinismo dentro do artefato (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: xvfb-run --auto-servernum "apps/desktop/release/linux-unpacked/paths-beyond" --determinismo
+
+      - name: Determinismo dentro do artefato (macOS)
+        if: matrix.os == 'macos-latest'
+        run: '"apps/desktop/release/mac/Paths Beyond.app/Contents/MacOS/Paths Beyond" --determinismo'
+
+      # M21, sub-sessão 4/N — o metadado de atualização sobe JUNTO do instalador.
+      #
+      # `latest*.yml` é o que o `electron-updater` lê para saber que existe versão nova, e o
+      # `.blockmap` é o que permite baixar só a diferença em vez do instalador inteiro. Um
+      # release publicado sem eles instala normalmente e **nunca atualiza** — a falha aparece
+      # semanas depois, na versão seguinte, e parece bug do updater.
+      - name: Publicar o artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: paths-beyond-${{ matrix.alvo }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest*.yml
+          if-no-files-found: error

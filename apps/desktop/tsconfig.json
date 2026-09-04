@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmit": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  // Só o que roda no processo PRINCIPAL. O `preload` e a medição do renderer são
+  // empacotados pelo Vite (eles importam o core, que vive fora deste `rootDir`), e mandar o
+  // tsc compilá-los faria os dois lados produzirem o mesmo arquivo por caminhos diferentes.
+  "include": ["src/main.ts", "src/determinism.ts", "src/achievements.ts"]
+}

@@ -3,6 +3,7 @@
   "name": "Companhia Crescendo",
   "description": "Tenha seis personagens.",
   "premium": 300,
+  "platformId": "ACH_COMPANHIA_CRESCENDO",
   "condition": {
     "kind": "charactersOwned",
     "atLeast": 6

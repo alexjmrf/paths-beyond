@@ -3,6 +3,7 @@
   "name": "Elenco Completo",
   "description": "Tenha os nove personagens.",
   "premium": 900,
+  "platformId": "ACH_ELENCO_COMPLETO",
   "condition": {
     "kind": "charactersOwned",
     "atLeast": 9
