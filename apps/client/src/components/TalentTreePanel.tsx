@@ -1,6 +1,7 @@
 import { STAT_KEYS, type StatKey, type TalentEffect } from '@paths-beyond/core';
 import { useState } from 'react';
 import { catalog } from '../data/catalog.js';
+import type { Tradutor } from '../i18n/idioma.js';
 import { encodeBuildCode } from '../logic/buildCode.js';
 import {
   availabilityByNode,
@@ -26,7 +27,9 @@ function nodeCenter(p: PositionedTalentNode): { x: number; y: number } {
   };
 }
 
-function describeEffect(effect: TalentEffect): string {
+// M25 — o tradutor entra por PARÂMETRO e não por import da store: assim a função continua
+// pura (mesma entrada, mesma saída) e testável sem montar o estado do jogo.
+function describeEffect(effect: TalentEffect, t: Tradutor): string {
   switch (effect.t) {
     case 'stat': {
       const parts: string[] = [];
@@ -35,27 +38,27 @@ function describeEffect(effect: TalentEffect): string {
       return `${effect.stat} ${parts.join(' ')}`;
     }
     case 'grantSkill':
-      return `Concede skill: ${effect.skillId}`;
+      return t('efeito.grantSkill', { skill: effect.skillId });
     case 'grantReaction':
-      return `Concede reação: ${effect.reactionId}`;
+      return t('efeito.grantReaction', { reacao: effect.reactionId });
     case 'modifySkill':
-      return `Modifica skill ${effect.skillId}`;
+      return t('efeito.modifySkill', { skill: effect.skillId });
     case 'extraTacticsSlot':
-      return '+1 linha no editor de táticas';
+      return t('efeito.extraTacticsSlot');
     case 'extraTacticsCondition':
-      return '+1 condição por linha de tática';
+      return t('efeito.extraTacticsCondition');
     case 'maxAp':
-      return `+${effect.n} AP máximo (batalha)`;
+      return t('efeito.maxAp', { n: effect.n });
     case 'maxPp':
-      return `+${effect.n} PP máximo (batalha)`;
+      return t('efeito.maxPp', { n: effect.n });
     case 'apRefund':
-      return `+${effect.n} AP ao ${effect.on === 'kill' ? 'abater' : effect.on === 'duelWon' ? 'vencer duelo' : 'assistir'}`;
+      return t('efeito.apRefund', { n: effect.n, quando: t(`efeito.apRefund.${effect.on}`) });
     case 'duelApCap':
-      return `+${effect.n} no teto de AP por duelo`;
+      return t('efeito.duelApCap', { n: effect.n });
     case 'assistRangeBonus':
-      return `+${effect.n} alcance de assistência`;
+      return t('efeito.assistRangeBonus', { n: effect.n });
     case 'passive':
-      return `Passiva: ${effect.passiveId}`;
+      return t('efeito.passive', { passiva: effect.passiveId });
   }
 }
 
@@ -66,7 +69,9 @@ function shortNodeLabel(nodeId: string): string {
   return nodeId.replace(/^talent-[^-]+-/, '');
 }
 
-const COLUMN_TITLE = ['Coluna A', 'Convergência', 'Coluna B'] as const;
+// M25 — os títulos das colunas viraram chave; a ORDEM continua sendo a do desenho
+// (§8.2: coluna A, o nó do meio, coluna B).
+const COLUMN_TITLE_KEYS = ['talento.colunaA', 'talento.convergencia', 'talento.colunaB'] as const;
 
 function statDeltaRow(stat: StatKey, before: number, after: number) {
   const delta = after - before;
@@ -90,6 +95,7 @@ function statDeltaRow(stat: StatKey, before: number, after: number) {
 // o nó apagado, e o motivo em português vindo do core sem reescrita.
 export function TalentTreePanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
   const talentEditorUnitId = useBattleStore((s) => s.talentEditorUnitId);
   const talentAllocationByUnit = useBattleStore((s) => s.talentAllocationByUnit);
@@ -115,10 +121,10 @@ export function TalentTreePanel() {
       <div className="talent-tree-overlay">
         <div className="talent-tree-panel">
           <h2>Talentos — {unit.unitId}</h2>
-          <p className="talent-hint">Esta unidade não é um personagem do elenco e não tem árvore de talentos.</p>
+          <p className="talent-hint">{t('talento.semArvore')}</p>
           <div className="talent-editor-actions">
             <button type="button" onClick={closeTalentEditor}>
-              Fechar
+              {t('talento.fechar')}
             </button>
           </div>
         </div>
@@ -171,9 +177,9 @@ export function TalentTreePanel() {
 
         <svg className="talent-graph" width={svgWidth} height={svgHeight}>
           <g className="talent-column-titles">
-            {COLUMN_TITLE.map((titulo, col) => (
-              <text key={titulo} x={MARGIN + col * COL_WIDTH + NODE_W / 2} y={14} textAnchor="middle">
-                {titulo}
+            {COLUMN_TITLE_KEYS.map((chave, col) => (
+              <text key={chave} x={MARGIN + col * COL_WIDTH + NODE_W / 2} y={14} textAnchor="middle">
+                {t(chave)}
               </text>
             ))}
           </g>
@@ -233,17 +239,23 @@ export function TalentTreePanel() {
           <div className="talent-node-details">
             <h3>{shortNodeLabel(selectedNode.id)}</h3>
             <p>
-              Linha {selectedNode.row} ·{' '}
-              {selectedNode.column === 'middle' ? 'convergência' : `coluna ${selectedNode.column.toUpperCase()}`} · rank{' '}
-              {allocation[selectedNode.id] ?? 0}/{selectedNode.maxRank}
+              {t('talento.no', {
+                linha: selectedNode.row,
+                coluna:
+                  selectedNode.column === 'middle'
+                    ? t('talento.colunaDoMeio')
+                    : t('talento.colunaLetra', { letra: selectedNode.column.toUpperCase() }),
+                rank: allocation[selectedNode.id] ?? 0,
+                teto: selectedNode.maxRank,
+              })}
             </p>
             <ul>
               {selectedNode.effects.map((effect, i) => (
-                <li key={i}>{describeEffect(effect)}</li>
+                <li key={i}>{describeEffect(effect, t)}</li>
               ))}
             </ul>
             {selectedNode.minAwakening !== undefined ? (
-              <p className="requires">exige despertar {selectedNode.minAwakening}</p>
+              <p className="requires">{t('talento.exigeDespertar', { nivel: selectedNode.minAwakening })}</p>
             ) : null}
             {selectedAvailability?.blockedReason ? (
               // O motivo é o do core, sem reescrita: se a tela explicasse por conta própria,
@@ -275,13 +287,13 @@ export function TalentTreePanel() {
             </div>
           </div>
         ) : (
-          <p className="talent-hint">Clique num nó pra ver o efeito.</p>
+          <p className="talent-hint">{t('talento.cliqueNoNo')}</p>
         )}
 
         {lastTalentReason ? <p className="error">{lastTalentReason}</p> : null}
 
         <div className="talent-preview">
-          <h3>Efeito total da build (delta sobre os stats atuais)</h3>
+          <h3>{t('talento.efeitoTotal')}</h3>
           <ul>{STAT_KEYS.map((stat) => statDeltaRow(stat, preview.statsBefore[stat], preview.statsAfter[stat]))}</ul>
           <p>
             Poder de combate: {preview.cpBefore} → {preview.cpAfter} (
@@ -291,9 +303,9 @@ export function TalentTreePanel() {
         </div>
 
         <div className="talent-build-code">
-          <h3>Build compartilhável</h3>
+          <h3>{t('talento.buildCode')}</h3>
           <label>
-            Código atual
+            {t('talento.codigoAtual')}
             <textarea readOnly value={currentCode} rows={2} />
           </label>
           <button
@@ -302,15 +314,15 @@ export function TalentTreePanel() {
               void navigator.clipboard?.writeText(currentCode).catch(() => undefined);
             }}
           >
-            Copiar código
+            {t('talento.copiar')}
           </button>
 
           <label>
-            Colar código
+            {t('talento.colar')}
             <textarea value={buildCodeInput} onChange={(e) => setBuildCodeInput(e.target.value)} rows={2} />
           </label>
           <button type="button" onClick={() => loadBuildCode(unit.unitId, buildCodeInput)}>
-            Carregar código
+            {t('talento.carregar')}
           </button>
         </div>
 

@@ -1,12 +1,13 @@
 import type { Condition, UnitType, WeaponType } from '@paths-beyond/core';
 import {
-  CONDITION_LABELS,
+  condicaoChave,
   CONDITION_TYPES,
   UNIT_TYPES,
   WEAPON_TYPES,
   createDefaultCondition,
   type BaseConditionType,
 } from '../data/conditionSpecs.js';
+import { useBattleStore } from '../store/battleStore.js';
 
 interface ConditionEditorProps {
   readonly condition: Condition;
@@ -18,6 +19,7 @@ interface ConditionEditorProps {
 // editado aqui como um checkbox "negar" em vez de mais uma opção no dropdown — decisão
 // registrada em DECISIONS.md, evita UI recursiva pra um caso que é só uma negação.
 export function ConditionEditor({ condition, onChange, onRemove }: ConditionEditorProps) {
+  const t = useBattleStore((s) => s.t);
   const isNegated = condition.t === 'not';
   const inner: Condition = isNegated ? (condition as Extract<Condition, { t: 'not' }>).c : condition;
 
@@ -42,7 +44,7 @@ export function ConditionEditor({ condition, onChange, onRemove }: ConditionEdit
       <select value={inner.t} onChange={(e) => changeType(e.target.value as BaseConditionType)}>
         {CONDITION_TYPES.map((type) => (
           <option key={type} value={type}>
-            {CONDITION_LABELS[type]}
+            {t(condicaoChave(type))}
           </option>
         ))}
       </select>
@@ -55,6 +57,10 @@ export function ConditionEditor({ condition, onChange, onRemove }: ConditionEdit
 }
 
 function ConditionFields({ condition, onChange }: { condition: Condition; onChange: (next: Condition) => void }) {
+  // M25 — os dois `placeholder` desta função são texto de tela; o resto são campos numéricos
+  // e dropdowns de id, que não têm o que traduzir.
+  const t = useBattleStore((s) => s.t);
+
   switch (condition.t) {
     case 'targetHpBelow':
     case 'targetHpAbove':
@@ -73,7 +79,7 @@ function ConditionFields({ condition, onChange }: { condition: Condition; onChan
       return (
         <input
           type="text"
-          placeholder="id do debuff"
+          placeholder={t('condicao.idDoDebuff')}
           value={condition.debuffId}
           onChange={(e) => onChange({ ...condition, debuffId: e.target.value })}
         />
@@ -84,7 +90,7 @@ function ConditionFields({ condition, onChange }: { condition: Condition; onChan
       return (
         <input
           type="text"
-          placeholder="id do buff"
+          placeholder={t('condicao.idDoBuff')}
           value={condition.buffId}
           onChange={(e) => onChange({ ...condition, buffId: e.target.value })}
         />

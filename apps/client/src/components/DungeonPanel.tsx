@@ -1,5 +1,6 @@
 import { resolveHeroStatSheet } from '@paths-beyond/core';
 import { catalog } from '../data/catalog.js';
+import { nomeDeConteudo } from '../i18n/conteudo.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §10 (M14, sub-sessão 5/N) — a tela do farm: masmorras, conta e o ciclo
@@ -9,12 +10,9 @@ import { useBattleStore } from '../store/battleStore.js';
 // energia, varredura liberada — vem RESOLVIDA do servidor; o painel só desenha, e todo
 // botão é uma chamada de rota.
 
-const FOCUS_LABEL: Record<string, string> = {
-  gear: 'Equipamento',
-  exp: 'Experiência',
-  gold: 'Ouro',
-  boss: 'Chefe',
-};
+// M25 — o rótulo do foco saiu daqui para o catálogo; o que sobra é o id, que é dado
+// de `packages/data` e não texto de tela.
+const FOCOS = ['gear', 'exp', 'gold', 'boss'] as const;
 
 // O "poder" mostrado ao lado do herói: o stat sheet resolvido pelo core a partir do que o
 // SERVIDOR devolveu (herói + itens equipados). É o número que precisa subir no fim do
@@ -39,6 +37,7 @@ function powerOf(heroId: string, roster: ReturnType<typeof useBattleStore.getSta
 
 export function DungeonPanel() {
   const pve = useBattleStore((s) => s.pve);
+  const t = useBattleStore((s) => s.t);
   const pvp = useBattleStore((s) => s.pvp);
   const mode = useBattleStore((s) => s.mode);
   const battleState = useBattleStore((s) => s.battleState);
@@ -62,27 +61,31 @@ export function DungeonPanel() {
   if (!pvp.me) {
     return (
       <section className="dungeon-panel">
-        <h2>Masmorras</h2>
-        <p className="hint">Conecte-se no painel de PvP com o seu token para farmar.</p>
+        <h2>{t('masmorra.titulo')}</h2>
+        <p className="hint">{t('masmorra.conecte')}</p>
       </section>
     );
   }
 
   return (
     <section className="dungeon-panel">
-      <h2>Masmorras</h2>
+      <h2>{t('masmorra.titulo')}</h2>
 
       <div className="pve-actions">
         <button type="button" onClick={() => void refreshPve()} disabled={pve.busy}>
-          Atualizar conta
+          {t('masmorra.atualizarConta')}
         </button>
       </div>
 
       {pve.economy ? (
         <p className="pve-economy">
-          Energia <strong>{pve.economy.energy.stored}</strong>/{pve.economy.energyMax} · Ouro{' '}
-          <strong>{pve.economy.wallet.gold}</strong> · Pedras <strong>{pve.economy.wallet.stones}</strong> ·{' '}
-          {pve.economy.inventory.length} item(ns) no inventário
+          {t('masmorra.economia', {
+            energia: pve.economy.energy.stored,
+            teto: pve.economy.energyMax,
+            ouro: pve.economy.wallet.gold,
+            pedras: pve.economy.wallet.stones,
+            itens: pve.economy.inventory.length,
+          })}
         </p>
       ) : null}
 
@@ -93,21 +96,21 @@ export function DungeonPanel() {
           </p>
           {battleOver ? (
             <p className="pve-battle-over">
-              Resultado local: <strong>{battleState.outcome}</strong>. O servidor é quem decide — envie os comandos.
+              {t('masmorra.resultadoLocal', { desfecho: battleState.outcome })}
             </p>
           ) : null}
           <div className="pve-actions">
             <button type="button" onClick={() => void submitDungeonRun()} disabled={pve.busy || !battleOver}>
-              Enviar ao servidor
+              {t('masmorra.enviar')}
             </button>
             <button type="button" onClick={exitDungeon} disabled={pve.busy}>
-              Abandonar
+              {t('masmorra.abandonar')}
             </button>
           </div>
         </>
       ) : (
         <>
-          <h3>Seu time</h3>
+          <h3>{t('masmorra.seuTime')}</h3>
           <ul className="pve-roster">
             {pvp.roster.map((entry) => {
               const power = powerOf(entry.hero.id, pvp.roster);
@@ -124,18 +127,21 @@ export function DungeonPanel() {
                         despertar e vínculo, que são justamente os dois botões ao lado. */}
                     <span
                       className="hint"
-                      title="Despertar sobe o teto do herói com materiais; vínculo usa fragmentos do próprio personagem."
+                      title={t('masmorra.heroiTitle')}
                     >
-                      (despertar {entry.hero.awakening} · vínculo {entry.hero.imprint}
-                      {power !== null ? ` · poder ${power}` : ''})
+                      {t('masmorra.heroiResumo', {
+                        despertar: entry.hero.awakening,
+                        vinculo: entry.hero.imprint,
+                        poder: power !== null ? t('masmorra.poder', { poder: power }) : '',
+                      })}
                     </span>
                   </label>
                   <span className="pve-hero-actions">
                     <button type="button" onClick={() => void awakenHero(entry.hero.id)} disabled={pve.busy}>
-                      Despertar
+                      {t('masmorra.despertar')}
                     </button>
                     <button type="button" onClick={() => void imprintHero(entry.hero.id)} disabled={pve.busy}>
-                      Vínculo
+                      {t('masmorra.vinculo')}
                     </button>
                   </span>
                 </li>
@@ -143,20 +149,30 @@ export function DungeonPanel() {
             })}
           </ul>
 
-          <h3>Masmorras</h3>
+          <h3>{t('masmorra.titulo')}</h3>
           <ul className="pve-dungeons">
             {pve.dungeons.map((dungeon) => (
               <li key={dungeon.id} className={dungeon.lockedBy ? 'locked' : ''}>
                 <span className="pve-dungeon-name">
-                  {dungeon.name} <span className="hint">({FOCUS_LABEL[dungeon.focus] ?? dungeon.focus})</span>
+                  {nomeDeConteudo(t, 'masmorra', dungeon.id, dungeon.name)}{' '}
+                  <span className="hint">
+                    ({FOCOS.includes(dungeon.focus as (typeof FOCOS)[number])
+                      ? t(`masmorra.foco.${dungeon.focus}`)
+                      : dungeon.focus})
+                  </span>
                 </span>
                 <span className="hint">
-                  {dungeon.energyCost} energia
-                  {dungeon.entriesLeft !== null ? ` · ${dungeon.entriesLeft} entrada(s)` : ''}
-                  {dungeon.cleared ? ' · limpa' : ''}
+                  {t('masmorra.custo', {
+                    energia: dungeon.energyCost,
+                    entradas:
+                      dungeon.entriesLeft !== null
+                        ? t('masmorra.entradas', { entradas: dungeon.entriesLeft })
+                        : '',
+                    limpa: dungeon.cleared ? t('masmorra.limpa') : '',
+                  })}
                 </span>
                 {dungeon.lockedBy ? (
-                  <span className="pve-locked">Trancada até limpar {dungeon.lockedBy}</span>
+                  <span className="pve-locked">{t('masmorra.trancada', { masmorra: dungeon.lockedBy })}</span>
                 ) : (
                   <span className="pve-actions">
                     <button
@@ -172,10 +188,10 @@ export function DungeonPanel() {
                       disabled={pve.busy || !dungeon.sweepAvailable || !dungeon.enoughEnergy}
                       title={
                         dungeon.manualOnly
-                          ? 'esta dificuldade é sempre manual'
+                          ? t('masmorra.sempreManual')
                           : dungeon.cleared
-                            ? 'varre com o time automático'
-                            : 'limpe à mão antes de varrer'
+                            ? t('masmorra.varreComAuto')
+                            : t('masmorra.limpeAntes')
                       }
                     >
                       Varrer
@@ -188,7 +204,7 @@ export function DungeonPanel() {
 
           {pve.economy && pve.economy.inventory.length > 0 ? (
             <>
-              <h3>Inventário</h3>
+              <h3>{t('masmorra.inventario')}</h3>
               <ul className="pve-inventory">
                 {pve.economy.inventory.map((item) => (
                   <li key={item.id}>
@@ -197,14 +213,14 @@ export function DungeonPanel() {
                     </span>
                     <span className="pve-actions">
                       <button type="button" onClick={() => void enhanceInventoryItem(item.id)} disabled={pve.busy}>
-                        Aprimorar
+                        {t('masmorra.aprimorar')}
                       </button>
                       <button
                         type="button"
                         onClick={() => heroDoFoco && void equipInventoryItem(heroDoFoco, item.id)}
                         disabled={pve.busy || !heroDoFoco}
                       >
-                        Equipar
+                        {t('masmorra.equipar')}
                       </button>
                     </span>
                   </li>
@@ -218,15 +234,22 @@ export function DungeonPanel() {
       {pve.lastRun ? (
         <div className="pve-result">
           <p>
-            Última run: <strong>{pve.lastRun.outcome}</strong> em {pve.lastRun.roundsPlayed} round(s)
+            {t('masmorra.ultimaRun', {
+              desfecho: pve.lastRun.outcome,
+              rounds: pve.lastRun.roundsPlayed,
+            })}
           </p>
           {pve.lastRun.rewards ? (
             <p className="hint">
-              +{pve.lastRun.rewards.gold} ouro · +{pve.lastRun.rewards.exp} exp · +{pve.lastRun.rewards.stones} pedras ·{' '}
-              {pve.lastRun.rewards.items.length} item(ns)
+              {t('masmorra.recompensa', {
+                ouro: pve.lastRun.rewards.gold,
+                exp: pve.lastRun.rewards.exp,
+                pedras: pve.lastRun.rewards.stones,
+                itens: pve.lastRun.rewards.items.length,
+              })}
             </p>
           ) : (
-            <p className="hint">Sem recompensa — a energia foi gasta do mesmo jeito.</p>
+            <p className="hint">{t('masmorra.semRecompensa')}</p>
           )}
         </div>
       ) : null}

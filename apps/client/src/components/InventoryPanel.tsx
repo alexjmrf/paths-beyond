@@ -32,6 +32,7 @@ function statDeltaRow(stat: StatKey, before: number, after: number) {
 // mudança em packages/core foi necessária.
 export function InventoryPanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const inventoryUnitId = useBattleStore((s) => s.inventoryUnitId);
   const inventory = useBattleStore((s) => s.inventory);
   const equippedByUnit = useBattleStore((s) => s.equippedByUnit);
@@ -90,7 +91,7 @@ export function InventoryPanel() {
           <label>
             Slot
             <select value={slotFilter} onChange={(e) => setSlotFilter(e.target.value as GearSlot | 'all')}>
-              <option value="all">todos</option>
+              <option value="all">{t('inventario.todos')}</option>
               {GEAR_SLOTS.map((slot) => (
                 <option key={slot} value={slot}>
                   {slot}
@@ -101,7 +102,7 @@ export function InventoryPanel() {
           <label>
             Set
             <select value={setFilter} onChange={(e) => setSetFilter(e.target.value)}>
-              <option value="all">todos</option>
+              <option value="all">{t('inventario.todos')}</option>
               {itemSets.map((set) => (
                 <option key={set.id} value={set.id}>
                   {set.name}
@@ -112,7 +113,7 @@ export function InventoryPanel() {
           <label>
             Substat
             <select value={substatFilter} onChange={(e) => setSubstatFilter(e.target.value as StatKey | 'all')}>
-              <option value="all">todos</option>
+              <option value="all">{t('inventario.todos')}</option>
               {STAT_KEYS.map((stat) => (
                 <option key={stat} value={stat}>
                   {stat}
@@ -130,7 +131,9 @@ export function InventoryPanel() {
               onClick={() => setSelectedItemId(it.id)}
             >
               {itemLabel(it)}
-              {equippedSlots[it.slot] === it.id ? <span className="equipped-tag">equipado</span> : null}
+              {equippedSlots[it.slot] === it.id ? (
+                <span className="equipped-tag">{t('inventario.equipado')}</span>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -148,7 +151,7 @@ export function InventoryPanel() {
             </p>
             {/* M23 3/N — "CP" é sigla de dentro do projeto. O número ao lado dele é
                 comparação de poder, e é assim que ele passa a se apresentar. */}
-            <p title="Poder de combate: um resumo dos stats do herói, usado para comparar equipamentos rapidamente.">
+            <p title={t('inventario.poderTitle')}>
               Poder de combate: {preview.cpBefore} → {preview.cpAfter} (
               {preview.cpAfter - preview.cpBefore >= 0 ? '+' : ''}
               {preview.cpAfter - preview.cpBefore})

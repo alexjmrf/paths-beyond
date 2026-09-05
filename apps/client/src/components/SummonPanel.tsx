@@ -1,4 +1,5 @@
 import { catalog } from '../data/catalog.js';
+import { nomeDeConteudo } from '../i18n/conteudo.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §10/D14/D17/D18 (M18, sub-sessão 6/N) — a tela de AQUISIÇÃO: banner com pity visível,
@@ -121,7 +122,8 @@ export function SummonPanel() {
         {summon.rewards.map((reward) => (
           <li key={reward.id} className={reward.claimed ? 'locked' : ''}>
             <span className="summon-reward-name">
-              {reward.name} <span className="pve-locked">({reward.premium})</span>
+              {nomeDeConteudo(t, 'premio', reward.id, reward.name)}{' '}
+              <span className="pve-locked">({reward.premium})</span>
             </span>
             {reward.claimed ? (
               <span className="pve-locked">{t('summon.reivindicado')}</span>

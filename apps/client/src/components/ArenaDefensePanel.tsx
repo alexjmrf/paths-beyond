@@ -18,12 +18,14 @@ import { defenseMapIds, MAX_DEFENSE_UNITS, useBattleStore } from '../store/battl
 // `overlayTheme` (as mesmas do mapa de batalha, inclusive no modo daltônico) e o painel usa
 // os padrões que `InventoryPanel`/`TacticsEditor` já estabeleceram.
 
-const ARCHETYPES: readonly { readonly id: MapAiArchetype; readonly label: string; readonly hint: string }[] = [
-  { id: 'aggressive', label: 'Agressivo', hint: 'Persegue o inimigo mais próximo pelo mapa inteiro.' },
-  { id: 'hold-position', label: 'Segura posição', hint: 'Não sai do lugar; só engaja quem chegar ao alcance.' },
-  { id: 'guard-tile', label: 'Guarda o tile', hint: 'Persegue, mas só até uma trela curta em volta de onde começou.' },
-  { id: 'flank', label: 'Flanqueia', hint: 'Prioriza alvo que já tem aliado adjacente (Flanco/Cerco, §5.5).' },
-  { id: 'support-nearest', label: 'Apoia o aliado', hint: 'Fica no alcance de assistência de quem está na linha de frente.' },
+const ARCHETYPES: readonly { readonly id: MapAiArchetype }[] = [
+  // M25 — o rótulo e a dica saíram daqui para o catálogo. O que sobra é o id, que é
+  // dado do core (`MapAiArchetype`) e não texto de tela.
+  { id: 'aggressive' },
+  { id: 'hold-position' },
+  { id: 'guard-tile' },
+  { id: 'flank' },
+  { id: 'support-nearest' },
 ];
 
 function hex(color: number): string {
@@ -32,6 +34,7 @@ function hex(color: number): string {
 
 export function ArenaDefensePanel() {
   const pvp = useBattleStore((s) => s.pvp);
+  const t = useBattleStore((s) => s.t);
   const colorblindMode = useBattleStore((s) => s.colorblindMode);
 
   const loadDefense = useBattleStore((s) => s.loadDefense);
@@ -66,15 +69,12 @@ export function ArenaDefensePanel() {
 
   return (
     <section className="defense-panel">
-      <h3>Defesa de arena</h3>
-      <p className="hint">
-        Este time luta por você enquanto estiver offline (§9.1). O atacante joga a camada de grid à mão; o
-        seu lado é resolvido pela IA de mapa que você escolher aqui.
-      </p>
+      <h3>{t('defesa.titulo')}</h3>
+      <p className="hint">{t('defesa.explicacao')}</p>
 
       <div className="defense-toolbar">
         <label>
-          Mapa
+          {t('defesa.mapa')}
           <select value={draft.mapId} onChange={(event) => setDefenseMap(event.target.value)}>
             {arenaMapIds.map((id) => (
               <option key={id} value={id}>
@@ -84,29 +84,26 @@ export function ArenaDefensePanel() {
           </select>
         </label>
         <button type="button" onClick={() => void loadDefense()} disabled={pvp.busy}>
-          Recarregar do servidor
+          {t('defesa.recarregar')}
         </button>
         <button type="button" onClick={() => void saveDefense()} disabled={pvp.busy || draft.units.length === 0}>
-          Salvar defesa
+          {t('defesa.salvar')}
         </button>
       </div>
 
       <p className="defense-state">
-        {saved ? (
-          <>
-            Salvo: <strong>{saved.units.length}</strong> herói(s) em {saved.mapId}
-            {dirty ? ' · há mudanças não salvas' : ' · igual ao rascunho'}
-          </>
-        ) : (
-          'Nenhuma defesa salva ainda — monte uma e salve.'
-        )}
+        {saved
+          ? t('defesa.salvo', {
+              herois: saved.units.length,
+              mapa: saved.mapId,
+              mudancas: dirty ? t('defesa.comMudancas') : t('defesa.semMudancas'),
+            })
+          : t('defesa.nenhuma')}
       </p>
 
       <div className="defense-layout">
         <div>
-          <h4>
-            Heróis ({draft.units.length}/{MAX_DEFENSE_UNITS})
-          </h4>
+          <h4>{t('defesa.herois', { postos: draft.units.length, maximo: MAX_DEFENSE_UNITS })}</h4>
           <ul className="defense-roster">
             {pvp.roster.map((entry) => {
               const placed = draft.units.find((u) => u.heroId === entry.hero.id);
@@ -118,7 +115,7 @@ export function ArenaDefensePanel() {
                     className={arming ? 'arming' : ''}
                     onClick={() => armDefenseHero(arming ? null : entry.hero.id)}
                   >
-                    {arming ? 'clique num tile…' : placed ? 'mover' : 'posicionar'}
+                    {arming ? t('defesa.cliqueNoTile') : placed ? t('defesa.mover') : t('defesa.posicionar')}
                   </button>
                   <span className="defense-hero">
                     {entry.hero.id} <span className="hint">({entry.hero.classId})</span>
@@ -131,16 +128,16 @@ export function ArenaDefensePanel() {
                       <select
                         value={placed.aiArchetype}
                         onChange={(event) => setDefenseArchetype(entry.hero.id, event.target.value as MapAiArchetype)}
-                        title={ARCHETYPES.find((a) => a.id === placed.aiArchetype)?.hint}
+                        title={t(`defesa.arquetipo.${placed.aiArchetype}.dica`)}
                       >
                         {ARCHETYPES.map((archetype) => (
                           <option key={archetype.id} value={archetype.id}>
-                            {archetype.label}
+                            {t(`defesa.arquetipo.${archetype.id}`)}
                           </option>
                         ))}
                       </select>
                       <button type="button" onClick={() => removeDefenseUnit(entry.hero.id)}>
-                        tirar
+                        {t('defesa.tirar')}
                       </button>
                     </>
                   ) : null}
@@ -152,7 +149,8 @@ export function ArenaDefensePanel() {
           <ul className="defense-archetype-legend">
             {ARCHETYPES.map((archetype) => (
               <li key={archetype.id}>
-                <strong>{archetype.label}</strong>: {archetype.hint}
+                <strong>{t(`defesa.arquetipo.${archetype.id}`)}</strong>:{' '}
+                {t(`defesa.arquetipo.${archetype.id}.dica`)}
               </li>
             ))}
           </ul>

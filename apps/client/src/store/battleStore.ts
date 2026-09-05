@@ -830,7 +830,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   refreshCampaign: async () => {
     const { pvp } = get();
     if (!pvp.token) {
-      set((s) => ({ campaign: { ...s.campaign, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ campaign: { ...s.campaign, error: get().t('estado.conecteAntes') } }));
       return;
     }
     set((s) => ({ campaign: { ...s.campaign, busy: true, error: null } }));
@@ -902,15 +902,15 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   enterChapter: async (chapterId) => {
     const { pvp, campaign } = get();
     if (!pvp.token) {
-      set((s) => ({ campaign: { ...s.campaign, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ campaign: { ...s.campaign, error: get().t('estado.conecteAntes') } }));
       return;
     }
     if (campaign.selectedHeroIds.length === 0) {
-      set((s) => ({ campaign: { ...s.campaign, error: 'escolha ao menos um herói para a vaga' } }));
+      set((s) => ({ campaign: { ...s.campaign, error: get().t('estado.escolhaHeroi') } }));
       return;
     }
 
-    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: 'pedindo o capítulo…' } }));
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: get().t('estado.pedindoCapitulo') } }));
     try {
       const ticket = await api.requestCampaignTicket(pvp.token, chapterId, campaign.selectedHeroIds);
       set((s) => ({
@@ -938,7 +938,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const { pvp, campaign, commandLog } = get();
     if (!campaign.ticket) return;
 
-    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: 'enviando comandos…' } }));
+    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: get().t('estado.enviandoComandos') } }));
     const corpoDoCapitulo = {
       nonce: campaign.ticket.nonce,
       heroIds: campaign.selectedHeroIds,
@@ -949,7 +949,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       const run = await api.submitCampaignRun(pvp.token, campaign.ticket.chapterId, corpoDoCapitulo);
       limparPedido();
       set((s) => ({
-        campaign: { ...s.campaign, lastRun: run, busy: false, status: `servidor resolveu: ${run.outcome}` },
+        campaign: { ...s.campaign, lastRun: run, busy: false, status: get().t('estado.servidorResolveu', { desfecho: run.outcome }) },
       }));
       // O capítulo pode ter virado "limpo" e a moeda pode ter sido paga: a lista é relida
       // para a tela não mostrar um estado que o servidor já mudou.
@@ -985,7 +985,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     try {
       const { hero } = await api.saveTactics(pvp.token, heroId, script);
       set((s) => ({
-        campaign: { ...s.campaign, busy: false, status: 'táticas salvas' },
+        campaign: { ...s.campaign, busy: false, status: get().t('estado.taticasSalvas') },
         pvp: {
           ...s.pvp,
           roster: s.pvp.roster.map((entry) => (entry.hero.id === heroId ? { ...entry, hero } : entry)),
@@ -1005,7 +1005,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     try {
       const { hero } = await api.saveTalents(pvp.token, heroId, allocation);
       set((s) => ({
-        campaign: { ...s.campaign, busy: false, status: 'talentos salvos' },
+        campaign: { ...s.campaign, busy: false, status: get().t('estado.talentosSalvos') },
         pvp: {
           ...s.pvp,
           roster: s.pvp.roster.map((entry) => (entry.hero.id === heroId ? { ...entry, hero } : entry)),
@@ -1245,7 +1245,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   refreshSummon: async () => {
     const { pvp } = get();
     if (!pvp.token) {
-      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.conecteAntes') } }));
       return;
     }
     set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
@@ -1278,12 +1278,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   rollSummon: async (bannerId) => {
     const { pvp, summon } = get();
     if (!pvp.token) {
-      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.conecteAntes') } }));
       return;
     }
     const banner = summon.banners.find((candidate) => candidate.id === bannerId);
     if (!banner) {
-      set((s) => ({ summon: { ...s.summon, error: 'banner desconhecido' } }));
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.bannerDesconhecido') } }));
       return;
     }
     // A recusa por saldo é do SERVIDOR (§9.4 — quem decide é ele), e mesmo assim a tela
@@ -1295,7 +1295,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       return;
     }
 
-    set((s) => ({ summon: { ...s.summon, busy: true, error: null, status: 'invocando…' } }));
+    set((s) => ({ summon: { ...s.summon, busy: true, error: null, status: get().t('estado.invocando') } }));
     try {
       const resultado = await api.summon(pvp.token, bannerId);
       set((s) => ({
@@ -1322,7 +1322,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   claimReward: async (rewardId) => {
     const { pvp, summon } = get();
     if (!pvp.token) {
-      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.conecteAntes') } }));
       return;
     }
     // Quem decide se a condição está cumprida é `rewards/conditions.ts`, no servidor; o
@@ -1330,7 +1330,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     // um 403 previsível.
     const premio = summon.rewards.find((candidate) => candidate.id === rewardId);
     if (!premio?.claimable) {
-      set((s) => ({ summon: { ...s.summon, error: 'este prêmio não está disponível' } }));
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.premioIndisponivel') } }));
       return;
     }
 
@@ -1338,7 +1338,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     try {
       const resposta = await api.claimReward(pvp.token, rewardId);
       set((s) => ({
-        summon: { ...s.summon, premium: resposta.premium, busy: false, status: `+${resposta.premiumAwarded} premium` },
+        summon: { ...s.summon, premium: resposta.premium, busy: false, status: get().t('estado.premiumGanho', { premium: resposta.premiumAwarded }) },
       }));
       await get().refreshSummon();
     } catch (error) {
@@ -1352,13 +1352,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   purchaseEnergy: async () => {
     const { pvp } = get();
     if (!pvp.token) {
-      set((s) => ({ summon: { ...s.summon, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.conecteAntes') } }));
       return;
     }
     set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
     try {
       const resposta = await api.purchaseEnergy(pvp.token);
-      set((s) => ({ summon: { ...s.summon, premium: resposta.premium, busy: false, status: 'energia comprada' } }));
+      set((s) => ({ summon: { ...s.summon, premium: resposta.premium, busy: false, status: get().t('estado.energiaComprada') } }));
       await get().refreshPve();
     } catch (error) {
       set((s) => ({ summon: { ...s.summon, busy: false, error: describeApiError(error) } }));
@@ -1495,12 +1495,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // é isso que o critério de aceite do M20 pede.
   connectPvp: async () => {
     const { pvp } = get();
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'conectando…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.conectando') } });
     try {
       const ticket = await platformBridge.requestSessionTicket();
       if (!ticket) {
         set((s) => ({
-          pvp: { ...s.pvp, busy: false, status: null, error: 'plataforma indisponível — abra o jogo por ela' },
+          pvp: { ...s.pvp, busy: false, status: null, error: get().t('estado.plataformaIndisponivel') },
         }));
         return;
       }
@@ -1520,7 +1520,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           // decisão do jogador, não pré-requisito pra começar.
           selectedHeroIds: roster.map((entry) => entry.hero.id),
           busy: false,
-          status: `conectado como ${me.displayName}`,
+          status: get().t('estado.conectadoComo', { nome: me.displayName }),
         },
       }));
       // §9.4 (M21, 3/N) — as conquistas cumpridas vão para a plataforma no SIGN-IN, e não
@@ -1542,16 +1542,16 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
                   pvp: {
                     ...s.pvp,
                     outcome: recuperado.resposta as BattleOutcomeResponse,
-                    status: 'batalha de arena recuperada depois da reconexão',
+                    status: get().t('estado.arenaRecuperada'),
                   },
                 }
               : recuperado.pedido.rota === 'dungeon-run'
-              ? { pve: { ...s.pve, lastRun: recuperado.resposta as DungeonRunResponse, status: 'run recuperada depois da reconexão' } }
+              ? { pve: { ...s.pve, lastRun: recuperado.resposta as DungeonRunResponse, status: get().t('estado.runRecuperada') } }
               : {
                   campaign: {
                     ...s.campaign,
                     lastRun: recuperado.resposta as CampaignRunResponse,
-                    status: 'capítulo recuperado depois da reconexão',
+                    status: get().t('estado.capituloRecuperado'),
                   },
                 },
           );
@@ -1575,7 +1575,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   loadDefense: async () => {
     const { pvp } = get();
     if (!pvp.token) return;
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'lendo a defesa salva…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.lendoDefesa') } });
     try {
       const defense = await api.defense(pvp.token);
       set((s) => ({
@@ -1584,7 +1584,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           savedDefense: defense,
           defenseDraft: { mapId: defense.mapId, units: defense.units, placingHeroId: null },
           busy: false,
-          status: 'defesa carregada do servidor',
+          status: get().t('estado.defesaCarregada'),
         },
       }));
     } catch (error) {
@@ -1595,7 +1595,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
             savedDefense: null,
             defenseDraft: { mapId: defenseMapIds()[0] ?? '', units: [], placingHeroId: null },
             busy: false,
-            status: 'você ainda não tem defesa montada',
+            status: get().t('estado.semDefesa'),
           },
         }));
         return;
@@ -1633,15 +1633,15 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     // Tile bloqueado por muro/portão (§5.1, M15) ou por terreno impassável: nascer ali é
     // nascer preso, e o motor não valida colocação inicial — quem tem de recusar é a tela.
     if (tile.object === 'wall' || tile.object === 'gate') {
-      set({ pvp: { ...pvp, error: 'muro e portão não são posição de defesa' } });
+      set({ pvp: { ...pvp, error: get().t('estado.muroNaoEhPosicao') } });
       return;
     }
     if (grid && grid.terrains[tile.terrain]?.moveCost.foot === 'impassable') {
-      set({ pvp: { ...pvp, error: 'terreno intransponível não é posição de defesa' } });
+      set({ pvp: { ...pvp, error: get().t('estado.terrenoNaoEhPosicao') } });
       return;
     }
     if (draft.units.some((u) => u.heroId !== heroId && u.pos.x === coord.x && u.pos.y === coord.y)) {
-      set({ pvp: { ...pvp, error: '1 herói = 1 tile: já tem alguém aí' } });
+      set({ pvp: { ...pvp, error: get().t('estado.tileOcupado') } });
       return;
     }
     if (draft.units.length >= MAX_DEFENSE_UNITS && !draft.units.some((u) => u.heroId === heroId)) {
@@ -1697,10 +1697,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const { pvp } = get();
     const draft = pvp.defenseDraft;
     if (draft.units.length === 0) {
-      set({ pvp: { ...pvp, error: 'posicione ao menos um herói' } });
+      set({ pvp: { ...pvp, error: get().t('estado.posicioneUmHeroi') } });
       return;
     }
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'salvando a defesa…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.salvandoDefesa') } });
     try {
       const saved = await api.saveDefense(pvp.token, draft.mapId, draft.units);
       set((s) => ({
@@ -1709,7 +1709,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           savedDefense: saved,
           defenseDraft: { mapId: saved.mapId, units: saved.units, placingHeroId: null },
           busy: false,
-          status: `defesa salva: ${saved.units.length} herói(s) em ${saved.mapId}`,
+          status: get().t('estado.defesaSalva', { herois: saved.units.length, mapa: saved.mapId }),
         },
       }));
     } catch (error) {
@@ -1730,11 +1730,11 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     // deixou salva. Sem isso dito, "oponente" promete uma coisa que não acontece.
     get().dispararIntroducao('primeira-arena');
     const { pvp } = get();
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'procurando oponente…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.procurandoOponente') } });
     try {
       const opponent = await api.findOpponent(pvp.token);
       set((s) => ({
-        pvp: { ...s.pvp, opponent, busy: false, status: `oponente: ${opponent.displayName} (ELO ${opponent.elo})` },
+        pvp: { ...s.pvp, opponent, busy: false, status: get().t('estado.oponenteEncontrado', { nome: opponent.displayName, elo: opponent.elo }) },
       }));
     } catch (error) {
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, opponent: null, error: describeApiError(error) } }));
@@ -1744,10 +1744,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   startPvpBattle: async () => {
     const { pvp } = get();
     if (!pvp.opponent) {
-      set({ pvp: { ...pvp, error: 'procure um oponente primeiro' } });
+      set({ pvp: { ...pvp, error: get().t('estado.procureOponente') } });
       return;
     }
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'pedindo ticket de batalha…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.pedindoTicket') } });
     try {
       const ticket = await api.requestTicket(pvp.token, pvp.selectedHeroIds, pvp.opponent.playerId);
       // A batalha é montada com o setup e a SEED do servidor: o que o jogador vê aqui é
@@ -1762,7 +1762,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         duelPreview: null,
         targetingMode: null,
         lastCommandReason: null,
-        pvp: { ...pvp, ticket, outcome: null, busy: false, status: 'batalha em andamento' },
+        pvp: { ...pvp, ticket, outcome: null, busy: false, status: get().t('estado.batalhaEmAndamento') },
       });
     } catch (error) {
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
@@ -1772,7 +1772,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   submitPvpBattle: async () => {
     const { pvp, commandLog } = get();
     if (!pvp.ticket || !pvp.opponent) return;
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'enviando comandos…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.enviandoComandos') } });
     // M22 (auditoria) — a arena guarda o pedido como a masmorra e o capítulo: ela resolve no
     // servidor, grava replay e mexe no ELO, então cair aqui deixava o jogador sem saber se a
     // partida valeu, com o ELO já mudado do outro lado.
@@ -1788,7 +1788,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       const outcome = await api.submitBattle(pvp.token, corpoDaArena);
       limparPedido();
       set((s) => ({
-        pvp: { ...s.pvp, outcome, busy: false, status: `servidor resolveu: ${outcome.result.outcome}` },
+        pvp: { ...s.pvp, outcome, busy: false, status: get().t('estado.servidorResolveu', { desfecho: outcome.result.outcome }) },
       }));
     } catch (error) {
       if (error instanceof ApiError) limparPedido();
@@ -1801,7 +1801,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   reviewPvpBattle: async () => {
     const { pvp } = get();
     if (!pvp.ticket) return;
-    set({ pvp: { ...pvp, busy: true, error: null, status: 'buscando replay do servidor…' } });
+    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.buscandoReplay') } });
     try {
       const stored = await api.fetchReplay(pvp.token, pvp.ticket.nonce);
       const replay: Replay = {
@@ -1812,7 +1812,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       };
       set((s) => ({
         replayViewer: { replay, step: 0, state: replayStateAt(replay, 0), playing: false, speed: 1 },
-        pvp: { ...s.pvp, busy: false, status: 'replay do servidor carregado' },
+        pvp: { ...s.pvp, busy: false, status: get().t('estado.replayCarregado') },
       }));
     } catch (error) {
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
@@ -1840,7 +1840,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   refreshPve: async () => {
     const { pvp } = get();
     if (!pvp.token) {
-      set((s) => ({ pve: { ...s.pve, error: 'conecte-se com um token antes' } }));
+      set((s) => ({ pve: { ...s.pve, error: get().t('estado.conecteAntes') } }));
       return;
     }
     set((s) => ({ pve: { ...s.pve, busy: true, error: null } }));
@@ -1877,7 +1877,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // PvP de M13 2/N. O jogador joga por cliques no mapa; nada aqui simula por conta própria.
   enterDungeon: async (dungeonId) => {
     const { pvp, pve } = get();
-    set({ pve: { ...pve, busy: true, error: null, status: 'pedindo ticket…' } });
+    set({ pve: { ...pve, busy: true, error: null, status: get().t('estado.pedindoTicketMasmorra') } });
     try {
       const ticket = await api.requestDungeonTicket(pvp.token, dungeonId, pve.selectedHeroIds);
       set({
@@ -1890,7 +1890,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         duelPreview: null,
         targetingMode: null,
         lastCommandReason: null,
-        pve: { ...pve, ticket, activeDungeonId: dungeonId, lastRun: null, busy: false, status: 'masmorra em andamento' },
+        pve: { ...pve, ticket, activeDungeonId: dungeonId, lastRun: null, busy: false, status: get().t('estado.masmorraEmAndamento') },
       });
     } catch (error) {
       set((s) => ({ pve: { ...s.pve, busy: false, status: null, error: describeApiError(error) } }));
@@ -1900,7 +1900,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   submitDungeonRun: async () => {
     const { pvp, pve, commandLog } = get();
     if (!pve.ticket || !pve.activeDungeonId) return;
-    set({ pve: { ...pve, busy: true, error: null, status: 'enviando comandos…' } });
+    set({ pve: { ...pve, busy: true, error: null, status: get().t('estado.enviandoComandos') } });
     // M22 2/N — o pedido é guardado ANTES de sair. A energia é debitada no servidor, e uma
     // queda de conexão depois disso deixaria o jogador sem a run e sem a energia; com o
     // nonce em disco, reconectar reenvia o mesmo pedido e recebe a run original de volta.
@@ -1932,7 +1932,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           ticket: null,
           activeDungeonId: null,
           busy: false,
-          status: `servidor resolveu: ${run.outcome}`,
+          status: get().t('estado.servidorResolveu', { desfecho: run.outcome }),
         },
       }));
       await get().refreshPve();
@@ -1949,10 +1949,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // quando perde, gasta a energia igual.
   sweepDungeon: async (dungeonId) => {
     const { pvp, pve } = get();
-    set({ pve: { ...pve, busy: true, error: null, status: 'varrendo…' } });
+    set({ pve: { ...pve, busy: true, error: null, status: get().t('estado.varrendo') } });
     try {
       const run = await api.sweepDungeon(pvp.token, dungeonId, pve.selectedHeroIds);
-      set((s) => ({ pve: { ...s.pve, lastRun: run, busy: false, status: `varredura: ${run.outcome}` } }));
+      set((s) => ({ pve: { ...s.pve, lastRun: run, busy: false, status: get().t('estado.varredura', { desfecho: run.outcome }) } }));
       await get().refreshPve();
     } catch (error) {
       set((s) => ({ pve: { ...s.pve, busy: false, status: null, error: describeApiError(error) } }));
@@ -2000,7 +2000,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ pve: { ...pve, busy: true, error: null } });
     try {
       await api.equipItem(pvp.token, heroId, itemId);
-      set((s) => ({ pve: { ...s.pve, busy: false, status: 'equipado' } }));
+      set((s) => ({ pve: { ...s.pve, busy: false, status: get().t('estado.equipado') } }));
       // O roster do PvP guarda os itens equipados: recarrega para o poder na tela subir.
       const roster = await api.roster(pvp.token);
       set((s) => ({ pvp: { ...s.pvp, roster } }));
@@ -2015,7 +2015,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ pve: { ...pve, busy: true, error: null } });
     try {
       const result = await api.awakenHero(pvp.token, heroId);
-      set((s) => ({ pve: { ...s.pve, busy: false, status: `awakening ${result.hero.awakening}` } }));
+      set((s) => ({ pve: { ...s.pve, busy: false, status: get().t('estado.awakening', { nivel: result.hero.awakening }) } }));
       const roster = await api.roster(pvp.token);
       set((s) => ({ pvp: { ...s.pvp, roster } }));
       await get().refreshPve();
@@ -2029,7 +2029,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ pve: { ...pve, busy: true, error: null } });
     try {
       const result = await api.imprintHero(pvp.token, heroId);
-      set((s) => ({ pve: { ...s.pve, busy: false, status: `imprint ${result.hero.imprint}` } }));
+      set((s) => ({ pve: { ...s.pve, busy: false, status: get().t('estado.imprint', { nivel: result.hero.imprint }) } }));
       const roster = await api.roster(pvp.token);
       set((s) => ({ pvp: { ...s.pvp, roster } }));
       await get().refreshPve();

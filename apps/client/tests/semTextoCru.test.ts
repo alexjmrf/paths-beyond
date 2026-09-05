@@ -16,15 +16,9 @@ import { describe, expect, it } from 'vitest';
 
 const COMPONENTES = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'components');
 
-// A 3/N converte estas. Cada uma sai da lista quando passar a usar `t(...)`.
-const FALTAM = new Set([
-  'ArenaDefensePanel.tsx',
-  'ConditionEditor.tsx',
-  'DungeonPanel.tsx',
-  'InventoryPanel.tsx',
-  'TacticsEditor.tsx',
-  'TalentTreePanel.tsx',
-]);
+// **A 3/N esvaziou esta lista.** Ela fica no arquivo de propósito: é o lugar declarado de
+// pôr uma tela nova que ainda não foi traduzida, em vez de deixá-la passar em silêncio.
+const FALTAM = new Set<string>([]);
 
 // Siglas e símbolos que são iguais em toda língua. `AP`, `PP` e `HP` são termos do jogo (§4) e
 // não frases; traduzi-los criaria três nomes para o mesmo recurso, que é o oposto do que a

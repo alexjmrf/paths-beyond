@@ -6251,3 +6251,69 @@ Traduzi-las exige um contrato de CÓDIGO de erro em ~60 pontos de rota — o mes
 M22 fez para `rules-version-mismatch` —, e é trabalho de tamanho próprio.
 
 **Suíte: 155 arquivos, 2159 testes** (era 152/2123).
+
+### M25 — sub-sessão 3/N: as telas de gestão, as mensagens de estado e o conteúdo
+
+Fecha o M25. `packages/core` e `packages/data` **sem uma linha alterada**; `RULES_VERSION`
+segue em `0.19.0`.
+
+#### As seis telas que faltavam, e as duas tabelas que viraram catálogo
+
+Arena, editor de táticas, editor de condições, inventário, árvore de talentos e masmorra.
+Duas delas guardavam **tabelas de rótulo em português dentro do código**, e é isso que a
+conversão desfez:
+
+- `ARCHETYPES` em `ArenaDefensePanel` tinha `label` e `hint` dos cinco arquétipos da IA de
+  mapa. Sobrou o `id`, que é dado do core (`MapAiArchetype`) e não texto de tela.
+- `CONDITION_LABELS` em `data/conditionSpecs.ts` tinha as dezessete condições de §6.3. Virou
+  `condicaoChave(type)`, que deriva a chave do próprio tipo — a tabela existia para dar nome
+  humano a `targetHpBelow`, e dar nome humano **em uma língua só** é o que a camada de idioma
+  veio consertar.
+- `describeEffect` na árvore de talentos montava doze frases em português a partir do efeito.
+  Agora recebe o tradutor **por parâmetro** e continua pura: mesma entrada, mesma saída,
+  testável sem montar o estado do jogo.
+
+#### As mensagens de estado: 51 trocas que a varredura não pegava
+
+`enviando comandos…`, `conectado como X`, `defesa salva: N herói(s) em M`. São texto de tela
+como qualquer outro — o jogador as lê no rodapé dos painéis —, só que nascem na store, longe
+do JSX, e por isso `semTextoCru` não as via. Elas usam `get().t(...)`, o que também é o que as
+faz mudar de língua junto com o resto sem nenhum trabalho extra.
+
+#### O texto autorado: sobreposição por id, e o dado continua único
+
+Traduzir `packages/data` copiando o JSON por idioma criaria cinco verdades sobre o mesmo
+conteúdo — e a quinta cópia é onde alguém esquece de mudar o custo de energia junto com o
+nome. Em vez disso: **o dado continua com um nome canônico**, o schema não muda, o servidor
+não sabe que a camada existe, e o catálogo de idioma sobrepõe por `conteudo.<tipo>.<id>`.
+
+A queda é o próprio motor: `t` devolve a CHAVE quando ela não existe em catálogo nenhum, e é
+exatamente isso que permite distinguir "não traduzido" de "traduzido" sem uma segunda API.
+Sem entrada, o jogador vê o nome autorado — **nunca `conteudo.masmorra.x` na tela**.
+
+**Nome PRÓPRIO ficou de fora, e é decisão.** Os personagens se chamam Sylla, Miron e Aren:
+nome de pessoa não se traduz, e criar `conteudo.personagem.*` seria convidar alguém a
+"traduzir" Sylla um dia. Há teste afirmando que essas chaves não existem.
+
+Traduzidas nesta fatia: as **8 masmorras** e as **10 conquistas**, que são o conteúdo que as
+telas mostram por nome. Skills, itens, inimigos e classes continuam caindo no autorado — que é
+o comportamento declarado, com teste provando que a tela não quebra por isso, e que é o mesmo
+caminho que as trinta missões do M27 vão percorrer no dia em que forem autoradas.
+
+#### Os quatro critérios de aceite do M25
+
+1. **Nenhuma string visível mora no JSX ou no JSON de conteúdo** — `semTextoCru.test.ts` varre
+   as 20 telas e a lista de pendências está VAZIA; as mensagens da store passaram todas pelo
+   tradutor.
+2. **Teste que reprova chave faltando e chave órfã** — `catalogos.test.ts` compara os dois
+   catálogos chave a chave, inclusive os marcadores de interpolação (o conjunto tem de ser o
+   mesmo; a ORDEM pode mudar, que é o motivo de eles serem nomeados).
+3. **Inglês e português completos, inglês como padrão, escolha persistida** — save v5, e a
+   ordem escolha → navegador → inglês.
+4. **Conteúdo traduzível sem duplicar o dado, e a estrutura aceita es/zh/ja** — sobreposição
+   por id; acrescentar um idioma é acrescentar uma entrada em `IDIOMAS` e um objeto em
+   `CATALOGOS`, e o teste de completude passa a cobrá-lo imediatamente.
+
+**Declarado e fora do M25** (inalterado desde a 1/N): as mensagens de erro do SERVIDOR.
+
+**Suíte: 156 arquivos, 2170 testes** (era 155/2159).

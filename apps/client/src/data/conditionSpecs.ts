@@ -28,25 +28,12 @@ export const CONDITION_TYPES: readonly BaseConditionType[] = [
   'alliesAdjacentAtLeast',
 ];
 
-export const CONDITION_LABELS: Record<BaseConditionType, string> = {
-  targetHpBelow: 'HP do alvo abaixo de (‰)',
-  targetHpAbove: 'HP do alvo acima de (‰)',
-  targetHasDebuff: 'Alvo tem debuff',
-  targetHasBuff: 'Alvo tem buff',
-  targetIsType: 'Alvo é do tipo',
-  targetWeaponIs: 'Arma do alvo é',
-  targetPpBelow: 'PP do alvo abaixo de',
-  selfHpBelow: 'Meu HP abaixo de (‰)',
-  selfBuffAbsent: 'Eu não tenho o buff',
-  apAtLeast: 'Meu AP é pelo menos',
-  ppAtLeast: 'Meu PP é pelo menos',
-  isAttacker: 'Eu sou o atacante',
-  isDefender: 'Eu sou o defensor',
-  hasPositionalBonus: 'Tenho bônus posicional',
-  trocaAtLeast: 'Troca é pelo menos',
-  battleRoundAtLeast: 'Round de batalha é pelo menos',
-  alliesAdjacentAtLeast: 'Aliados adjacentes é pelo menos',
-};
+// M25 — os rótulos saíram daqui para o catálogo de idioma. O que sobra é a CHAVE, derivada
+// do próprio tipo da condição: a tabela existia para dar nome humano a `targetHpBelow`, e dar
+// nome humano em uma língua só é o que a camada de idioma veio consertar.
+export function condicaoChave(type: BaseConditionType): string {
+  return `condicao.${type}`;
+}
 
 // Cria uma Condition "default" pro tipo escolhido no dropdown — usada tanto pra "+
 // condição" quanto ao trocar o tipo de uma condition já existente.

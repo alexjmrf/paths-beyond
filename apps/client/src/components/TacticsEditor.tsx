@@ -17,6 +17,7 @@ function cloneLine(line: TacticsLine): TacticsLine {
 // packages/core. Edita um rascunho local; "Salvar" é que grava no battleState.
 export function TacticsEditor() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const tacticsEditorUnitId = useBattleStore((s) => s.tacticsEditorUnitId);
   const closeTacticsEditor = useBattleStore((s) => s.closeTacticsEditor);
   const updateUnitTacticsScript = useBattleStore((s) => s.updateUnitTacticsScript);
@@ -90,14 +91,14 @@ export function TacticsEditor() {
     setTestResult(
       decision.kind === 'skill'
         ? `Linha ${decision.lineIndex}: dispara ${decision.skillId}`
-        : 'Nenhuma linha bateu — ataque básico',
+        : t('taticas.nenhumaBateu'),
     );
   }
 
   return (
     <div className="tactics-editor-overlay">
       <div className="tactics-editor-panel">
-        <h2>Editor de táticas — {unit.unitId}</h2>
+        <h2>{t('taticas.titulo', { unidade: unit.unitId })}</h2>
 
         <ol className="tactics-lines">
           {script.map((line, index) => (
@@ -112,7 +113,7 @@ export function TacticsEditor() {
               }}
               className="tactics-line"
             >
-              <span className="drag-handle" title="arraste pra reordenar">
+              <span className="drag-handle" title={t('taticas.arraste')}>
                 ⠿
               </span>
               <input
@@ -128,7 +129,7 @@ export function TacticsEditor() {
                 ))}
               </select>
               <button type="button" className="remove" onClick={() => removeLine(index)}>
-                remover linha
+                {t('taticas.removerLinha')}
               </button>
 
               <div className="conditions">
@@ -147,7 +148,7 @@ export function TacticsEditor() {
                   />
                 ))}
                 <button type="button" onClick={() => addCondition(index)}>
-                  + condição
+                  {t('taticas.maisCondicao')}
                 </button>
               </div>
             </li>
@@ -158,19 +159,16 @@ export function TacticsEditor() {
           onClick={addLine}
           disabled={locked || script.length >= MAX_LINES || knownDuelSkills.length === 0}
         >
-          + linha
+          {t('taticas.maisLinha')}
         </button>
         {locked ? (
-          <p className="tactics-locked">
-            A batalha já começou: o script vale como está até o fim do mapa. O botão “Testar contra manequim”
-            continua disponível.
-          </p>
+          <p className="tactics-locked">{t('taticas.travado')}</p>
         ) : null}
 
         <div className="tactics-test">
-          <h3>Testar contra manequim</h3>
+          <h3>{t('taticas.testar')}</h3>
           <label>
-            HP %
+            {t('taticas.hpPct')}
             <input
               type="number"
               min={0}
@@ -189,7 +187,7 @@ export function TacticsEditor() {
             />
           </label>
           <label>
-            Tipo
+            {t('taticas.tipo')}
             <select value={dummy.unitType} onChange={(e) => setDummy({ ...dummy, unitType: e.target.value as UnitType })}>
               {UNIT_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -199,7 +197,7 @@ export function TacticsEditor() {
             </select>
           </label>
           <label>
-            Arma
+            {t('taticas.arma')}
             <select
               value={dummy.weaponType}
               onChange={(e) => setDummy({ ...dummy, weaponType: e.target.value as WeaponType })}
@@ -217,20 +215,20 @@ export function TacticsEditor() {
               checked={dummy.isSelfAttacker}
               onChange={(e) => setDummy({ ...dummy, isSelfAttacker: e.target.checked })}
             />
-            Eu sou o atacante
+            {t('taticas.souAtacante')}
           </label>
           <button type="button" onClick={runTest}>
-            Testar
+            {t('taticas.botaoTestar')}
           </button>
           {testResult ? <p className="test-result">{testResult}</p> : null}
         </div>
 
         <div className="tactics-editor-actions">
           <button type="button" onClick={save} disabled={locked}>
-            Salvar
+            {t('taticas.salvar')}
           </button>
           <button type="button" onClick={closeTacticsEditor}>
-            Cancelar
+            {t('taticas.cancelar')}
           </button>
         </div>
       </div>
