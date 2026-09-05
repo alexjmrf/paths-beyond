@@ -57,6 +57,8 @@ import { catalog } from '../data/catalog.js';
 import { espelharConquistas, sincronizarConquistasDaConta } from '../data/platformAchievements.js';
 import { audioDoJogo, definirVolumesDoJogo } from '../audio/motorCompartilhado.js';
 import { VOLUMES_PADRAO } from '../audio/sons.js';
+import { CATALOGOS } from '../i18n/catalogos.js';
+import { criarTradutor, idiomaDoNavegador, idiomaValido, type Idioma, type Tradutor } from '../i18n/idioma.js';
 import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
 import {
   marcarIntroducaoVista,
@@ -186,6 +188,13 @@ function awakeningForUnit(heroesByUnitId: Readonly<Record<string, Hero>>, unitId
 // concilia com a `rulesVersion` é ele, pelo 409 do replay.
 const restoredSave = loadSave(saveStorage);
 
+// §11/D24 (M25) — a ordem de resolução do idioma, e ela é a única que não atropela ninguém:
+// a ESCOLHA do jogador vence; sem escolha, a língua do navegador; sem nenhuma das duas, o
+// inglês, que é a língua de lançamento.
+const idiomaInicial: Idioma = idiomaValido(restoredSave?.idioma)
+  ? restoredSave.idioma
+  : idiomaDoNavegador(globalThis.navigator?.language);
+
 export function saveProjection(state: {
   readonly instantResultMode: boolean;
   readonly colorblindMode: boolean;
@@ -194,6 +203,7 @@ export function saveProjection(state: {
   readonly introducoesVistas: readonly string[];
   readonly volumeEfeitos: number;
   readonly volumeMusica: number;
+  readonly idiomaEscolhido: string | null;
 }): SaveGame {
   return {
     v: SAVE_FORMAT_VERSION,
@@ -205,6 +215,7 @@ export function saveProjection(state: {
     introducoesVistas: state.introducoesVistas,
     volumeEfeitos: state.volumeEfeitos,
     volumeMusica: state.volumeMusica,
+    idioma: state.idiomaEscolhido,
   };
 }
 
@@ -418,6 +429,12 @@ interface BattleStore {
   // §11 (M24) — volume de efeitos e de música, separados.
   readonly volumeEfeitos: number;
   readonly volumeMusica: number;
+  // §11/D24 (M25) — o idioma ativo e o tradutor dele. O tradutor mora no estado (e não numa
+  // variável de módulo) porque trocar de idioma tem de redesenhar a tela: com ele fora do
+  // estado, o React não teria por que reavaliar nada.
+  readonly idioma: Idioma;
+  readonly idiomaEscolhido: string | null;
+  readonly t: Tradutor;
   readonly duelPreview: DuelPreview | null;
   readonly lastCommandReason: string | null;
   readonly tacticsEditorUnitId: string | null;
@@ -504,6 +521,7 @@ interface BattleStore {
   dispararIntroducao: (gatilho: GatilhoDeIntroducao) => void;
   fecharIntroducao: () => void;
   definirVolume: (categoria: 'efeitos' | 'musica', valor: number) => void;
+  definirIdioma: (idioma: Idioma) => void;
   toggleInstantResultMode: () => void;
   setBoardAnimating: (value: boolean) => void;
   toggleColorblindMode: () => void;
@@ -675,6 +693,11 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   introducoesVistas: restoredSave?.introducoesVistas ?? [],
   volumeEfeitos: restoredSave?.volumeEfeitos ?? VOLUMES_PADRAO.efeitos,
   volumeMusica: restoredSave?.volumeMusica ?? VOLUMES_PADRAO.musica,
+  // A escolha do jogador vence; sem escolha, a língua do navegador; sem nenhuma das duas, o
+  // inglês (D24). É a única ordem que não sobrescreve quem escolheu.
+  idioma: idiomaInicial,
+  idiomaEscolhido: idiomaValido(restoredSave?.idioma) ? restoredSave.idioma : null,
+  t: criarTradutor(idiomaInicial, CATALOGOS),
   boardAnimating: false,
   aiTurnReport: null,
   colorblindMode: restoredSave?.colorblindMode ?? false,
@@ -2027,6 +2050,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 
     const introducao = proximaIntroducao(gatilho, introducoesVistas);
     if (introducao) set({ introducaoAtual: introducao });
+  },
+
+  // §11/D24 (M25) — a troca de idioma. Ela grava a ESCOLHA (e não só o resolvido): é o que
+  // faz a preferência sobreviver a abrir o jogo noutro navegador.
+  definirIdioma: (idioma) => {
+    set({ idioma, idiomaEscolhido: idioma, t: criarTradutor(idioma, CATALOGOS) });
   },
 
   // §11 (M24) — os dois controles de volume. Aplicados no motor NA HORA (o jogador precisa

@@ -22,6 +22,7 @@ function nomeDoMaterial(materialId: string): string {
 
 export function SummonPanel() {
   const summon = useBattleStore((s) => s.summon);
+  const t = useBattleStore((s) => s.t);
   const pvp = useBattleStore((s) => s.pvp);
   const refreshSummon = useBattleStore((s) => s.refreshSummon);
   const rollSummon = useBattleStore((s) => s.rollSummon);
@@ -31,8 +32,8 @@ export function SummonPanel() {
   if (!pvp.me) {
     return (
       <section className="summon-panel">
-        <h2>Invocação</h2>
-        <p className="hint">Conecte-se no painel de PvP com o seu token para invocar.</p>
+        <h2>{t('summon.titulo')}</h2>
+        <p className="hint">{t('summon.conecte')}</p>
       </section>
     );
   }
@@ -41,16 +42,20 @@ export function SummonPanel() {
 
   return (
     <section className="summon-panel">
-      <h2>Invocação</h2>
+      <h2>{t('summon.titulo')}</h2>
 
       <div className="pve-actions">
         <button type="button" onClick={() => void refreshSummon()} disabled={summon.busy}>
-          Atualizar
+          {t('summon.atualizar')}
         </button>
       </div>
 
       <p className="summon-premium">
-        Moeda premium <strong>{summon.premium}</strong> · {possuidos}/{summon.characters.length} personagens
+        {t('summon.premium', {
+          premium: summon.premium,
+          possuidos,
+          total: summon.characters.length,
+        })}
       </p>
 
       {summon.banners.map((banner) => {
@@ -64,14 +69,19 @@ export function SummonPanel() {
                 garantida. Mostrar o contador é o que torna a garantia jogável em vez de
                 uma promessa invisível. */}
             <p className="summon-pity">
-              Pity <strong>{banner.rollsSinceNew}</strong>/{banner.pityThreshold} ·{' '}
-              {faltam === 0 ? 'a próxima é garantida' : `garantido em ${faltam} rolagem(ns)`}
+              {t('summon.pity', {
+                atual: banner.rollsSinceNew,
+                teto: banner.pityThreshold,
+                estado: faltam === 0 ? t('summon.pityPronto') : t('summon.pityFaltam', { faltam }),
+              })}
             </p>
             <p className="summon-pool">
-              No banner: {banner.pool.map((entry) => nomeDoPersonagem(entry.characterId)).join(', ')}
+              {t('summon.noBanner', {
+                personagens: banner.pool.map((entry) => nomeDoPersonagem(entry.characterId)).join(', '),
+              })}
             </p>
             <button type="button" onClick={() => void rollSummon(banner.id)} disabled={summon.busy || semSaldo}>
-              Invocar ({banner.premiumCost})
+              {t('summon.invocar', { custo: banner.premiumCost })}
             </button>
           </div>
         );
@@ -79,32 +89,34 @@ export function SummonPanel() {
 
       {summon.lastResult ? (
         <p className="summon-result">
-          {summon.lastResult.outcome.kind === 'character' ? (
-            <>
-              Você recrutou <strong>{nomeDoPersonagem(summon.lastResult.outcome.characterId)}</strong>.
-            </>
-          ) : (
-            <>
-              Repetido: <strong>{nomeDoPersonagem(summon.lastResult.outcome.characterId)}</strong> virou 1{' '}
-              {nomeDoMaterial(summon.lastResult.outcome.fragmentMaterialId)}.
-            </>
-          )}
+          {summon.lastResult.outcome.kind === 'character'
+            ? t('summon.recrutou', {
+                personagem: nomeDoPersonagem(summon.lastResult.outcome.characterId),
+              })
+            : t('summon.repetido', {
+                personagem: nomeDoPersonagem(summon.lastResult.outcome.characterId),
+                material: nomeDoMaterial(summon.lastResult.outcome.fragmentMaterialId),
+              })}
         </p>
       ) : null}
 
-      <h3>Elenco</h3>
+      <h3>{t('summon.elenco')}</h3>
       <ul className="summon-roster">
         {summon.characters.map((character) => (
           <li key={character.id} className={character.owned ? '' : 'locked'}>
             <span className="summon-character-name">{character.name}</span>
             <span className="pve-locked">
-              {character.owned ? (character.fromStory ? 'história' : 'recrutado') : 'não recrutado'}
+              {character.owned
+                ? character.fromStory
+                  ? t('summon.historia')
+                  : t('summon.recrutado')
+                : t('summon.naoRecrutado')}
             </span>
           </li>
         ))}
       </ul>
 
-      <h3>Prêmios</h3>
+      <h3>{t('summon.premios')}</h3>
       <ul className="summon-rewards">
         {summon.rewards.map((reward) => (
           <li key={reward.id} className={reward.claimed ? 'locked' : ''}>
@@ -112,23 +124,25 @@ export function SummonPanel() {
               {reward.name} <span className="pve-locked">({reward.premium})</span>
             </span>
             {reward.claimed ? (
-              <span className="pve-locked">reivindicado</span>
+              <span className="pve-locked">{t('summon.reivindicado')}</span>
             ) : (
               <button type="button" onClick={() => void claimReward(reward.id)} disabled={summon.busy || !reward.claimable}>
                 {/* Evento fora da janela e condição não cumprida são estados diferentes, e
                     é o servidor quem os separa — derivar aqui exigiria o relógio do
                     cliente, que não decide nada neste projeto. */}
-                {reward.kind === 'event' && reward.windowOpen === false ? 'fora da janela' : 'Reivindicar'}
+                {reward.kind === 'event' && reward.windowOpen === false
+                  ? t('summon.foraDaJanela')
+                  : t('summon.reivindicar')}
               </button>
             )}
           </li>
         ))}
       </ul>
 
-      <h3>Energia</h3>
+      <h3>{t('summon.energia')}</h3>
       <div className="pve-actions">
         <button type="button" onClick={() => void purchaseEnergy()} disabled={summon.busy}>
-          Comprar energia
+          {t('summon.comprarEnergia')}
         </button>
       </div>
 

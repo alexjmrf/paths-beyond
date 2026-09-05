@@ -5,6 +5,7 @@ import { useBattleStore } from '../store/battleStore.js';
 // atalho pro editor de táticas (§11).
 export function UnitActionBar() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const lastCommandReason = useBattleStore((s) => s.lastCommandReason);
   const waitSelectedUnit = useBattleStore((s) => s.waitSelectedUnit);
@@ -22,7 +23,7 @@ export function UnitActionBar() {
   if (!unit) {
     return (
       <div className="unit-action-bar">
-        <p>Selecione uma unidade no mapa ou na lista de iniciativa.</p>
+        <p>{t('unidade.selecione')}</p>
       </div>
     );
   }
@@ -38,18 +39,14 @@ export function UnitActionBar() {
   return (
     <div className="unit-action-bar">
       <h3>{unit.unitId}</h3>
-      <p>
-        HP {unit.hp} · AP {unit.ap} · PP {unit.pp}
-      </p>
-      <p>
-        Moveu {distanceMoved} / {unit.moveRange} este turno
-      </p>
+      <p>{t('unidade.stats', { hp: unit.hp, ap: unit.ap, pp: unit.pp })}</p>
+      <p>{t('unidade.moveu', { andou: distanceMoved, alcance: unit.moveRange })}</p>
       <div className="actions">
         <button type="button" disabled={unit.hasActedThisRound} onClick={waitSelectedUnit}>
-          Esperar
+          {t('unidade.esperar')}
         </button>
         <button type="button" disabled={unit.hasActedThisRound} onClick={restSelectedUnit}>
-          Descansar (+1 AP +1 PP)
+          {t('unidade.descansar')}
         </button>
         {mapSkills.map((skill) => {
           const targeting = targetingMode?.kind === 'mapSkill' && targetingMode.skillId === skill.id;
@@ -62,22 +59,26 @@ export function UnitActionBar() {
               disabled={unit.hasActedThisRound || unit.ap < skill.apCost || cooldown > 0}
               onClick={() => (targeting ? cancelTargeting() : beginMapSkillTargeting(skill.id))}
             >
-              {skill.name} ({skill.apCost} AP{skill.areaRadius ? `, área ${skill.areaRadius}` : ''})
+              {t('unidade.skillCusto', {
+                skill: skill.name,
+                custo: skill.apCost,
+                area: skill.areaRadius ? t('unidade.area', { raio: skill.areaRadius }) : '',
+              })}
             </button>
           );
         })}
         <button type="button" onClick={() => openTacticsEditor(unit.unitId)}>
-          Editar táticas
+          {t('unidade.editarTaticas')}
         </button>
         <button type="button" onClick={() => openInventory(unit.unitId)}>
-          Inventário
+          {t('unidade.inventario')}
         </button>
         <button type="button" onClick={() => openTalentEditor(unit.unitId)}>
-          Talentos
+          {t('unidade.talentos')}
         </button>
       </div>
       {targetingMode?.kind === 'mapSkill' ? (
-        <p className="targeting-hint">Clique num tile dentro do alcance para lançar.</p>
+        <p className="targeting-hint">{t('unidade.mireNoAlcance')}</p>
       ) : null}
       {lastCommandReason ? <p className="error">{lastCommandReason}</p> : null}
     </div>

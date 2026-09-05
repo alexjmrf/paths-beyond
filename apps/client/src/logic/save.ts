@@ -1,4 +1,5 @@
 import { VOLUMES_PADRAO } from '../audio/sons.js';
+import { idiomaValido } from '../i18n/idioma.js';
 import { DEFAULT_UI_SCALE, isSupportedUiScale } from '../data/overlayTheme.js';
 
 // Volume é um número entre 0 e 1. Fora disso é preferência corrompida (o save é disco do
@@ -46,13 +47,17 @@ export const SAVE_STORAGE_KEY = 'paths-beyond/save';
 // **v4 (M24):** entram os dois volumes (efeitos e música). Mesma natureza do resto do que
 // sobrou aqui — preferência de apresentação, que é exatamente onde o roadmap mandou pô-los:
 // "ao lado de `uiScale` e `colorblindMode`".
-export const SAVE_FORMAT_VERSION = 4;
+// **v5 (M25):** entra o idioma escolhido. Mesma natureza do resto — preferência de
+// apresentação —, e com uma consequência que só ela tem: a escolha do jogador vence a língua
+// do navegador em toda abertura depois da primeira. Quem escolheu inglês num navegador em
+// português não pode ser sobrescrito a cada recarga.
+export const SAVE_FORMAT_VERSION = 5;
 
 // As versões anteriores, aceitas na leitura e reescritas como v3 na primeira gravação. Um
 // save antigo nunca é descartado: as preferências dele continuam significando exatamente a
 // mesma coisa, e apagar o tamanho de fonte de quem já jogava por causa de uma mudança de
 // formato seria punir o jogador por uma decisão nossa.
-const VERSOES_ACEITAS = new Set([1, 2, 3, SAVE_FORMAT_VERSION]);
+const VERSOES_ACEITAS = new Set([1, 2, 3, 4, SAVE_FORMAT_VERSION]);
 
 export interface SaveGame {
   readonly v: number;
@@ -76,6 +81,10 @@ export interface SaveGame {
   // recuperável e cai no padrão, como `uiScale` já fazia.
   readonly volumeEfeitos: number;
   readonly volumeMusica: number;
+  // §11/D24 (M25) — o idioma escolhido. `null` = o jogador nunca escolheu, e aí vale a língua
+  // do navegador (e, se ela não for uma das declaradas, o inglês). Guardar `null` em vez de
+  // já gravar o resolvido é o que permite ao jogo acompanhar o navegador de quem nunca mexeu.
+  readonly idioma: string | null;
 }
 
 export interface SaveStorage {
@@ -135,6 +144,12 @@ export function parseSave(raw: string | null): SaveGame | null {
   const volumeEfeitos = volumeValido(parsed.volumeEfeitos) ? parsed.volumeEfeitos : VOLUMES_PADRAO.efeitos;
   const volumeMusica = volumeValido(parsed.volumeMusica) ? parsed.volumeMusica : VOLUMES_PADRAO.musica;
 
+  // Idioma ausente (save anterior ao v5) é `null`, que significa "nunca escolhi". Idioma com
+  // tipo errado é formato malformado e rejeita; idioma desconhecido (um `zz` de uma versão
+  // futura ou editado à mão) vira `null` em vez de derrubar o save inteiro.
+  if (parsed.idioma !== undefined && parsed.idioma !== null && typeof parsed.idioma !== 'string') return null;
+  const idioma = idiomaValido(parsed.idioma) ? parsed.idioma : null;
+
   // O save v1 chega aqui com capítulo, táticas, equipamento e talentos junto. Eles são
   // simplesmente ignorados: quem os guarda agora é o servidor, e o que o jogador tinha
   // localmente não pode virar autoridade sobre a conta dele (§9.4).
@@ -148,6 +163,7 @@ export function parseSave(raw: string | null): SaveGame | null {
     introducoesVistas: introducoesVistas as string[],
     volumeEfeitos,
     volumeMusica,
+    idioma,
   };
 }
 

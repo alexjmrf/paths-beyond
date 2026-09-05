@@ -32,6 +32,7 @@ function describeCommand(command: BattleCommand): string {
 
 export function ReplayPanel() {
   const viewer = useBattleStore((s) => s.replayViewer);
+  const t = useBattleStore((s) => s.t);
   const closeReplayViewer = useBattleStore((s) => s.closeReplayViewer);
   const seekReplay = useBattleStore((s) => s.seekReplay);
   const setReplaySpeed = useBattleStore((s) => s.setReplaySpeed);
@@ -59,13 +60,22 @@ export function ReplayPanel() {
   return (
     <div className="replay-overlay">
       <section className="replay-panel">
-        <h2>Replay</h2>
+        <h2>{t('replay.titulo')}</h2>
         <p className="replay-meta">
-          rulesVersion {viewer.replay.rulesVersion} · seed {viewer.replay.seed} · {total} comandos
+          {t('replay.cabecalho', {
+            versao: viewer.replay.rulesVersion,
+            seed: viewer.replay.seed,
+            comandos: total,
+          })}
         </p>
 
         <p className="replay-step">
-          Passo <strong>{step}</strong> de {total} · round {state.round} · {state.outcome}
+          {t('replay.passo', {
+            passo: step,
+            total,
+            round: state.round,
+            desfecho: state.outcome,
+          })}
         </p>
         <p className="replay-command">{step === 0 ? 'Estado inicial.' : describeCommand(current!)}</p>
         {next ? <p className="replay-next">A seguir: {describeCommand(next)}</p> : null}
@@ -73,11 +83,11 @@ export function ReplayPanel() {
         <table className="replay-units">
           <thead>
             <tr>
-              <th>Unidade</th>
+              <th>{t('recursos.unidade')}</th>
               <th>HP</th>
               <th>AP</th>
               <th>PP</th>
-              <th>Posição</th>
+              <th>{t('replay.posicao')}</th>
             </tr>
           </thead>
           <tbody>
@@ -99,24 +109,24 @@ export function ReplayPanel() {
 
         <div className="replay-controls">
           <button type="button" onClick={() => seekReplay(0)} disabled={step === 0}>
-            ⏮ Início
+            {t('replay.inicio')}
           </button>
           <button type="button" onClick={() => seekReplay(step - 1)} disabled={step === 0}>
-            ◀ Anterior
+            {t('replay.anterior')}
           </button>
           <button type="button" onClick={toggleReplayPlaying} disabled={total === 0}>
-            {playing ? '⏸ Pausar' : '▶ Reproduzir'}
+            {playing ? t('replay.pausar') : t('replay.reproduzir')}
           </button>
           <button type="button" onClick={() => seekReplay(step + 1)} disabled={step >= total}>
-            Próximo ▶
+            {t('replay.proximo')}
           </button>
           <button type="button" onClick={() => seekReplay(total)} disabled={step >= total}>
-            Fim ⏭
+            {t('replay.fim')}
           </button>
         </div>
 
         <div className="replay-speed">
-          Velocidade:
+          {t('replay.velocidade')}
           {SPEEDS.map((option) => (
             <button
               key={option}
@@ -131,7 +141,7 @@ export function ReplayPanel() {
 
         <div className="replay-actions">
           <button type="button" onClick={closeReplayViewer}>
-            Fechar
+            {t('replay.fechar')}
           </button>
         </div>
       </section>

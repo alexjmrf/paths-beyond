@@ -12,17 +12,18 @@ import { useBattleStore } from '../store/battleStore.js';
 export function IntroducaoOverlay() {
   const introducao = useBattleStore((s) => s.introducaoAtual);
   const fechar = useBattleStore((s) => s.fecharIntroducao);
+  const t = useBattleStore((s) => s.t);
 
   if (!introducao) return null;
 
   return (
     <aside className="introducao" role="note">
-      <h3>{introducao.titulo}</h3>
-      <p>{introducao.texto}</p>
+      <h3>{t(introducao.tituloChave)}</h3>
+      <p>{t(introducao.textoChave)}</p>
       {/* "Entendi" e não "fechar": o botão é o que marca a dica como vista, e o jogador
           precisa saber que ela não volta. */}
       <button type="button" onClick={fechar}>
-        Entendi
+        {t('introducao.entendi')}
       </button>
     </aside>
   );

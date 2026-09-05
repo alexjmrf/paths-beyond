@@ -12,6 +12,7 @@ const TROCA_REVEAL_MS = 900; // roadmap M6 — animação; pulada inteiramente e
 // recalcula nada.
 export function DuelPreviewPanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const duelPreview = useBattleStore((s) => s.duelPreview);
   const instantResultMode = useBattleStore((s) => s.instantResultMode);
   const confirmEngage = useBattleStore((s) => s.confirmEngage);
@@ -49,37 +50,38 @@ export function DuelPreviewPanel() {
   return (
     <div className="duel-preview-overlay">
       <div className="duel-preview-panel">
-        <h2>Preview de duelo</h2>
-        <p>
-          {duelResult.attackerId} engaja {duelResult.defenderId}
-        </p>
+        <h2>{t('duelo.titulo')}</h2>
+        <p>{t('duelo.engaja', { atacante: duelResult.attackerId, defensor: duelResult.defenderId })}</p>
 
         {visibleTrocas.map((troca) => (
           <div key={troca.trocaNumber} className="troca">
-            <h3>
-              Troca {troca.trocaNumber} — {troca.firstMoverId} age primeiro
-            </h3>
+            <h3>{t('duelo.troca', { numero: troca.trocaNumber, primeiro: troca.firstMoverId })}</h3>
             <ul>
               {troca.actions.map((action, index) => (
                 <li key={index}>
                   {action.decision === 'none' ? (
-                    <span>{action.actorId}: não pôde agir</span>
+                    <span>{t('duelo.naoPodeAgir', { ator: action.actorId })}</span>
                   ) : (
                     <span>
-                      {action.actorId} usa {action.skillId}
-                      {action.tacticsLineIndex !== null ? ` [linha ${action.tacticsLineIndex}]` : ' [ataque básico]'} em{' '}
-                      {action.targetId}
-                      {action.hit === false ? ' — errou' : null}
+                      {t('duelo.usa', { ator: action.actorId, skill: action.skillId ?? '' })}
+                      {action.tacticsLineIndex !== null
+                        ? t('duelo.linha', { linha: action.tacticsLineIndex })
+                        : t('duelo.ataqueBasico')}
+                      {t('duelo.em', { alvo: action.targetId })}
+                      {action.hit === false ? t('duelo.errou') : null}
                       {action.hit === true
-                        ? `${action.isCrit ? ' CRÍTICO' : ''} — ${action.damage} de dano`
+                        ? t('duelo.dano', {
+                            critico: action.isCrit ? t('duelo.critico') : '',
+                            dano: action.damage,
+                          })
                         : null}
                     </span>
                   )}
                   {action.reaction ? (
                     <div className="reaction">
-                      reação de {action.targetId}: {action.reaction.skillId}
+                      {t('duelo.reacao', { alvo: action.targetId, skill: action.reaction.skillId })}
                       {action.reaction.counterDamage !== null
-                        ? ` (${action.reaction.counterDamage} de contra-dano)`
+                        ? t('duelo.contraDano', { dano: action.reaction.counterDamage })
                         : ''}
                     </div>
                   ) : null}
@@ -92,32 +94,47 @@ export function DuelPreviewPanel() {
         {fullyRevealed ? (
           <div className="duel-preview-summary">
             <p>
-              HP final — {duelResult.attackerId}: {duelResult.finalHpAttacker} · {duelResult.defenderId}:{' '}
-              {duelResult.finalHpDefender}
+              {t('duelo.hpFinal', {
+                atacante: duelResult.attackerId,
+                hpAtacante: duelResult.finalHpAttacker,
+                defensor: duelResult.defenderId,
+                hpDefensor: duelResult.finalHpDefender,
+              })}
             </p>
             <p>
-              Recursos gastos — {duelResult.attackerId}: {attackerApSpent} AP / {attackerPpSpent} PP ·{' '}
-              {duelResult.defenderId}: {defenderApSpent} AP / {defenderPpSpent} PP
+              {t('duelo.recursos', {
+                atacante: duelResult.attackerId,
+                apAtacante: attackerApSpent,
+                ppAtacante: attackerPpSpent,
+                defensor: duelResult.defenderId,
+                apDefensor: defenderApSpent,
+                ppDefensor: defenderPpSpent,
+              })}
             </p>
             <p>
-              Assistências — {duelResult.attackerId}:{' '}
-              {duelResult.attackerAssists.map((a) => a.assistantId).join(', ') || 'nenhuma'} · {duelResult.defenderId}:{' '}
-              {duelResult.defenderAssists.map((a) => a.assistantId).join(', ') || 'nenhuma'}
+              {t('duelo.assistencias', {
+                atacante: duelResult.attackerId,
+                assistAtacante:
+                  duelResult.attackerAssists.map((a) => a.assistantId).join(', ') || t('duelo.nenhuma'),
+                defensor: duelResult.defenderId,
+                assistDefensor:
+                  duelResult.defenderAssists.map((a) => a.assistantId).join(', ') || t('duelo.nenhuma'),
+              })}
             </p>
-            <p>Vencedor: {duelResult.winnerId ?? '(nenhum — 3 trocas sem morte)'}</p>
+            <p>{t('duelo.vencedor', { vencedor: duelResult.winnerId ?? t('duelo.semVencedor') })}</p>
           </div>
         ) : (
           <p className="duel-preview-revealing">
-            Revelando troca {revealedCount + 1} de {duelResult.trocas.length}…
+            {t('duelo.revelando', { atual: revealedCount + 1, total: duelResult.trocas.length })}
           </p>
         )}
 
         <div className="duel-preview-actions">
           <button type="button" disabled={!fullyRevealed} onClick={confirmEngage}>
-            Confirmar
+            {t('duelo.confirmar')}
           </button>
           <button type="button" onClick={cancelEngage}>
-            Cancelar
+            {t('duelo.cancelar')}
           </button>
         </div>
       </div>

@@ -18,11 +18,12 @@ describe('a projeção do save', () => {
       introducoesVistas: ['preview-de-duelo', 'recursos-ap-pp'],
       volumeEfeitos: 0.7,
       volumeMusica: 0.5,
+      idiomaEscolhido: null,
     });
 
     expect(projecao.introducoesVistas).toEqual(['preview-de-duelo', 'recursos-ap-pp']);
-    // A versão do formato acompanha o save: v4 desde o M24, que acrescentou os volumes.
-    expect(projecao.v).toBe(4);
+    // A versão do formato acompanha o save: v5 desde o M25, que acrescentou o idioma.
+    expect(projecao.v).toBe(5);
   });
 
   it('o ciclo fecha: dispensar uma dica a tira das próximas vezes', () => {
@@ -36,6 +37,7 @@ describe('a projeção do save', () => {
       introducoesVistas: depoisDeFechar,
       volumeEfeitos: 0.7,
       volumeMusica: 0.5,
+      idiomaEscolhido: null,
     });
 
     expect(proximaIntroducao('preview-de-duelo', gravado.introducoesVistas)).toBeNull();

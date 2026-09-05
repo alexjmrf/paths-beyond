@@ -11,6 +11,7 @@ import { ArenaDefensePanel } from './ArenaDefensePanel.js';
 
 export function PvpPanel() {
   const pvp = useBattleStore((s) => s.pvp);
+  const t = useBattleStore((s) => s.t);
   const mode = useBattleStore((s) => s.mode);
   const battleState = useBattleStore((s) => s.battleState);
   const commandCount = useBattleStore((s) => s.commandLog.length);
@@ -28,27 +29,27 @@ export function PvpPanel() {
 
   return (
     <section className="pvp-panel">
-      <h2>PvP — arena</h2>
+      <h2>{t('pvp.titulo')}</h2>
 
       {!pvp.me ? (
         <div className="pvp-login">
           <button type="button" onClick={() => void connectPvp()} disabled={pvp.busy}>
-            Entrar
+            {t('pvp.entrar')}
           </button>
           {/* §9.4 (M20) — não há mais o que digitar: quem diz quem você é é a plataforma. O
               ticket vem de `data/platformBridge.ts`, que no navegador é a ponte de
               desenvolvimento e no shell desktop (M21) será a da Steam. */}
-          <p className="hint">Identidade da plataforma — nada a digitar.</p>
+          <p className="hint">{t('pvp.identidade')}</p>
         </div>
       ) : (
         <>
           <p className="pvp-me">
-            {pvp.me.displayName} · ELO <strong>{pvp.me.elo}</strong> · {pvp.me.arenaMarks} marcas
+            {t('pvp.eu', { nome: pvp.me.displayName, elo: pvp.me.elo, marcas: pvp.me.arenaMarks })}
           </p>
 
           {!inBattle ? (
             <>
-              <h3>Seu time</h3>
+              <h3>{t('pvp.seuTime')}</h3>
               <ul className="pvp-roster">
                 {pvp.roster.map((entry) => (
                   <li key={entry.hero.id}>
@@ -66,21 +67,24 @@ export function PvpPanel() {
 
               <div className="pvp-actions">
                 <button type="button" onClick={() => void findPvpOpponent()} disabled={pvp.busy}>
-                  Procurar oponente
+                  {t('pvp.procurarOponente')}
                 </button>
                 <button
                   type="button"
                   onClick={() => void startPvpBattle()}
                   disabled={pvp.busy || !pvp.opponent || pvp.selectedHeroIds.length === 0}
                 >
-                  Iniciar batalha
+                  {t('pvp.iniciarBatalha')}
                 </button>
               </div>
 
               {pvp.opponent ? (
                 <p className="pvp-opponent">
-                  Oponente: <strong>{pvp.opponent.displayName}</strong> · ELO {pvp.opponent.elo}
-                  {pvp.opponent.mapId ? ` · ${pvp.opponent.mapId}` : ''}
+                  {t('pvp.oponente', {
+                    nome: pvp.opponent.displayName,
+                    elo: pvp.opponent.elo,
+                    mapa: pvp.opponent.mapId ? ` · ${pvp.opponent.mapId}` : '',
+                  })}
                 </p>
               ) : null}
 
@@ -91,39 +95,46 @@ export function PvpPanel() {
           ) : (
             <>
               <p className="pvp-battle">
-                Batalha de arena em andamento · round {battleState.round} · {commandCount} comando(s) gravado(s)
+                {t('pvp.emAndamento', { round: battleState.round, comandos: commandCount })}
               </p>
               {battleOver ? (
                 <p className="pvp-battle-over">
-                  Resultado local: <strong>{battleState.outcome}</strong>. O servidor é quem decide — envie os
-                  comandos.
+                  {t('pvp.resultadoLocal', { desfecho: battleState.outcome })}
                 </p>
               ) : null}
 
               <div className="pvp-actions">
                 <button type="button" onClick={() => void submitPvpBattle()} disabled={pvp.busy || !battleOver}>
-                  Enviar ao servidor
+                  {t('pvp.enviar')}
                 </button>
                 <button type="button" onClick={() => void reviewPvpBattle()} disabled={pvp.busy || !pvp.outcome}>
-                  Rever replay do servidor
+                  {t('pvp.reverReplay')}
                 </button>
                 <button type="button" onClick={exitPvp} disabled={pvp.busy}>
-                  Voltar à campanha
+                  {t('pvp.voltar')}
                 </button>
               </div>
 
               {pvp.outcome ? (
                 <div className="pvp-result">
                   <p>
-                    Servidor: <strong>{pvp.outcome.result.outcome}</strong> em {pvp.outcome.result.roundsPlayed} round(s)
-                    · seed {pvp.outcome.seed}
+                    {t('pvp.servidorDisse', {
+                      desfecho: pvp.outcome.result.outcome,
+                      rounds: pvp.outcome.result.roundsPlayed,
+                      seed: pvp.outcome.seed,
+                    })}
                   </p>
                   {pvp.outcome.elo ? (
                     <p>
-                      ELO: {pvp.outcome.elo.attacker} (você) · {pvp.outcome.elo.defender} (defensor)
+                      {t('pvp.eloDepois', {
+                        atacante: pvp.outcome.elo.attacker,
+                        defensor: pvp.outcome.elo.defender,
+                      })}
                     </p>
                   ) : null}
-                  {pvp.outcome.arenaMarks ? <p>Marcas de arena: {pvp.outcome.arenaMarks.attacker}</p> : null}
+                  {pvp.outcome.arenaMarks ? (
+                    <p>{t('pvp.marcas', { marcas: pvp.outcome.arenaMarks.attacker })}</p>
+                  ) : null}
                 </div>
               ) : null}
             </>

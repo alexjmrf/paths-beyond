@@ -12,6 +12,7 @@ import { useBattleStore } from '../store/battleStore.js';
 // respondeu (o que ele pagou, e a volta para a lista).
 export function CampaignTransitionOverlay() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const campaign = useBattleStore((s) => s.campaign);
   const submitCampaignRun = useBattleStore((s) => s.submitCampaignRun);
   const exitCampaign = useBattleStore((s) => s.exitCampaign);
@@ -42,18 +43,20 @@ export function CampaignTransitionOverlay() {
     return (
       <div className="campaign-overlay">
         <div className="campaign-overlay-panel">
-          <h2>{campaign.lastRun.outcome === 'victory' ? 'Capítulo concluído!' : 'Derrota'}</h2>
+          <h2>
+            {campaign.lastRun.outcome === 'victory' ? t('capituloFim.concluido') : t('capituloFim.derrota')}
+          </h2>
           <p>
-            O servidor resolveu em {campaign.lastRun.roundsPlayed} round(s).
+            {t('capituloFim.resolvido', { rounds: campaign.lastRun.roundsPlayed })}
             {campaign.lastRun.premiumAwarded > 0
-              ? ` Primeira vez: +${campaign.lastRun.premiumAwarded} de moeda premium.`
+              ? t('capituloFim.primeiraVez', { premium: campaign.lastRun.premiumAwarded })
               : ''}
           </p>
           <button type="button" onClick={openReplayViewer}>
-            Rever batalha
+            {t('capituloFim.reverBatalha')}
           </button>
           <button type="button" onClick={exitCampaign}>
-            Voltar aos capítulos
+            {t('capituloFim.voltar')}
           </button>
         </div>
       </div>
@@ -63,24 +66,20 @@ export function CampaignTransitionOverlay() {
   return (
     <div className="campaign-overlay">
       <div className="campaign-overlay-panel">
-        <h2>{venceu ? 'Vitória!' : 'Derrota'}</h2>
+        <h2>{venceu ? t('capituloFim.vitoria') : t('capituloFim.derrota')}</h2>
         {/* Submeter não é opcional nem no caso da derrota: é a submissão que fecha o
             capítulo do lado do servidor, e sem ela nada foi jogado do ponto de vista da
             conta. */}
-        <p>
-          {venceu
-            ? 'Envie os comandos para o servidor confirmar o capítulo.'
-            : 'Envie o resultado ou volte para tentar de novo.'}
-        </p>
+        <p>{venceu ? t('capituloFim.envieVitoria') : t('capituloFim.envieDerrota')}</p>
         <button type="button" onClick={() => void submitCampaignRun()} disabled={campaign.busy}>
-          Enviar ao servidor
+          {t('capituloFim.enviar')}
         </button>
         <button type="button" onClick={openReplayViewer}>
-          Rever batalha
+          {t('capituloFim.reverBatalha')}
         </button>
         {!venceu ? (
           <button type="button" onClick={() => void enterChapter(campaign.ticket!.chapterId)} disabled={campaign.busy}>
-            Tentar novamente
+            {t('capituloFim.tentarNovamente')}
           </button>
         ) : null}
         {campaign.error ? <p className="error">{campaign.error}</p> : null}

@@ -6177,3 +6177,77 @@ interesse — português, espanhol, chinês e japonês.
 consequência de ORDEM: a UI hoje é português cru dentro do JSX (`Esperar`, `Descansar (+1 AP +1
 PP)`), e as trinta missões da demo vêm com nome e texto. Autorar trinta missões antes da camada de
 idioma é escrever tudo duas vezes.
+
+---
+
+## M25 — A camada de idioma
+
+### M25 — sub-sessões 1/N e 2/N: o motor, os catálogos e o laço de jogo em duas línguas
+
+`packages/core` e `packages/data` **sem uma linha alterada** — `RULES_VERSION` fica em
+`0.19.0`. Isto é camada de apresentação, e o motor não sabe que ela existe.
+
+#### Sem biblioteca, e é decisão
+
+O que uma biblioteca de i18n traria — detecção de região, formatação de data e número por
+locale, carregamento assíncrono de catálogo, pluralização por regra CLDR — este jogo não usa:
+os números que ele mostra são inteiros de ponto fixo, e não há data na tela. O que ele usa
+cabe em cem linhas testáveis, sem dependência nova e sem magia em runtime.
+
+#### As três decisões do motor, e o modo de falha que cada uma evita
+
+- **Chave estável, não frase inglesa como chave.** `t('Wait')` parece prático até o dia em que
+  alguém corrige a redação em inglês e todas as outras línguas perdem a entrada de uma vez.
+- **A queda tem três degraus e nenhum é vazio:** idioma ativo, inglês, a própria chave. Idioma
+  incompleto é o estado NORMAL enquanto a tradução não terminou, e botão sem rótulo é pior que
+  botão em inglês; chave inexistente aparece como `acao.esperar` na tela, que é feio de
+  propósito — erro que some não é corrigido.
+- **Marcador nomeado e visível quando falta.** `{atual} de {maximo}` sobrevive a uma tradução
+  que inverte a ordem das duas coisas; `%s %s` não. E marcador sem valor fica à mostra, porque
+  apagá-lo daria "2 de  AP" e ninguém notaria.
+
+#### A ordem que resolve o idioma, e por que ela não atropela ninguém
+
+Escolha do jogador, depois língua do navegador, depois inglês. O save guarda a ESCOLHA
+(`null` = nunca escolheu), e não o idioma resolvido: gravar o resolvido na migração congelaria
+a língua de quem só abriu o jogo uma vez, e quem escolheu inglês num navegador em português
+seria sobrescrito a cada recarga. **Save v5**, ao lado de `uiScale`, `colorblindMode` e os
+volumes.
+
+#### A introdução do M23 virou catálogo, e o teste dela mudou de alvo
+
+As cinco dicas eram português cru dentro de `introducao.ts`. Uma dica que só aparece em
+português num jogo lançado em inglês é pior que dica nenhuma: ela interrompe sem explicar.
+Agora são chaves, e **o limite de 320 caracteres passou a valer em TODAS as línguas** — o
+paredão de texto que o roadmap proíbe não fica menor traduzido.
+
+#### O que a varredura cobre, e o que ela declara
+
+`semTextoCru.test.ts` reprova frase escrita dentro do JSX e nos atributos que o jogador lê
+(`title`, `placeholder`, `aria-label`). **`AP`, `PP` e `HP` ficam de fora de propósito:** são
+termos do jogo (§4), não frases, e traduzi-los criaria três nomes para o mesmo recurso — o
+oposto do que a legibilidade de §1.1 pede.
+
+**A lista `FALTAM` é o que impede o teste de ser uma promessa.** As seis telas ainda não
+convertidas estão NOMEADAS nela — arena, editor de táticas, editor de condições, inventário,
+árvore de talentos e masmorra —, e o teste reprova se alguém tentar esvaziar a varredura
+enchendo a lista. Tirar um arquivo de lá é o que fecha a conversão dele.
+
+#### O que está feito e o que falta, sem arredondar
+
+**Feito (14 de 20 telas):** o laço de jogo inteiro — cabeçalho e preferências, campanha,
+preview de duelo, iniciativa, objetivo e Valor, recursos do exército, barra de ação da
+unidade, replay, transição de capítulo, arena/PvP, invocação, além da introdução, da tela de
+versão e do aviso de atualização.
+
+**Falta (3/N):** as seis telas de gestão da lista `FALTAM`; as ~25 mensagens de estado da
+store (`enviando comandos…`, `conectado como X`), que são texto de tela vindo de outro lugar;
+e o texto autorado em `packages/data` — nome de personagem, de skill, de missão —, que precisa
+ser traduzível **sem duplicar o dado**, e é a metade do critério de aceite que ainda não foi
+tocada.
+
+**Declarado e fora do M25:** as mensagens de erro do SERVIDOR continuam em português.
+Traduzi-las exige um contrato de CÓDIGO de erro em ~60 pontos de rota — o mesmo desenho que o
+M22 fez para `rules-version-mismatch` —, e é trabalho de tamanho próprio.
+
+**Suíte: 155 arquivos, 2159 testes** (era 152/2123).

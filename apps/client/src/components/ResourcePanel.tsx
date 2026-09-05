@@ -14,6 +14,7 @@ function canRest(distanceMoved: number, moveRange: number, hasActedThisRound: bo
 // `rest`, quem está sem PP (vulnerável a Emboscada)."
 export function ResourcePanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
   const dispararIntroducao = useBattleStore((s) => s.dispararIntroducao);
@@ -29,14 +30,14 @@ export function ResourcePanel() {
 
   return (
     <section className="resource-panel">
-      <h2>Recursos do exército</h2>
+      <h2>{t('recursos.titulo')}</h2>
       <table>
         <thead>
           <tr>
-            <th>Unidade</th>
+            <th>{t('recursos.unidade')}</th>
             <th>AP</th>
             <th>PP</th>
-            <th>Status</th>
+            <th>{t('recursos.status')}</th>
           </tr>
         </thead>
         <tbody>
@@ -58,13 +59,13 @@ export function ResourcePanel() {
                 <td>{unit.pp}</td>
                 <td className="tags">
                   {unit.hasActedThisRound ? (
-                    <span className="tag acted">já agiu</span>
+                    <span className="tag acted">{t('recursos.jaAgiu')}</span>
                   ) : restable ? (
-                    <span className="tag rest">pode descansar</span>
+                    <span className="tag rest">{t('recursos.podeDescansar')}</span>
                   ) : (
-                    <span className="tag no-rest">moveu demais p/ rest</span>
+                    <span className="tag no-rest">{t('recursos.moveuDemais')}</span>
                   )}
-                  {vulnerable ? <span className="tag vulnerable">sem PP — emboscada</span> : null}
+                  {vulnerable ? <span className="tag vulnerable">{t('recursos.semPp')}</span> : null}
                 </td>
               </tr>
             );

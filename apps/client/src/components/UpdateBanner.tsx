@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { lerEstadoDaAtualizacao, platformBridge, type EstadoDaAtualizacao } from '../data/platformBridge.js';
+import { useBattleStore } from '../store/battleStore.js';
 
 // §2/§9.4 (M21, sub-sessão 4/N) — o aviso de ATUALIZAÇÃO.
 //
@@ -10,6 +11,7 @@ import { lerEstadoDaAtualizacao, platformBridge, type EstadoDaAtualizacao } from
 // Fora do shell ele não renderiza nada — no navegador, atualizar é recarregar a página.
 
 export function UpdateBanner() {
+  const t = useBattleStore((s) => s.t);
   const [estado, setEstado] = useState<EstadoDaAtualizacao | null>(null);
 
   useEffect(() => {
@@ -37,20 +39,18 @@ export function UpdateBanner() {
 
   return (
     <div className="update-banner" role="status">
-      {estado.fase === 'disponivel' && <span>Atualização {estado.versao} encontrada — baixando…</span>}
+      {estado.fase === 'disponivel' && <span>{t('atualizacao.encontrada', { versao: estado.versao })}</span>}
       {estado.fase === 'baixando' && (
-        <span>
-          Baixando atualização {estado.versao} — {estado.porcento}%
-        </span>
+        <span>{t('atualizacao.baixando', { versao: estado.versao, porcento: estado.porcento })}</span>
       )}
       {estado.fase === 'pronta' && (
         <>
-          <span>Atualização {estado.versao} pronta.</span>
+          <span>{t('atualizacao.pronta', { versao: estado.versao })}</span>
           {/* O reinício é do JOGADOR. Reiniciar sozinho fecharia o jogo com uma batalha em
               curso — e a batalha está no servidor, então ele perderia o que estava ganhando.
               Quem não clicar recebe a atualização ao fechar o jogo, sem fazer nada. */}
           <button type="button" onClick={() => void platformBridge.restartToUpdate?.()}>
-            Reiniciar agora
+            {t('atualizacao.reiniciarAgora')}
           </button>
         </>
       )}

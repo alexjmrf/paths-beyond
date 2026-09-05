@@ -18,6 +18,7 @@ import { UpdateBanner } from './components/UpdateBanner.js';
 import { VersionGate } from './components/VersionGate.js';
 import { useEffect } from 'react';
 import { UI_SCALES } from './data/overlayTheme.js';
+import { IDIOMAS } from './i18n/idioma.js';
 import { useBattleStore } from './store/battleStore.js';
 
 // Tamanho de fonte raiz em escala 1. Todo o CSS do cliente está em `rem`, então mudar esta
@@ -38,6 +39,9 @@ export function App() {
   const volumeEfeitos = useBattleStore((s) => s.volumeEfeitos);
   const volumeMusica = useBattleStore((s) => s.volumeMusica);
   const definirVolume = useBattleStore((s) => s.definirVolume);
+  const idioma = useBattleStore((s) => s.idioma);
+  const definirIdioma = useBattleStore((s) => s.definirIdioma);
+  const t = useBattleStore((s) => s.t);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${BASE_ROOT_FONT_PX * uiScale}px`;
@@ -55,29 +59,29 @@ export function App() {
           com a tela viva atrás. */}
       <IntroducaoOverlay />
       <header>
-        <h1>Project Vanguard — campanha</h1>
+        <h1>{t('app.titulo')}</h1>
         <span className="campaign-progress">
           {/* M18 7/N — o capítulo em curso vem do TICKET, e não de um índice local: quem
               sabe em que ponto da campanha o jogador está é o servidor. */}
           {mode === 'pvp'
-            ? 'Arena — PvP'
+            ? t('app.modo.pvp')
             : mode === 'dungeon'
-              ? 'Masmorra'
-              : (campaignChapter ?? 'Escolha um capítulo')}
+              ? t('app.modo.masmorra')
+              : (campaignChapter ?? t('app.modo.escolhaCapitulo'))}
         </span>
         {/* §11 (acessibilidade) — os três itens: resultado instantâneo, modo daltônico e
             fonte escalável. Nenhum deles toca regra: são preferências de apresentação, e
             todas sobrevivem à recarga junto com o progresso. */}
         <label className="instant-result-toggle">
           <input type="checkbox" checked={instantResultMode} onChange={toggleInstantResultMode} />
-          Modo resultado instantâneo (pula animações)
+          {t('app.pref.resultadoInstantaneo')}
         </label>
         <label className="accessibility-toggle">
           <input type="checkbox" checked={colorblindMode} onChange={toggleColorblindMode} />
-          Modo daltônico
+          {t('app.pref.daltonico')}
         </label>
         <label className="ui-scale-select">
-          Tamanho
+          {t('app.pref.tamanho')}
           <select value={uiScale} onChange={(event) => setUiScale(Number(event.target.value))}>
             {UI_SCALES.map((scale) => (
               <option key={scale} value={scale}>
@@ -91,7 +95,7 @@ export function App() {
             entre as duas coisas. Eles vivem aqui, junto das outras preferências de
             apresentação, porque é isso que eles são — e é onde o roadmap mandou pô-los. */}
         <label className="volume-control">
-          Efeitos
+          {t('app.pref.efeitos')}
           <input
             type="range"
             min={0}
@@ -102,7 +106,7 @@ export function App() {
           />
         </label>
         <label className="volume-control">
-          Música
+          {t('app.pref.musica')}
           <input
             type="range"
             min={0}
@@ -112,10 +116,23 @@ export function App() {
             onChange={(event) => definirVolume('musica', Number(event.target.value))}
           />
         </label>
+        {/* §11/D24 (M25) — o seletor de idioma. Cada língua aparece escrita NELA MESMA: quem
+            procura português numa tela em japonês procura "Português", não a palavra japonesa
+            para português. */}
+        <label className="language-select">
+          {t('app.pref.idioma')}
+          <select value={idioma} onChange={(event) => definirIdioma(event.target.value as typeof idioma)}>
+            {IDIOMAS.map((codigo) => (
+              <option key={codigo} value={codigo}>
+                {t(`idioma.${codigo}`)}
+              </option>
+            ))}
+          </select>
+        </label>
         {/* M13, 3/N — o progresso é salvo sozinho; este é o único jeito de desfazê-lo sem
             abrir o console do navegador. */}
         <button type="button" className="clear-progress" onClick={clearProgress}>
-          Apagar progresso
+          {t('app.pref.apagarProgresso')}
         </button>
       </header>
       <main>

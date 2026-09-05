@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { CATALOGOS } from '../src/i18n/catalogos.js';
+import { IDIOMAS } from '../src/i18n/idioma.js';
 import {
   GATILHOS_DA_INTRODUCAO,
   INTRODUCOES,
@@ -31,13 +33,21 @@ describe('o catálogo da introdução', () => {
     expect(new Set(INTRODUCOES.map((i) => i.gatilho)).size).toBe(INTRODUCOES.length);
   });
 
-  it('toda introdução tem título e texto, e o texto é curto', () => {
+  // M25 — o texto virou chave, então o teste passou a medir o CATÁLOGO. E ele mede em todas
+  // as línguas: o paredão que o roadmap proíbe não fica menor traduzido.
+  it('toda introdução tem título e texto EM TODA LÍNGUA, e o texto é curto', () => {
     for (const introducao of INTRODUCOES) {
-      expect(introducao.titulo.length, introducao.gatilho).toBeGreaterThan(0);
-      expect(introducao.texto.length, introducao.gatilho).toBeGreaterThan(0);
-      // O limite é o ponto do roadmap virado em asserção: passar disto é o paredão de texto
-      // que a milestone existe para não ter.
-      expect(introducao.texto.length, introducao.gatilho).toBeLessThanOrEqual(320);
+      for (const idioma of IDIOMAS) {
+        const titulo = CATALOGOS[idioma][introducao.tituloChave];
+        const texto = CATALOGOS[idioma][introducao.textoChave];
+        const onde = `${idioma}:${introducao.gatilho}`;
+
+        expect(titulo, onde).toBeTruthy();
+        expect(texto, onde).toBeTruthy();
+        // O limite é o ponto do roadmap virado em asserção: passar disto é o paredão de texto
+        // que a milestone existe para não ter.
+        expect(texto!.length, onde).toBeLessThanOrEqual(320);
+      }
     }
   });
 

@@ -47,6 +47,7 @@ function describeObjective(condition: WinCondition, state: BattleState): { title
 // fica sempre disponível, e não só quando há unidade selecionada.
 function ValorSection() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const targetingMode = useBattleStore((s) => s.targetingMode);
   const beginValorTargeting = useBattleStore((s) => s.beginValorTargeting);
   const cancelTargeting = useBattleStore((s) => s.cancelTargeting);
@@ -56,10 +57,10 @@ function ValorSection() {
   return (
     <div className="valor-section">
       <h3>
-        Valor: <span className="valor-amount">{battleState.valor}</span>
+        {t('valor.titulo')} <span className="valor-amount">{battleState.valor}</span>
       </h3>
       {skills.length === 0 ? (
-        <p className="hint">Este mapa não declara skills de Valor.</p>
+        <p className="hint">{t('valor.semSkills')}</p>
       ) : (
         <ul className="valor-skills">
           {skills.map((skill) => {
@@ -75,9 +76,9 @@ function ValorSection() {
                   className={targeting ? 'targeting' : ''}
                   disabled={battleState.valor < skill.cost || unsupported}
                   onClick={() => (targeting ? cancelTargeting() : beginValorTargeting(skill.id))}
-                  title={unsupported ? 'sem resolução no motor — ver DECISIONS.md (M11 3/N)' : skill.kind}
+                  title={unsupported ? t('valor.semResolucao') : skill.kind}
                 >
-                  {skill.name} <span className="cost">({skill.cost} Valor)</span>
+                  {skill.name} <span className="cost">{t('valor.custo', { custo: skill.cost })}</span>
                 </button>
               </li>
             );
@@ -85,7 +86,7 @@ function ValorSection() {
         </ul>
       )}
       {targetingMode?.kind === 'valor' ? (
-        <p className="targeting-hint">Clique num tile do mapa para lançar, ou no botão de novo para cancelar.</p>
+        <p className="targeting-hint">{t('valor.mireNoMapa')}</p>
       ) : null}
     </div>
   );
@@ -93,14 +94,15 @@ function ValorSection() {
 
 export function ObjectivePanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const tObjetivo = useBattleStore((s) => s.t);
   const objective = describeObjective(battleState.winCondition, battleState);
 
   return (
     <section className="objective-panel">
-      <h2>Objetivo</h2>
+      <h2>{tObjetivo('objetivo.titulo')}</h2>
       <p className="objective-title">{objective.title}</p>
       <p className="objective-detail">{objective.detail}</p>
-      <p className="round-counter">Round {battleState.round}</p>
+      <p className="round-counter">{tObjetivo('objetivo.round', { round: battleState.round })}</p>
       <ValorSection />
     </section>
   );

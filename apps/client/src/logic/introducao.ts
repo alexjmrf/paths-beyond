@@ -36,50 +36,22 @@ export type GatilhoDeIntroducao = (typeof GATILHOS_DA_INTRODUCAO)[number];
 
 export interface Introducao {
   readonly gatilho: GatilhoDeIntroducao;
-  readonly titulo: string;
-  readonly texto: string;
+  // §11/D24 (M25) — o texto virou CHAVE. Ele era português cru aqui, e uma dica que só
+  // aparece em português num jogo lançado em inglês é pior que dica nenhuma: ela interrompe
+  // sem explicar. O limite de tamanho continua valendo, agora contra o catálogo — o paredão
+  // que o roadmap proíbe não fica menor traduzido.
+  readonly tituloChave: string;
+  readonly textoChave: string;
 }
 
 // O texto é curto de propósito, e o teste trava o tamanho: uma caixa que o jogador fecha sem
 // ler não explicou nada, e o limite é a diferença entre uma dica e o paredão que o roadmap
 // proíbe. Cada uma responde a pergunta que a TELA levanta, não a que a spec responde.
-export const INTRODUCOES: readonly Introducao[] = [
-  {
-    gatilho: 'preview-de-duelo',
-    titulo: 'O duelo se resolve sozinho',
-    texto:
-      'Você escolhe QUEM ataca quem; o resto é automático, em até 3 trocas. O resultado abaixo já é o ' +
-      'verdadeiro — se confirmar, é exatamente isso que acontece. Nada de sorte escondida.',
-  },
-  {
-    gatilho: 'recursos-ap-pp',
-    titulo: 'AP e PP duram a batalha inteira',
-    texto:
-      'AP paga habilidades; PP paga reações, como contra-atacar. Eles NÃO voltam sozinhos entre duelos: ' +
-      'quem gastou tudo no começo chega sem nada no fim. Descansar recupera, mas custa o turno.',
-  },
-  {
-    gatilho: 'script-tatico',
-    titulo: 'Você programa a unidade antes, não durante',
-    texto:
-      'No duelo ela segue este script, linha por linha, na ordem: a primeira condição verdadeira decide a ação. ' +
-      'É por isso que dá para prever o combate — a unidade faz o que você escreveu, sempre.',
-  },
-  {
-    gatilho: 'primeiro-summon',
-    titulo: 'Invocação, e o contador que garante',
-    texto:
-      'Invocar gasta a moeda premium. O contador ao lado do banner é a garantia: ao chegar no número, a ' +
-      'próxima invocação vem no raro garantido. Personagem repetido vira fragmento de vínculo.',
-  },
-  {
-    gatilho: 'primeira-arena',
-    titulo: 'A arena é assíncrona',
-    texto:
-      'Você não enfrenta a pessoa: enfrenta a defesa que ela montou e deixou salva. A sua defesa faz o mesmo ' +
-      'enquanto você está fora. Ganhar e perder mexem no seu ELO, que é quem escolhe seus próximos oponentes.',
-  },
-];
+export const INTRODUCOES: readonly Introducao[] = GATILHOS_DA_INTRODUCAO.map((gatilho) => ({
+  gatilho,
+  tituloChave: `introducao.${gatilho}.titulo`,
+  textoChave: `introducao.${gatilho}.texto`,
+}));
 
 const PORgatilho = new Map<string, Introducao>(INTRODUCOES.map((i) => [i.gatilho, i]));
 

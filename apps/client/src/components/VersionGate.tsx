@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { RulesVersionMismatch } from '@paths-beyond/core';
 import { onRulesVersionMismatch } from '../data/api.js';
 import { lerEstadoDaAtualizacao, platformBridge } from '../data/platformBridge.js';
+import { useBattleStore } from '../store/battleStore.js';
 
 // §3.3/§9.4 (M22, sub-sessão 1/N) — a tela de ATUALIZAÇÃO OBRIGATÓRIA.
 //
@@ -19,6 +20,7 @@ import { lerEstadoDaAtualizacao, platformBridge } from '../data/platformBridge.j
 // A política que a produz (`N-1` não é aceito) está em `packages/core/src/rulesVersionCompat.ts`.
 
 export function VersionGate() {
+  const t = useBattleStore((s) => s.t);
   const [mismatch, setMismatch] = useState<RulesVersionMismatch | null>(null);
   const [atualizacaoPronta, setAtualizacaoPronta] = useState(false);
 
@@ -45,30 +47,27 @@ export function VersionGate() {
   return (
     <div className="version-gate" role="alertdialog" aria-modal="true">
       <div className="version-gate-card">
-        <h2>Atualize o jogo para continuar</h2>
+        <h2>{t('versao.titulo')}</h2>
         <p>
-          {mismatch.reason === 'missing'
-            ? 'Esta versão do jogo é anterior à checagem de regras do servidor.'
-            : 'As regras do servidor mudaram desde a versão que você está rodando.'}{' '}
-          Enquanto as duas não forem a mesma, nenhuma batalha pode ser resolvida — o servidor
-          reexecuta cada partida para confirmar o resultado.
+          {mismatch.reason === 'missing' ? t('versao.motivo.ausente') : t('versao.motivo.diferente')}{' '}
+          {t('versao.explicacao')}
         </p>
         <p className="version-gate-detalhe">
-          servidor: <strong>{mismatch.expected}</strong> · este cliente:{' '}
-          <strong>{mismatch.received ?? 'não informada'}</strong>
+          {t('versao.detalhe', {
+            esperado: mismatch.expected,
+            recebido: mismatch.received ?? t('versao.naoInformada'),
+          })}
         </p>
 
         {/* Três situações, três instruções — e nenhuma delas é "tente de novo", que é o que
             a mensagem de erro genérica dizia na prática. */}
         {noShell && atualizacaoPronta && (
           <button type="button" onClick={() => void platformBridge.restartToUpdate?.()}>
-            Reiniciar e atualizar
+            {t('versao.reiniciar')}
           </button>
         )}
-        {noShell && !atualizacaoPronta && (
-          <p>A atualização está sendo baixada. Feche e reabra o jogo quando ela terminar.</p>
-        )}
-        {!noShell && <p>Recarregue a página para receber a versão nova.</p>}
+        {noShell && !atualizacaoPronta && <p>{t('versao.baixando')}</p>}
+        {!noShell && <p>{t('versao.recarregue')}</p>}
       </div>
     </div>
   );

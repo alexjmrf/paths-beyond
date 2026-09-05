@@ -54,6 +54,8 @@ const baseSave: SaveGame = {
   // M24 — v4: os dois volumes.
   volumeEfeitos: 0.4,
   volumeMusica: 0.2,
+  // M25 — v5: o idioma escolhido (`null` = nunca escolheu).
+  idioma: 'pt',
 };
 
 // Um save na forma ANTIGA, como um jogador de M13–M18 6/N tem no disco agora.
@@ -380,5 +382,43 @@ describe('save v4 — os volumes', () => {
 
   it('volume com TIPO errado é formato malformado e rejeita', () => {
     expect(parseSave(JSON.stringify({ ...baseSave, volumeEfeitos: 'alto' }))).toBeNull();
+  });
+});
+
+// §11/D24 (M25) — o idioma atravessando o save.
+describe('save v5 — o idioma', () => {
+  it('lê de volta o idioma escolhido', () => {
+    expect(parseSave(serializeSave(baseSave))?.idioma).toBe('pt');
+  });
+
+  it('save v4 sobe para v5 com idioma `null` — que significa "nunca escolhi"', () => {
+    // `null` e não "pt": quem nunca escolheu deve acompanhar o navegador. Gravar o idioma
+    // resolvido na migração congelaria a língua de quem só abriu o jogo uma vez.
+    const v4 = JSON.stringify({
+      v: 4,
+      rulesVersion: RULES_VERSION,
+      instantResultMode: false,
+      colorblindMode: false,
+      uiScale: 1,
+      pvpToken: 'token',
+      introducoesVistas: [],
+      volumeEfeitos: 0.7,
+      volumeMusica: 0.5,
+    });
+
+    const lido = parseSave(v4);
+
+    expect(lido?.v).toBe(SAVE_FORMAT_VERSION);
+    expect(lido?.idioma).toBeNull();
+  });
+
+  it('idioma desconhecido vira `null` em vez de derrubar o save', () => {
+    // Um `zz` de uma versão futura, ou editado à mão: perder a língua é recuperável, perder
+    // o token e as preferências junto não seria.
+    expect(parseSave(JSON.stringify({ ...baseSave, idioma: 'zz' }))?.idioma).toBeNull();
+  });
+
+  it('idioma com TIPO errado é formato malformado e rejeita', () => {
+    expect(parseSave(JSON.stringify({ ...baseSave, idioma: 42 }))).toBeNull();
   });
 });

@@ -11,6 +11,7 @@ import { useBattleStore } from '../store/battleStore.js';
 // um tem e quanto a primeira vitória paga vêm todos do servidor.
 export function CampaignPanel() {
   const campaign = useBattleStore((s) => s.campaign);
+  const t = useBattleStore((s) => s.t);
   const pvp = useBattleStore((s) => s.pvp);
   const mode = useBattleStore((s) => s.mode);
   const refreshCampaign = useBattleStore((s) => s.refreshCampaign);
@@ -22,8 +23,8 @@ export function CampaignPanel() {
   if (!pvp.me) {
     return (
       <section className="campaign-panel">
-        <h2>Campanha</h2>
-        <p className="hint">Conecte-se no painel de PvP com o seu token para jogar a campanha.</p>
+        <h2>{t('campanha.titulo')}</h2>
+        <p className="hint">{t('campanha.conecte')}</p>
       </section>
     );
   }
@@ -32,12 +33,10 @@ export function CampaignPanel() {
   if (campaign.ticket && mode === 'campaign') {
     return (
       <section className="campaign-panel">
-        <h2>Campanha</h2>
-        <p className="campaign-em-curso">
-          Jogando <strong>{campaign.ticket.chapterId}</strong>
-        </p>
+        <h2>{t('campanha.titulo')}</h2>
+        <p className="campaign-em-curso">{t('campanha.jogando', { capitulo: campaign.ticket.chapterId })}</p>
         <button type="button" onClick={exitCampaign} disabled={campaign.busy}>
-          Abandonar capítulo
+          {t('campanha.abandonar')}
         </button>
         {campaign.error ? <p className="error">{campaign.error}</p> : null}
       </section>
@@ -48,18 +47,16 @@ export function CampaignPanel() {
 
   return (
     <section className="campaign-panel">
-      <h2>Campanha</h2>
+      <h2>{t('campanha.titulo')}</h2>
 
       <div className="pve-actions">
         <button type="button" onClick={() => void refreshCampaign()} disabled={campaign.busy}>
-          Atualizar
+          {t('campanha.atualizar')}
         </button>
       </div>
 
       {campaign.premiumOnFirstClear > 0 ? (
-        <p className="hint">
-          Primeira vitória em cada capítulo paga <strong>{campaign.premiumOnFirstClear}</strong> de moeda premium.
-        </p>
+        <p className="hint">{t('campanha.primeiraVitoria', { premium: campaign.premiumOnFirstClear })}</p>
       ) : null}
 
       <ul className="campaign-chapters">
@@ -69,7 +66,8 @@ export function CampaignPanel() {
               {chapter.name}
             </button>
             <span className="pve-locked">
-              {chapter.slots} vaga(s){chapter.cleared ? ' · limpo' : ''}
+              {t('campanha.vagas', { vagas: chapter.slots })}
+              {chapter.cleared ? t('campanha.limpo') : ''}
             </span>
           </li>
         ))}
@@ -79,9 +77,7 @@ export function CampaignPanel() {
         <>
           {/* D16 — o capítulo declara VAGAS e o jogador leva quem tem. É por isso que esta
               lista é o ROSTER dele e não um elenco fixo: o que ele possui é a party. */}
-          <h3>
-            Quem vai ({campaign.selectedHeroIds.length}/{selecionado.slots})
-          </h3>
+          <h3>{t('campanha.quemVai', { escolhidos: campaign.selectedHeroIds.length, vagas: selecionado.slots })}</h3>
           <ul className="campaign-roster">
             {pvp.roster.map((entry) => (
               <li key={entry.hero.id}>
@@ -102,11 +98,11 @@ export function CampaignPanel() {
             onClick={() => void enterChapter(selecionado.id)}
             disabled={campaign.busy || campaign.selectedHeroIds.length === 0}
           >
-            Entrar no capítulo
+            {t('campanha.entrar')}
           </button>
         </>
       ) : (
-        <p className="hint">Escolha um capítulo.</p>
+        <p className="hint">{t('campanha.escolha')}</p>
       )}
 
       {campaign.status ? <p className="pve-status">{campaign.status}</p> : null}

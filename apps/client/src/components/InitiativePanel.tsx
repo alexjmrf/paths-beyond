@@ -4,6 +4,7 @@ import { useBattleStore } from '../store/battleStore.js';
 // duro). A ordem em si é fixa (§5.3) — este painel só espelha `initiativeOrder`.
 export function InitiativePanel() {
   const battleState = useBattleStore((s) => s.battleState);
+  const t = useBattleStore((s) => s.t);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
 
@@ -11,7 +12,7 @@ export function InitiativePanel() {
 
   return (
     <aside className="initiative-panel">
-      <h2>Iniciativa — round {battleState.round}</h2>
+      <h2>{t('iniciativa.titulo', { round: battleState.round })}</h2>
       <ol>
         {battleState.initiativeOrder.map((entry) => {
           const unit = unitsById.get(entry.unitId);
@@ -33,7 +34,11 @@ export function InitiativePanel() {
             >
               <span className="name">{unit.unitId}</span>
               <span className="initiative-value">{entry.initiative}</span>
-              {dead ? <span className="status">morto</span> : unit.hasActedThisRound ? <span className="status">agiu</span> : null}
+              {dead ? (
+                <span className="status">{t('iniciativa.morto')}</span>
+              ) : unit.hasActedThisRound ? (
+                <span className="status">{t('iniciativa.agiu')}</span>
+              ) : null}
             </li>
           );
         })}
@@ -41,10 +46,11 @@ export function InitiativePanel() {
       {/* M23 3/N — "nenhuma tela exige conhecimento que o jogo não deu". `Valor: 3` não
           dizia nada a quem chega: o número é recurso do MAPA (§5.6), ganho ao capturar e
           gasto em habilidades de Valor, e sem isso ele parecia um placar. */}
-      <p className="valor" title="Recurso do mapa inteiro. Você ganha capturando objetivos e gasta em habilidades de Valor.">
-        Valor: {battleState.valor} <span className="hint">— recurso do mapa</span>
+      <p className="valor" title={t('iniciativa.valorTitle')}>
+        {t('iniciativa.valor', { valor: battleState.valor })}{' '}
+        <span className="hint">{t('iniciativa.valorHint')}</span>
       </p>
-      <p className="outcome">Resultado: {battleState.outcome}</p>
+      <p className="outcome">{t('iniciativa.resultado', { resultado: battleState.outcome })}</p>
     </aside>
   );
 }
