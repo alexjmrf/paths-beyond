@@ -338,24 +338,36 @@ jargão continuam valendo na língua ativa.
 
 ---
 
-### M26 — Arte 2.5D: a peça deixa de ser desenhada por código
-**D22 decidiu: uma imagem por unidade, animada por transformação.** O que a geração por IA faz mal
-é consistência entre quadros; uma imagem por unidade elimina o problema por construção, e
-`motion.ts` já anima por transformação e não por troca de quadro — impacto, tremor, queda e
-movimento com peso continuam iguais. O `UnitRenderer` de M16 1/N foi construído como hedge para
-exatamente isto (D2), com teste de contrato provando a troca.
+### M26 — Arte: a peça deixa de ser desenhada por código
+**D22 decidiu a FORMA e D25 decidiu a FONTE.** A forma: uma fonte de verdade por unidade,
+animada pelo `motion.ts`, que já anima por transformação e não por troca de quadro; o
+`UnitRenderer` de M16 1/N foi construído como hedge para exatamente esta troca (D2), com teste
+de contrato provando que a costura aguenta. A fonte: **PixelLab**, escolhida depois de um teste
+de fumaça com quatro peças geradas e postas no tabuleiro real — o caso fácil e o caso difícil
+(cavaleira montada em grifo) saíram legíveis, e o pipeline é dirigível por script pela API v2.
+**O que o teste já resolveu, e não se re-discute:** o sprite CABE no tile (transbordando, as
+unidades de linhas adjacentes se sobrepõem, e "1 herói = 1 tile" é a primeira regra do jogo); a
+camada programática vira o HUD e é desenhada POR CIMA do sprite, o que preserva o modo
+daltônico de M13 4/N intacto; e a animação mantém a identidade entre quadros, que é o defeito
+que derrubou jogos alheios.
+**O que o teste deixou em aberto para esta milestone medir:** a resolução do quadro (48 ou 64,
+sabendo que 64 só se paga se o tile subir de 36 e isso muda o enquadramento dos mapas) e o
+movimento, que saiu tímido — um levantar de espada em vez de um golpe com impacto e
+recuperação. Os três caminhos a testar estão em D25.
 **O critério 1 do M16 está formalmente reaberto por esta milestone**, e o ajuste é declarado:
-`semAssetsRaster.test.ts` deixa de exigir zero imagens e passa a exigir que imagem só exista onde
-é declarada, com manifesto e procedência. **O terreno continua programático** — distinguir terreno,
-alvenaria e portão é contraste no TILE, é o critério 2 que o usuário reprovou em 2026-08-28, e
-nenhuma camada de personagem toca nisso.
-**Aceite:** o tabuleiro desenha sprite para as unidades com o pipeline de animação de M16 intocado
-(nenhum número de `motion.ts` muda); todo personagem e todo inimigo de `packages/data` tem asset
-declarado **ou** cai explicitamente no glifo programático, com teste que reprova conteúdo novo sem
-uma das duas coisas; existe manifesto com procedência e licença de cada imagem, e o teste de assets
-reprova imagem fora dele; o modo daltônico e a marca por overlay de M13 4/N continuam legíveis
-sobre o sprite; e a integração da ferramenta de geração é uma porta injetável — o pipeline roda com
-uma implementação de mentira em teste, como o validador de identidade e o atualizador já fazem.
+`semAssetsRaster.test.ts` deixa de exigir zero imagens e passa a exigir que imagem só exista
+onde é declarada, com manifesto e procedência. **O terreno continua programático** — distinguir
+terreno, alvenaria e portão é contraste no TILE, é o critério 2 que o usuário reprovou em
+2026-08-28, e nenhuma camada de personagem toca nisso.
+**Aceite:** o tabuleiro desenha sprite para as unidades com o pipeline de animação de M16
+intocado (nenhum número de `motion.ts` muda) e com o HUD por cima; todo personagem e todo
+inimigo de `packages/data` tem asset declarado **ou** cai explicitamente no glifo programático,
+com teste que reprova conteúdo novo sem uma das duas coisas; existe manifesto com procedência,
+prompt, seed e licença de cada imagem, e o teste de assets reprova imagem fora dele; o modo
+daltônico e a marca por overlay continuam legíveis sobre o sprite; a geração é um script
+repetível com a chave fora do repositório, e roda com uma implementação de mentira em teste —
+mesmo padrão do validador de identidade e do atualizador; e **o golpe tem peso**, julgado pelo
+usuário como o critério 2 do M16 foi julgado.
 
 ---
 

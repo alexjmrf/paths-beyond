@@ -6317,3 +6317,71 @@ caminho que as trinta missões do M27 vão percorrer no dia em que forem autorad
 **Declarado e fora do M25** (inalterado desde a 1/N): as mensagens de erro do SERVIDOR.
 
 **Suíte: 156 arquivos, 2170 testes** (era 155/2159).
+
+---
+
+## D25 — A fonte da arte é a PixelLab, decidida com o teste na tela
+
+**Decisão do usuário em 2026-09-04**, depois de um teste de fumaça com quatro peças geradas de
+verdade e postas no tabuleiro real. Ele também deu liberdade explícita para eu iterar a
+qualidade da animação sem consultar a cada rodada.
+
+### Por que esta e não as outras duas
+
+O caminho **3D→2D pré-renderizado** (Meshy/Tripo + Blender) tem teto mais alto e resolve
+consistência por geometria, mas exige uma dependência a mais na máquina de quem gera e
+esbarra no rig de unidades não-humanoides. O caminho **programático com teto alto** (o que os
+jogos de demonstração do Opus 5 fizeram: shader e textura por código, sem asset) é o único sem
+rótulo na loja, mas é forte em terreno e fraco em **reconhecimento de personagem** — e o nosso
+problema são 50 unidades que precisam ser distinguidas num relance.
+
+A PixelLab ganhou porque **funcionou nas duas pontas do teste**: o caso fácil (espadachim) e o
+caso difícil (cavaleira montada em grifo) saíram legíveis a 48px, e o pipeline inteiro é
+dirigível por script daqui — API v2, jobs assíncronos, sem ninguém gerando à mão.
+
+### O que o teste de fumaça mediu, e que vale mais que a impressão
+
+- **Custo real:** 2 gerações por personagem, 1 por animação. As quatro peças do teste custaram
+  **7 de 2.000** da assinatura Tier 1. O limitador não é o orçamento, é quantas iterações de
+  gosto se quer fazer.
+- **Tempo real:** ~4 minutos por personagem, ~2 por animação. Cinquenta unidades é um laço de
+  algumas horas, não de uma tarde.
+- **O sprite tem de CABER no tile.** Desenhado a 1,33× do tile (como Fire Emblem faz), as
+  unidades de linhas adjacentes se sobrepõem — e "1 herói = 1 tile" é a primeira regra do
+  jogo. Medido no tabuleiro, não deduzido.
+- **A camada programática não morre: ela vira o HUD.** Círculo de lado, distintivo de AP/PP,
+  barra de estado e a marca do modo daltônico continuam desenhados por código, POR CIMA do
+  sprite. O sprite carrega identidade; o código carrega informação. O modo daltônico de M13
+  4/N sobrevive intacto, porque nunca dependeu da peça.
+- **Ordem de desenho importa:** sprite primeiro, HUD depois. No teste eu inverti e o sprite
+  cobriu o distintivo.
+- **Escala não-inteira é aceitável.** A 175% o tile vai a 63px e um sprite de 48 é esticado
+  1,31× — irregular na teoria, imperceptível com vizinho-mais-próximo.
+- **Detalhe responde a duas alavancas:** tamanho do quadro e o campo `detail`. 64×64 com "high
+  detail" é outro patamar em relação a 48×48 com "medium". **Consequência em aberto:** um
+  sprite de 64 só se paga se o tile subir de 36 para 48 ou 64, o que muda o enquadramento dos
+  mapas. Fica para a 1/N medir com as duas resoluções lado a lado.
+- **A animação mantém a IDENTIDADE**, que é o defeito que derrubou jogos alheios: os 9 quadros
+  são o mesmo personagem, porque o modelo anima um personagem existente em vez de gerar cada
+  quadro do zero.
+- **Mas o movimento saiu tímido.** Pedido "wide slash", veio um levantar de espada sem golpe
+  nem recuperação — usuário e eu chegamos à mesma leitura olhando separadamente. Para um jogo
+  cujo M16 inteiro foi construído sobre peso e timing, isso ainda não serve. Os três caminhos
+  a testar, do mais barato ao mais controlado: ação descrita em três fases com mais quadros;
+  `mode: "pro"`; e `animate-with-skeleton`, em que os ossos são posicionados à mão e o
+  movimento deixa de ser sorteio.
+- **Detalhe de encanamento:** as URLs de quadro do armazenamento recusam `Authorization` e
+  exigem `User-Agent` de navegador. Custou uma rodada de 403 para descobrir.
+
+### O que esta decisão custa, escrito de propósito
+
+**O rótulo de IA na Steam passa a valer para este jogo.** Ele é binário — uma textura ou o
+elenco inteiro dão a mesma marca —, e a pesquisa de 2026-09-04 mediu o preço: entre os jogos
+que fracassaram com rótulo, **72% usaram IA para VISUAL**; o estudo de Stanford aponta 18% menos
+vendas e 25% mais avaliações negativas para conteúdo de IA claramente identificável. O usuário
+recebeu esses números antes de decidir. Está registrado aqui não para reabrir a decisão, mas
+porque quem ler este arquivo daqui a um ano precisa saber que ela foi tomada de olhos abertos.
+
+**A mitigação que continua nossa:** o que separa "arte de IA" de "slop" nos casos que
+pesquisamos foi consistência e acabamento. Identidade estável entre quadros nós já temos de
+graça pelo desenho da ferramenta; o acabamento é a iteração que o usuário me autorizou a fazer.
