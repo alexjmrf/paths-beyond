@@ -321,32 +321,87 @@ ajuste é declarado e não silencioso.
 
 ---
 
-### Horizonte — o que NÃO virou milestone, e por quê
+### M25 — A camada de idioma, com inglês como língua de lançamento
+**A UI é português cru dentro do JSX**, e não há camada de i18n: `Esperar`, `Descansar (+1 AP +1
+PP)` e as cinco caixas da introdução do M23 estão escritas no lugar onde são desenhadas. D24
+decidiu que a língua de lançamento é o inglês, com português, espanhol, chinês e japonês depois.
+**Esta milestone vem antes do conteúdo por aritmética, não por gosto:** a demo do M27 traz trinta
+missões com nome e texto, e autorá-las antes da camada de idioma é escrever tudo duas vezes. O
+custo de extrair strings cresce com cada tela nova e com cada linha de conteúdo autorada.
+**Aceite:** nenhuma string visível ao jogador mora dentro do JSX ou do JSON de conteúdo — todas
+passam por uma chave; existe teste que reprova chave faltando em qualquer idioma declarado e chave
+órfã que ninguém usa; inglês e português estão completos, com o inglês como padrão e a escolha
+persistida no save ao lado das outras preferências; o texto autorado em `packages/data` (nome de
+personagem, de missão, de skill) é traduzível **sem duplicar o dado**, e a estrutura aceita
+espanhol, chinês e japonês sem mudar de forma; a introdução contextual do M23 e a varredura de
+jargão continuam valendo na língua ativa.
 
-Quatro frentes reais que **não foram escritas como milestone de propósito**, porque cada uma depende
-de uma decisão do usuário que ainda está aberta. Escrever critério de aceite para elas agora seria
-inventar a decisão junto.
+---
 
-- **Arte 2.5D / 3D.** Aberta desde 2026-08-28, em `DECISIONS.md`: o usuário declarou querer sprite
-  2.5D ou 3D, e o critério 1 do M16 ("nenhum arquivo de imagem entra no repositório") ainda está
-  escrito como definitivo. **A costura já existe** (`UnitRenderer`, M16 1/N, com teste de contrato
-  provando que é trocável), então isto é uma camada por cima e não uma reescrita — mas o tamanho da
-  milestone depende inteiramente de qual das duas direções é escolhida.
-- **Volume de conteúdo.** Seis capítulos, sete mapas, nove personagens e 41 inimigos são um
-  **piloto jogável, não um jogo publicável**. Quanto conteúdo entra depende do modelo de negócio,
-  que é o item F.
-- **Localização.** A UI é português cru no código (`Esperar`, `Descansar (+1 AP +1 PP)` direto no
-  JSX). Não há camada de i18n. Para uma loja global isso é trabalho próprio, e o custo cresce a cada
-  tela nova — vale decidir cedo **se** haverá outro idioma, mesmo que a implementação venha tarde.
-- **Monetização real.** §15 declara integração de pagamento fora de escopo e D15/D19 fecharam *que*
-  o jogo é um gacha — mas **não** se ele é pago ou F2P (item F). Sempre-online + gacha + moeda
-  premium + jogo pago na Steam é a combinação que aquela comunidade pune com mais força; F2P é o que
-  o gênero espera. A decisão muda o desenho da moeda, o volume de conteúdo exigido e a página da
-  loja, e sai mais barata agora do que depois de mais banner autorado.
+### M26 — Arte 2.5D: a peça deixa de ser desenhada por código
+**D22 decidiu: uma imagem por unidade, animada por transformação.** O que a geração por IA faz mal
+é consistência entre quadros; uma imagem por unidade elimina o problema por construção, e
+`motion.ts` já anima por transformação e não por troca de quadro — impacto, tremor, queda e
+movimento com peso continuam iguais. O `UnitRenderer` de M16 1/N foi construído como hedge para
+exatamente isto (D2), com teste de contrato provando a troca.
+**O critério 1 do M16 está formalmente reaberto por esta milestone**, e o ajuste é declarado:
+`semAssetsRaster.test.ts` deixa de exigir zero imagens e passa a exigir que imagem só exista onde
+é declarada, com manifesto e procedência. **O terreno continua programático** — distinguir terreno,
+alvenaria e portão é contraste no TILE, é o critério 2 que o usuário reprovou em 2026-08-28, e
+nenhuma camada de personagem toca nisso.
+**Aceite:** o tabuleiro desenha sprite para as unidades com o pipeline de animação de M16 intocado
+(nenhum número de `motion.ts` muda); todo personagem e todo inimigo de `packages/data` tem asset
+declarado **ou** cai explicitamente no glifo programático, com teste que reprova conteúdo novo sem
+uma das duas coisas; existe manifesto com procedência e licença de cada imagem, e o teste de assets
+reprova imagem fora dele; o modo daltônico e a marca por overlay de M13 4/N continuam legíveis
+sobre o sprite; e a integração da ferramenta de geração é uma porta injetável — o pipeline roda com
+uma implementação de mentira em teste, como o validador de identidade e o atualizador já fazem.
 
-**Uma pendência de processo, que não é milestone e é do usuário:** a árvore tem **47 arquivos não
-commitados** cobrindo as sub-sessões 6/N e 7/N, e o último commit é o da 5/N. Duas sub-sessões
-inteiras de trabalho existem só na máquina local. Nenhum roadmap conserta isso.
+---
+
+### M27 — A demo: três capítulos, trinta missões
+**D23 recortou o lançamento:** três capítulos iniciais de uma linha de história, dez missões cada.
+Hoje `encounters` tem **seis capítulos de um encontro cada** — capítulo *é* missão —, então isto é
+mudança de FORMA antes de ser de volume: duas camadas (capítulo → missões), no schema, em
+`GET /campaign`, na tela e no que "primeira completude" significa para a moeda premium.
+Junto vem a consequência de D21 que só pode ser medida quando o conteúdo existir: **o jogador que
+nunca paga precisa progredir** pelas quatro fontes autoradas no M18 4/N, e nenhuma tela pode exigir
+pagamento para continuar.
+**Aceite:** o schema de campanha tem capítulo e missão como camadas distintas, e a campanha antiga
+migra sem perder o que o jogador já limpou; as trinta missões existem, são jogáveis ponta a ponta e
+passam pelo `pnpm balance` com os dois critérios do M8; uma conta que nunca gasta dinheiro real
+completa os três capítulos, provado por teste que parte de servidor vazio (o mesmo idioma de
+`primeiraSessao.test.ts`); a energia e o summon aceleram e nunca destravam — nenhuma missão exige
+moeda premium; e a primeira completude paga por MISSÃO ou por CAPÍTULO com a escolha registrada,
+porque trinta missões pagando o valor de capítulo mudaria a economia inteira.
+
+---
+
+### Horizonte — RESOLVIDO em 2026-09-04, e o que sobrou
+
+As quatro frentes desta seção existiam porque cada uma dependia de uma decisão do usuário que
+estava aberta. **As quatro foram fechadas** (D21–D24 em `DECISIONS.md`) e viraram M25, M26 e M27:
+
+- **Monetização (D21):** F2P, sempre-online, gacha e moeda premium. Não virou milestone própria —
+  ela confirma o que M14 e M18 já construíram, e a consequência que exige trabalho ("quem nunca
+  paga precisa progredir") é critério de aceite do **M27**, porque só pode ser medida quando o
+  conteúdo da demo existir.
+- **Arte (D22):** sprite 2.5D com uma imagem por unidade, animada por transformação → **M26**.
+- **Volume (D23):** a demo é três capítulos de dez missões → **M27**.
+- **Localização (D24):** inglês como língua de lançamento → **M25**, e ela vem PRIMEIRO porque
+  autorar trinta missões antes da camada de idioma é escrever tudo duas vezes.
+
+**O que continua fora de milestone, e por quê:**
+
+- **Integração de pagamento.** §15 a mantém fora de escopo, e D21 acrescenta um motivo: numa loja
+  de desktop, quem cobra é a plataforma.
+- **A história.** O usuário declarou tê-la pensada e que ela "não é tão relevante no momento". O
+  M27 constrói a ESTRUTURA que ela vai ocupar; o texto entra depois, e já traduzível por M25.
+- **Espanhol, chinês e japonês.** M25 deixa a estrutura pronta para os três; autorar cada idioma é
+  trabalho de tradução, não de engenharia, e depende do texto final da demo.
+
+**A pendência de processo desta seção foi resolvida em 2026-09-04:** os 47 arquivos não commitados
+viraram 140 e foram commitados em sete commits, de M18 6/N a M24. A árvore está limpa.
 
 ---
 
@@ -357,4 +412,4 @@ inteiras de trabalho existem só na máquina local. Nenhum roadmap conserta isso
 - **Alcance de assistência:** começar em 2 tiles para melee e `duelRange` para ranged. Se assistências dispararem em mais de 70% dos duelos, elas viraram obrigatórias e não decisão — encareça o custo em PP.
 - **Duelo ranged unilateral (§6.1):** é forte de propósito. Se arqueiros dominarem, a correção é reduzir o dano deles, não permitir contra-ataque — a assimetria é o que dá identidade tática ao alcance.
 - **Permadeath:** sugestão de `classic` como padrão, com `casual` disponível desde o início.
-- **Monetização:** ~~fora do escopo~~ — **resolvido no M18** (2026-09-02): o jogo é um gacha com núcleo de história, e a restrição virou D15/D19 em `DECISIONS.md`. A parte que continua valendo ao pé da letra: o gacha **NÃO** toca em `packages/core` — a rolagem vive em `packages/gacha`. Integração de pagamento segue fora do escopo.
+- **Monetização:** ~~fora do escopo~~ — **resolvida em duas etapas.** *O quê* (M18, 2026-09-02): o jogo é um gacha com núcleo de história (D15/D19). *Com ou sem preço de entrada* (2026-09-04): **F2P** (D21). A parte que continua valendo ao pé da letra: o gacha **NÃO** toca em `packages/core` — a rolagem vive em `packages/gacha`. Integração de pagamento segue fora do escopo, e agora com um motivo a mais: numa loja de desktop, quem cobra é a plataforma.

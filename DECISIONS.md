@@ -6083,3 +6083,97 @@ Se o jogo soa BEM. Isso é julgamento do usuário, como a estética sempre foi n
 instante certo, com o ganho certo, e que ele não vira borrão.
 
 **Suíte: 152 arquivos, 2121 testes.** `validate:data` inalterado em 29/204.
+
+---
+
+## As quatro decisões de horizonte, fechadas pelo usuário em 2026-09-04
+
+O fim de `09-roadmap.md` listava quatro frentes que **não viraram milestone de propósito**, porque
+cada uma dependia de uma decisão que ainda estava aberta. As quatro foram fechadas. Abaixo, o que
+foi decidido e o que cada uma passa a exigir — e, a partir daqui, elas viram spec e milestone.
+
+### D21 — Monetização: F2P, sempre-online, gacha e moeda premium
+
+**Decisão do usuário.** O jogo não tem preço de entrada.
+
+Isto **confirma** o que o projeto já vinha construindo (D15/D19 fecharam o gacha; M14 e M18 fizeram
+a economia server-authoritative) e **fecha** a pergunta que estava aberta desde então: se o jogo era
+pago ou gratuito. O roadmap já registrava o risco do outro caminho — sempre-online + gacha + moeda
+premium **+ preço de entrada** é a combinação que a comunidade de desktop pune com mais força.
+
+**O que a decisão passa a exigir, e não é retórica:**
+
+- **O jogador que nunca paga precisa progredir.** As quatro fontes de moeda premium autoradas no
+  M18 4/N (história, primeira completude, conquistas, eventos) deixam de ser "um extra" e passam a
+  ser **o** caminho — e isso é um requisito de balanceamento a ser medido quando o conteúdo da demo
+  existir, não uma afirmação a fazer agora.
+- **Nenhuma tela pode exigir pagamento para continuar.** A energia comprável e o summon continuam
+  sendo aceleradores; a campanha não pode depender de nenhum dos dois.
+- **Integração de pagamento continua fora de escopo** (§15), e agora por um motivo a mais: numa loja
+  de desktop, quem cobra é a plataforma.
+
+### D22 — Arte: sprite 2.5D com UMA imagem por unidade, animada por código
+
+**Decisão delegada a mim pelo usuário** ("a que você achar melhor para desenvolver por meio de IA"),
+com a preferência declarada por 2D/2.5D e abertura para 3D se aquilo se mostrasse complicado.
+**Escolha: 2.5D, e não é por preferência estética — é pelo lugar onde a geração por IA quebra.**
+
+**1. O que a IA de imagem faz mal é CONSISTÊNCIA ENTRE QUADROS.** Uma folha de sprites com oito
+quadros de caminhada, para nove personagens e 41 inimigos, é o pior caso possível: cada quadro sai
+um personagem ligeiramente diferente, e em movimento o olho pega isso imediatamente. **Uma imagem
+por unidade elimina o problema por construção** — não há segundo quadro com quem ser inconsistente.
+
+**2. O projeto já tem o motor que torna isso suficiente.** `motion.ts` (M16) anima por
+TRANSFORMAÇÃO — impacto com pico, tremor, queda, movimento com peso por tipo de unidade —, não por
+troca de quadro. Trocar o glifo desenhado por um sprite não muda uma linha de animação. Foi
+exatamente para isto que o `UnitRenderer` foi construído (D2), e o teste de contrato com o renderer
+alternativo já prova que a costura aguenta.
+
+**3. Por que 3D foi descartado.** O cliente é PixiJS, que é 2D: 3D significaria trocar o renderer
+inteiro (three.js) e reescrever `MapCanvas`. E a geração de malha por IA entrega topologia ruim e
+rig nenhum — sem alguém que saiba modelar, **o gargalo passa a ser o rig, não a arte**, que é
+justamente a habilidade que o usuário declarou não ter.
+
+**4. Por que pixel art foi descartada.** É o pior caso para IA: ela produz "estilo pixel art" fora
+de grade, com paleta inconsistente e anti-aliasing onde não pode haver. O conserto é manual, pixel
+a pixel, e exige exatamente a habilidade que não está disponível.
+
+**5. O terreno continua programático, e isso não é economia.** É o critério 2 do M16 que o usuário
+REPROVOU em 2026-08-28: distinguir terreno, alvenaria e portão é contraste de valor e forma no
+TILE, e nenhuma camada de personagem toca nisso. Pior: sprite de personagem sobre tile gerado por
+IA reduziria a legibilidade tática — o pilar de §1.1 — porque o fundo passaria a competir com a
+peça em detalhe.
+
+**Consequência formal, declarada e não silenciosa:** o critério 1 do M16 ("nenhum arquivo de imagem
+entra no repositório") **está reaberto por esta decisão**. Imagem passa a entrar, confinada a um
+diretório de assets com manifesto e procedência declarada, e `semAssetsRaster.test.ts` muda de
+"zero imagens" para "imagem só onde é declarada". Ele não é apagado: vira a trava do novo contrato.
+
+**O que eu preciso do usuário para executar:** uma ferramenta de geração de imagem alcançável daqui,
+com (a) condicionamento por imagem de referência — é o que mantém o personagem o mesmo entre as
+variações dele — e (b) fundo transparente, ou um removedor de fundo. O resto é meu: o pipeline, o
+manifesto, os testes e a especificação de cada peça derivada do que já está autorado em
+`packages/data` (classe, arma, papel e árvore de cada personagem já descrevem o que a imagem
+precisa mostrar).
+
+### D23 — Volume: a demo é 3 capítulos de 10 missões
+
+**Decisão do usuário.** O recorte de lançamento é uma DEMO: três capítulos iniciais de uma linha de
+história, dez missões cada — trinta missões.
+
+Isto muda a forma da campanha e não só a quantidade. Hoje `encounters` tem **seis capítulos de um
+encontro cada**: capítulo *é* missão. O modelo pedido tem duas camadas (capítulo → missões), e essa
+é uma mudança de schema, de rota (`GET /campaign`) e de tela, não de volume.
+
+A história em si fica para depois, por decisão do usuário ("não é tão relevante no momento"). O que
+não fica para depois é a ESTRUTURA que ela vai ocupar.
+
+### D24 — Localização: inglês é a língua de lançamento
+
+**Decisão do usuário.** Inglês primeiro, por ser a língua global. Depois — e nesta ordem de
+interesse — português, espanhol, chinês e japonês.
+
+**O custo cresce com cada tela e com cada missão autorada**, e é por isso que esta decisão tem
+consequência de ORDEM: a UI hoje é português cru dentro do JSX (`Esperar`, `Descansar (+1 AP +1
+PP)`), e as trinta missões da demo vêm com nome e texto. Autorar trinta missões antes da camada de
+idioma é escrever tudo duas vezes.
