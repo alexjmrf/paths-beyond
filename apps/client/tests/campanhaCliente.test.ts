@@ -217,6 +217,48 @@ describe('entrar no capítulo', () => {
     expect(pedido.body.heroIds).toEqual(['h-aren']);
   });
 
+  // M26 3/N — a arte que vem junto do setup.
+  it('guarda o mapa de arte do ticket, e ele sobrevive à montagem do tabuleiro', async () => {
+    conectado();
+    responder('/api/campaign/encounter-campanha-1/ticket', {
+      nonce: 'n-1',
+      seed: 7,
+      rulesVersion: 'x',
+      setup: SETUP,
+      characterIdByUnitId: { 'player-h-aren': 'hero-jogador' },
+      chapterId: 'encounter-campanha-1',
+    });
+    useBattleStore.getState().selectChapter('encounter-campanha-1');
+    useBattleStore.getState().toggleCampaignHero('h-aren');
+
+    await useBattleStore.getState().enterChapter('encounter-campanha-1');
+
+    // `player-h-aren` é o `unitId` do tabuleiro e `hero-jogador` é a entrada do manifesto.
+    // Sem esta linha o cliente teria de adivinhar uma pela outra, e é exatamente o que ele
+    // não consegue fazer nos modos que não têm roster.
+    expect(useBattleStore.getState().artIdByUnitId).toEqual({ 'player-h-aren': 'hero-jogador' });
+  });
+
+  it('sair do capítulo esvazia o mapa — arte de outra batalha no tabuleiro seguinte é pior que glifo', async () => {
+    conectado();
+    responder('/api/campaign/encounter-campanha-1/ticket', {
+      nonce: 'n-1',
+      seed: 7,
+      rulesVersion: 'x',
+      setup: SETUP,
+      characterIdByUnitId: { 'player-h-aren': 'hero-jogador' },
+      chapterId: 'encounter-campanha-1',
+    });
+    useBattleStore.getState().selectChapter('encounter-campanha-1');
+    useBattleStore.getState().toggleCampaignHero('h-aren');
+    await useBattleStore.getState().enterChapter('encounter-campanha-1');
+    expect(useBattleStore.getState().artIdByUnitId).not.toEqual({});
+
+    useBattleStore.getState().exitPvp();
+
+    expect(useBattleStore.getState().artIdByUnitId).toEqual({});
+  });
+
   it('sem herói escolhido não manda requisição', async () => {
     conectado();
     useBattleStore.getState().selectChapter('encounter-campanha-1');

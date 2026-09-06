@@ -1,0 +1,20 @@
+{
+  "unitId": "enemy-forja-guarda-couracado",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/enemy-forja-guarda-couracado.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/enemy-forja-guarda-couracado-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/enemy-forja-guarda-couracado-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a heavily armoured knight in thick layered plate, wielding a heavy two-handed battle axe, dark crimson and blackened iron colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 2841407275,
+    "characterId": "99939795-0b40-4640-b1c7-6ab216e3aa2a",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}

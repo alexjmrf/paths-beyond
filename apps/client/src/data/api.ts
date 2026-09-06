@@ -119,6 +119,13 @@ export interface BattleTicket {
   readonly rulesVersion: string;
   readonly setup: BattleSetup;
   readonly defenderPlayerId: string;
+  // M26 3/N — quem é cada unidade do tabuleiro, para DESENHAR. `BattleUnit.heroId` guarda a
+  // INSTÂNCIA de herói e o manifesto de arte é indexado pelo PERSONAGEM; na campanha o cliente
+  // fecha essa distância pelo roster, e em PvP não fecha nem em princípio — o time do defensor
+  // são instâncias de outra conta. Viaja ao lado do setup, e não dentro dele, para
+  // `packages/core` ficar intocado e `RULES_VERSION` não subir por um dado que nenhuma regra lê.
+  // Unidade ausente do mapa cai no glifo do M16, que é o caso normal de uma ficha de cenário.
+  readonly characterIdByUnitId: Readonly<Record<string, string>>;
 }
 
 // §9.1 (M15, sub-sessão 3/N) — o time que defende o castelo do jogador enquanto ele está
@@ -154,6 +161,8 @@ export interface StoredReplayResponse {
   readonly attackerPlayerId: string;
   readonly defenderPlayerId: string;
   readonly createdAt: string;
+  // Ver `BattleTicket.characterIdByUnitId`.
+  readonly characterIdByUnitId: Readonly<Record<string, string>>;
 }
 
 // §10 (M14, sub-sessão 5/N) — a economia PvE. O servidor já resolve a disponibilidade de
@@ -188,6 +197,8 @@ export interface DungeonTicket {
   readonly rulesVersion: string;
   readonly setup: BattleSetup;
   readonly dungeonId: string;
+  // Ver `BattleTicket.characterIdByUnitId`.
+  readonly characterIdByUnitId: Readonly<Record<string, string>>;
 }
 
 export interface DungeonRunRewards {
@@ -243,6 +254,8 @@ export interface CampaignTicket {
   readonly rulesVersion: string;
   readonly setup: BattleSetup;
   readonly chapterId: string;
+  // Ver `BattleTicket.characterIdByUnitId`.
+  readonly characterIdByUnitId: Readonly<Record<string, string>>;
 }
 
 export interface CampaignRunResponse {

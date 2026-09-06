@@ -211,6 +211,31 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)(@vitest/browser@2.1.9)(msw@2.15.0(@types/node@22.20.1)(typescript@5.9.3))
 
+  tools/art:
+    dependencies:
+      '@paths-beyond/content':
+        specifier: workspace:*
+        version: link:../../packages/content
+      '@paths-beyond/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@paths-beyond/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.1
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(@vitest/browser@2.1.9)(msw@2.15.0(@types/node@22.20.1)(typescript@5.9.3))
+
   tools/balance:
     dependencies:
       '@paths-beyond/content':

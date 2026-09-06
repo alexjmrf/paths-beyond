@@ -1,0 +1,21 @@
+{
+  "name": "@paths-beyond/tools-art",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/cli.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paths-beyond/content": "workspace:*",
+    "@paths-beyond/core": "workspace:*",
+    "@paths-beyond/data": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

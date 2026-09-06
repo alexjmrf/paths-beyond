@@ -6385,3 +6385,378 @@ porque quem ler este arquivo daqui a um ano precisa saber que ela foi tomada de 
 **A mitigação que continua nossa:** o que separa "arte de IA" de "slop" nos casos que
 pesquisamos foi consistência e acabamento. Identidade estável entre quadros nós já temos de
 graça pelo desenho da ferramenta; o acabamento é a iteração que o usuário me autorizou a fazer.
+
+---
+
+## M26 — Arte: a peça deixa de ser desenhada por código
+
+### M26 — sub-sessão 1/N: a costura, o manifesto, e a medição que corrigiu D25
+
+`packages/core` sem uma linha alterada e nenhuma regra tocada em `packages/data`;
+`RULES_VERSION` fica em `0.19.0`. O que entrou em `packages/data` é conteúdo novo (o manifesto de
+arte), não regra.
+
+#### D26 — A resolução do quadro é IGUAL ao tile, e o tile subiu para 64
+
+**D25 deixou em aberto "48 ou 64", e a medição na tela respondeu outra coisa: a pergunta estava
+mal-posta.** D25 tinha registrado que "escala não-inteira é aceitável — a 175% o tile vai a 63px e
+um sprite de 48 é esticado 1,31×, imperceptível com vizinho-mais-próximo". **Isso vale para
+AMPLIAR e não para reduzir.** Vizinho-mais-próximo não faz média: ele descarta. Um quadro de 48
+desenhado num tile de 36 perde uma linha de pixel em cada quatro; um de 64 no mesmo tile perde
+quase metade. Medido com o cliente rodando, capítulo 1, com `image-rendering: pixelated` para ver
+os pixels como eles são — a espada vira um tracejado e a armadura vira borrão.
+
+**A regra que substitui a pergunta: o quadro é igual ao tile a 100%**, e toda escala de §11 acima
+disso vira uma AMPLIAÇÃO, que é o caso que D25 já tinha aprovado. Com isso a decisão deixou de ser
+sobre a arte e passou a ser sobre o TILE.
+
+**O usuário escolheu tile 64 / quadro 64, sabendo o preço**, depois da bateria de animação abaixo.
+As três opções e o que cada uma custava estavam na mesa: 36 não reenquadra nada mas devolve uma
+peça quase tão pobre quanto o glifo; 48 cabe em tudo; 64 tem o melhor detalhe e a melhor
+consistência e **não cabe** — um mapa 20×15 a 175% pede 2240px.
+
+**O preço foi pago pela ROLAGEM do tabuleiro, e não por cortar as escalas de acessibilidade**, que
+são requisito duro de §11. `main` ganhou `min-width: 0` e `.map-canvas` ganhou `overflow: auto` com
+`max-width: 100%` — sem isso um filho flex nunca encolhe abaixo do conteúdo e o tabuleiro
+empurraria os painéis para fora da tela em vez de rolar. Verificado na tela a 175%: canvas
+1792×1792, janela do tabuleiro 1322×1086, rolável nos dois eixos, painéis inteiros e legíveis.
+
+**Rolar cria um defeito próprio, e ele é pior que o que resolve:** a unidade selecionada pode ficar
+fora da janela, e seleção invisível falha §1.1 de um jeito pior do que o glifo genérico falhava.
+Daí `logic/enquadramento.ts` — pura, testada sem browser, no mesmo padrão de `motion.ts` (M16 3/N):
+não mexe se já está visível (reenquadrar a cada clique faz o tabuleiro saltar), move o MÍNIMO
+(centralizar jogaria fora o contexto em volta da peça, que num jogo tático é metade da decisão) e
+nunca sai do conteúdo. Verificado na tela: clicar numa peça colada na borda inferior rolou 90px no
+eixo vertical e **zero** no horizontal.
+
+#### D27 — Os quadros gerados estão FORA, e o motivo não é o que D25 supunha
+
+D25 registrou que o movimento gerado saiu tímido e listou três caminhos a testar. **O primeiro
+resolveu o problema que D25 viu, e revelou outro, abaixo da resolução.**
+
+Bateria: 2 unidades × 2 resoluções × 4 movimentos = **16 animações geradas de verdade**, por
+esqueleto (`mode: template`). Consistência medida em número, relativa ao quadro 0 e normalizada
+pelo tamanho do quadro, com a cor quantizada a 5 bits por canal para ruído de compressão não contar
+como "cor nova":
+
+| | derivaPaleta | coresNovas/base | derivaÁrea |
+| --- | --- | --- | --- |
+| média 48px | 1,3% | 4,1 / 49,4 | 16,1% |
+| média 64px | **0,4%** | **1,5 / 62,1** | **14,3%** |
+
+**64 é três vezes mais consistente, e a distância cresce com a dificuldade do assunto.** No caso
+difícil é gritante: a grifeira a 48 dá 6,0% de deriva e 13 cores inventadas — nos quadros ela se
+desmonta, a montaria some no terceiro quadro e no quarto sobra uma asa flutuando. A 64: 0,9% e 4
+cores, e ela continua sendo a mesma grifeira nos sete quadros.
+
+**Mas a bateria respondeu uma pergunta que ninguém tinha feito, e ela é a que decide: a ARMA não
+sobrevive em resolução nenhuma.** A 48 a espada golpeia nos quadros 2–4 e some do 5 em diante; a 64
+o corpo é mais estável e a espada some ainda mais cedo, e o escudo se duplica. O motivo é
+estrutural: o animador de esqueleto anima um **corpo**, e a espada não é osso — ela é reimaginada a
+cada quadro.
+
+**Para este jogo isso é desqualificante.** §6.1 faz a arma decidir o alcance no duelo; a arma é a
+identidade tática da peça. Uma peça que golpeia sem espada mente sobre a regra que o duelo vai
+aplicar. **O tabuleiro fica com o desenho de D22 — uma imagem por unidade, animada por
+transformação — e `motion.ts` continua sem uma linha alterada.** O caminho dos quadros gerados fica
+fechado com medida em vez de impressão; reabri-lo exigiria que a arma fosse parte do esqueleto, e
+isso não é um parâmetro da API.
+
+#### O que mais a medição achou, e que não estava previsto
+
+- **PvP, masmorra e replay não têm arte.** `heroesByUnitId` chega VAZIO nesses modos — o
+  `BattleSetup` vem pronto do servidor sem o `characterId` —, então o herói do jogador cai no glifo
+  do M16 lá. Na campanha os dois lados resolvem: o inimigo autorado carrega o próprio id em
+  `heroId` (`assemble.ts:184`) e o herói vem pelo roster, no mesmo caminho que
+  `characterTreeForUnit` (M17 4/N) já usa. **Consertar é o servidor mandar o `characterId` no
+  setup — é trabalho de servidor, e fica para a 2/N.**
+- **A plaqueta de AP/PP cobria a cabeça da peça.** Em M16 ela não tinha teto, e isso não incomodava
+  ninguém: o glifo é baixo e centrado, e o topo do tile estava vazio. O sprite tem cabeça. Entrou o
+  token `labelPlateMaxRatio` (0,42), **em fração do tile e não em pixels**, para a propriedade
+  valer em qualquer tile e em qualquer escala de §11 por construção — e não por a conta dar certo
+  no tamanho de hoje. **O que encolhe é o fundo, não o número:** §11 exige AP/PP legíveis sem
+  hover, e a fonte continua acompanhando a escala de UI.
+- **A API tem limite de jobs em voo, e ela chama isso de erro.** Disparadas 16 animações de uma
+  vez, 8 entraram e 8 voltaram com 429 "Not enough concurrent job slots" (e um 500 "Failed to start
+  any animation jobs", que é o mesmo assunto com outro código). Sem reenvio, a geração das
+  cinquenta unidades da 2/N seria um trabalho de babá — e pior, um em que a metade que falhou é
+  silenciosa até alguém conferir o diretório. O cliente passou a reenviar com espera crescente e
+  com teto, distinguindo fila de erro de verdade: 500 genérico e 401 falham na primeira tentativa,
+  porque chave errada não melhora com paciência.
+- **O template `attack` não existe para o esqueleto `mannequin`.** Os golpes disponíveis são de
+  corpo (`cross-punch`, `surprise-uppercut`, `high-kick`…). Com a espada na mão, o braço que cruza
+  é o talho — e o arco existe. É o que torna o defeito da arma tão claro.
+
+#### O critério 1 do M16, reaberto por D22 e agora com trava nova
+
+`semAssetsRaster.test.ts` **não foi apagado: virou a trava do contrato novo**, exatamente como D22
+mandou. Ele ficou MAIS forte, não mais fraco: antes perguntava uma coisa ("existe imagem?"), agora
+pergunta três — se a imagem está no diretório declarado, se ela está no manifesto, e (do outro
+lado, em `packages/data/tests/arteDeUnidade.test.ts`) se o manifesto não promete arquivo que não
+existe. **Nenhuma das duas metades basta sozinha:** sem esta, um PNG entra em qualquer canto do
+repositório sem origem; sem a outra, o manifesto promete arquivos que não vieram no commit.
+
+**A palavra que carrega o peso do critério de aceite é "explicitamente".** Por isso o glifo também
+tem arquivo, e o arquivo exige um `motivo`: sem ele, "sem sprite" e "esqueci de gerar o sprite"
+seriam o mesmo estado do repositório, e a diferença só apareceria quando alguém abrisse o jogo e
+visse um disco cinza no meio de cinquenta personagens desenhados.
+
+#### Onde cada coisa mora, e por quê
+
+- **O manifesto é CONTEÚDO** (`packages/data/unit-art/`, uma entrada por unidade, Zod, dentro do
+  `pnpm validate:data`). Regra 4. Quem responde "esta unidade tem arte?" tem de ser dado versionado
+  que o autor de conteúdo enxerga, não código do cliente.
+- **Os bytes são asset do CLIENTE** (`apps/client/src/art/units/`). Pô-los em `packages/data` faria
+  o servidor e o `sim-cli` carregarem imagem que nunca desenham.
+- **O glifo do M16 NÃO foi aposentado.** Ele é a representação de toda unidade sem arte, e o
+  renderer de sprite cai nele unidade a unidade — é o que permite o elenco ganhar arte aos poucos
+  sem o tabuleiro ficar meio desenhado e meio vazio. Sem arte, a saída é **idêntica** à do
+  `shapeUnitRenderer`, e há teste disso.
+- **O prompt é DERIVADO, não escrito à mão** (`tools/art/src/prompt.ts`), como D22 pediu. Cinquenta
+  prompts à mão seriam cinquenta chances de o elenco não parecer o mesmo jogo, e D25 registrou que
+  consistência é o que separa "arte de IA" de "slop". O bloco de estilo é literalmente o mesmo
+  texto em todas as peças; o que varia vem de campo já autorado (arma, tipo de unidade, tipo de
+  movimento, lado).
+- **A costura de M16 aguentou a troca sem ser reescrita.** `activeUnitRenderer` mudou de UMA linha,
+  o `MapCanvas` não sabe que a peça agora é imagem (ele traduz uma primitiva a mais), e os TRÊS
+  renderers — o de formas, o alternativo mínimo de D3 e o de sprite — passam pelo MESMO contrato. É
+  o hedge de D2 sendo cobrado cinco milestones depois.
+
+#### O que ficou para a 2/N
+
+Gerar as 48 unidades restantes a 64px (o custo real é ~2 gerações por unidade, de 1993 disponíveis
+no ciclo); o `characterId` no `BattleSetup` para PvP, masmorra e replay terem arte; e olhar o
+tabuleiro cheio de sprites, que é diferente de olhar dois.
+
+### M26 — sub-sessão 2/N: a tela de duelo, e a arma que sai dos pixels
+
+`packages/core` sem uma linha alterada e nenhuma regra tocada em `packages/data`;
+`RULES_VERSION` fica em `0.19.0`. **Nenhum número de `motion.ts` mudou** — os 40 testes de M16
+3/N passam sem ajuste, e o critério de aceite do M26 sobre isso continua verdadeiro.
+
+#### D28 — A identidade da arma sai dos pixels gerados e entra no efeito, que é código
+
+**A ideia é do usuário**, e ela ataca exatamente o ponto onde a geração falhou. D27 mediu que os
+quadros gerados perdem a ARMA; §6.1 faz a arma decidir o alcance no duelo, e uma peça que golpeia
+sem espada mente sobre a regra que o duelo vai aplicar. A saída: o sprite carrega **quem a pessoa
+é**, e o corte, a estocada, a flecha e o clarão carregam **o que ela fez**.
+
+**A aritmética inverte junto, e é o argumento mais forte a favor:** o efeito é por TIPO DE ARMA
+(são 7) e por desfecho, não por unidade (são 50). Autora-se uma vez, em código, determinístico e
+testável — e o modo daltônico de M13 4/N sobrevive de graça, porque quem distingue os efeitos é a
+FORMA e não a cor (arco de corte, reta com ponta, flecha, estouro radial, espiral, coluna).
+
+**Uma medida a mais, tirada depois de a ideia surgir, e ela derrubou a minha própria hipótese.**
+Eu saí de 1/N achando que golpes largos quebravam e movimentos pequenos aguentariam — logo, um
+idle gerado seria seguro. **Falso:** no `walking`, a animação de MENOR amplitude da bateria e a de
+melhores números (0,2% de deriva de paleta, 1,4% de deriva de área a 64px), a espada não aparece
+em quadro nenhum a 64 e o escudo se duplica. O modelo re-sintetiza o personagem a cada quadro, e a
+arma é o elemento menos estável dele **independentemente de quanto ele se mexe**.
+
+**E as minhas medidas não pegaram isso.** Deriva de paleta não vê: o aço da espada é o mesmo aço da
+armadura. Deriva de área não vê: uma espada fina é pouca área. Quem pegou foi o olho, na tira. Fica
+registrado porque o número me deu confiança onde eu não devia ter tido — e porque a próxima sessão
+que for medir consistência de sprite precisa saber que essas duas métricas têm esse ponto cego.
+
+**Consequência:** o idle também é por TRANSFORMAÇÃO, e não por quadro gerado. `idleMotion` é uma
+respiração — estica no eixo Y, achata no X, sobe um triz —, com ciclo derivado do perfil de peso de
+M16 3/N (o couraçado respira mais devagar que o mensageiro). **Consistente por construção: não
+existe segundo quadro com quem ser inconsistente**, que é o item 1 de D22 aplicado ao tempo.
+
+#### D29 — A tela de duelo, e as três coisas que ela não podia quebrar
+
+**Decisão do usuário:** tela de resolução como Fire Emblem e Unicorn Overlord, com efeito, sem
+precisar de detalhe. **A tela SUBSTITUI a animação de duelo do tabuleiro, com interruptor** — o
+terceiro nível, entre assistir a cena e o modo resultado instantâneo de §11. O farm de masmorra
+vive nesse meio-termo: quem repete a mesma masmorra vinte vezes não quer a cena, mas ainda quer ver
+o tabuleiro.
+
+**A pose custou ZERO geração, e essa foi a descoberta que barateou a milestone inteira.**
+`create-character-v3` produz as **8 rotações** numa passada só, e a 1/N baixava uma. As outras sete
+estavam paradas do lado da PixelLab, presas ao mesmo `characterId` que o manifesto já guardava.
+Escolhida (pelo usuário) a pose de **três quartos** — sudeste para quem está à esquerda, sudoeste
+para quem está à direita — porque mostra rosto, arma e montaria ao mesmo tempo, e reconhecimento de
+personagem é o problema que D22 nomeou ao escolher esta direção de arte. Entrou `pnpm art --
+completar <unitId>`, que baixa rotações que faltam de um personagem que já existe: o `characterId`
+no manifesto deixou de ser só procedência e passou a ser ferramenta.
+
+**A ESQUIVA passa a aparecer, e só na tela.** §8 dá à `spd` exatamente três benefícios, e a evasão
+com teto é um deles — se o jogador nunca a vê acontecer, o stat vira número de planilha. Mas M16
+3/N estabeleceu o contrário para o tabuleiro: "ação que não causou dano não vira batida", porque
+sacudir uma peça num golpe que errou seria a animação contradizendo o core. **As duas coisas são
+verdadeiras ao mesmo tempo**, então há duas leituras do mesmo log: `duelBeats` (tabuleiro,
+intocada) e `duelSceneBeats` (tela). O risco de duas leituras é divergirem, e é o que o teste de
+PARIDADE cobra: filtrar as batidas da tela pelas que têm dano tem de devolver exatamente as do
+tabuleiro. Os três campos novos em `DuelChoreographyInput` (`hit`, `isCrit`, `skillId`) são
+opcionais e aditivos — nenhuma fixture de M16 mudou.
+
+**A decisão de abrir a cena mora num lugar só, e a primeira versão errou isso.** Eu liguei a cena
+no `confirmEngage`, e a verificação em navegador mostrou o buraco: **o duelo iniciado pela IA não
+passa por lá**, então a fase inimiga ficaria sem tela — meia funcionalidade, e as duas referências
+que o usuário deu mostram as duas fases. `AiTurnStep` já carrega `stateBefore` e `duelResult`, e o
+duelo do jogador e o da IA já viravam a mesma lista de cenas no `MapCanvas` desde M16 4/N. A porta
+virou `abrirCenaDeDuelo(stateBefore, duelResult)`, chamada de lá, para os dois casos.
+
+**A sequência é INTERCALADA, e isso exigiu uma ref.** A IA anda, engaja, anda de novo. O tabuleiro
+toca até o primeiro duelo, entrega o duelo à cena e guarda o resto em `cenasPendentesRef`; quando a
+cena fecha, o efeito roda de novo (`duelScene` é dependência dele) e retoma. A alternativa — tocar
+todos os movimentos e só então todos os duelos — conta a mesma batalha na ordem errada.
+
+#### O bug que a verificação em navegador achou, e que teria sobrevivido a qualquer teste
+
+**O "Pular" dependia do relógio.** Ele marcava uma ref que o `ticker` do Pixi lia — e o `ticker`
+anda com `requestAnimationFrame`, que o navegador **pausa em aba oculta**. Visto na verificação: com
+a aba em segundo plano a cena congela no primeiro golpe, e um botão de pular que depende do mesmo
+relógio parado deixa o jogador preso numa tela modal, sem saída. Agora ele fecha direto. Isso não
+custa nada em correção porque o estado da batalha é commitado ANTES de a cena abrir: a cena só conta
+o que o core já decidiu (D4, regra 3).
+
+#### O que foi visto na tela, e o que não foi
+
+**Visto:** a cena abre num duelo iniciado pela IA; desenha o atacante e o defensor de três quartos,
+um olhando para o outro; a unidade COM arte sai como sprite e a SEM arte cai no disco de lado do
+M16, lado a lado, sem buraco; o arco de corte da espada é desenhado sobre o alvo; o número de dano
+aparece por cima; e o "Pular" fecha mesmo com o relógio parado.
+
+**NÃO visto:** a sequência inteira animando. A aba do navegador ficou em segundo plano
+(`document.visibilityState === 'hidden'`) e o Chrome pausa o `requestAnimationFrame`, então o que
+apareceu foi um quadro congelado. **O julgamento de "o golpe tem peso" continua sendo do usuário**,
+e é o último item aberto do aceite do M26.
+
+#### O que ficou para a 3/N
+
+Gerar as 48 unidades restantes a 64px, já baixando as três poses; o `characterId` no `BattleSetup`
+para PvP, masmorra e replay terem arte (hoje `heroesByUnitId` chega vazio nesses modos e tudo cai no
+glifo); e ajustar o peso do efeito depois do olho do usuário.
+
+### M26 — sub-sessão 3/N: o elenco inteiro, e a arte chegando aos três modos que não tinham
+
+`packages/core` sem uma linha alterada — `git status packages/core` vazio ao fim da sessão — e
+nenhuma regra tocada em `packages/data`; `RULES_VERSION` fica em `0.19.0`. **Nenhum número de
+`motion.ts` mudou.** O que entrou em `packages/data` é conteúdo: 48 manifestos que deixaram de
+declarar glifo e passaram a declarar sprite.
+
+#### O elenco: 50 de 50, e o lote foi construído antes de ser rodado
+
+A 1/N e a 2/N geraram DUAS peças. O que sobrava era volume, e volume é onde `gerar <unitId>`
+deixa de servir: o critério de aceite pede um script **repetível**, e 48 invocações à mão não são
+repetíveis por ninguém — nem hoje, nem no dia em que o bloco de estilo de `prompt.ts` mudar e o
+elenco tiver de nascer de novo.
+
+`tools/art/src/lote.ts` ataca as três falhas que o lote tem e a peça sozinha não tem, e as três
+saíram de medida da 1/N e não de imaginação:
+
+- **A fila da API.** 1/N mediu 8 de 16 trabalhos recusados com "Not enough concurrent job slots".
+  O teto de trabalhos em voo ficou em **4, metade do teto da conta**: encostar no teto faz a API
+  recusar e o cliente pagar espera crescente, 48 vezes.
+- **A interrupção.** Uma execução de meia hora vai ser interrompida, e retomar não pode regerar o
+  que já ficou pronto — gerações são finitas e do mês. A triagem pergunta ao **manifesto** e não
+  ao diretório de PNGs: o manifesto é a declaração (regra 4), e um PNG solto sem declaração é
+  exatamente o estado que `semAssetsRaster.test.ts` reprova.
+- **A falha de uma peça.** Abortar o lote jogaria fora o trabalho pago das outras 49. Cada falha é
+  isolada, nomeada no relatório, e a rodada seguinte tenta só ela.
+
+**A terceira foi cobrada no mesmo dia.** A execução real terminou **44 geradas, 2 falharam** —
+`enemy-emboscada-arqueiro` estourou as 60 consultas de espera e `enemy-emboscada-couracado` levou
+um `fetch failed`. Rodar de novo gerou **exatamente as duas**, pulando as 48 prontas. Sem a
+retomada isso teria custado 48 gerações; sem o isolamento, teria custado a execução inteira.
+
+Detalhe que só aparece ao retomar, e por isso tem teste próprio: **`--somente N` conta o que vai
+GERAR, não o que vai percorrer.** Contando posições na lista, `--somente 2` sobre um lote com as
+duas primeiras prontas geraria zero peças e diria que fez o pedido.
+
+O comando sai com **código de erro** quando alguma peça falha. Sem isso, um lote meio feito é
+indistinguível de um lote inteiro para qualquer coisa que encadeie comandos — e a metade que
+falhou é silenciosa até alguém conferir o diretório.
+
+**Resultado:** 50 manifestos, **50 sprites, 0 glifos**, 150 PNGs (a peça de tabuleiro mais as duas
+poses de duelo), **856 KB** no total. Todos a `frameSize` 64, que é a regra de D26. O custo real
+ficou em ~100 gerações de 1966 disponíveis no ciclo.
+
+**O glifo do M16 não foi aposentado por isso.** Ele continua sendo a resposta para toda unidade
+sem arte, e o teste que exige declaração explícita continua de pé — o que mudou é que hoje
+ninguém está nesse caminho.
+
+#### D30 — O `characterId` viaja no TICKET, e não dentro do `BattleSetup`
+
+**A decisão é do usuário**, levada antes de codar porque a 2/N tinha escrito "o servidor mandar o
+`characterId` no setup" e a frase admite duas leituras com preços muito diferentes.
+
+O buraco, medido em 1/N: em PvP, masmorra e replay o `BattleSetup` chega pronto do servidor e o
+cliente não consegue dizer que PERSONAGEM é cada unidade. `BattleUnit.heroId` guarda a INSTÂNCIA
+de herói (`h-9f3a`), que é o que a conta possui; o manifesto de arte é indexado pelo PERSONAGEM
+(`ally-guerreiro`), que é quem a pessoa é. Na campanha o cliente fecha essa distância pelo roster.
+**Em PvP não fecha nem em princípio: o time do defensor são instâncias de OUTRA conta.**
+
+**Escolhido: um mapa `characterIdByUnitId` ao lado do setup, nas quatro superfícies** (ticket de
+arena, de masmorra, de capítulo, e a resposta do replay).
+
+**Descartado: `characterId` em `BattleUnit`.** Cumpriria a frase da 2/N ao pé da letra e custaria
+uma alteração em `packages/core` mais um bump de `RULES_VERSION` (regra 11) **por um dado que
+nenhuma regra lê** — enquanto o critério de aceite do M26 afirma o contrário, que o core sai
+intocado. O mapa é resposta de rota, e some sem deixar rastro no dia em que a arte mudar de forma.
+
+**No replay o mapa é DERIVADO na leitura**, dos rosters dos dois jogadores, e não gravado com ele.
+Gravar exigiria migração e — pior — deixaria sem arte todo replay que já está no banco, que é
+justamente o acervo que alguém abre para rever. O preço, aceitável: um herói apagado desde a
+partida não resolve mais e cai no glifo. Um replay é registro do que aconteceu, não do que a conta
+tem hoje.
+
+**O inimigo autorado entra no mapa mesmo já sendo a própria chave.** Um mapa que cobrisse um lado
+só obrigaria o cliente a manter dois caminhos para sempre — e é exatamente por manter dois
+caminhos que a campanha tinha arte e o resto não tinha.
+
+`artIdDeUnidade` passou a resolver em **três níveis**: o mapa do servidor, depois o roster, depois
+o `heroId` do inimigo. Os dois últimos não são redundância morta: são o caminho de quem nunca
+falou com o servidor — o tabuleiro vazio da abertura e a suíte.
+
+#### O que a 3/N encontrou e não estava previsto
+
+- **O aliado de cenário da campanha vinha caindo no glifo em silêncio.** Ele não está no roster de
+  ninguém (D16, M18 5/N), então nem o caminho da campanha o alcançava. Como o mapa do servidor é
+  montado dos `Placement` — que incluem o cenário —, ele passou a ter peça de graça.
+- **`enemy-emboscada-arqueiro` provou o laço de espera.** As 60 consultas a 5s (~5 min) que a 1/N
+  calibrou por "um personagem leva ~4 min" foram estouradas por um personagem real. O teto está
+  certo como teto (travar para sempre num lote de 50 é pior que falhar), mas fica registrado que
+  ~4 min é a mediana e não o pior caso.
+
+#### O que foi visto na tela
+
+Verificado com os dois servidores de pé (`pnpm dev` no cliente, `pnpm dev:memory` no servidor) e a
+aba em PRIMEIRO plano — que é a metade que a 2/N não conseguiu:
+
+- **O tabuleiro de PvP com peça nos DOIS lados.** Quatro unidades do jogador (anel azul) e duas do
+  oponente (anel vermelho), todas em sprite. Antes desta fatia o lado do oponente saía em disco, e
+  esse é o buraco inteiro de D30 acontecendo na tela.
+- **O HUD por cima do sprite**: plaqueta de AP/PP, barra de HP e anel de lado, com a plaqueta
+  respeitando o teto de 0,42 do tile que a 1/N introduziu.
+- **A cena de duelo com os dois de três quartos** — o espadachim de sudeste à esquerda, o
+  guerreiro de sudoeste à direita —, o efeito de contra-ataque desenhado sobre o alvo, o número de
+  dano por cima, e a peça voltando à respiração de `idleMotion` entre as trocas.
+
+**"O golpe tem peso" continua sendo julgamento do usuário**, e é o último item aberto do aceite do
+M26. O ambiente ficou de pé para isso.
+
+### M26 — o critério de aceite "o golpe tem peso", fechado pelo usuário
+
+**2026-09-05.** O último item aberto do M26 não era código: o roadmap escreveu "**e o golpe tem
+peso**, julgado pelo usuário como o critério 2 do M16 foi julgado", e por isso ele atravessou as
+três sub-sessões sem que eu pudesse marcá-lo.
+
+Fechado com a cena rodando na tela, num duelo de PvP: o espadachim do jogador contra o guerreiro
+do oponente, os dois de três quartos, o arco de corte sobre o alvo e o número de dano por cima.
+**Veredito do usuário: "acho que ficou legal."**
+
+Fica registrado com as palavras dele e não com uma paráfrase mais forte. É aprovação, e é o que o
+critério pedia — não é entusiasmo, e a diferença importa para quem ler isto depois: se numa sessão
+futura alguém quiser mexer no peso dos efeitos de `combatFx.ts` ou nas batidas de `motion.ts`, este
+registro **não** é argumento de que o assunto está resolvido para sempre. É o critério de aceite de
+M26 batendo, na barra que M26 estabeleceu.
+
+**O que exatamente foi julgado, para o registro não crescer com o tempo:** a cena de duelo de D29
+com os sprites de D22 e os efeitos por FORMA de D28 — não o tabuleiro em modo instantâneo, não a
+animação de duelo do tabuleiro (o segundo dos três níveis), e não a cena com as 50 unidades
+(foram vistas duas peças em duelo, e o tabuleiro cheio de sprites foi visto à parte).
+
+**Com isso o M26 tem os seus critérios de aceite completos** e a milestone fecha em três
+sub-sessões. `packages/core` sem uma linha alterada nas três; `RULES_VERSION` em `0.19.0`.

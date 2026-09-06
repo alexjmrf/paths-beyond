@@ -27,6 +27,7 @@ import {
 type DungeonEncounterUnit = DungeonEncounter['units'][number];
 import type { FastifyPluginAsync } from 'fastify';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
+import { characterIdsForPlacements } from '../battle/artIds.js';
 import { rejectOnRulesVersion } from '../version.js';
 import type {
   CharacterOwnershipRepository,
@@ -93,7 +94,7 @@ async function assembleDungeonBattle(
   encounter: DungeonEncounter,
   playerHeroIds: readonly string[],
   ownerPlayerId: string,
-): Promise<{ setup: BattleSetup } | { error: string }> {
+): Promise<{ setup: BattleSetup; characterIdByUnitId: Readonly<Record<string, string>> } | { error: string }> {
   const arenaMap = opts.catalog.maps[encounter.mapId];
   if (!arenaMap) return { error: `masmorra referencia mapa desconhecido: ${encounter.mapId}` };
 
@@ -147,6 +148,9 @@ async function assembleDungeonBattle(
   );
 
   return {
+    // M26 3/N — quem é cada unidade, para o cliente desenhar. Sai daqui porque só aqui os
+    // `Hero` ainda estão à mão: o `BattleSetup` guarda a INSTÂNCIA de herói, não a pessoa.
+    characterIdByUnitId: characterIdsForPlacements(placements),
     setup: buildBattleSetupFromHeroes({
       placements,
       map: arenaMap.grid,
@@ -280,6 +284,7 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
       seed: deriveSeed(opts.ticketSecret, nonce),
       rulesVersion: RULES_VERSION,
       setup: assembled.setup,
+      characterIdByUnitId: assembled.characterIdByUnitId,
       dungeonId: dungeon.id,
     };
   });

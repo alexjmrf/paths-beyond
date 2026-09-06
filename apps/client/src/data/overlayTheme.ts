@@ -52,6 +52,17 @@ export interface VisualTokens {
   // glifo deslocado para baixo dela, o número vira crachá em vez de virar parte da figura.
   readonly labelPlate: number;
   readonly labelPlateAlpha: number;
+  // M26 — a maior fração do tile que a plaqueta de AP/PP pode ocupar.
+  //
+  // Em M16 a plaqueta não tinha teto: ela era do tamanho do texto, e isso bastava porque o
+  // glifo é baixo e centrado — não havia nada no topo do tile para ela cobrir. **O sprite tem
+  // cabeça**, e cabeça fica no topo. Medido na tela com o cliente rodando: a 48px a plaqueta
+  // atravessava a coluna central e apagava o rosto da peça.
+  //
+  // O teto é em FRAÇÃO do tile e não em pixels porque é assim que a propriedade se mantém
+  // verdadeira em qualquer tile e em qualquer escala de §11: abaixo de 0,5 a plaqueta nunca
+  // alcança o meio, e o meio é onde a peça põe a cabeça.
+  readonly labelPlateMaxRatio: number;
   readonly pipRatio: number;
   readonly buffInk: number;
   readonly debuffInk: number;
@@ -102,6 +113,7 @@ export const DEFAULT_THEME: OverlayTheme = {
     glyphInk: 0xffffff,
     labelPlate: 0x111827,
     labelPlateAlpha: 0.82,
+    labelPlateMaxRatio: 0.42,
     pipRatio: 0.14,
     buffInk: 0x86efac,
     debuffInk: 0xfca5a5,
@@ -162,6 +174,7 @@ export const COLORBLIND_THEME: OverlayTheme = {
     glyphInk: 0xffffff,
     labelPlate: 0x000000,
     labelPlateAlpha: 0.85,
+    labelPlateMaxRatio: 0.42,
     pipRatio: 0.14,
     // O que separa buff de debuff aqui é FORMA (triângulo para cima contra para baixo) e
     // POSIÇÃO (canto superior direito contra inferior esquerdo). A tinta só reforça.

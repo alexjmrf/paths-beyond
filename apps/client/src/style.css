@@ -110,11 +110,24 @@ main {
   flex: 1;
   gap: 1rem;
   padding: 1rem;
+  /* Sem `min-width: 0` um filho flex nunca encolhe abaixo do conteúdo dele, e o tabuleiro de
+     tile 64 empurraria os painéis para fora da tela em vez de rolar. */
+  min-width: 0;
 }
 
+/* M26 — o tabuleiro ROLA em vez de empurrar.
+   O tile subiu para 64 (medição de 1/N) e um mapa 20×15 a 175% pede 2240px. As duas saídas
+   eram cortar as escalas de acessibilidade — requisito duro de §11 — ou o tabuleiro rolar.
+   `max-width` é o que garante que ele nunca roube a coluna dos painéis; quem mantém a unidade
+   selecionada dentro da janela é `logic/enquadramento.ts`. */
 .map-canvas {
   border: 1px solid #1f2937;
   line-height: 0;
+  overflow: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 6rem);
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .side-panels {
@@ -1581,4 +1594,49 @@ button.targeting {
   align-items: center;
   gap: 0.4rem;
   font-size: 0.8rem;
+}
+
+/* M26 2/N — a tela de duelo.
+   Ela cobre o tabuleiro porque é o duelo acontecendo, e o duelo é o núcleo do jogo. O `pointer-
+   events` só existe no botão de pular: clicar no tabuleiro atrás dela durante a cena seria dar
+   um comando enquanto o anterior ainda está sendo contado. */
+.duel-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 12, 20, 0.92);
+}
+
+.duel-scene-quadro {
+  position: relative;
+  width: min(960px, 94vw);
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #0b1220;
+  padding: 0.75rem;
+}
+
+.duel-scene-nomes {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  padding: 0 0.5rem 0.5rem;
+  color: #e5e7eb;
+}
+
+/* O canvas é desenhado num espaço lógico de 960×420 e encolhe com a janela. É o mesmo
+   princípio do espaço normalizado das formas: um desenho, qualquer tamanho de tela. */
+.duel-scene-palco canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.duel-scene-pular {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
 }

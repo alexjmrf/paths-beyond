@@ -141,7 +141,11 @@ function buildTestApp(
   };
   const defenderHero: StoredHero = {
     ownerPlayerId: 'player-defensor',
-    hero: buildHero({ id: 'heroi-defensor', classId: weakClassDef.id }),
+    // M26 3/N — o defensor DECLARA personagem, e é o único herói deste arquivo do lado de lá
+    // que declara. Sem isso não haveria como afirmar o caso que a milestone existe para
+    // fechar: em PvP o time do defensor são instâncias de OUTRA conta, e o atacante não tem
+    // como saber quem elas são — o mapa de arte do ticket é a única resposta possível.
+    hero: { ...buildHero({ id: 'heroi-defensor', classId: weakClassDef.id }), characterId: 'enemy-tirano' },
     equippedItems: [],
   };
   const heroPersonagem: StoredHero = {
@@ -503,6 +507,29 @@ describe('GET /battles/:nonce', () => {
     nonce: 'nonce-replay-1',
   };
 
+  it('o replay guardado devolve o mesmo mapa, derivado na leitura', async () => {
+    // Derivado e não gravado: é o que dá arte também aos replays que já estavam no banco
+    // antes desta milestone. Ver `characterIdsForReplayUnits`.
+    const app = buildTestApp();
+    const nonce = 'nonce-do-replay-com-arte';
+    const jogar = await app.inject({
+      method: 'POST',
+      url: '/battles',
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
+      payload: { ...validBody, nonce },
+    });
+    expect(jogar.statusCode).toBe(200);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/battles/${nonce}`,
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().characterIdByUnitId).toEqual({ 'heroi-defensor': 'enemy-tirano' });
+  });
+
   it('404 pra nonce desconhecido', async () => {
     const app = buildTestApp();
     const response = await app.inject({
@@ -572,6 +599,45 @@ describe('POST /battles/ticket', () => {
       'heroi-defensor',
     ]);
     expect(ticket.setup.units.find((u: { unitId: string }) => u.unitId === 'heroi-atacante').side).toBe('player');
+  });
+
+  // M26 3/N — a arte. A função que monta o mapa é pura e tem teste próprio
+  // (`arteDoSetup.test.ts`); o que se afirma AQUI é que a rota a chamou e pôs o resultado na
+  // resposta — sem isto, o mapa poderia estar perfeito e não sair do servidor.
+  it('devolve o mapa de arte, e é ele que dá peça ao time do defensor', async () => {
+    const ownership = createMemoryCharacterOwnershipRepository();
+    await ownership.grant('player-atacante', PERSONAGEM_ADQUIRIVEL);
+    const app = buildTestApp(undefined, ownership);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
+      payload: { attackerHeroIds: ['heroi-personagem'], defenderPlayerId: 'player-defensor' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().characterIdByUnitId).toEqual({
+      'heroi-personagem': PERSONAGEM_ADQUIRIVEL,
+      // Esta linha é a milestone inteira: 'heroi-defensor' é uma instância da conta do
+      // defensor, e o roster do atacante não a contém nem em princípio.
+      'heroi-defensor': 'enemy-tirano',
+    });
+  });
+
+  it('omite quem não declara personagem em vez de mandar a instância de herói', async () => {
+    // `heroi-atacante` é ficha sintética sem `characterId`. Mandar 'heroi-atacante' como id de
+    // arte faria o cliente procurar no manifesto uma entrada que nunca vai existir — e a
+    // diferença entre isso e o glifo do M16 só apareceria na tela.
+    const app = buildTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/battles/ticket',
+      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
+      payload: ticketBody,
+    });
+
+    expect(res.json().characterIdByUnitId).toEqual({ 'heroi-defensor': 'enemy-tirano' });
   });
 
   it('aplica as mesmas validações de posse e de defesa que POST /battles', async () => {

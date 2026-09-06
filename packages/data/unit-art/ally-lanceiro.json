@@ -1,0 +1,20 @@
+{
+  "unitId": "ally-lanceiro",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/ally-lanceiro.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/ally-lanceiro-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/ally-lanceiro-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a nimble foot soldier in light leather armour, wielding a long spear held upright, steel blue and warm bronze colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 2658876811,
+    "characterId": "9c01b253-9295-45ff-87c9-c5dee888f9ad",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}

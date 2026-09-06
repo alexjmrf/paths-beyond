@@ -1,0 +1,20 @@
+{
+  "unitId": "ally-mensageira",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/ally-mensageira.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/ally-mensageira-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/ally-mensageira-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a robed spellcaster with a hooded mantle, holding a gnarled wooden staff wrapped in living vines, steel blue and warm bronze colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 3555477852,
+    "characterId": "b0232d65-d44e-4ba8-b376-542f3e7bcca3",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}

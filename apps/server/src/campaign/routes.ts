@@ -16,6 +16,7 @@ import {
 import type { FastifyPluginAsync } from 'fastify';
 import { rejectOnRulesVersion } from '../version.js';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
+import { characterIdsForPlacements } from '../battle/artIds.js';
 import type {
   CharacterOwnershipRepository,
   HeroRepository,
@@ -78,7 +79,7 @@ async function assembleChapterBattle(
   encounter: Encounter,
   playerHeroIds: readonly string[],
   ownerPlayerId: string,
-): Promise<{ setup: BattleSetup } | { error: string }> {
+): Promise<{ setup: BattleSetup; characterIdByUnitId: Readonly<Record<string, string>> } | { error: string }> {
   const arenaMap = opts.catalog.maps[encounter.mapId];
   if (!arenaMap) return { error: `capítulo referencia mapa desconhecido: ${encounter.mapId}` };
 
@@ -137,6 +138,11 @@ async function assembleChapterBattle(
   // função fazia exatamente isso e não teria sobrevivido ao primeiro teste: `Placement` não
   // é `BattleUnit`, e nada dentro dele tem `stats` até passar por aqui.
   return {
+    // M26 3/N — quem é cada unidade, para o cliente desenhar. Na campanha o cliente já
+    // resolvia isso pelo roster; o mapa entra aqui mesmo assim, para as quatro superfícies
+    // responderem pela MESMA fonte — e porque o aliado de cenário (D16) não está no roster
+    // de ninguém e vinha caindo no glifo em silêncio.
+    characterIdByUnitId: characterIdsForPlacements([...placements, ...doCenario]),
     setup: buildBattleSetupFromHeroes({
       placements: [...placements, ...doCenario],
       map: arenaMap.grid,
@@ -194,6 +200,7 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
       seed: deriveSeed(opts.ticketSecret, nonce),
       rulesVersion: RULES_VERSION,
       setup: assembled.setup,
+      characterIdByUnitId: assembled.characterIdByUnitId,
       chapterId: encounter.id,
     };
   });

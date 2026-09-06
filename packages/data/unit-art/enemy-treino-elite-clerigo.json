@@ -1,0 +1,20 @@
+{
+  "unitId": "enemy-treino-elite-clerigo",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/enemy-treino-elite-clerigo.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/enemy-treino-elite-clerigo-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/enemy-treino-elite-clerigo-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a robed spellcaster with a hooded mantle, holding a holy mace and a hanging censer, dark crimson and blackened iron colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 3710700975,
+    "characterId": "91e14b02-989d-4b5f-a84b-45e09df36620",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}

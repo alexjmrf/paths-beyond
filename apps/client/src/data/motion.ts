@@ -440,6 +440,20 @@ export interface DuelChoreographyInput {
       readonly actorId: string;
       readonly targetId: string;
       readonly damage: number;
+      // M26 2/N — o que a TELA de duelo precisa e o tabuleiro nunca precisou.
+      //
+      // Os três são aditivos e opcionais de propósito: `duelBeats` não os lê, então nenhum
+      // teste e nenhuma fixture de M16 muda, e uma entrada antiga continua produzindo
+      // exatamente as mesmas batidas de tabuleiro.
+      //
+      // `hit: false` é a ESQUIVA. No tabuleiro ela não vira nada — sacudir a peça num golpe
+      // que a evasão de `spd` fez errar seria a animação afirmando o contrário do que o core
+      // decidiu. Na tela ela precisa aparecer: §8 dá à `spd` exatamente três benefícios, e a
+      // evasão com teto é um deles — se o jogador nunca a vê acontecer, o stat vira número de
+      // planilha.
+      readonly hit?: boolean | null;
+      readonly isCrit?: boolean;
+      readonly skillId?: string | null;
       // §6.5.3 (M24) — a cura que o ator aplicou nesta ação, e a da reação de cura. Elas não
       // viram animação (curar não sacode ninguém), mas viram SOM: sem isso, "curei" e "não
       // aconteceu nada" soam igual.
@@ -498,6 +512,166 @@ export function duelBeats(result: DuelChoreographyInput): readonly DuelBeat[] {
   }
   if (result.finalHpDefender <= 0) {
     beats.push({ actorId: result.defenderId, targetId: result.defenderId, damage: 0, kind: 'death' });
+  }
+
+  return beats;
+}
+
+
+// ---------------------------------------------------------------------------
+// M26 2/N — o repouso e o efeito
+// ---------------------------------------------------------------------------
+
+// A RESPIRAÇÃO. D22 escolheu uma imagem por unidade justamente porque a IA de imagem erra
+// consistência entre quadros; a bateria de 1/N mediu que ela erra mesmo em movimento pequeno,
+// e que a arma é o primeiro a sumir (D27). **Um idle por TRANSFORMAÇÃO não tem esse problema
+// por construção: não existe segundo quadro com quem ser inconsistente.**
+//
+// O ciclo é lento e a amplitude é pequena de propósito. Uma peça que respira forte chama
+// atenção para si a cada quadro, e num tabuleiro com dez unidades isso é ruído constante —
+// §1.1 quer o olho livre para ler a posição, não preso à animação.
+export const IDLE_MS = 2600;
+export const IDLE_ESCALA = 0.018;
+
+export function idleMotion(weight: WeightProfile): Motion {
+  // O peso já ordena os cinco perfis (M16 3/N); o couraçado respira mais devagar que o
+  // mensageiro pela mesma razão que assenta com mais força ao chegar.
+  const duracao = Math.round(IDLE_MS * (weight.msPerTile / FALLBACK_WEIGHT.msPerTile));
+
+  return {
+    durationMs: duracao,
+    sampleAt(elapsedMs) {
+      // Nunca termina: `done` é sempre falso, e quem para o repouso é quem começa outra coisa.
+      const t = ((elapsedMs % duracao) + duracao) % duracao / duracao;
+      const onda = Math.sin(t * Math.PI * 2);
+      return {
+        dx: 0,
+        // Achata e estica em torno do centro, e sobe um triz junto: só escalar dá um efeito de
+        // gelatina; escalar e subir dá peito enchendo.
+        dy: -onda * IDLE_ESCALA * 0.5,
+        scaleX: 1 - onda * IDLE_ESCALA * 0.5,
+        scaleY: 1 + onda * IDLE_ESCALA,
+        alpha: 1,
+        done: false,
+      };
+    },
+  };
+}
+
+// O EFEITO de combate: surge rápido, fica no pico e some. É a curva oposta à do impacto —
+// `impactMotion` acelera até o pico e volta, porque a peça vai e vem; o efeito não vai a lugar
+// nenhum, ele APARECE.
+export const FX_MS = 260;
+export const FX_PICO_EM = 0.22;
+
+export function fxMotion(durationMs = FX_MS): Motion {
+  return {
+    durationMs,
+    sampleAt(elapsedMs) {
+      if (elapsedMs >= durationMs) return { dx: 0, dy: 0, scaleX: 1, scaleY: 1, alpha: 0, done: true };
+      const t = elapsedMs / durationMs;
+
+      if (t < FX_PICO_EM) {
+        // Entrada: cresce de 60% ao tamanho cheio e opacidade de zero a um. Rápido — o
+        // jogador tem de ver o efeito APARECER no instante do golpe, não crescendo depois.
+        const k = t / FX_PICO_EM;
+        return { dx: 0, dy: 0, scaleX: 0.6 + 0.4 * k, scaleY: 0.6 + 0.4 * k, alpha: k, done: false };
+      }
+
+      // Saída: continua abrindo um pouco enquanto some. Abrir e sumir junto é o que faz o
+      // efeito se dissipar em vez de ser apagado.
+      const k = (t - FX_PICO_EM) / (1 - FX_PICO_EM);
+      return { dx: 0, dy: 0, scaleX: 1 + k * 0.35, scaleY: 1 + k * 0.35, alpha: 1 - k * k, done: false };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// M26 2/N — as batidas da TELA de duelo
+// ---------------------------------------------------------------------------
+
+export interface DuelSceneBeat {
+  readonly actorId: string;
+  readonly targetId: string;
+  readonly damage: number;
+  readonly kind: 'strike' | 'counter' | 'miss' | 'heal' | 'death';
+  readonly crit: boolean;
+  readonly skillId: string | null;
+}
+
+// **Por que uma segunda leitura do MESMO log, e não um parâmetro em `duelBeats`.**
+//
+// As duas leituras querem coisas diferentes, e a diferença é de regra e não de gosto. O
+// tabuleiro só pode animar o que aconteceu: "ação que não causou dano não vira batida", porque
+// sacudir uma peça num golpe que errou seria a animação contradizendo o core. A tela precisa
+// do contrário — ela existe para MOSTRAR o duelo, e um duelo em que a evasão de `spd` decidiu
+// a troca não pode aparecer como um silêncio.
+//
+// O risco de duas leituras é divergirem. É o que o teste de paridade cobra: filtrar estas
+// batidas pelas que têm dano tem de devolver exatamente as de `duelBeats`.
+export function duelSceneBeats(result: DuelChoreographyInput): readonly DuelSceneBeat[] {
+  const beats: DuelSceneBeat[] = [];
+
+  for (const troca of result.trocas) {
+    for (const acao of troca.actions) {
+      const comum = { crit: acao.isCrit ?? false, skillId: acao.skillId ?? null };
+
+      if (acao.damage > 0) {
+        beats.push({ actorId: acao.actorId, targetId: acao.targetId, damage: acao.damage, kind: 'strike', ...comum });
+      } else if (acao.hit === false) {
+        // §8 — a evasão com teto. Só aqui, e nunca no tabuleiro.
+        beats.push({ actorId: acao.actorId, targetId: acao.targetId, damage: 0, kind: 'miss', ...comum });
+      }
+
+      if ((acao.heal ?? 0) > 0) {
+        beats.push({ actorId: acao.actorId, targetId: acao.actorId, damage: 0, kind: 'heal', ...comum });
+      }
+
+      const contra = acao.reaction?.counterDamage ?? 0;
+      if (contra > 0) {
+        beats.push({
+          actorId: acao.targetId,
+          targetId: acao.actorId,
+          damage: contra,
+          kind: 'counter',
+          crit: false,
+          skillId: null,
+        });
+      }
+
+      const curaDaReacao = acao.reaction?.healDone ?? 0;
+      if (curaDaReacao > 0) {
+        beats.push({
+          actorId: acao.targetId,
+          targetId: acao.targetId,
+          damage: 0,
+          kind: 'heal',
+          crit: false,
+          skillId: null,
+        });
+      }
+    }
+  }
+
+  if (result.finalHpAttacker <= 0) {
+    beats.push({
+      actorId: result.attackerId,
+      targetId: result.attackerId,
+      damage: 0,
+      kind: 'death',
+      crit: false,
+      skillId: null,
+    });
+  }
+  if (result.finalHpDefender <= 0) {
+    beats.push({
+      actorId: result.defenderId,
+      targetId: result.defenderId,
+      damage: 0,
+      kind: 'death',
+      crit: false,
+      skillId: null,
+    });
   }
 
   return beats;

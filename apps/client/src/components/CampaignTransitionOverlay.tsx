@@ -25,6 +25,9 @@ export function CampaignTransitionOverlay() {
   // commitado no primeiro quadro da animação (é dele que a animação sai), então sem esta
   // espera o "Vitória!" cobria exatamente o golpe que venceu a batalha.
   const boardAnimating = useBattleStore((s) => s.boardAnimating);
+  // M26 2/N — o mesmo argumento, para a cena de duelo: o "Vitória!" não pode cobrir o
+  // golpe que venceu a batalha, e com a cena aberta é ela quem está contando esse golpe.
+  const duelScene = useBattleStore((s) => s.duelScene);
 
   // Só a CAMPANHA tem capítulo a submeter. Em PvP e em masmorra o fluxo está no painel
   // correspondente — em M14 5/N este overlay chegou a aparecer por cima de uma masmorra
@@ -33,6 +36,7 @@ export function CampaignTransitionOverlay() {
   if (!campaign.ticket) return null;
   if (battleState.outcome === 'ongoing') return null;
   if (boardAnimating) return null;
+  if (duelScene) return null;
 
   const venceu = battleState.outcome === 'victory';
 

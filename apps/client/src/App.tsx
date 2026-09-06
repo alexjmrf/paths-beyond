@@ -5,6 +5,7 @@ import { InitiativePanel } from './components/InitiativePanel.js';
 import { IntroducaoOverlay } from './components/IntroducaoOverlay.js';
 import { InventoryPanel } from './components/InventoryPanel.js';
 import { MapCanvas } from './components/MapCanvas.js';
+import { DuelScene } from './components/DuelScene.js';
 import { ObjectivePanel } from './components/ObjectivePanel.js';
 import { PvpPanel } from './components/PvpPanel.js';
 import { ReplayPanel } from './components/ReplayPanel.js';
@@ -30,6 +31,8 @@ export function App() {
   const campaignChapter = useBattleStore((s) => s.campaign.ticket?.chapterId ?? null);
   const mode = useBattleStore((s) => s.mode);
   const instantResultMode = useBattleStore((s) => s.instantResultMode);
+  const duelSceneEnabled = useBattleStore((s) => s.duelSceneEnabled);
+  const setDuelSceneEnabled = useBattleStore((s) => s.setDuelSceneEnabled);
   const toggleInstantResultMode = useBattleStore((s) => s.toggleInstantResultMode);
   const colorblindMode = useBattleStore((s) => s.colorblindMode);
   const toggleColorblindMode = useBattleStore((s) => s.toggleColorblindMode);
@@ -72,6 +75,17 @@ export function App() {
         {/* §11 (acessibilidade) — os três itens: resultado instantâneo, modo daltônico e
             fonte escalável. Nenhum deles toca regra: são preferências de apresentação, e
             todas sobrevivem à recarga junto com o progresso. */}
+        {/* M26 2/N — o segundo nível, entre assistir a cena e não ver nada. O farm de
+            masmorra vive nesse meio-termo: quem repete a mesma masmorra vinte vezes não
+            quer a cena, mas ainda quer ver o tabuleiro. */}
+        <label className="instant-result-toggle">
+          <input
+            type="checkbox"
+            checked={duelSceneEnabled}
+            onChange={(e) => setDuelSceneEnabled(e.target.checked)}
+          />
+          {t('app.pref.animacaoDeBatalha')}
+        </label>
         <label className="instant-result-toggle">
           <input type="checkbox" checked={instantResultMode} onChange={toggleInstantResultMode} />
           {t('app.pref.resultadoInstantaneo')}
@@ -137,6 +151,7 @@ export function App() {
       </header>
       <main>
         <MapCanvas />
+        <DuelScene />
         <div className="side-panels">
           <CampaignPanel />
           <ObjectivePanel />

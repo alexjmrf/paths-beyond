@@ -14,6 +14,7 @@ import { computeEloUpdate } from '../matchmaking/elo.js';
 import { rejectOnRulesVersion } from '../version.js';
 import { ownedCharacterIds, unownedAmong } from '../summon/ownership.js';
 import { deriveSeed, generateNonce } from './ticket.js';
+import { characterIdsForPlacements, characterIdsForReplayUnits } from './artIds.js';
 import type {
   ArenaDefenseRepository,
   CharacterOwnershipRepository,
@@ -68,7 +69,15 @@ export interface BattleRoutesOptions {
 }
 
 type AssembleResult =
-  | { readonly ok: true; readonly setup: BattleSetup; readonly defenderPlayerId: string }
+  | {
+      readonly ok: true;
+      readonly setup: BattleSetup;
+      readonly defenderPlayerId: string;
+      // M26 3/N — quem é cada unidade, para o cliente DESENHAR. Sai daqui e não de uma
+      // segunda passada sobre o `setup` porque só aqui os `Hero` ainda estão à mão: o
+      // `BattleSetup` já é estado de batalha resolvido e guarda a instância, não a pessoa.
+      readonly characterIdByUnitId: Readonly<Record<string, string>>;
+    }
   | { readonly ok: false; readonly code: number; readonly error: string };
 
 // A montagem do confronto de arena: valida a posse dos heróis do atacante, carrega a
@@ -156,6 +165,7 @@ async function assembleArenaBattle(
   return {
     ok: true,
     defenderPlayerId: defense.ownerPlayerId,
+    characterIdByUnitId: characterIdsForPlacements(placements),
     setup: buildBattleSetupFromHeroes({
       placements,
       map: arenaMapDef.grid,
@@ -275,6 +285,7 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
       rulesVersion: RULES_VERSION,
       setup: assembled.setup,
       defenderPlayerId: assembled.defenderPlayerId,
+      characterIdByUnitId: assembled.characterIdByUnitId,
     };
   });
 
@@ -382,6 +393,16 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
       return reply.code(403).send({ error: 'este replay não é seu' });
     }
 
-    return replay;
+    // M26 3/N — a arte do replay. Derivada aqui e não gravada com ele: gravar exigiria
+    // migração e deixaria sem arte todo replay que já está no banco, que é justamente o
+    // acervo que alguém abre para rever.
+    const heroes = await opts.heroRepository.getHeroesByIds(replay.initialState.units.map((u) => u.heroId));
+    return {
+      ...replay,
+      characterIdByUnitId: characterIdsForReplayUnits(
+        replay.initialState.units,
+        heroes.map((stored) => stored.hero),
+      ),
+    };
   });
 };

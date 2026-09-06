@@ -29,6 +29,20 @@ const en: Catalogo = {
   'app.pref.idioma': 'Language',
   'app.pref.apagarProgresso': 'Erase progress',
 
+  // M26 2/N — a tela de duelo, e o interruptor dela.
+  //
+  // Três níveis, e não dois: `app.pref.animacaoDeBatalha` fica ENTRE assistir a cena inteira e
+  // o modo resultado instantâneo de §11. O farm de masmorra vive nesse meio-termo — quem
+  // repete a mesma masmorra vinte vezes não quer a cena, mas ainda quer ver o tabuleiro.
+  'app.pref.animacaoDeBatalha': 'Battle scene on engage',
+  'cena.troca': 'Exchange {n}',
+  'cena.esquivou': 'Missed',
+  'cena.critico': 'Critical!',
+  'cena.contra': 'Counter',
+  'cena.derrotado': 'Defeated',
+  'cena.pular': 'Skip',
+  'cena.continuar': 'Continue',
+
   // Nomes dos idiomas — sempre na PRÓPRIA língua, e não traduzidos. Quem procura português
   // numa tela em japonês procura "Português", não a palavra japonesa para português.
   'idioma.en': 'English',
@@ -445,6 +459,16 @@ const pt: Catalogo = {
   'app.pref.musica': 'Música',
   'app.pref.idioma': 'Idioma',
   'app.pref.apagarProgresso': 'Apagar progresso',
+
+  // M26 2/N — a tela de duelo, e o interruptor dela.
+  'app.pref.animacaoDeBatalha': 'Cena de batalha ao engajar',
+  'cena.troca': 'Troca {n}',
+  'cena.esquivou': 'Esquivou',
+  'cena.critico': 'Crítico!',
+  'cena.contra': 'Contra-ataque',
+  'cena.derrotado': 'Derrotado',
+  'cena.pular': 'Pular',
+  'cena.continuar': 'Continuar',
 
   'idioma.en': 'English',
   'idioma.pt': 'Português',

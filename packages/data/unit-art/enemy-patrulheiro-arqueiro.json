@@ -1,0 +1,20 @@
+{
+  "unitId": "enemy-patrulheiro-arqueiro",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/enemy-patrulheiro-arqueiro.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/enemy-patrulheiro-arqueiro-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/enemy-patrulheiro-arqueiro-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a nimble foot soldier in light leather armour, drawing a tall longbow, a quiver of arrows on the back, dark crimson and blackened iron colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 946127118,
+    "characterId": "e2d1d301-8dad-4187-9eaf-5c097bee7c5e",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}

@@ -2,6 +2,7 @@ import type { UnitType, WeaponType } from '@paths-beyond/core';
 import { glyphFor, glyphLabelFor, type UnitProfile } from './classGlyphs.js';
 import type { OverlayTheme, UnitShape } from './overlayTheme.js';
 import { placeShapes, type Primitive } from './shapes.js';
+import { arteDeUnidade } from './unitArt.js';
 
 // M16 — a costura de representação de unidade.
 //
@@ -42,6 +43,14 @@ export interface UnitRenderUnit {
   // Nível 2 — o perfil, que TODO `BattleUnit` carrega. Ver `classGlyphs.ts`.
   readonly weaponType?: WeaponType;
   readonly unitType?: UnitType;
+  // M26 — a chave da unidade no manifesto de arte (`packages/data/unit-art/`): o id do
+  // PERSONAGEM para quem é do elenco, o id do inimigo autorado para quem é de fase.
+  //
+  // Ele chega resolvido, pelo mesmo motivo que `classId` chega resolvido: quem sabe ligar uma
+  // unidade de batalha ao conteúdo que a montou é o `MapCanvas`, contra o roster; o renderer
+  // continua puro e sem catálogo nenhum. Ausente é o caso normal e não um erro — é o que faz
+  // uma unidade sem arte cair no glifo do M16 em vez de sumir do tabuleiro.
+  readonly artId?: string;
 }
 
 export interface TileGeometry {
@@ -109,7 +118,17 @@ const LABEL_ADVANCE = 0.62;
 function apPpLabel(input: UnitRenderInput): readonly UnitPrimitive[] {
   const texto = `${input.unit.ap}/${input.unit.pp}`;
   const altura = Math.round(input.labelSize * 1.2);
-  const largura = Math.min(input.tile.size, Math.round(texto.length * input.labelSize * LABEL_ADVANCE) + 4);
+  // M26 — o teto de largura. Em M16 a plaqueta ia até a borda do tile se o texto pedisse, e
+  // isso não incomodava ninguém: o glifo é baixo e centrado, e o topo do tile estava vazio.
+  //
+  // O SPRITE tem cabeça, e cabeça fica no topo. Com o teto abaixo de meio tile a plaqueta não
+  // alcança a coluna central em tile nenhum e em escala nenhuma de §11 — a propriedade passa a
+  // valer por construção, e não por a conta dar certo no tamanho que estamos usando hoje.
+  //
+  // O tamanho da FONTE não entra nesta conta: §11 exige "AP/PP legíveis no próprio tile (sem
+  // hover)" e o texto acompanha a escala de UI. O que encolhe é o fundo, não o número.
+  const teto = Math.round(input.tile.size * input.theme.tokens.labelPlateMaxRatio);
+  const largura = Math.min(teto, Math.round(texto.length * input.labelSize * LABEL_ADVANCE) + 4);
 
   return [
     {
@@ -211,69 +230,141 @@ function shapePrimitive(
     : { t: 'circle', cx, cy, r, ...extra };
 }
 
-// O renderer de produção: o corpo de M6 (disco, ou quadrado no modo daltônico) com os anéis de
-// estado de M13 4/N, e — a partir de 2/N — o glifo da classe dentro dele, os pips de efeito e a
-// faixa de HP.
+// M26 — o CORPO de uma unidade: o que muda entre desenhar por código e desenhar um sprite.
+//
+// Tudo o mais — o disco de lado, os anéis de estado, a barra de HP, os pips de efeito e a
+// plaqueta de AP/PP — é o HUD, e ele é rigorosamente o mesmo nos dois casos. Fatorar assim não
+// é economia de linhas: é o que torna "o HUD continua por cima do sprite, intacto" uma
+// propriedade da CONSTRUÇÃO em vez de uma coincidência que um teste teria de vigiar.
+//
+// D25 mediu isso na tela e errou uma vez: "ordem de desenho importa: sprite primeiro, HUD
+// depois. No teste eu inverti e o sprite cobriu o distintivo."
+interface Corpo {
+  readonly primitivas: readonly UnitPrimitive[];
+  // O véu de "já agiu" acompanha o corpo, porque escurecer a peça é escurecer o que a peça É:
+  // um disco cobre o glifo, mas deixaria os cantos de um sprite acesos.
+  readonly veu: UnitPrimitive;
+}
+
+function corpoDeGlifo(input: UnitRenderInput): Corpo {
+  const t = input.theme.tokens;
+  const side = input.theme.sides[input.unit.side];
+  const shape: UnitShape = side?.shape ?? 'circle';
+  const cx = input.tile.px + input.tile.size / 2;
+  const cy = input.tile.py + input.tile.size / 2;
+  const r = input.tile.size / 2 - t.unitInset;
+  const lado = input.tile.size * t.glyphBoxRatio;
+
+  // O glifo de classe (D1): a resposta ao diagnóstico do briefing de que "um Clérigo e um
+  // Couraçado são indistinguíveis sem clicar".
+  return {
+    primitivas: placeShapes(
+      glyphFor(input.unit.classId, profileOf(input.unit)),
+      { x: cx - lado / 2, y: cy - lado / 2 + input.tile.size * t.glyphOffsetY, size: lado },
+      { ink: t.glyphInk, strokeWidth: input.tile.size * t.glyphStrokeRatio },
+    ),
+    veu: shapePrimitive(shape, cx, cy, r, { fill: 0x000000, alpha: ACTED_ALPHA }),
+  };
+}
+
+// D25: "o sprite tem de CABER no tile". Foi medido no tabuleiro, não deduzido — desenhado a
+// 1,33x do tile (como Fire Emblem faz), as unidades de linhas adjacentes se sobrepõem, e
+// "1 herói = 1 tile" é a primeira regra do jogo. O retângulo é o tile, e ponto.
+function corpoDeSprite(input: UnitRenderInput, src: string): Corpo {
+  const caixa = { x: input.tile.px, y: input.tile.py, w: input.tile.size, h: input.tile.size };
+  return {
+    primitivas: [{ t: 'sprite', ...caixa, src }],
+    veu: { t: 'rect', ...caixa, fill: 0x000000, alpha: ACTED_ALPHA },
+  };
+}
+
+// O HUD, que é o mesmo com sprite e sem. Ordem de desenho, de baixo para cima: disco de lado,
+// corpo, anéis de estado, véu de "já agiu", barra de HP, pips e plaqueta.
+function montar(input: UnitRenderInput, corpo: Corpo): readonly UnitPrimitive[] {
+  const t = input.theme.tokens;
+  const side = input.theme.sides[input.unit.side];
+  const shape: UnitShape = side?.shape ?? 'circle';
+  const cx = input.tile.px + input.tile.size / 2;
+  const cy = input.tile.py + input.tile.size / 2;
+  const r = input.tile.size / 2 - t.unitInset;
+
+  // O disco (ou quadrado, no modo daltônico) fica EMBAIXO do sprite. É a "camada programática
+  // que vira o HUD" de D25: o sprite carrega identidade, o código carrega informação — e a
+  // marca de lado do M13 4/N, que nunca dependeu da peça, sobrevive intacta.
+  const primitivas: UnitPrimitive[] = [shapePrimitive(shape, cx, cy, r, { fill: side?.color ?? 0xffffff })];
+
+  primitivas.push(...corpo.primitivas);
+
+  if (input.state.selected) {
+    primitivas.push(shapePrimitive(shape, cx, cy, r + 2, { stroke: input.theme.selectedRing, strokeWidth: 3 }));
+  }
+  if (input.state.engageable) {
+    primitivas.push(shapePrimitive(shape, cx, cy, r + 3, { stroke: input.theme.engageableRing, strokeWidth: 2 }));
+  }
+  // O véu vem DEPOIS do corpo (escurece a peça inteira, que é o que "já agiu" quer dizer) e
+  // ANTES da barra de HP e dos pips: quem já agiu continua tendo de dizer quanto lhe resta.
+  if (input.unit.hasActedThisRound) primitivas.push(corpo.veu);
+
+  primitivas.push(...hpBar(input));
+
+  for (const slot of pipSlots(input, 'buff')) {
+    // Triângulo para CIMA.
+    primitivas.push({
+      t: 'poly',
+      points: [slot.x + slot.size / 2, slot.y, slot.x + slot.size, slot.y + slot.size, slot.x, slot.y + slot.size],
+      closed: true,
+      fill: t.buffInk,
+    });
+  }
+  for (const slot of pipSlots(input, 'debuff')) {
+    // Triângulo para BAIXO.
+    primitivas.push({
+      t: 'poly',
+      points: [slot.x, slot.y, slot.x + slot.size, slot.y, slot.x + slot.size / 2, slot.y + slot.size],
+      closed: true,
+      fill: t.debuffInk,
+    });
+  }
+
+  primitivas.push(...apPpLabel(input));
+  return primitivas;
+}
+
+// O renderer de M16: o corpo de M6 (disco, ou quadrado no modo daltônico) com os anéis de
+// estado de M13 4/N, o glifo da classe dentro dele, os pips de efeito e a faixa de HP.
+//
+// Ele NÃO foi aposentado pelo M26. Continua sendo a representação de toda unidade sem arte
+// declarada, e o `spriteUnitRenderer` cai nele unidade a unidade — é o que permite o elenco
+// ganhar sprite aos poucos sem o tabuleiro ficar meio desenhado e meio vazio.
 export const shapeUnitRenderer: UnitRenderer = {
   id: 'shape',
   render(input) {
-    const t = input.theme.tokens;
-    const side = input.theme.sides[input.unit.side];
-    const shape: UnitShape = side?.shape ?? 'circle';
-    const cx = input.tile.px + input.tile.size / 2;
-    const cy = input.tile.py + input.tile.size / 2;
-    const r = input.tile.size / 2 - t.unitInset;
-
-    const primitivas: UnitPrimitive[] = [shapePrimitive(shape, cx, cy, r, { fill: side?.color ?? 0xffffff })];
-
-    // O glifo de classe (D1): a resposta ao diagnóstico do briefing de que "um Clérigo e um
-    // Couraçado são indistinguíveis sem clicar".
-    const lado = input.tile.size * t.glyphBoxRatio;
-    primitivas.push(
-      ...placeShapes(
-        glyphFor(input.unit.classId, profileOf(input.unit)),
-        { x: cx - lado / 2, y: cy - lado / 2 + input.tile.size * t.glyphOffsetY, size: lado },
-        { ink: t.glyphInk, strokeWidth: input.tile.size * t.glyphStrokeRatio },
-      ),
-    );
-
-    if (input.state.selected) {
-      primitivas.push(shapePrimitive(shape, cx, cy, r + 2, { stroke: input.theme.selectedRing, strokeWidth: 3 }));
-    }
-    if (input.state.engageable) {
-      primitivas.push(shapePrimitive(shape, cx, cy, r + 3, { stroke: input.theme.engageableRing, strokeWidth: 2 }));
-    }
-    // O véu vem DEPOIS do glifo (escurece a peça inteira, que é o que "já agiu" quer dizer) e
-    // ANTES da barra de HP e dos pips: quem já agiu continua tendo de dizer quanto lhe resta.
-    if (input.unit.hasActedThisRound) {
-      primitivas.push(shapePrimitive(shape, cx, cy, r, { fill: 0x000000, alpha: ACTED_ALPHA }));
-    }
-
-    primitivas.push(...hpBar(input));
-
-    for (const slot of pipSlots(input, 'buff')) {
-      // Triângulo para CIMA.
-      primitivas.push({
-        t: 'poly',
-        points: [slot.x + slot.size / 2, slot.y, slot.x + slot.size, slot.y + slot.size, slot.x, slot.y + slot.size],
-        closed: true,
-        fill: t.buffInk,
-      });
-    }
-    for (const slot of pipSlots(input, 'debuff')) {
-      // Triângulo para BAIXO.
-      primitivas.push({
-        t: 'poly',
-        points: [slot.x, slot.y, slot.x + slot.size, slot.y, slot.x + slot.size / 2, slot.y + slot.size],
-        closed: true,
-        fill: t.debuffInk,
-      });
-    }
-
-    primitivas.push(...apPpLabel(input));
-    return primitivas;
+    return montar(input, corpoDeGlifo(input));
   },
 };
+
+// M26 — o que uma unidade com arte declarada tem.
+export interface ArteDeUnidade {
+  readonly src: string;
+  readonly frameSize: number;
+}
+
+// A costura do M26, e o motivo de ela ser uma FUNÇÃO injetada: quem lê o manifesto e resolve
+// os arquivos é `data/unitArt.ts`, que depende do `import.meta.glob` do Vite. Recebendo o
+// resolvedor de fora, este arquivo continua puro — o teste de contrato monta um resolvedor de
+// mentira e prova o desenho sem um PNG existir, exatamente como `tests/unitRenderer.test.ts`
+// já provava o glifo sem um browser existir.
+export type ResolvedorDeArte = (artId: string | undefined) => ArteDeUnidade | undefined;
+
+export function criarRendererDeSprite(resolver: ResolvedorDeArte): UnitRenderer {
+  return {
+    id: 'sprite',
+    render(input) {
+      const arte = resolver(input.unit.artId);
+      return montar(input, arte ? corpoDeSprite(input, arte.src) : corpoDeGlifo(input));
+    },
+  };
+}
 
 // A SEGUNDA implementação (D3): só retângulos e texto, nenhum círculo e nenhum polígono. Não é
 // um espião de chamadas — é um renderer alternativo de verdade, e é por isso que ele prova
@@ -353,5 +444,7 @@ export const minimalUnitRenderer: UnitRenderer = {
   },
 };
 
-// O renderer em uso pelo tabuleiro. Um ponto só de troca — é a costura em si.
-export const activeUnitRenderer: UnitRenderer = shapeUnitRenderer;
+// O renderer em uso pelo tabuleiro. Um ponto só de troca — é a costura em si, e o M26 é a
+// troca para a qual ela foi construída (D2/D22): uma linha, sem uma linha de `motion.ts`
+// mudada e sem o `MapCanvas` saber que a peça agora é uma imagem.
+export const activeUnitRenderer: UnitRenderer = criarRendererDeSprite(arteDeUnidade);

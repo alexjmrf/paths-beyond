@@ -69,6 +69,10 @@ export interface SaveGame {
   // §11 (acessibilidade), M13 4/N.
   readonly colorblindMode: boolean;
   readonly uiScale: number;
+  // M26 2/N — a cena de duelo ao engajar. Opcional no formato porque um save gravado antes
+  // dela existe e continua válido: ausente cai no padrão (ligada), do mesmo jeito que
+  // `uiScale` e `colorblindMode` já faziam quando entraram.
+  readonly duelSceneEnabled?: boolean;
   // Só o token do PvP entra (decisão do usuário, M13 3/N): ele é digitado à mão e
   // redigitá-lo a cada recarga seria hostil. Ticket, oponente e batalha em curso não são
   // persistidos — retomar uma partida é estado que o servidor conhece e o cliente não.
@@ -127,6 +131,7 @@ export function parseSave(raw: string | null): SaveGame | null {
   if (typeof parsed.pvpToken !== 'string') return null;
 
   if (parsed.colorblindMode !== undefined && typeof parsed.colorblindMode !== 'boolean') return null;
+  if (parsed.duelSceneEnabled !== undefined && typeof parsed.duelSceneEnabled !== 'boolean') return null;
   if (parsed.uiScale !== undefined && typeof parsed.uiScale !== 'number') return null;
   const uiScale = typeof parsed.uiScale === 'number' && isSupportedUiScale(parsed.uiScale) ? parsed.uiScale : DEFAULT_UI_SCALE;
 
@@ -157,6 +162,7 @@ export function parseSave(raw: string | null): SaveGame | null {
     v: SAVE_FORMAT_VERSION,
     rulesVersion: parsed.rulesVersion,
     instantResultMode: parsed.instantResultMode,
+    ...(typeof parsed.duelSceneEnabled === 'boolean' ? { duelSceneEnabled: parsed.duelSceneEnabled } : {}),
     colorblindMode: parsed.colorblindMode ?? false,
     uiScale,
     pvpToken: parsed.pvpToken,

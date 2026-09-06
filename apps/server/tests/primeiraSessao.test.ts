@@ -257,6 +257,45 @@ describe('a primeira sessão, de uma conta que não existia', () => {
     expect(['victory', 'defeat']).toContain(arena.body.result.outcome);
   });
 
+  // M26 3/N — a arte da campanha e da masmorra, contra o CATÁLOGO REAL.
+  //
+  // `battles.test.ts` prova a mesma costura com fixture sintética, e prova o que só a arena
+  // tem (o time do defensor). O que só este arquivo prova é que os ids que o servidor manda
+  // são os ids que o manifesto usa: numa fixture, 'enemy-tirano' é uma string qualquer; aqui
+  // ele é uma entrada de `packages/data/unit-art/`.
+  it('o ticket de capítulo e o de masmorra dizem quem é cada unidade, com ids do catálogo real', async () => {
+    const app = servidorVazio();
+    const eu = await contaNova(app, 'jogador-novo');
+    const heroes = (await eu.get('/me/heroes')).body as { hero: { id: string; characterId: string } }[];
+
+    const capitulo = await eu.post(`/campaign/${CAPITULO}/ticket`, { heroIds: [heroes[0]!.hero.id] });
+    expect(capitulo.status, JSON.stringify(capitulo.body)).toBe(200);
+    const mapa = capitulo.body.characterIdByUnitId as Record<string, string>;
+
+    // Toda unidade do tabuleiro tem quem seja — o capítulo 1 não tem ficha sem personagem.
+    const unidades = (capitulo.body.setup.units as { unitId: string }[]).map((u) => u.unitId);
+    expect(Object.keys(mapa).sort()).toEqual([...unidades].sort());
+
+    // O herói do jogador sai como PERSONAGEM e não como instância. É a linha inteira do bug:
+    // `unitId` aqui é 'player-<id da instância>', que não é ninguém no manifesto.
+    expect(mapa[`player-${heroes[0]!.hero.id}`]).toBe(heroes[0]!.hero.characterId);
+    expect(Object.values(mapa)).not.toContain(heroes[0]!.hero.id);
+
+    // E todo id que sai daqui é um id que o manifesto de arte conhece.
+    for (const id of Object.values(mapa)) {
+      expect(catalog.characters[id] ?? catalog.enemies[id], `${id} não está no catálogo`).toBeDefined();
+    }
+
+    const timeCompleto = heroes.slice(0, VAGAS_DA_MASMORRA).map((h) => h.hero.id);
+    const masmorra = await eu.post(`/dungeons/${MASMORRA.id}/ticket`, { heroIds: timeCompleto });
+    expect(masmorra.status, JSON.stringify(masmorra.body)).toBe(200);
+    const mapaMasmorra = masmorra.body.characterIdByUnitId as Record<string, string>;
+    expect(Object.keys(mapaMasmorra).length).toBeGreaterThan(0);
+    for (const id of Object.values(mapaMasmorra)) {
+      expect(catalog.characters[id] ?? catalog.enemies[id], `${id} não está no catálogo`).toBeDefined();
+    }
+  });
+
   it('a conquista de "limpe o primeiro capítulo" é reivindicável logo depois — e paga', async () => {
     // Faz parte de "sem instrução fora do jogo": a primeira fonte de moeda que o jogador
     // encontra precisa estar acessível pelas telas dele, não por conhecimento externo.

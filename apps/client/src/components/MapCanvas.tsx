@@ -8,7 +8,7 @@ import {
   type Coord,
   type DuelResult,
 } from '@paths-beyond/core';
-import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, Text, Texture, type Ticker } from 'pixi.js';
 import { useEffect, useRef } from 'react';
 import { narrateAiTurns, type AiScene } from '../data/aiNarration.js';
 import { catalog } from '../data/catalog.js';
@@ -31,6 +31,8 @@ import { structureMarkFor } from '../data/structureMarks.js';
 import { terrainMarkFor } from '../data/terrainMarks.js';
 import { patternPrimitives } from '../data/tilePatterns.js';
 import { activeUnitRenderer, type UnitRenderInput, type UnitRenderState } from '../data/unitRenderer.js';
+import { artIdDeUnidade, urlsDeArte } from '../data/unitArt.js';
+import { rolagemParaEnquadrar } from '../logic/enquadramento.js';
 import { audioDoJogo } from '../audio/motorCompartilhado.js';
 import { somDaBatida, type SomAgendado } from '../audio/sons.js';
 import { classDefForUnit, useBattleStore } from '../store/battleStore.js';
@@ -38,7 +40,20 @@ import { classDefForUnit, useBattleStore } from '../store/battleStore.js';
 // Tamanho do tile em escala 1. O tamanho real é este vezes a escala de UI (§11 — "fonte
 // escalável"): o mapa cresce junto com os painéis, senão o rótulo de AP/PP no tile, que
 // §11 exige legível sem hover, continuaria em 10px enquanto o resto da tela dobra.
-const BASE_TILE_SIZE = 36;
+// M26 — o tile subiu de 36 para 64, e o quadro da arte acompanha.
+//
+// A medição de 1/N mediu na tela o que D25 tinha deixado em aberto, e corrigiu uma premissa
+// dela no caminho: "escala não-inteira é aceitável" vale para AMPLIAR, não para reduzir —
+// vizinho-mais-próximo não faz média, ele descarta linhas de pixel. Um quadro de 64 desenhado
+// num tile de 36 perde quase metade das linhas e a espada vira um tracejado.
+//
+// Daí a regra que substitui a pergunta "48 ou 64": **o quadro é igual ao tile a 100%**, e toda
+// escala de §11 acima disso é uma ampliação, que é o caso que D25 já tinha aprovado.
+//
+// O preço, escolhido pelo usuário de olhos abertos: um mapa 20×15 a 175% pede 2240px e não cabe
+// em 1080p. Ele é pago pela rolagem do tabuleiro (ver `logic/enquadramento.ts`), e não por
+// cortar as escalas de acessibilidade, que são requisito duro de §11.
+const BASE_TILE_SIZE = 64;
 const BASE_LABEL_SIZE = 10;
 // O número de dano é maior que o rótulo de AP/PP de propósito: ele aparece por meio segundo em
 // cima da peça e some, enquanto o rótulo fica. Um efêmero pequeno não é lido a tempo.
@@ -101,7 +116,9 @@ function tileKey(coord: Coord): string {
 // e passam todos por aqui.
 function applyPrimitives(g: Graphics, primitives: readonly Primitive[]): void {
   for (const p of primitives) {
-    if (p.t === 'text') continue;
+    // Texto e sprite não entram num `Graphics`: `Text` e `Sprite` são filhos do `Container`.
+    // Quem os posiciona é `paintPrimitives`, logo abaixo.
+    if (p.t === 'text' || p.t === 'sprite') continue;
 
     if (p.t === 'circle') g.circle(p.cx, p.cy, p.r);
     else if (p.t === 'rect') g.rect(p.x, p.y, p.w, p.h);
@@ -185,12 +202,47 @@ function computeThreatenedTiles(battleState: ReturnType<typeof useBattleStore.ge
   return threatened;
 }
 
-// A mesma tradução, mas criando o `Graphics`: as formas entram num `Graphics` só (como antes) e
-// cada texto vira um `Text` próprio, depois — trocar essa ordem mudaria o que cobre o quê.
+// M26 — a tradução criando os objetos, e o único lugar do cliente onde a ORDEM de desenho de
+// uma unidade vira ordem de filhos do Pixi.
+//
+// Até o M26 as formas cabiam todas num `Graphics` só, porque nada podia se intercalar entre
+// elas. Um sprite pode: o disco de lado fica embaixo dele e a barra de HP, os pips e a plaqueta
+// ficam em cima. Então o `Graphics` é FECHADO e um novo é aberto sempre que um sprite
+// interrompe a sequência — sem isso, um único `Graphics` viria inteiro antes ou inteiro depois
+// da imagem, e o HUD sumiria atrás da peça. D25 mediu esse erro na tela: "ordem de desenho
+// importa: sprite primeiro, HUD depois. No teste eu inverti e o sprite cobriu o distintivo."
+//
+// O texto continua vindo por último, como em M16: ele é sempre rótulo por cima de tudo, e
+// mudar isso agora mexeria no que cobre o quê em telas que nada têm a ver com esta fatia.
 function paintPrimitives(layer: Container, primitives: readonly Primitive[]): void {
-  const g = new Graphics();
-  applyPrimitives(g, primitives);
-  layer.addChild(g);
+  let g: Graphics | null = null;
+
+  for (const p of primitives) {
+    if (p.t === 'text') continue;
+
+    if (p.t === 'sprite') {
+      if (g) {
+        layer.addChild(g);
+        g = null;
+      }
+      const textura = Texture.from(p.src);
+      // Vizinho-mais-próximo: a 175% o tile vai a 63px e um sprite de 48 é esticado 1,31×.
+      // D25 mediu que a escala não-inteira é imperceptível assim — e que com interpolação
+      // suave a arte vira um borrão.
+      textura.source.scaleMode = 'nearest';
+      const sprite = new Sprite(textura);
+      sprite.position.set(p.x, p.y);
+      sprite.width = p.w;
+      sprite.height = p.h;
+      if (p.alpha !== undefined) sprite.alpha = p.alpha;
+      layer.addChild(sprite);
+      continue;
+    }
+
+    g ??= new Graphics();
+    applyPrimitives(g, [p]);
+  }
+  if (g) layer.addChild(g);
 
   for (const p of primitives) {
     if (p.t !== 'text') continue;
@@ -228,6 +280,13 @@ export function MapCanvas() {
   // Quem está sendo animado é escondido do tabuleiro e desenhado aqui.
   const fxLayerRef = useRef<Container | null>(null);
   const fxRunningRef = useRef(false);
+  // M26 2/N — o que falta contar DEPOIS que a cena de duelo fechar.
+  //
+  // A sequência de um quadro é intercalada: a IA anda, engaja, anda de novo. Com a cena
+  // ligada, o tabuleiro toca até o primeiro duelo, entrega o duelo à cena e guarda o resto
+  // aqui. Sem esta ref, a alternativa seria tocar todos os movimentos e só então todos os
+  // duelos — o que conta a mesma batalha na ordem errada.
+  const cenasPendentesRef = useRef<readonly AiScene[] | null>(null);
   const hiddenUnitIdsRef = useRef<ReadonlySet<string>>(new Set());
   // M16 4/N — o último relato de turno de IA já contado. O relato traz o estado junto, então
   // "é de outra batalha" se resolve por comparação; esta ref resolve a outra metade, "já
@@ -261,6 +320,15 @@ export function MapCanvas() {
   // `classId`, e D4 proíbe mexer em `packages/core` neste milestone.
   const mode = useBattleStore((s) => s.mode);
   const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
+  // M26 3/N — o mapa de arte do servidor. É o que dá peça a PvP, masmorra e replay, onde o
+  // roster não alcança as unidades do outro lado.
+  const artIdByUnitId = useBattleStore((s) => s.artIdByUnitId);
+  // M26 2/N — enquanto a cena de duelo conta o golpe, o tabuleiro NÃO anima nada.
+  // Sem isto o turno da IA rodaria atrás da tela e o jogador voltaria para um tabuleiro
+  // diferente do que deixou — e o duelo seria contado duas vezes, uma em cada lugar.
+  const duelScene = useBattleStore((s) => s.duelScene);
+  const duelSceneEnabled = useBattleStore((s) => s.duelSceneEnabled);
+  const abrirCenaDeDuelo = useBattleStore((s) => s.abrirCenaDeDuelo);
 
   const theme = themeFor(colorblindMode);
   const tileSize = Math.round(BASE_TILE_SIZE * uiScale);
@@ -286,6 +354,12 @@ export function MapCanvas() {
     // tem entrada, e o glifo cai no nível seguinte como sempre caiu.
     const classId = classDefForUnit(heroesByUnitId, unit.unitId)?.id;
 
+    // M26 — a chave da unidade no manifesto de arte. Mesma inversão do `classId`: quem sabe
+    // ligar uma unidade de batalha ao conteúdo que a montou é este componente, contra o roster;
+    // o renderer continua puro. Ver `artIdDeUnidade` para por que os dois lados usam campos
+    // diferentes de `BattleUnit`.
+    const artId = artIdDeUnidade(heroesByUnitId, unit, artIdByUnitId);
+
     return {
       unit: {
         side: unit.side as 'player' | 'enemy',
@@ -301,6 +375,7 @@ export function MapCanvas() {
         // Nível 2 — o perfil, que todo `BattleUnit` carrega.
         weaponType: unit.weaponType,
         unitType: unit.unitType,
+        ...(artId ? { artId } : {}),
       },
       tile: { px, py, size: tileSize },
       state,
@@ -607,6 +682,18 @@ export function MapCanvas() {
         app.stage.addChild(fx);
         fxLayerRef.current = fx;
         redraw();
+
+        // M26 — as texturas das peças. `Texture.from` lê do cache do Pixi, então sem este
+        // carregamento a primeira pintura sairia com a textura vazia e a unidade apareceria
+        // como um retângulo branco. O `redraw()` acima acontece de qualquer jeito (o tabuleiro
+        // não pode esperar a rede para aparecer) e este segundo troca o glifo pela peça quando
+        // a imagem chega — degradar é sempre um tabuleiro jogável, nunca uma tela vazia.
+        const urls = urlsDeArte();
+        if (urls.length > 0) {
+          void Assets.load([...urls]).then(() => {
+            if (!disposed) redraw();
+          });
+        }
       });
 
     return () => {
@@ -643,6 +730,22 @@ export function MapCanvas() {
       anterior && anterior.preview && !duelPreview && battleState !== anterior.state ? anterior.preview : null;
 
     redraw();
+    enquadrarSelecionada();
+
+    // A cena de duelo está no ar: o tabuleiro já foi redesenhado com o estado novo, e nada
+    // mais acontece aqui. `relatoConsumidoRef` NÃO é marcada, então o turno da IA continua
+    // pendente e toca quando a cena fechar — este efeito roda de novo, porque `duelScene` é
+    // dependência dele.
+    if (duelScene) return;
+
+    // A cena acabou de fechar e havia mais para contar: retoma de onde parou, sem passar pela
+    // montagem de cenas de novo (o `confirmado` daquele quadro já foi consumido).
+    const pendentes = cenasPendentesRef.current;
+    if (pendentes) {
+      cenasPendentesRef.current = null;
+      tocarComCenaDeDuelo(pendentes);
+      return;
+    }
 
     // M16 4/N — o relato do turno da IA que veio DEPOIS deste comando. Duas condições, e as
     // duas são necessárias: `state === battleState` descarta relato de outra batalha (trocar de
@@ -677,7 +780,7 @@ export function MapCanvas() {
       if (relato) setBoardAnimating(false);
       return;
     }
-    playScenes(scenes, () => redraw());
+    tocarComCenaDeDuelo(scenes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     battleState,
@@ -689,8 +792,71 @@ export function MapCanvas() {
     uiScale,
     mode,
     heroesByUnitId,
+    artIdByUnitId,
     aiTurnReport,
+    duelScene,
   ]);
+
+  // M26 — com o tile em 64 o tabuleiro rola, e uma seleção fora da janela é uma seleção
+  // invisível (§1.1). A REGRA de para onde rolar é pura e está em `logic/enquadramento.ts`;
+  // aqui só sobra ler o tamanho da janela e escrever `scrollLeft`, do mesmo jeito que o único
+  // relógio do cliente mora neste arquivo e o movimento em si mora em `motion.ts`.
+  function enquadrarSelecionada() {
+    const caixa = containerRef.current;
+    const unidade = battleState.units.find((u) => u.unitId === selectedUnitId && u.hp > 0);
+    if (!caixa || !unidade) return;
+
+    const { scrollLeft, scrollTop } = rolagemParaEnquadrar(
+      {
+        scrollLeft: caixa.scrollLeft,
+        scrollTop: caixa.scrollTop,
+        largura: caixa.clientWidth,
+        altura: caixa.clientHeight,
+        conteudoLargura: battleState.map.width * tileSize,
+        conteudoAltura: battleState.map.height * tileSize,
+      },
+      { px: unidade.pos.x * tileSize, py: unidade.pos.y * tileSize, size: tileSize },
+    );
+    caixa.scrollLeft = scrollLeft;
+    caixa.scrollTop = scrollTop;
+  }
+
+  // M26 2/N — tocar uma sequência de cenas ENTREGANDO os duelos para a tela.
+  //
+  // O tabuleiro anima até o primeiro duelo; o duelo abre a cena; o resto espera na ref e volta
+  // quando ela fechar. Com a cena desligada (ou se ela não puder ser montada) o caminho é o de
+  // M16 4/N, intocado — o duelo é contado com impacto e tremor no próprio tile.
+  function tocarComCenaDeDuelo(cenas: readonly AiScene[]) {
+    if (cenas.length === 0) {
+      redraw();
+      setBoardAnimating(false);
+      return;
+    }
+
+    const usaCena = duelSceneEnabled && !instantResultMode;
+    const i = usaCena ? cenas.findIndex((c) => c.kind === 'duel') : -1;
+    if (i < 0) {
+      playScenes(cenas, () => redraw());
+      return;
+    }
+
+    const antes = cenas.slice(0, i);
+    const duelo = cenas[i] as Extract<AiScene, { kind: 'duel' }>;
+    const depois = cenas.slice(i + 1);
+
+    const entregar = () => {
+      redraw();
+      if (abrirCenaDeDuelo(duelo.stateBefore, duelo.duelResult)) {
+        cenasPendentesRef.current = depois;
+        return;
+      }
+      // Não deu para montar a cena: o duelo é contado no tabuleiro, como sempre.
+      tocarComCenaDeDuelo([duelo, ...depois]);
+    };
+
+    if (antes.length === 0) entregar();
+    else playScenes(antes, entregar);
+  }
 
   function redraw() {
     const layer = layerRef.current;

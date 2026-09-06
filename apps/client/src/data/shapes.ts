@@ -71,6 +71,27 @@ export type Primitive =
       readonly size: number;
       readonly color: number;
       readonly bold?: boolean;
+    }
+  // M26 — a peça deixa de ser desenhada por código.
+  //
+  // D22 reabriu o critério 1 do M16 e trouxe imagem para o repositório. A imagem entra por
+  // AQUI e não por um caminho paralelo, e isso é a coisa toda: um sprite continua sendo uma
+  // primitiva na mesma lista que o glifo, o anel de lado e a barra de HP, produzida pelo mesmo
+  // renderer puro e traduzida no mesmo ponto único do `MapCanvas`. Se a imagem tivesse virado
+  // um segundo canal de desenho, a ordem "sprite primeiro, HUD depois" — que D25 mediu na tela
+  // e errou uma vez — deixaria de ser afirmável em teste.
+  //
+  // `src` é a URL já resolvida (o `import.meta.glob` do Vite a emite relativa, que é o que faz
+  // o `file://` do shell desktop funcionar — M21 2/N). O renderer não sabe carregar nada; ele
+  // descreve o que vai aparecer, como sempre.
+  | {
+      readonly t: 'sprite';
+      readonly x: number;
+      readonly y: number;
+      readonly w: number;
+      readonly h: number;
+      readonly src: string;
+      readonly alpha?: number;
     };
 
 export interface Bounds {
@@ -119,11 +140,14 @@ export function boundsOf(shapes: readonly NormShape[]): Bounds {
 // `text` conta como ponto: a largura de um texto depende da fonte, e o cliente não mede fonte
 // fora do browser. O rótulo de AP/PP é curto e ancorado no canto por construção.
 export function primitiveBounds(p: Primitive): Bounds {
-  const folga = p.t === 'text' ? 0 : (p.stroke !== undefined ? (p.strokeWidth ?? 1) / 2 : 0);
+  const folga = p.t === 'text' || p.t === 'sprite' ? 0 : p.stroke !== undefined ? (p.strokeWidth ?? 1) / 2 : 0;
   const nucleo: Bounds =
     p.t === 'circle'
       ? { minX: p.cx - p.r, minY: p.cy - p.r, maxX: p.cx + p.r, maxY: p.cy + p.r }
-      : p.t === 'rect'
+      : // Um sprite ocupa exatamente o retângulo declarado: a imagem é escalada para ele, não
+        // ele para a imagem. É o que torna "o sprite CABE no tile" (D25) uma propriedade do
+        // desenho e não uma torcida sobre o que a PixelLab devolveu.
+        p.t === 'rect' || p.t === 'sprite'
         ? { minX: p.x, minY: p.y, maxX: p.x + p.w, maxY: p.y + p.h }
         : p.t === 'poly'
           ? pontosDe(p.points)

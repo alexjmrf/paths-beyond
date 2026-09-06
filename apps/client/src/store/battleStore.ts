@@ -197,6 +197,7 @@ const idiomaInicial: Idioma = idiomaValido(restoredSave?.idioma)
 
 export function saveProjection(state: {
   readonly instantResultMode: boolean;
+  readonly duelSceneEnabled: boolean;
   readonly colorblindMode: boolean;
   readonly uiScale: number;
   readonly pvp: PvpSession;
@@ -209,6 +210,7 @@ export function saveProjection(state: {
     v: SAVE_FORMAT_VERSION,
     rulesVersion: RULES_VERSION,
     instantResultMode: state.instantResultMode,
+    duelSceneEnabled: state.duelSceneEnabled,
     colorblindMode: state.colorblindMode,
     uiScale: state.uiScale,
     pvpToken: state.pvp.token,
@@ -224,6 +226,18 @@ export function saveProjection(state: {
 // computado — confirmar só aplica esse mesmo objeto, nunca recalcula, então o que o
 // jogador vê no preview é *literalmente* o que acontece ao confirmar (não uma segunda
 // rodada que só deveria dar o mesmo resultado).
+// M26 2/N — o que a TELA de duelo precisa para se desenhar.
+//
+// As duas unidades vêm do estado ANTES do engajamento, e isso não é detalhe: `confirmEngage`
+// commita `nextState` no mesmo instante, e nele o perdedor já está morto. A cena conta o que
+// aconteceu — ela precisa dos dois de pé no primeiro quadro, exatamente como a animação de
+// tabuleiro de M16 3/N precisa de `stateBefore`.
+export interface CenaDeDuelo {
+  readonly atacante: BattleUnit;
+  readonly defensor: BattleUnit;
+  readonly duelResult: DuelResult;
+}
+
 export interface DuelPreview {
   readonly nextState: BattleState;
   readonly duelResult: DuelResult;
@@ -451,6 +465,13 @@ interface BattleStore {
   // batalha — verificado em navegador nesta fatia, num duelo que matou o último inimigo do
   // capítulo 1: a animação inteira rodou atrás do modal. Não é regra e não vai para o save.
   readonly boardAnimating: boolean;
+  // M26 2/N — a cena de duelo em andamento. Ela guarda as unidades do estado ANTES do
+  // engajamento: o estado novo já matou uma delas, e uma peça que não existe mais não tem como
+  // lutar na tela. Mesmo motivo que fez a animação de tabuleiro de M16 3/N guardar
+  // `stateBefore`.
+  readonly duelScene: CenaDeDuelo | null;
+  // O interruptor. Três níveis com o `instantResultMode` de §11: cena, tabuleiro, nada.
+  readonly duelSceneEnabled: boolean;
   // M16 4/N — o turno que a IA jogou depois do último comando aceito, esperando para ser
   // contado no tabuleiro. Guarda o ESTADO junto do relato de propósito: quem consome só age
   // quando `state === battleState`, e é isso que impede um relato velho de ser animado em cima
@@ -487,6 +508,13 @@ interface BattleStore {
   // Quem é cada unidade do tabuleiro atual. Preenchido sempre que uma batalha nasce de um
   // ticket, a partir do roster do servidor — ver `heroesPorUnidade`.
   readonly heroesByUnitId: Readonly<Record<string, Hero>>;
+  // M26 3/N — quem é cada unidade do tabuleiro para DESENHAR, vindo do servidor no ticket.
+  //
+  // Separado de `heroesByUnitId` de propósito, e não é duplicação: aquele é o herói INTEIRO
+  // e existe só do lado do jogador, porque as telas que o consomem (talentos, equipamento,
+  // táticas) abrem sobre uma unidade que é sua. Este cobre os DOIS lados e carrega uma string
+  // — é o único que responde por PvP, onde o time do defensor são instâncias de outra conta.
+  readonly artIdByUnitId: Readonly<Record<string, string>>;
 
   selectUnit: (unitId: string | null) => void;
   moveSelectedUnitTo: (destination: Coord) => void;
@@ -524,6 +552,9 @@ interface BattleStore {
   definirIdioma: (idioma: Idioma) => void;
   toggleInstantResultMode: () => void;
   setBoardAnimating: (value: boolean) => void;
+  abrirCenaDeDuelo: (stateBefore: BattleState, duelResult: DuelResult) => boolean;
+  fecharCenaDeDuelo: () => void;
+  setDuelSceneEnabled: (value: boolean) => void;
   toggleColorblindMode: () => void;
   setUiScale: (scale: number) => void;
   clearProgress: () => void;
@@ -699,6 +730,8 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   idiomaEscolhido: idiomaValido(restoredSave?.idioma) ? restoredSave.idioma : null,
   t: criarTradutor(idiomaInicial, CATALOGOS),
   boardAnimating: false,
+  duelScene: null,
+  duelSceneEnabled: restoredSave?.duelSceneEnabled ?? true,
   aiTurnReport: null,
   colorblindMode: restoredSave?.colorblindMode ?? false,
   uiScale: restoredSave?.uiScale ?? DEFAULT_UI_SCALE,
@@ -712,6 +745,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   summon: EMPTY_SUMMON,
   campaign: EMPTY_CAMPAIGN,
   heroesByUnitId: {},
+  artIdByUnitId: {},
 
   selectUnit: (unitId) => {
     if (!unitId) {
@@ -917,11 +951,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         mode: 'campaign',
         battleState: buildInitialState(ticket.setup, ticket.seed),
         heroesByUnitId: heroesPorUnidade(ticket.setup, s.pvp.roster),
+        artIdByUnitId: ticket.characterIdByUnitId,
         commandLog: [],
         replayViewer: null,
         selectedUnitId: null,
         reachableTiles: [],
         duelPreview: null,
+        duelScene: null,
         targetingMode: null,
         lastCommandReason: null,
         aiTurnReport: null,
@@ -964,6 +1000,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set((s) => ({
       battleState: tabuleiroVazio(),
       heroesByUnitId: {},
+      artIdByUnitId: {},
       commandLog: [],
       replayViewer: null,
       selectedUnitId: null,
@@ -1755,11 +1792,16 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       set({
         mode: 'pvp',
         battleState: buildInitialState(ticket.setup, ticket.seed),
+        // M26 3/N — é aqui que o mapa do servidor deixa de ser conveniência e vira a única
+        // resposta possível: o time do defensor são instâncias de herói de OUTRA conta, e o
+        // roster do atacante não as contém nem em princípio.
+        artIdByUnitId: ticket.characterIdByUnitId,
         commandLog: [],
         replayViewer: null,
         selectedUnitId: null,
         reachableTiles: [],
         duelPreview: null,
+        duelScene: null,
         targetingMode: null,
         lastCommandReason: null,
         pvp: { ...pvp, ticket, outcome: null, busy: false, status: get().t('estado.batalhaEmAndamento') },
@@ -1812,6 +1854,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       };
       set((s) => ({
         replayViewer: { replay, step: 0, state: replayStateAt(replay, 0), playing: false, speed: 1 },
+        // M26 3/N — o replay também desenha peça. O mapa vem DERIVADO na leitura (o servidor
+        // não o grava), então replays antigos ganham arte junto com os novos.
+        artIdByUnitId: stored.characterIdByUnitId,
         pvp: { ...s.pvp, busy: false, status: get().t('estado.replayCarregado') },
       }));
     } catch (error) {
@@ -1824,6 +1869,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       mode: 'campaign',
       battleState: tabuleiroVazio(),
       heroesByUnitId: {},
+      artIdByUnitId: {},
       commandLog: [],
       replayViewer: null,
       selectedUnitId: null,
@@ -1883,11 +1929,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       set({
         mode: 'dungeon',
         battleState: buildInitialState(ticket.setup, ticket.seed),
+        artIdByUnitId: ticket.characterIdByUnitId,
         commandLog: [],
         replayViewer: null,
         selectedUnitId: null,
         reachableTiles: [],
         duelPreview: null,
+        duelScene: null,
         targetingMode: null,
         lastCommandReason: null,
         pve: { ...pve, ticket, activeDungeonId: dungeonId, lastRun: null, busy: false, status: get().t('estado.masmorraEmAndamento') },
@@ -1921,10 +1969,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         mode: 'campaign',
         battleState: tabuleiroVazio(),
         heroesByUnitId: {},
+        artIdByUnitId: {},
         commandLog: [],
         selectedUnitId: null,
         reachableTiles: [],
         duelPreview: null,
+        duelScene: null,
         targetingMode: null,
         pve: {
           ...s.pve,
@@ -1964,6 +2014,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       mode: 'campaign',
       battleState: tabuleiroVazio(),
       heroesByUnitId: {},
+      artIdByUnitId: {},
       commandLog: [],
       replayViewer: null,
       selectedUnitId: null,
@@ -2079,6 +2130,32 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 
   setBoardAnimating: (value) => set({ boardAnimating: value }),
 
+  // A cena terminou (ou o jogador pulou). Fechá-la é o que LIBERA a narração do turno da IA:
+  // o `MapCanvas` não anima nada enquanto ela está aberta, senão o inimigo se moveria atrás da
+  // tela e o jogador voltaria para um tabuleiro diferente do que deixou.
+  // M26 2/N — abrir a cena para UM duelo, a partir do estado de ANTES dele.
+  //
+  // **Quem chama é o `MapCanvas`, e num lugar só.** O duelo que o jogador confirmou e o que a
+  // IA jogou chegam por caminhos diferentes (`duelPreview` e `aiTurnReport`), mas viram a mesma
+  // lista de cenas no tabuleiro desde M16 4/N — e é ali que a decisão cabe. Ligar a cena no
+  // `confirmEngage` teria deixado a FASE INIMIGA sem tela, que é meia funcionalidade: Fire
+  // Emblem e Unicorn Overlord mostram as duas.
+  //
+  // Devolve `false` quando não dá para montar a cena (uma das duas peças não está no estado de
+  // antes). O chamador então anima no tabuleiro, como sempre fez — degradar é sempre um duelo
+  // contado, nunca um silêncio.
+  abrirCenaDeDuelo: (stateBefore, duelResult) => {
+    const atacante = stateBefore.units.find((u) => u.unitId === duelResult.attackerId);
+    const defensor = stateBefore.units.find((u) => u.unitId === duelResult.defenderId);
+    if (!atacante || !defensor) return false;
+    set({ duelScene: { atacante, defensor, duelResult } });
+    return true;
+  },
+
+  fecharCenaDeDuelo: () => set({ duelScene: null }),
+
+  setDuelSceneEnabled: (value) => set({ duelSceneEnabled: value }),
+
   toggleColorblindMode: () => set((s) => ({ colorblindMode: !s.colorblindMode })),
 
   // Escala fora da lista é ignorada em vez de aplicada: o mapa é canvas, e um valor
@@ -2099,6 +2176,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({
       battleState: tabuleiroVazio(),
       heroesByUnitId: {},
+      artIdByUnitId: {},
       campaign: EMPTY_CAMPAIGN,
       summon: EMPTY_SUMMON,
       tacticsOverrides: {},

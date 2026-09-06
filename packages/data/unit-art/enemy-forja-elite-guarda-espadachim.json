@@ -1,0 +1,20 @@
+{
+  "unitId": "enemy-forja-elite-guarda-espadachim",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/enemy-forja-elite-guarda-espadachim.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/enemy-forja-elite-guarda-espadachim-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/enemy-forja-elite-guarda-espadachim-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a nimble foot soldier in light leather armour, wielding a straight steel sword and a small round shield, dark crimson and blackened iron colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 3080074809,
+    "characterId": "df15c403-33aa-4d51-9956-92008aab8b21",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}

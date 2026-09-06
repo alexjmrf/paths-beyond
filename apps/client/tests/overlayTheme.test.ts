@@ -159,6 +159,9 @@ describe('tokens da linguagem visual', () => {
       'glyphInk',
       'labelPlate',
       'labelPlateAlpha',
+      // M26 — o teto da plaqueta de AP/PP. Entrou porque o sprite tem cabeça e a cabeça fica
+      // no topo do tile, que é onde a plaqueta de M16 morava sem teto.
+      'labelPlateMaxRatio',
       'pipRatio',
       'buffInk',
       'debuffInk',

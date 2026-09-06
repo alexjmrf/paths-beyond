@@ -1,0 +1,20 @@
+{
+  "unitId": "enemy-sentinela-alada",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/enemy-sentinela-alada.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/enemy-sentinela-alada-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/enemy-sentinela-alada-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "an airborne rider in a windswept cloak, wielding a long spear held upright, mounted on a winged griffin with spread feathered wings, dark crimson and blackened iron colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 160443867,
+    "characterId": "9a31ea06-7082-416d-a10d-851792fae31a",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-06"
+  }
+}
