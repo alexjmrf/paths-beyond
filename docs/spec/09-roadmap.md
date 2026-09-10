@@ -417,6 +417,105 @@ viraram 140 e foram commitados em sete commits, de M18 6/N a M24. A árvore est�
 
 ---
 
+> **M28–M32 foram PROPOSTAS pelo agente em 2026-09-10**, depois de uma auditoria do repositório
+> executando as suítes, e com a direção escolhida pelo usuário na mesma sessão: **fechar a demo
+> para ser jogada**. Ratificar antes de abrir, como M19–M27.
+>
+> **O diagnóstico que ordena estas cinco.** A demo existe: três capítulos, trinta missões, 2.493
+> testes verdes, shell empacotável, determinismo provado dentro do Electron. **E ninguém fora desta
+> máquina consegue jogá-la** — não há Dockerfile, não há compose, não há alvo de deploy, e o jogo é
+> sempre-online por decisão (D21). O binário sabe para onde apontar desde o M21 2/N; não existe
+> para onde apontar. **Tudo aqui serve a uma frase: um estranho instala e joga os três capítulos.**
+> A ordem é de bloqueio, não de gosto — a primeira desbloqueia as quatro seguintes e desbloqueia
+> também o usuário, que hoje não consegue julgar nada na tela porque o cliente real exige Postgres.
+
+### M28 — O ambiente jogável
+**A milestone que existe porque o jogo, hoje, não é alcançável por ninguém.** O M19 pôs o servidor
+em Postgres e o M21 fez o cliente empacotado receber a URL do shell pelo `preload` — as duas metades
+certas de uma ponte que **não tem margem do outro lado**. Junto vem um bloqueio prático que já
+apareceu duas vezes no `PROGRESS.md`: o julgamento na tela (o capítulo recolhível do M27, o critério
+3 do M23) fica pendente porque *"o Docker não está de pé nesta máquina"* — ou seja, a mesma
+ausência trava o playtest e trava o autor. O `compose` local não é conveniência: é o que faz o
+usuário conseguir olhar o próprio jogo. Entram também as migrations no caminho do deploy (existe
+`migrate.ts` e nada o chama fora do CI), os segredos (`BATTLE_TICKET_SECRET` já falha alto, o que é
+o comportamento certo, e precisa de onde vir) e backup automático — o M19 provou o restore à mão.
+**Aceite:** `docker compose up` sobe servidor + Postgres migrado numa máquina limpa, e o cliente de
+desenvolvimento fala com ele sem passo manual; existe um ambiente hospedado alcançável pela
+internet, com as migrations rodando no deploy e não à mão; **uma pessoa em OUTRA máquina instala o
+build empacotado e joga a missão 1 do capítulo 1 ponta a ponta**, que é a única prova que importa;
+o backup roda sozinho e um restore é exercitado contra o ambiente hospedado; o julgamento na tela
+que M23 e M27 deixaram pendente deixa de estar bloqueado por ambiente.
+
+---
+
+### M29 — A camada de idioma da campanha
+**Declarada fora do M27 por decisão do usuário, e é maior do que o registro dizia.** A auditoria de
+2026-09-10 mediu: `TipoDeConteudo` declara **seis** tipos e os catálogos têm entrada para **dois**
+(`masmorra`, 8; `premio`, 10). Ficam em português na build inglesa **~81 nomes autorados** — 30
+missões (o tipo `missao` **não existe** na camada), 3 capítulos (`capitulo` declarado, zero
+entradas), 10 classes, 28 skills e 10 materiais — mais as cinco frases que dizem "capítulo" onde a
+1/N pôs missão. Com D24 fazendo do inglês a língua de lançamento, isto não é polimento: é a demo
+falando a língua errada. **E há uma lição de teste que vale mais que os nomes:**
+`conteudoTraduzido.test.ts` afirma cobertura **só dos dois tipos já prontos** — é o padrão "lacuna
+de eixo e não de profundidade" que este projeto já pegou cinco vezes, desta vez dentro do teste que
+existe para impedi-lo. Consertar a cobertura sem consertar o teste deixa a próxima omissão passar
+igual.
+**Aceite:** todo nome autorado de todo tipo declarado em `TipoDeConteudo` tem entrada nas duas
+línguas, com `missao` existindo como tipo; as cinco frases de "capítulo"/"missão" dizem a coisa
+certa; **o teste de cobertura passa a derivar do catálogo de conteúdo em vez de listar números** —
+acrescentar uma missão sem traduzi-la fica vermelho, e um tipo novo em `TipoDeConteudo` sem
+entradas também; nenhum nome próprio de personagem ganha entrada (a decisão do M25 continua).
+
+---
+
+### M30 — O texto: a história nos três capítulos
+**O M27 construiu a estrutura que a história vai ocupar e o M25 a deixou traduzível; o texto nunca
+entrou.** O usuário declarou tê-la pensada e que ela "não é tão relevante no momento" — verdade
+enquanto a demo não seria jogada por ninguém, e deixa de ser no instante em que ela é. Trinta
+missões com nome e sem uma linha de contexto são um tutorial de sistemas, não uma demo: o jogador
+não descobre por que escolta a Wren no capítulo 5 nem por que Bardan vira aliado no 6, e essas duas
+decisões de conteúdo já estão no dado desde o M18 5/N. Entra o texto pelos pontos que já existem —
+abertura de capítulo, briefing de missão, o que acontece ao limpar — sem inventar tela nova e sem
+tocar em regra.
+**Aceite:** os três capítulos e as trinta missões têm texto autorado, em inglês e português, pela
+camada do M25 e não cru no dado; o aliado de cenário do capítulo 5 e o do 6 têm motivo dito no
+jogo; nenhuma tela nova foi criada e `packages/core` fica intocado; a varredura de jargão
+(`semJargao.test.ts`) continua valendo para o texto novo.
+
+---
+
+### M31 — O critério 3 do M23, e o veredito da primeira sessão
+**Este é o único critério de aceite aberto em todo o projeto**, e `PROGRESS.md` o carrega desde
+2026-09-04: *"observar alguém que nunca viu o jogo"*. Não é código — é do usuário, e segue o
+precedente do critério 2 do M16. As três milestones acima existem para que ele seja possível de
+fazer: sem ambiente (M28) não há o que instalar, sem idioma (M29) o observado lê metade em
+português, sem texto (M30) ele joga sem saber por quê. **E há um achado esperando decisão, já
+registrado:** *a primeira batalha do jogo é vencida em 65% das vezes* — para uma primeira batalha,
+isso provavelmente é baixo demais, e a correção pode ser conteúdo (a missão), economia (a ficha
+inicial) ou nada, se a intenção for que o jogador perca e aprenda. É decisão de design e não de
+código.
+**Aceite:** o usuário observa pelo menos uma pessoa que nunca viu o jogo jogar do zero até o fim do
+capítulo 1, sem ajudar; o que travou essa pessoa está escrito, item a item, em `DECISIONS.md`; a
+decisão sobre os 65% da primeira batalha está tomada e registrada, seja ela "corrigir" ou
+"deliberado"; **o M23 é marcado como fechado ou o que falta vira milestone própria** — ele não
+continua aberto por inércia.
+
+---
+
+### M32 — Telemetria e o playtest ampliado
+**Depois de uma pessoa observada, as próximas não estarão na sala.** O servidor tem log estruturado
+desde o M19, e nada mede JOGO: onde o jogador para, quanto tempo leva a missão, quantas vezes
+repete, em que ponto fecha o jogo e não volta. Sem isso, um playtest com dez pessoas remotas
+devolve dez opiniões e nenhum número. Entra o mínimo que responde a essas perguntas — e entra com
+a decisão de privacidade explícita, porque coletar comportamento de jogador é coleta de dado
+pessoal e a conta já é identidade de plataforma desde o M20.
+**Aceite:** dá para responder, por número e não por impressão, onde os jogadores param na demo e
+quanto tempo cada missão leva; o que é coletado está declarado e o jogador pode recusar; nada
+coletado identifica alguém além do id de conta que o servidor já tem; um playtest com mais de uma
+pessoa remota roda ponta a ponta e o relatório sai do dado coletado.
+
+---
+
 ## 15. Decisões em aberto (registrar em `DECISIONS.md` ao resolver)
 
 - **`MAX_TROCAS = 3`** é um chute inicial. Com 2, o duelo vira "quem bate primeiro"; com 4+, o preview fica ilegível e `spd` volta a dominar. Teste 3 antes de mexer.
