@@ -417,16 +417,16 @@ viraram 140 e foram commitados em sete commits, de M18 6/N a M24. A árvore est�
 
 ---
 
-> **M28–M32 foram PROPOSTAS pelo agente em 2026-09-10**, depois de uma auditoria do repositório
+> **M28–M33 foram PROPOSTAS pelo agente em 2026-09-10**, depois de uma auditoria do repositório
 > executando as suítes, e com a direção escolhida pelo usuário na mesma sessão: **fechar a demo
 > para ser jogada**. Ratificar antes de abrir, como M19–M27.
 >
-> **O diagnóstico que ordena estas cinco.** A demo existe: três capítulos, trinta missões, 2.493
+> **O diagnóstico que ordena estas seis.** A demo existe: três capítulos, trinta missões, 2.493
 > testes verdes, shell empacotável, determinismo provado dentro do Electron. **E ninguém fora desta
 > máquina consegue jogá-la** — não há Dockerfile, não há compose, não há alvo de deploy, e o jogo é
 > sempre-online por decisão (D21). O binário sabe para onde apontar desde o M21 2/N; não existe
 > para onde apontar. **Tudo aqui serve a uma frase: um estranho instala e joga os três capítulos.**
-> A ordem é de bloqueio, não de gosto — a primeira desbloqueia as quatro seguintes e desbloqueia
+> A ordem é de bloqueio, não de gosto — a primeira desbloqueia as cinco seguintes e desbloqueia
 > também o usuário, que hoje não consegue julgar nada na tela porque o cliente real exige Postgres.
 
 ### M28 — O ambiente jogável
@@ -484,7 +484,34 @@ jogo; nenhuma tela nova foi criada e `packages/core` fica intocado; a varredura 
 
 ---
 
-### M31 — O critério 3 do M23, e o veredito da primeira sessão
+### M31 — O volume do gacha na demo
+**A tela de summon está quase inerte, e o playtest ia medir isso sem querer.** Medido nesta sessão
+contra o conteúdo autorado: 30 missões × 60 + 3 capítulos × 300 + 8 masmorras × 200 + 4.650 de
+achievements e eventos = **≈ 8.950 premium**, e com `summon.premiumCost = 500` isso é
+**17 rolagens na demo inteira**. O usuário nomeou o gacha como a peça que prende o jogador; entregar
+17 puxadas ao primeiro estranho que jogar (M32) é testar um jogo que não é este.
+
+**A restrição que ordena a fatia, e ela contraria a intuição: o pity não pode crescer antes do pool
+crescer.** Com pity `P` e pool `N`, o pior caso para completar o pool é `N × P` rolagens — hoje
+5 × 10 = 50. Um pity de 30 exigiria 150 rolagens, que a renda da demo não paga nem de longe, e
+`pool esgotado CONGELA o contador de pity` (M18 1/N) transformaria o excedente em rolagem morta.
+**Logo esta fatia NÃO é onde o pity cresce** — ela é onde o volume passa a caber no pool que existe.
+O pity maior que o usuário quer chega com o elenco do M34, e é lá que ele deve ser afinado.
+
+**O ajuste de menor toque é o custo, não a renda:** `summon.premiumCost` é **um número em
+`packages/data`**, contra os 45 arquivos de recompensa que mexer na renda exigiria. O alvo é o
+volume da demo ficar próximo de `N × P`, para que o gacha continue vivo do começo ao fim e complete
+perto do final em vez de morrer no meio.
+**Aceite:** o número de rolagens que a demo paga está **medido por teste que deriva do catálogo** —
+acrescentar uma missão ou um achievement muda o número medido e não o deixa passar em silêncio, que
+é a diferença entre uma asserção e um comentário; o volume cai na faixa em que o pool de 5 completa
+perto do fim da demo e não no meio; `pnpm balance` reexecutado com os dois critérios do M8 de pé;
+os números finais (`premiumCost`, `pityThreshold`) vieram do usuário e estão registrados em
+`DECISIONS.md` com a medição que os justificou, por D18 e pela regra 10.
+
+---
+
+### M32 — O critério 3 do M23, e o veredito da primeira sessão
 **Este é o único critério de aceite aberto em todo o projeto**, e `PROGRESS.md` o carrega desde
 2026-09-04: *"observar alguém que nunca viu o jogo"*. Não é código — é do usuário, e segue o
 precedente do critério 2 do M16. As três milestones acima existem para que ele seja possível de
@@ -502,7 +529,7 @@ continua aberto por inércia.
 
 ---
 
-### M32 — Telemetria e o playtest ampliado
+### M33 — Telemetria e o playtest ampliado
 **Depois de uma pessoa observada, as próximas não estarão na sala.** O servidor tem log estruturado
 desde o M19, e nada mede JOGO: onde o jogador para, quanto tempo leva a missão, quantas vezes
 repete, em que ponto fecha o jogo e não volta. Sem isso, um playtest com dez pessoas remotas
@@ -513,6 +540,85 @@ pessoal e a conta já é identidade de plataforma desde o M20.
 quanto tempo cada missão leva; o que é coletado está declarado e o jogador pode recusar; nada
 coletado identifica alguém além do id de conta que o servidor já tem; um playtest com mais de uma
 pessoa remota roda ponta a ponta e o relatório sai do dado coletado.
+
+---
+
+> **M34–M36 foram PROPOSTAS pelo agente em 2026-09-10**, sobre o desenho de gacha final que o
+> usuário fechou na mesma sessão. Decisões, colisões e números abertos em `DECISIONS.md`, seção
+> **"Em aberto (levantadas pelo usuário em 2026-09-10, ao desenhar o gacha final)"**. As três vêm
+> **depois do playtest (M32)** de propósito: elas somam sistema a um jogo cujo M32 existe para
+> descobrir se ele já tem regra demais, e o veredito do playtest deve poder mudá-las.
+
+### M34 — Os três tiers: Adventurer, Hero e Legend
+**O elenco deixa de ser plano.** `Adventurer` é o tier de baixo, `Hero` o do meio e `Legend` o topo,
+e **o topo não é invocável**: chega-se nele por evolução. Os caminhos são assimétricos de propósito
+— quem nasce `Hero` sobe direto a `Legend`; quem nasce `Adventurer` sobe a `Hero` e só então a
+`Legend`. **O tier de baixo NÃO é mais fraco no fim**, e essa é a trava do milestone e não um
+detalhe: o que muda é a complexidade do kit e o custo de evolução, nunca o teto de poder. **A
+metade "kit mais simples" já está construída** — a profundidade da árvore varia por personagem (5 a
+9) e D9 já declarou que profundidade é troca de forma e não de poder, então `Adventurer` ≈
+profundidade 5–6 e `Hero` ≈ 8–9, com o mesmo orçamento de 9 pontos. **`Legend` monta no `awakening`**
+(decisão do usuário), reusando a curva, o material e a idempotência que existem desde o M14 em vez
+de criar um quinto eixo de progressão. **Isto reverte "pesos iguais, sem raridade" (M18 2/N)**, e a
+reversão é legítima porque o desenho novo respeita a premissa original: raridade sem poder. **É
+também o milestone que faz o pity poder crescer**, porque o `Adventurer` é o que preenche o
+intervalo entre dois `Hero` — sem ele, pity alto é rolagem morta (ver M31). **O item mais caro é
+elenco:** nove personagens não se partem em dois tiers de forma convincente, então autorar
+personagens novos (ficha, árvore, arte pela PixelLab do M26, balanceamento) dimensiona a fatia.
+**Aceite:** o tier de BASE é catálogo e o tier CORRENTE é estado de conta, e nenhum dos dois mora
+no lugar do outro (o erro que o M18 2/N pagou com o fragmento de imprint); um `Adventurer` promovido
+a `Hero` e um `Hero` de base são indistinguíveis em regra depois de promovidos; `Adventurer` não
+aparece em banner próprio e sai do banner de `Hero`; **`pnpm balance` roda com todas as comps no
+MESMO tier corrente e os dois critérios do M8 batem, com um teste que falha se a matriz misturar
+tiers** — medir investimento diferente e ler como design é a lacuna de eixo que o M17 5/N pegou;
+`RULES_VERSION` sobe e o servidor recusa replay anterior com 409; os números (limiares de awakening,
+divisão do elenco, pity novo) vieram do usuário.
+
+---
+
+### M35 — Armas assinatura e o banner de armas
+**O equipamento vira alvo de gacha.** Uma arma/artefato assinatura por personagem, **travada por
+CLASSE** — equipável por qualquer personagem da classe de quem ela pertence —, com banner próprio; e
+quando um personagem entra em rotação, a arma dele entra junto. **A máquina de item já existe
+inteira** (mainstat por slot, até 4 substats com `rolls`, enhance +0→+15, reforge, sets), então esta
+fatia é banner, trava e direito de escolha — não um sistema de equipamento novo. **Os dois números
+derivam do pity de personagem `P`** (decisão do usuário): pity do banner de armas entre `0,60·P` e
+`0,75·P`, e o **token de escolha no banner de personagem em `1,5·P` rolagens NAQUELE banner**,
+deliberadamente **não** condicionado a como o personagem saiu — a regra original ("tirou no
+garantido, faça mais 50%") punia quem tivesse sorte, e boa sorte pior que má sorte é o erro clássico
+do gênero. **A pergunta que trava a fatia e precisa estar respondida antes de uma linha de código:**
+a arma é *sidegrade* (muda o eixo de build sem somar poder) ou *upgrade*? Se for upgrade, ela é
+poder saindo do gacha e reprova no critério do M8 — e então o critério muda de forma deliberada, ou
+a arma muda.
+**Aceite:** a trava por classe é forma e não varredura (o schema recusa arma sem classe declarada);
+o token de `1,5·P` é contador duro por `(jogador, banner)`, concedido uma única vez por banner, e o
+caso de bater o limiar sem possuir o personagem deixa o token pendente em vez de perdê-lo — com
+teste para os dois caminhos, incluindo o recíproco; `pnpm balance` com os dois critérios do M8 de
+pé, medido **com e sem** a arma assinatura equipada, porque é essa diferença que responde à pergunta
+de sidegrade; a decisão sidegrade-vs-upgrade está registrada em `DECISIONS.md` com a medição.
+
+---
+
+### M36 — A Soul
+**Um item exclusivo do personagem, e o primeiro slot novo desde o M1.** Dois substats roláveis mais
+um **mainstat ligado às habilidades daquele personagem** (2 a 3 possibilidades), num slot que só
+abre depois de o personagem ser upado até certo nível. **O farm dropa material GENÉRICO e a escolha
+de para quem craftar acontece no craft** (decisão do usuário, e é a certa): um farm por classe
+recriaria o "hoje tenho de farmar o domínio errado" de Genshin e do Epic Seven. **Duas consequências
+de forma que dimensionam a fatia:** a Soul é um **7º slot**, e `GEAR_SLOTS` é lista única usada por
+UI e validação de save enquanto §7.1 diz "6 slots" normativamente e §4.1 fixa a ordem de agregação —
+é mudança de regra; e como o mainstat é sorteado entre 2–3 opções, o jogador **vai recraftar**, então
+o sumidouro tem de ser afinado como repetível e não como gasto único. **Distinção a preservar:**
+arma é travada por CLASSE e Soul por PERSONAGEM — dois modelos de exclusividade de propósito, com
+nomes distintos no dado para ninguém fundi-los depois. (`ItemInstance.lockedBy?: HeroId` existe no
+tipo e no schema **sem consumidor** desde o M4 e é o "trancar no herói" do E7 — não serve para
+nenhuma das duas travas.)
+**Aceite:** a Soul entra como slot próprio com a ordem de agregação de §4.1 declarada e testada, e
+§7.1 deixa de dizer "6 slots"; o slot recusa abrir abaixo do nível declarado, e o nível é conteúdo e
+não constante em código; o mainstat sorteia entre as opções declaradas DAQUELE personagem e o schema
+recusa uma Soul cujo mainstat não pertença a ele; craftar escolhe o personagem no ato, a partir de
+material genérico, com idempotência por nonce como toda ação de economia desde o M14 4/N;
+`RULES_VERSION` sobe; `pnpm balance` com os dois critérios do M8 de pé.
 
 ---
 

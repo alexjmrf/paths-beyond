@@ -234,6 +234,184 @@ qualquer lançamento sempre-online.
   **nenhuma destas entradas deve ser escrita antes de o usuário definir a milestone**, que é como
   M17 e M18 nasceram.
 
+## Em aberto (levantadas pelo usuário em 2026-09-10, ao desenhar o gacha final)
+
+> **Nada aqui é trabalho das milestones já propostas (M28–M33), e nada aqui deve ser antecipado.**
+> Esta seção existe porque o usuário desenhou o gacha final da demo em diante, e **duas decisões já
+> travadas mudam de lado**. Registrado antes de virar código para que a reversão seja lida como
+> decisão e não como bug. Os números continuam abertos: por D18 e pela regra 10, número de
+> balanceamento é do usuário e não se inventa na hora.
+
+### 1. Três tiers de personagem: Adventurer → Hero → Legend
+
+Nomes fechados pelo usuário. **`Adventurer`** é o tier de baixo, **`Hero`** o do meio e
+**`Legend`** o topo — e o topo **não é invocável**: chega-se nele por evolução.
+
+**Os caminhos são assimétricos de propósito:** um personagem cuja base é `Hero` sobe **direto**
+para `Legend`; um cuja base é `Adventurer` sobe primeiro a `Hero` e só então a `Legend`. É o que
+torna o Adventurer "mais difícil de upgradar" sem torná-lo mais fraco no fim.
+
+**Isso implica que tier é DUAS coisas, e confundi-las seria o erro caro:** o tier **de base** é
+catálogo (`packages/data`, identidade do personagem, como `characterId` e classe), e o tier
+**corrente** é estado de conta (servidor, como awakening e imprint já são). Um personagem tem tier
+de base `Adventurer` para sempre; a instância daquele jogador pode estar em `Hero`. Guardar o tier
+corrente no catálogo repetiria o erro que o M18 2/N pagou com o fragmento de imprint (o dado
+descrevendo o que é estado de conta).
+
+**O Adventurer não tem banner** (decisão do usuário): ele sai do banner de `Hero` como o que se
+tira quando o Hero desejado não vem, ao lado de material. É o 4★ de Genshin e o 3★ do Epic Seven.
+
+### 2. "Mais simples, não mais fraco" — e isto JÁ está construído
+
+O usuário pediu kits mais simples para o tier de baixo, explicitamente sem que sejam piores. **O
+eixo existe desde o M17 e já foi medido:** a profundidade da árvore varia por personagem (Mensageira
+5; Arcanista e Grifeiro 6; Clérigo e Guerreiro 7; Arqueiro e Lanceiro 8; Couraçado e o jogador 9) e
+**D9 travou o orçamento em 9 pontos para todos** — *"a profundidade é troca de forma, não de
+poder"*.
+
+Portanto: **Adventurer ≈ árvore de profundidade 5–6, Hero ≈ 8–9, mesmo orçamento de pontos.** Menos
+decisões, não menos poder. Nenhum mecanismo novo é necessário para esta metade, e a referência de
+mercado confirma o desenho: em Arknights uma 4★ (Myrtle) é obrigatória em quase todo time, e em
+Blue Archive uma aluna 1★ sobe a 5★ por fragmento e compete de igual para igual. O tier vira
+**complexidade e custo de evolução**, nunca teto de poder.
+
+**A intuição do usuário é o que mantém o critério do M8 satisfazível.** Se o Adventurer fosse mais
+fraco, `pnpm balance` reprovaria (nenhuma comp acima de 60%). Ele não é — logo passa.
+
+### 3. O que ISTO REVERTE, e por que a reversão é legítima
+
+**D (M18 2/N) — "pesos iguais, sem raridade" — cai.** O argumento original era: *"o critério de
+aceite do M8 exige que nenhuma composição passe de 60%, ou seja, o jogo proíbe que um personagem
+seja mais forte que outro; raridade com diferença de poder reprova no `pnpm balance`."*
+
+A reversão é legítima **porque o desenho novo contorna exatamente a premissa**: o tier não carrega
+poder, carrega complexidade de kit e custo de evolução. A parte da decisão antiga que **continua
+valendo ao pé da letra** é a proibição de poder por raridade — e ela vira a trava do desenho novo,
+não sua vítima.
+
+**Consequência para o `pnpm balance`, e é critério de aceite:** a matriz passa a ser válida
+**somente com todas as comps no MESMO tier corrente**. Medir um Legend contra um Adventurer e ler
+o resultado como balanceamento de personagem seria ler diferença de investimento como diferença de
+design. Isto é propriedade testável e deve virar teste, no espírito do M17 5/N (onde três comps
+eram o mesmo time e nenhuma asserção comparava comps entre si).
+
+### 4. O terceiro rank monta no `awakening` (decisão do usuário)
+
+`Legend` não ganha máquina própria: é o topo do awakening, que já existe (0→6), já custa ouro +
+`material-nucleo-de-despertar` numa curva que já sobe (500g/2 núcleos → 16.000g/25) e já tem
+idempotência por nonce, repositório e tela. Herdar isso em vez de criar um quinto eixo de
+progressão (nível, awakening, imprint, talentos, +rank) é o que evita que o jogador tenha duas
+barras que significam a mesma coisa.
+
+**A forma proposta:** a promoção de tier acontece em limiares de awakening. `Hero` de base vira
+`Legend` ao topo da curva; `Adventurer` de base vira `Hero` num limiar intermediário e segue até
+`Legend`. O Adventurer atravessa mais curva — que é precisamente "mais difícil de upgradar" — sem
+nenhum número de poder o separando. `TalentNode.minAwakening` já existe como precedente de gate por
+awakening.
+
+**Fica em aberto:** se a curva do Adventurer é a mesma com mais degraus, ou a mesma com mais
+material por degrau; e se o teto de awakening sobe de 6.
+
+### 5. A colisão que NÃO tem resposta ainda, e é para perguntar
+
+O usuário disse "upgradável via materiais da loja". §10 tem duas frases que essa formulação
+atropela **de uma vez**:
+
+- *"A moeda premium não paga evolução de personagem."* Se a loja for a premium, isto cai.
+- *"A loja de arena nunca vende poder bruto."* Se for a de arena, isto cai.
+
+Como `Legend` é poder (é o topo de uma curva de evolução), **ou o material vem de uma terceira
+fonte** — masmorra, evento, primeira completude — **ou uma dessas duas decisões é revertida de
+propósito**. Não pode ficar implícito: as duas frases são normativas e as duas são citadas em
+decisões anteriores.
+
+### 6. O pity: o número pequeno não é o pity, é o VOLUME
+
+Medido nesta sessão contra o conteúdo autorado:
+
+| Fonte | Cálculo | Premium |
+|---|---|---|
+| 30 missões (`missionFirstClear` 60) | × 60 | 1.800 |
+| 3 capítulos (`chapterFirstClear` 300) | × 300 | 900 |
+| 8 masmorras (`dungeonFirstClear` 200) | × 200 | 1.600 |
+| 10 achievements + 2 eventos | autorados | 4.650 |
+| **Total da demo** | | **≈ 8.950** |
+
+Com `summon.premiumCost = 500`, são **17 rolagens na demo inteira**. O usuário está certo de que
+está pequeno, e a causa é o volume: 17 puxadas não é experiência de gacha, é meia multi.
+
+**E há uma sutileza que muda a comparação com o mercado:** o pity deste projeto garante um
+personagem **NOVO** (não possuído), não apenas um raro. Genshin garante um 5★ em 90 — que pode ser
+um que você já tem. Comparar `pityThreshold: 10` com 90 é comparar mecânicas diferentes; o pity
+daqui é muito mais generoso do que o número sugere. Com o tier entrando, a semântica muda sozinha:
+o pity passa a garantir um **Hero**, e o Adventurer preenche o intervalo.
+
+**As duas ideias do usuário são, por isso, uma só:** não dá para subir o pity sem ter o que
+preencher o caminho, e o Adventurer é exatamente esse preenchimento.
+
+**Direção de número, e a decisão é do usuário (regra 10 — nada entra sem `pnpm balance`):** baixar
+`summon.premiumCost` é o ajuste de menor toque, porque é **um número em `packages/data`** contra os
+45 arquivos de recompensa que seriam necessários para mexer na renda. De 500 para ~150, a demo sai
+de 17 para ~60 rolagens.
+
+### 7. Os números derivados da arma, agora paramétricos (decisão do usuário)
+
+O usuário fechou que os dois números do sistema de armas **derivam do pity de personagem `P`**, em
+vez de serem literais:
+
+- **Pity do banner de armas: `0,60·P` a `0,75·P`.** Menor que o de personagem, como pedido.
+- **Token de arma no banner de personagem: `1,5·P`** — o "pity + 50%" do usuário, contado como
+  rolagens NAQUELE banner e **não** condicionado a como o personagem saiu.
+
+**O motivo de não condicionar (proposta desta sessão, aceita):** a regra original — "tirou no
+garantido, faça mais 50%" — punia quem tivesse sorte, porque quem tira cedo nunca "chega no
+garantido". Boa sorte pior que má sorte é o erro clássico de gacha. Contando rolagens do banner,
+quem tirou na 2ª e quem tirou no pity chegam ambos a `1,5·P` e pagam o mesmo preço pelo mesmo
+prêmio. É contador duro, pelo mesmo argumento de testabilidade que D18 usou para escolher pity
+duro. Caso de borda: bateu `1,5·P` sem possuir o personagem → o token fica pendente e é concedido
+quando ele sair, o que é limitado porque o pity garante em `P`.
+
+**Alerta de interação:** com `P` grande e a renda atual, `1,5·P` pode ficar inalcançável dentro da
+demo. Não é defeito — o banner de armas é pós-demo —, mas os dois números têm de ser afinados na
+mesma sessão.
+
+### 8. O custo que precisa estar visível antes de começar
+
+**Dois tiers exigem mais Adventurers que Heroes** (Genshin tem cerca de três vezes mais 4★ que 5★).
+O elenco inteiro hoje são **nove** personagens — quatro do núcleo e cinco adquiríveis. Partir nove
+em dois tiers daria algo como três Heroes e seis Adventurers, com o banner rolando sobre um pool de
+três. **Autorar personagens novos é o item mais caro de tudo que esta seção descreve** — ficha,
+árvore, arte pela PixelLab (M26), balanceamento — e é o que dimensiona a milestone.
+
+### 9. A Soul (registrada junto, decidida na mesma conversa)
+
+Item de personagem, **exclusivo por personagem**, com **dois substats roláveis** e um **mainstat
+ligado às habilidades daquele personagem** (2 a 3 possibilidades). O slot só abre depois de o
+personagem ser upado até certo nível. O farm dropa **material genérico** e a escolha de para quem
+craftar acontece **na hora do craft** — decisão do usuário, e é a certa: farm por classe recria o
+"hoje tenho de farmar o domínio errado" de Genshin e do E7.
+
+**Duas consequências de forma:**
+- A Soul é, na prática, um **7º slot**. `GEAR_SLOTS` é lista única usada por UI e validação de
+  save, §7.1 diz "6 slots" normativamente e §4.1 fixa a ordem de agregação. É **mudança de regra** →
+  `RULES_VERSION` sobe.
+- Como o mainstat é sorteado entre 2–3 opções, o jogador **vai recraftar**. O sumidouro precisa ser
+  afinado como repetível e não como gasto único — número de balanceamento, logo `packages/data`.
+
+**Distinção a preservar no dado:** arma/artefato é travado por **classe** (circula pelo elenco
+daquela classe); Soul é travada por **personagem**. São dois modelos de exclusividade de propósito,
+e precisam nascer com nomes distintos para ninguém fundi-los depois. Nota: `ItemInstance.lockedBy?:
+HeroId` já existe no tipo e no schema e **não tem consumidor** desde o M4 — é o "trancar no herói"
+do E7, e **não** serve como trava de classe.
+
+### 10. O que precisa de decisão do usuário antes de qualquer código
+
+1. **`P`** — o pity de personagem — e o `summon.premiumCost` que o acompanha. Tudo o mais deriva.
+2. **De onde vem o material do rank `Legend`**, dado o item 5.
+3. **A curva do Adventurer**: mais degraus, ou mais material por degrau; e se o teto de awakening
+   sobe de 6.
+4. **Quantos personagens novos** entram, e a divisão do elenco entre `Adventurer` e `Hero`.
+
 ## Decididas
 
 - **2026-07-31 — `TalentAllocation = Record<TalentNodeId, rank>`** (ausência de chave = rank 0) — Contexto: `Hero.talents` (§4.2) referencia o tipo `TalentAllocation`, mas a spec nunca define seu shape. — Alternativas descartadas: árvores separadas (`{class: Record<Id,rank>, spec: Record<Id,rank>}`) — desnecessário porque `TalentNode.id` já é globalmente único e cada nó já carrega seu próprio `tree`. — Consequência: `packages/data/schemas/heroes.schema.ts` valida `talents` como `Record<string,int>=0`.
