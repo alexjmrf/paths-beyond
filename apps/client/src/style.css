@@ -1640,3 +1640,46 @@ button.targeting {
   right: 1rem;
   bottom: 1rem;
 }
+
+/* M27 3/N — o capítulo recolhível.
+   O cabeçalho continua sendo um cabeçalho: o <button> existe para dar teclado e
+   `aria-expanded` de graça, e não para parecer um botão. */
+.campaign-chapters,
+.campaign-missions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.campaign-chapter-name {
+  margin: 0.6rem 0 0.2rem;
+}
+
+.campaign-chapter-toggle {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.15rem 0;
+  color: #e5e7eb;
+  font: inherit;
+  cursor: pointer;
+}
+
+.campaign-missions {
+  padding-left: 1rem;
+}
+
+.campaign-missions .selected .campaign-mission-name {
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.campaign-mission-name {
+  background: none;
+  border: none;
+  padding: 0.1rem 0;
+  color: #d1d5db;
+  font: inherit;
+  cursor: pointer;
+}

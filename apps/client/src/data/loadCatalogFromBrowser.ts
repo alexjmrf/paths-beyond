@@ -48,6 +48,7 @@ const valorSkillModules = import.meta.glob('../../../../packages/data/valor-skil
 // no HUD e seria rejeitado no clique.
 const summonBlueprintModules = import.meta.glob('../../../../packages/data/summon-blueprints/*.json', { eager: true, import: 'default' });
 const compModules = import.meta.glob('../../../../packages/data/comps/*.json', { eager: true, import: 'default' });
+const chapterModules = import.meta.glob('../../../../packages/data/chapters/*.json', { eager: true, import: 'default' });
 const encounterModules = import.meta.glob('../../../../packages/data/encounters/*.json', { eager: true, import: 'default' });
 const mapModules = import.meta.glob('../../../../packages/data/maps/*.json', { eager: true, import: 'default' });
 const terrainModules = import.meta.glob('../../../../packages/data/terrains/*.json', { eager: true, import: 'default' });
@@ -90,6 +91,7 @@ export function loadCatalogFromBrowser(): ContentCatalog {
     valorSkills: globJsonValues(valorSkillModules),
     summonBlueprints: globJsonValues(summonBlueprintModules),
     comps: globJsonValues(compModules),
+    chapters: globJsonValues(chapterModules),
     encounters: globJsonValues(encounterModules),
     maps: globJsonValues(mapModules),
     terrains: globJsonValues(terrainModules),

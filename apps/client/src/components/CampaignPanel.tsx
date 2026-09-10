@@ -1,4 +1,4 @@
-import { useBattleStore } from '../store/battleStore.js';
+import { missaoPorId, useBattleStore } from '../store/battleStore.js';
 
 // §10/§9.4/D16 (M18, sub-sessão 7/N) — a tela da CAMPANHA, agora jogada contra o servidor.
 //
@@ -16,6 +16,7 @@ export function CampaignPanel() {
   const mode = useBattleStore((s) => s.mode);
   const refreshCampaign = useBattleStore((s) => s.refreshCampaign);
   const selectChapter = useBattleStore((s) => s.selectChapter);
+  const toggleChapterOpen = useBattleStore((s) => s.toggleChapterOpen);
   const toggleCampaignHero = useBattleStore((s) => s.toggleCampaignHero);
   const enterChapter = useBattleStore((s) => s.enterChapter);
   const exitCampaign = useBattleStore((s) => s.exitCampaign);
@@ -43,7 +44,9 @@ export function CampaignPanel() {
     );
   }
 
-  const selecionado = campaign.chapters.find((c) => c.id === campaign.selectedChapterId) ?? null;
+  // M27 — o que se seleciona é uma MISSÃO. `missaoPorId` varre as duas camadas num lugar
+  // só; procurar aqui de novo seria uma segunda resposta para a mesma pergunta.
+  const selecionado = missaoPorId(campaign.chapters, campaign.selectedMissionId) ?? null;
 
   return (
     <section className="campaign-panel">
@@ -59,18 +62,53 @@ export function CampaignPanel() {
         <p className="hint">{t('campanha.primeiraVitoria', { premium: campaign.premiumOnFirstClear })}</p>
       ) : null}
 
+      {/* M27 (D23) — DUAS camadas, e o capítulo RECOLHE (3/N). A 1/N o deixou como
+          cabeçalho não-clicável porque um capítulo não é jogável — continua não sendo, e o
+          clique agora abre e fecha, que é a única coisa que um agrupamento pode fazer. Com
+          trinta missões a lista inteira aberta é uma rolagem em que "onde eu parei" some.
+
+          O contador `n/10` fica no cabeçalho fechado de propósito: é o que responde essa
+          pergunta sem abrir nada. Ele não tem palavra nenhuma — nem ele nem as setas — e é
+          por isso que esta fatia não acrescentou chave de idioma. */}
       <ul className="campaign-chapters">
-        {campaign.chapters.map((chapter) => (
-          <li key={chapter.id} className={chapter.id === campaign.selectedChapterId ? 'selected' : ''}>
-            <button type="button" className="campaign-chapter-name" onClick={() => selectChapter(chapter.id)}>
-              {chapter.name}
-            </button>
-            <span className="pve-locked">
-              {t('campanha.vagas', { vagas: chapter.slots })}
-              {chapter.cleared ? t('campanha.limpo') : ''}
-            </span>
-          </li>
-        ))}
+        {campaign.chapters.map((chapter) => {
+          const aberto = campaign.openChapterIds.includes(chapter.id);
+          const limpas = chapter.missions.filter((mission) => mission.cleared).length;
+          return (
+            <li key={chapter.id} className="campaign-chapter">
+              <h3 className="campaign-chapter-name">
+                <button
+                  type="button"
+                  className="campaign-chapter-toggle"
+                  aria-expanded={aberto}
+                  onClick={() => toggleChapterOpen(chapter.id)}
+                >
+                  {aberto ? '▼' : '▶'} {chapter.name}
+                  {chapter.cleared ? t('campanha.limpo') : ` ${limpas}/${chapter.missions.length}`}
+                </button>
+              </h3>
+              {aberto ? (
+                <ul className="campaign-missions">
+                  {chapter.missions.map((mission) => (
+                    <li key={mission.id} className={mission.id === campaign.selectedMissionId ? 'selected' : ''}>
+                      <button
+                        type="button"
+                        className="campaign-mission-name"
+                        onClick={() => selectChapter(mission.id)}
+                      >
+                        {mission.order}. {mission.name}
+                      </button>
+                      <span className="pve-locked">
+                        {t('campanha.vagas', { vagas: mission.slots })}
+                        {mission.cleared ? t('campanha.limpo') : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
 
       {selecionado ? (

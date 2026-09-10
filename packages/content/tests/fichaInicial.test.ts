@@ -2,7 +2,6 @@ import { buildBattleSetupFromHeroes, resolveHeroStatSheet } from '@paths-beyond/
 import { describe, expect, it } from 'vitest';
 import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
 import { toStartingHero } from '../src/startingHero.js';
-import { COMMAND_BUDGET, playthrough } from './campaignPilot.js';
 
 // §10/D14 (M18, 6/N) — a FICHA INICIAL conversando com o resto do conteúdo.
 //
@@ -175,35 +174,15 @@ describe('M18 §10/D16 — a campanha foi afinada contra a ficha que o jogador r
     });
   });
 
-  // A metade JOGÁVEL, e a que fecha o critério de aceite 3 no caminho que produção usa:
-  // os seis capítulos jogados pelo mesmo piloto da 5/N, com as vagas preenchidas pelos
-  // heróis que uma CONTA NOVA recebe — ficha inicial, `talents: {}`, o script tático
-  // padrão e nenhum item farmado.
+  // A metade JOGÁVEL desta afirmação MUDOU DE ARQUIVO em M27 2/N.
   //
-  // A 5/N jogou com o herói AUTORADO na vaga, que carrega alocação de talento escolhida a
-  // dedo (Miron com a mão que alcança, Sylla com o fôlego de combate) e o script tático de
-  // duas linhas do clérigo. Nada disso existe numa conta nova, e era exatamente a pergunta
-  // que ninguém tinha medido: o jogador que ainda não gastou um ponto de talento tem
-  // campanha para jogar?
-  describe('os seis capítulos com a party de uma CONTA NOVA', () => {
-    function comFichaInicial(encounter: (typeof catalog.encounters)[number]): typeof encounter {
-      return {
-        ...encounter,
-        units: encounter.units.map((unit) =>
-          unit.side === 'player'
-            ? { ...unit, hero: toStartingHero(catalog.characters[unit.hero.characterId!]!, unit.hero.id) }
-            : unit,
-        ),
-      };
-    }
-
-    for (const encounter of catalog.encounters) {
-      it(`${encounter.name}: o piloto vence`, () => {
-        const { state, commands } = playthrough(catalog, comFichaInicial(encounter));
-
-        expect({ id: encounter.id, outcome: state.outcome }).toEqual({ id: encounter.id, outcome: 'victory' });
-        expect(commands).toBeLessThan(COMMAND_BUDGET);
-      });
-    }
-  });
+  // Ela nasceu aqui, na M18 6/N, jogando os seis capítulos com a ficha da conta nova. A demo
+  // de D23 levou a campanha a trinta missões com uma rampa de dificuldade, e "o piloto vence
+  // na seed 42" deixou de ser a pergunta certa: ela obriga toda missão a ser vencível de
+  // primeira, o que é o mesmo que obrigar a demo a não ter dificuldade nenhuma.
+  //
+  // A prova continua existindo, com a MESMA ficha e mais forte: `demoDeTrintaMissoes.test.ts`
+  // mede a taxa de vitória de cada uma das trinta com `comFichaInicial`, e cobra o piso de
+  // 25% por missão e o teto de 60% por capítulo. O que fica aqui é a metade da FORMA — os
+  // três campos que definem o poder da referência.
 });

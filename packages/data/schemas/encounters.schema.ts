@@ -93,9 +93,25 @@ const encounterSchema = z
     id: idSchema,
     name: z.string().min(1),
     mapId: idSchema,
-    // §10 — "campanha em capítulos". Ordena a campanha sem depender da ordem em que os
-    // arquivos são lidos do disco (que `findJsonFiles` não garante entre plataformas).
-    chapter: z.number().int().positive(),
+    // M27 (D23) — a MISSÃO aponta para o capítulo, e não o contrário.
+    //
+    // Até aqui isto era `chapter: number`, e capítulo *era* missão: seis encontros, seis
+    // capítulos, e o número servindo só para ordenar a lista. D23 pede três capítulos de dez
+    // missões, e o modelo antigo não tinha onde pendurar "a missão 4 do capítulo 2".
+    //
+    // O capítulo não lista as missões dele (ver `chapters.schema.ts`): um índice mantido à
+    // mão é a forma clássica de o repositório passar a mentir — o diretório tem dez missões,
+    // o índice lista nove, e nada reclama.
+    //
+    // **O `id` desta missão NÃO mudou na migração, e não é detalhe:** é ele que o servidor
+    // guarda como "limpo" (`listClearedChapters`). Renomear um dos seis encontros antigos
+    // apagaria o progresso de quem já jogou, em silêncio, e o sintoma apareceria longe da
+    // causa — uma conquista deixando de ser reivindicável.
+    chapterId: idSchema,
+    // A posição DENTRO do capítulo, contígua a partir de 1. Dentro e não global: a missão 1
+    // do capítulo 2 tem de poder ser a "1", senão acrescentar uma missão no capítulo 1
+    // renumeraria a campanha inteira.
+    order: z.number().int().positive(),
     // §5.7 — "Permadeath é flag do BattleSetup (casual | classic | ironman), nunca
     // hardcoded". Estava hardcoded em `campaign.ts` como 'casual' desde M6; é conteúdo do
     // cenário, então mora aqui.

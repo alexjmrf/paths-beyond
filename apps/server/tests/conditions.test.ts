@@ -6,6 +6,7 @@ import { isWithinWindow, meetsCondition, type AccountSnapshot } from '../src/rew
 
 const conta: AccountSnapshot = {
   chaptersCleared: 3,
+  missionsCleared: 3,
   dungeonsCleared: 2,
   charactersOwned: 6,
   bestImprint: 1,
@@ -34,6 +35,7 @@ describe('meetsCondition', () => {
   it('uma conta zerada não cumpre nada', () => {
     const nova: AccountSnapshot = {
       chaptersCleared: 0,
+      missionsCleared: 0,
       dungeonsCleared: 0,
       charactersOwned: 0,
       bestImprint: 0,

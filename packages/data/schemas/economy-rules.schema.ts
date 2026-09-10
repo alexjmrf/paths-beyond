@@ -55,6 +55,19 @@ const economyRulesSchema = z.object({
   // mesmo), então moram aqui e não em cada peça de conteúdo: espalhá-los por 6 encontros e
   // 8 masmorras seria 14 lugares para um número que é um só.
   premiumRewards: z.object({
+    // M27 (D23) — a primeira completude passou a ter DUAS granularidades, porque a campanha
+    // passou a ter duas camadas. A escolha é do usuário e o critério de aceite do M27 pede
+    // que ela fique registrada; a aritmética que a decidiu:
+    //
+    // Manter 600 por unidade jogável com trinta missões daria 18.000 de moeda premium na
+    // demo — 36 invocações a 500 cada, de graça. O gacha viraria decoração antes do fim do
+    // capítulo 1. Com 60 por missão e 300 ao FECHAR o capítulo: 30×60 + 3×300 = 2.700, uns
+    // cinco summons na demo inteira.
+    //
+    // Duas regras e não uma porque cada uma paga uma coisa diferente: a missão recompensa o
+    // passo a passo (nove missões seguidas sem nenhum pagamento é um trecho longo e seco
+    // para quem está começando) e o capítulo mantém o fechamento sendo um momento.
+    missionFirstClear: z.number().int().positive(),
     chapterFirstClear: z.number().int().positive(),
     dungeonFirstClear: z.number().int().positive(),
   }),

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useBattleStore } from '../src/store/battleStore.js';
+import { capituloInicialAberto, useBattleStore } from '../src/store/battleStore.js';
 
 // §10/§9.4 (M18, sub-sessão 7/N) — a CAMPANHA do cliente, agora jogada pelo servidor.
 //
@@ -14,9 +14,19 @@ import { useBattleStore } from '../src/store/battleStore.js';
 
 const TOKEN = 'token-de-teste';
 
+// M27 (D23) — a campanha passou a ter DUAS camadas: o capítulo agrupa, e a missão é o que
+// se joga. O ticket e a run continuam sendo por id de MISSÃO.
 const CAPITULOS = [
-  { id: 'encounter-campanha-1', chapter: 1, name: 'Capítulo 1', cleared: false, slots: 1 },
-  { id: 'encounter-campanha-2', chapter: 2, name: 'Capítulo 2', cleared: false, slots: 2 },
+  {
+    id: 'chapter-1',
+    order: 1,
+    name: 'Capítulo 1',
+    cleared: false,
+    missions: [
+      { id: 'encounter-campanha-1', order: 1, name: 'Missão 1', cleared: false, slots: 1 },
+      { id: 'encounter-campanha-2', order: 2, name: 'Missão 2', cleared: false, slots: 2 },
+    ],
+  },
 ];
 
 const ROSTER = [
@@ -91,7 +101,7 @@ function responder(url: string, body: unknown, status = 200): void {
 function instalarFetch(): void {
   chamadas = [];
   respostas = {};
-  responder('/api/campaign', { chapters: CAPITULOS, premiumOnFirstClear: 600 });
+  responder('/api/campaign', { chapters: CAPITULOS, premiumOnFirstClear: 60, premiumOnChapterClear: 300 });
   responder('/api/me/heroes', ROSTER);
 
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -321,9 +331,14 @@ describe('submeter o capítulo', () => {
       premiumAwarded: 600,
       premium: 600,
     });
+    // M27 — a releitura devolve as duas camadas, com a MISSÃO limpa dentro do capítulo.
     responder('/api/campaign', {
-      chapters: CAPITULOS.map((c) => (c.id === 'encounter-campanha-1' ? { ...c, cleared: true } : c)),
-      premiumOnFirstClear: 600,
+      chapters: CAPITULOS.map((c) => ({
+        ...c,
+        missions: c.missions.map((m) => (m.id === 'encounter-campanha-1' ? { ...m, cleared: true } : m)),
+      })),
+      premiumOnFirstClear: 60,
+      premiumOnChapterClear: 300,
     });
 
     await useBattleStore.getState().submitCampaignRun();
@@ -331,8 +346,10 @@ describe('submeter o capítulo', () => {
 
     expect(campaign.lastRun?.outcome).toBe('victory');
     expect(campaign.lastRun?.premiumAwarded).toBe(600);
-    // E a lista foi relida: o capítulo aparece limpo sem recarregar a página.
-    expect(campaign.chapters.find((c) => c.id === 'encounter-campanha-1')?.cleared).toBe(true);
+    // E a lista foi relida: a missão aparece limpa sem recarregar a página.
+    expect(
+      campaign.chapters.flatMap((c) => c.missions).find((m) => m.id === 'encounter-campanha-1')?.cleared,
+    ).toBe(true);
   });
 
   it('sem ticket não manda nada', async () => {
@@ -377,5 +394,135 @@ describe('a preparação passa a persistir no servidor', () => {
     expect(useBattleStore.getState().pvp.roster.find((e) => e.hero.id === 'h-aren')!.hero.talents).toEqual({
       'talent-aren-fio-agressivo': 1,
     });
+  });
+});
+
+// M27, 3/N — O CAPÍTULO RECOLHÍVEL.
+//
+// A 1/N desenhou a lista com o capítulo como cabeçalho e a missão como botão, e ali eram
+// oito missões. São trinta. Três cabeçalhos e trinta botões numa rolagem só transformam
+// "onde eu parei?" numa busca visual — e a demo tem rampa, então onde o jogador parou é a
+// única informação que a tela precisa dar de graça.
+//
+// O que se afirma aqui é a REGRA de qual capítulo abre, e não o desenho: o projeto testa o
+// store, e é por isso que este estado mora nele e não numa `useState` do componente.
+const TRES_CAPITULOS = [
+  {
+    id: 'chapter-1',
+    order: 1,
+    name: 'Capítulo 1',
+    cleared: true,
+    missions: [{ id: 'm-1-1', order: 1, name: 'M1', cleared: true, slots: 1 }],
+  },
+  {
+    id: 'chapter-2',
+    order: 2,
+    name: 'Capítulo 2',
+    cleared: false,
+    missions: [
+      { id: 'm-2-1', order: 1, name: 'M1', cleared: true, slots: 2 },
+      { id: 'm-2-2', order: 2, name: 'M2', cleared: false, slots: 2 },
+    ],
+  },
+  {
+    id: 'chapter-3',
+    order: 3,
+    name: 'Capítulo 3',
+    cleared: false,
+    missions: [{ id: 'm-3-1', order: 1, name: 'M1', cleared: false, slots: 3 }],
+  },
+];
+
+function comCapitulos(chapters: unknown): void {
+  responder('/api/campaign', { chapters, premiumOnFirstClear: 60, premiumOnChapterClear: 300 });
+}
+
+function zerarAbertos(): void {
+  useBattleStore.setState((s) => ({ campaign: { ...s.campaign, openChapterIds: [] } }));
+}
+
+describe('capituloInicialAberto() — onde o jogador parou', () => {
+  it('é o primeiro capítulo que ainda tem missão por limpar', () => {
+    expect(capituloInicialAberto(TRES_CAPITULOS)).toBe('chapter-2');
+  });
+
+  it('pula o capítulo inteiro limpo, mesmo sendo o primeiro', () => {
+    // A alternativa ingênua — "abre o primeiro" — mandaria quem já jogou metade da demo
+    // para o começo dela toda vez que a tela abrisse.
+    expect(TRES_CAPITULOS[0]!.missions.every((m) => m.cleared), 'a fixture perdeu o sentido').toBe(true);
+    expect(capituloInicialAberto(TRES_CAPITULOS)).not.toBe('chapter-1');
+  });
+
+  it('com a demo inteira limpa abre o ÚLTIMO — quem terminou volta pelo fim', () => {
+    const tudoLimpo = TRES_CAPITULOS.map((c) => ({
+      ...c,
+      cleared: true,
+      missions: c.missions.map((m) => ({ ...m, cleared: true })),
+    }));
+    expect(capituloInicialAberto(tudoLimpo)).toBe('chapter-3');
+  });
+
+  it('sem capítulo nenhum não inventa um', () => {
+    expect(capituloInicialAberto([])).toBeNull();
+  });
+});
+
+describe('a lista recolhe, e a escolha do jogador é dele', () => {
+  it('a primeira carga já vem com o capítulo de onde ele parou aberto', async () => {
+    useBattleStore.setState((s) => ({ pvp: { ...s.pvp, token: TOKEN } }));
+    zerarAbertos();
+    comCapitulos(TRES_CAPITULOS);
+
+    await useBattleStore.getState().refreshCampaign();
+
+    expect(useBattleStore.getState().campaign.openChapterIds).toEqual(['chapter-2']);
+  });
+
+  it('atualizar NÃO reabre o que ele fechou — a lista se atualiza sozinha ao vencer', async () => {
+    useBattleStore.setState((s) => ({ pvp: { ...s.pvp, token: TOKEN } }));
+    comCapitulos(TRES_CAPITULOS);
+    useBattleStore.setState((s) => ({ campaign: { ...s.campaign, openChapterIds: ['chapter-3'] } }));
+
+    await useBattleStore.getState().refreshCampaign();
+
+    expect(useBattleStore.getState().campaign.openChapterIds).toEqual(['chapter-3']);
+  });
+
+  it('mas descarta capítulo que o servidor não manda mais', async () => {
+    // Sem isto, um capítulo removido do catálogo ficaria "aberto" para sempre num conjunto
+    // que ninguém mais consegue limpar pela tela.
+    useBattleStore.setState((s) => ({ pvp: { ...s.pvp, token: TOKEN } }));
+    comCapitulos(TRES_CAPITULOS);
+    useBattleStore.setState((s) => ({
+      campaign: { ...s.campaign, openChapterIds: ['chapter-3', 'chapter-que-saiu'] },
+    }));
+
+    await useBattleStore.getState().refreshCampaign();
+
+    expect(useBattleStore.getState().campaign.openChapterIds).toEqual(['chapter-3']);
+  });
+
+  it('abre e fecha, e mais de um por vez', () => {
+    useBattleStore.setState((s) => ({
+      campaign: { ...s.campaign, chapters: TRES_CAPITULOS as never, openChapterIds: [] },
+    }));
+    const { toggleChapterOpen } = useBattleStore.getState();
+
+    toggleChapterOpen('chapter-1');
+    toggleChapterOpen('chapter-3');
+    expect(useBattleStore.getState().campaign.openChapterIds).toEqual(['chapter-1', 'chapter-3']);
+
+    toggleChapterOpen('chapter-1');
+    expect(useBattleStore.getState().campaign.openChapterIds).toEqual(['chapter-3']);
+  });
+
+  it('capítulo que não existe não entra no conjunto', () => {
+    useBattleStore.setState((s) => ({
+      campaign: { ...s.campaign, chapters: TRES_CAPITULOS as never, openChapterIds: [] },
+    }));
+
+    useBattleStore.getState().toggleChapterOpen('chapter-inventado');
+
+    expect(useBattleStore.getState().campaign.openChapterIds).toEqual([]);
   });
 });

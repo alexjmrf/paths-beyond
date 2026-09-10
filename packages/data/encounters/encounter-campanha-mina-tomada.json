@@ -1,0 +1,164 @@
+{
+  "id": "encounter-campanha-mina-tomada",
+  "name": "A Mina Tomada",
+  "mapId": "map-campanha-3",
+  "chapterId": "chapter-2",
+  "order": 6,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 7
+      },
+      "height": 1
+    },
+    {
+      "unitId": "ally-clerigo",
+      "side": "player",
+      "hero": {
+        "id": "ally-clerigo",
+        "characterId": "ally-clerigo",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 6
+      },
+      "height": 1
+    },
+    {
+      "unitId": "ally-arqueiro",
+      "side": "player",
+      "hero": {
+        "id": "ally-arqueiro",
+        "characterId": "ally-arqueiro",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 5,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "unit-mina-tomada-1",
+      "side": "enemy",
+      "enemyId": "enemy-veio-saqueador-espadachim",
+      "pos": {
+        "x": 12,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "unit-mina-tomada-2",
+      "side": "enemy",
+      "enemyId": "enemy-veio-saqueador-couracado",
+      "pos": {
+        "x": 12,
+        "y": 5
+      },
+      "height": 0,
+      "aiArchetype": "guard-tile"
+    },
+    {
+      "unitId": "unit-mina-tomada-3",
+      "side": "enemy",
+      "enemyId": "enemy-invasor-arqueiro",
+      "pos": {
+        "x": 13,
+        "y": 9
+      },
+      "height": 0,
+      "aiArchetype": "flank"
+    }
+  ]
+}

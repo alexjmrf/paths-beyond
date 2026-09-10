@@ -20,13 +20,34 @@ import {
   type MoveType,
   type WinCondition,
 } from '@paths-beyond/core';
-import type { ContentCatalog, Encounter } from '../src/types.js';
-import { toSummonBlueprintPlacements } from '../src/summonPlacements.js';
-import { toEncounterPlacements } from '../src/encounterPlacements.js';
+import type { ContentCatalog, Encounter } from './types.js';
+import { toSummonBlueprintPlacements } from './summonPlacements.js';
+import { toEncounterPlacements } from './encounterPlacements.js';
+import { toStartingHero } from './startingHero.js';
 
 // M12, sub-sessão 3/N — piloto automático do lado do jogador, usado por
 // `campanha.test.ts` pra provar que os 6 capítulos são JOGÁVEIS (o critério de aceite do
-// milestone). Não é IA de jogo e por isso não mora em `packages/core`: é arnês de teste.
+// milestone). Não é IA de jogo e por isso não mora em `packages/core`: é arnês de autoria.
+//
+// **M27, 2/N — ele saiu de `tests/` e virou peça de `src/`, e o motivo é um defeito que a
+// 1/N leu ao contrário.** A corrente de servidor vazio (`primeiraSessao.test.ts`) usava
+// `resolveAutoBattle` como jogador, e `resolveAutoBattle` roda `decideMapAiCommand` — cujos
+// cinco arquétipos de §9.1 **não perseguem objetivo de mapa**. Medido: em
+// `encounter-campanha-2` (`seize` em 12,7) ele matou os TRÊS inimigos, ficou vivo a quatro
+// tiles do objetivo e rodou até o teto de 800 comandos; em `encounter-campanha-5` ele leva
+// a escoltada para a emboscada e a perde no round 2. Os dois davam 0/20, e o 0/20 foi
+// registrado como "a missão é difícil demais para a conta nova". Não era: com este piloto e
+// a ficha LIVRE (mesmo personagem, `talents: {}`, equipamento inicial) as duas dão 20/20.
+//
+// Uma missão de objetivo só é jogável por quem persegue objetivo. Como agora são DOIS
+// pacotes que precisam do mesmo jogador de referência — o teste de conteúdo e a corrente do
+// servidor —, deixá-lo sob `tests/` de um deles seria `apps/server` dependendo de um arquivo
+// de teste de `packages/content` que nenhum `package.json` declara.
+//
+// **O que ele continua NÃO sendo: IA de jogo.** Nada em `apps/server/src` nem em
+// `apps/client/src` pode chamá-lo — quem decide pelo jogador em produção é o jogador, e quem
+// decide pela varredura de masmorra é `resolveAutoBattle` (§9.1, M14 2/N). Este aqui existe
+// para responder uma pergunta de AUTORIA: "a missão que acabei de escrever tem desfecho?".
 //
 // Regras fixas, nesta ordem: anda em direção ao objetivo do mapa (quem o persegue),
 // engaja o inimigo mais ferido ao alcance, senão persegue o inimigo mais perto, senão
@@ -231,7 +252,19 @@ export function playthrough(
   encounter: Encounter,
   seed: number = CAMPAIGN_SEED,
 ): PlaythroughResult {
-  let state = buildInitialState(setupFor(catalog, encounter), seed);
+  return playFromSetup(setupFor(catalog, encounter), seed, encounter.id);
+}
+
+// M27 2/N — a MESMA jogada, a partir do `BattleSetup` já montado.
+//
+// É esta a entrada que a corrente de servidor vazio usa: lá o setup não sai de
+// `setupFor` — ele sai do ticket de `POST /campaign/:id/ticket`, com as VAGAS já
+// substituídas pelos heróis de verdade da conta (M18 5/N). Montar o setup de novo aqui
+// seria uma segunda montagem da mesma batalha, que é o que §9.1 chama de bug crítico.
+//
+// `label` só aparece em mensagem de erro; é o id da missão quando quem chama sabe qual é.
+export function playFromSetup(setup: BattleSetup, seed: number, label = 'setup'): PlaythroughResult {
+  let state = buildInitialState(setup, seed);
   const commandLog: BattleCommand[] = [];
   let commands = 0;
 
@@ -257,10 +290,33 @@ export function playthrough(
     commandLog.push(command);
     if (!outcome.applied) {
       // Comando rejeitado seria laço infinito: falha alto com o motivo real.
-      throw new Error(`${encounter.id}: comando rejeitado para ${next.unitId}: ${outcome.reason}`);
+      throw new Error(`${label}: comando rejeitado para ${next.unitId}: ${outcome.reason}`);
     }
     state = outcome.state;
   }
 
   return { state, commands, commandLog };
+}
+
+// M18 6/N, promovido a peça em M27 2/N — a missão com a VAGA preenchida pela ficha que uma
+// CONTA NOVA recebe.
+//
+// A vaga autorada carrega alocação de talento escolhida a dedo (Miron com a mão que alcança,
+// Sylla com o fôlego de combate) e o script tático de duas linhas do clérigo. Nada disso
+// existe numa conta nova. Medir a rampa contra a vaga autorada mediria uma party que só
+// existe no arquivo de conteúdo — e é a rampa da conta nova que o critério de aceite 3 do
+// M27 cobra.
+//
+// Medido nesta fatia: a diferença entre as duas fichas é pequena (as missões antigas dão
+// 20/20 contra 20/20, 7/20 contra 8/20). O que decide não é o talento — é QUEM ocupa a vaga.
+export function comFichaInicial(catalog: ContentCatalog, encounter: Encounter): Encounter {
+  return {
+    ...encounter,
+    units: encounter.units.map((unit) => {
+      if (unit.side !== 'player') return unit;
+      const character = catalog.characters[unit.hero.characterId!];
+      if (!character) throw new Error(`${encounter.id}/${unit.unitId}: personagem fora do elenco`);
+      return { ...unit, hero: toStartingHero(character, unit.hero.id) };
+    }),
+  };
 }

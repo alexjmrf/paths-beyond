@@ -2,7 +2,7 @@ import { RULES_VERSION, buildInitialState, simulate, type BattleState, type Repl
 import { describe, expect, it } from 'vitest';
 import { applyCommandAndAdvance } from '@paths-beyond/core';
 import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
-import { CAMPAIGN_SEED, playthrough, setupFor } from './campaignPilot.js';
+import { CAMPAIGN_SEED, playthrough, setupFor } from '../src/campaignPilot.js';
 
 // M13, sub-sessão 1/N — o critério de aceite do milestone: "um `Replay` gravado é
 // reproduzido passo a passo na UI e bate com o resultado do core".

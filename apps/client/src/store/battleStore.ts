@@ -46,6 +46,7 @@ import {
   type RosterEntry,
   type BannerView,
   type CampaignChapter,
+  type CampaignMission,
   type CampaignRunResponse,
   type CampaignTicket,
   type CharacterRosterEntry,
@@ -180,6 +181,38 @@ export function characterTreeForUnit(
 // sem ele a tela ofereceria um nó avançado que o motor recusaria depois.
 function awakeningForUnit(heroesByUnitId: Readonly<Record<string, Hero>>, unitId: string): number {
   return heroesByUnitId[unitId]?.awakening ?? 0;
+}
+
+// M27 — a missão vive DENTRO do capítulo, e mais de um lugar precisa achá-la pelo id. Uma
+// função só porque a alternativa é cada chamador varrer as duas camadas do seu jeito.
+export function missaoPorId(
+  chapters: readonly CampaignChapter[],
+  missionId: string | null,
+): CampaignMission | undefined {
+  if (!missionId) return undefined;
+  for (const chapter of chapters) {
+    const missao = chapter.missions.find((m) => m.id === missionId);
+    if (missao) return missao;
+  }
+  return undefined;
+}
+
+// M27 3/N — QUAL capítulo abre quando a tela chega.
+//
+// Com seis missões a lista inteira cabia na tela; com trinta, três cabeçalhos e trinta
+// botões numa rolagem só transformam "onde eu parei?" numa busca visual. O capítulo passa a
+// recolher, e a escolha do que já vem aberto é esta: **o primeiro que ainda tem missão por
+// limpar** — que é onde o jogador parou, e é o único capítulo em que ele tem algo a fazer.
+//
+// Função pura, e fora do `set` de propósito: a regra de "onde eu parei" é o que este arquivo
+// precisa poder afirmar em teste sem montar tela nenhuma.
+//
+// Com tudo limpo não há "onde parou", e a resposta é o ÚLTIMO capítulo: quem terminou a demo
+// e volta quer rejogar o fim, não recomeçar do começo.
+export function capituloInicialAberto(chapters: readonly CampaignChapter[]): string | null {
+  if (chapters.length === 0) return null;
+  const parou = chapters.find((chapter) => chapter.missions.some((missao) => !missao.cleared));
+  return (parou ?? chapters[chapters.length - 1]!).id;
 }
 
 // A hidratação é SÍNCRONA, no boot do módulo. **M18 7/N: sem reconciliação**, porque não
@@ -379,11 +412,18 @@ const EMPTY_PVE: PveSession = {
 // capítulo declara quantas, e quem as preenche é o jogador.
 export interface CampaignSession {
   readonly chapters: readonly CampaignChapter[];
-  readonly selectedChapterId: string | null;
+  // M27 — o que se seleciona é uma MISSÃO: é ela que vira ticket e é o id dela que o
+  // servidor guarda como limpo. O capítulo agrupa, e não é jogável.
+  readonly selectedMissionId: string | null;
+  // M27 3/N — quais capítulos estão ABERTOS na lista. Estado de tela, e mora aqui pelo mesmo
+  // motivo que `selectedMissionId`: é o store que este projeto testa, e uma `useState` dentro
+  // do componente poria a regra de "onde o jogador parou" onde nenhum teste a alcança.
+  readonly openChapterIds: readonly string[];
   readonly selectedHeroIds: readonly string[];
   readonly ticket: CampaignTicket | null;
   readonly lastRun: CampaignRunResponse | null;
   readonly premiumOnFirstClear: number;
+  readonly premiumOnChapterClear: number;
   readonly status: string | null;
   readonly error: string | null;
   readonly busy: boolean;
@@ -391,11 +431,13 @@ export interface CampaignSession {
 
 const EMPTY_CAMPAIGN: CampaignSession = {
   chapters: [],
-  selectedChapterId: null,
+  selectedMissionId: null,
+  openChapterIds: [],
   selectedHeroIds: [],
   ticket: null,
   lastRun: null,
   premiumOnFirstClear: 0,
+  premiumOnChapterClear: 0,
   status: null,
   error: null,
   busy: false,
@@ -525,6 +567,7 @@ interface BattleStore {
   cancelEngage: () => void;
   refreshCampaign: () => Promise<void>;
   selectChapter: (chapterId: string) => void;
+  toggleChapterOpen: (chapterId: string) => void;
   toggleCampaignHero: (heroId: string) => void;
   enterChapter: (chapterId: string) => Promise<void>;
   submitCampaignRun: () => Promise<void>;
@@ -874,7 +917,16 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         campaign: {
           ...s.campaign,
           chapters: lista.chapters,
+          // A escolha do jogador SOBREVIVE à atualização, e só a primeira carga é semeada.
+          // Reabrir o capítulo "de onde ele parou" a cada `refreshCampaign` brigaria com
+          // ele: a lista se atualiza sozinha ao vencer uma missão, e o capítulo que ele
+          // acabou de fechar reabriria na cara dele.
+          openChapterIds:
+            s.campaign.openChapterIds.length > 0
+              ? s.campaign.openChapterIds.filter((id) => lista.chapters.some((c) => c.id === id))
+              : [capituloInicialAberto(lista.chapters)].filter((id): id is string => id !== null),
           premiumOnFirstClear: lista.premiumOnFirstClear,
+          premiumOnChapterClear: lista.premiumOnChapterClear,
           busy: false,
         },
         pvp: { ...s.pvp, roster },
@@ -886,16 +938,33 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 
   selectChapter: (chapterId) => {
     const { campaign } = get();
-    const capitulo = campaign.chapters.find((c) => c.id === chapterId);
-    if (!capitulo) return;
+    const missao = missaoPorId(campaign.chapters, chapterId);
+    if (!missao) return;
     // Trocar de capítulo APARA a seleção em vez de zerá-la: quem escolheu quatro e clicou
     // num capítulo de duas vagas não quer recomeçar a escolha, quer as duas primeiras.
     set({
       campaign: {
         ...campaign,
-        selectedChapterId: chapterId,
-        selectedHeroIds: campaign.selectedHeroIds.slice(0, capitulo.slots),
+        selectedMissionId: chapterId,
+        selectedHeroIds: campaign.selectedHeroIds.slice(0, missao.slots),
         error: null,
+      },
+    });
+  },
+
+  // M27 3/N — abrir e fechar um capítulo. Sem exclusividade: o jogador que quer comparar a
+  // rampa de dois capítulos abre os dois, e forçá-lo a um de cada vez seria uma regra que
+  // nada pede.
+  toggleChapterOpen: (chapterId) => {
+    const { campaign } = get();
+    if (!campaign.chapters.some((chapter) => chapter.id === chapterId)) return;
+    const aberto = campaign.openChapterIds.includes(chapterId);
+    set({
+      campaign: {
+        ...campaign,
+        openChapterIds: aberto
+          ? campaign.openChapterIds.filter((id) => id !== chapterId)
+          : [...campaign.openChapterIds, chapterId],
       },
     });
   },
@@ -920,10 +989,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     // desde a 4/N.
     if (!pvp.roster.some((entry) => entry.hero.id === heroId)) return;
 
-    const capitulo = campaign.chapters.find((c) => c.id === campaign.selectedChapterId);
-    const vagas = capitulo?.slots ?? 0;
+    const missao = missaoPorId(campaign.chapters, campaign.selectedMissionId);
+    const vagas = missao?.slots ?? 0;
     if (campaign.selectedHeroIds.length >= vagas) {
-      set({ campaign: { ...campaign, error: `este capítulo tem ${vagas} vaga(s)` } });
+      set({ campaign: { ...campaign, error: `esta missão tem ${vagas} vaga(s)` } });
       return;
     }
     set({ campaign: { ...campaign, selectedHeroIds: [...campaign.selectedHeroIds, heroId], error: null } });
@@ -961,7 +1030,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         targetingMode: null,
         lastCommandReason: null,
         aiTurnReport: null,
-        campaign: { ...s.campaign, ticket, selectedChapterId: chapterId, lastRun: null, busy: false, status: null },
+        campaign: { ...s.campaign, ticket, selectedMissionId: chapterId, lastRun: null, busy: false, status: null },
       }));
     } catch (error) {
       set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));

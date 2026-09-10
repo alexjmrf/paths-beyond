@@ -38,6 +38,7 @@ const emptyCatalog: ContentCatalog = {
   weaponDuelRanges: { sword: 1, axe: 1, spear: 1, bow: 2, arcane: 2, nature: 2, holy: 2 },
   maps: {},
   comps: [],
+  chapters: [],
   encounters: [],
   dungeons: {},
   dungeonEncounters: {},
@@ -52,7 +53,7 @@ const emptyCatalog: ContentCatalog = {
   premiumRules: {
     summon: { premiumCost: 500, pityThreshold: 10 },
     energyPurchase: { premiumCost: 100, energy: 60 },
-    premiumRewards: { chapterFirstClear: 600, dungeonFirstClear: 200 },
+    premiumRewards: { missionFirstClear: 60, chapterFirstClear: 600, dungeonFirstClear: 200 },
   },
   achievements: {},
   events: {},

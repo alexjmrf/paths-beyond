@@ -1,8 +1,9 @@
 {
   "id": "encounter-campanha-4",
-  "name": "Capítulo 4 — Cerco no Bosque",
+  "name": "Cerco no Bosque",
   "mapId": "map-campanha-4",
-  "chapter": 4,
+  "chapterId": "chapter-3",
+  "order": 8,
   "permadeath": "casual",
   "units": [
     {

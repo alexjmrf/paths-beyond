@@ -1,8 +1,9 @@
 {
   "id": "encounter-campanha-6",
-  "name": "Capítulo 6 — A Fortaleza do Mestre",
+  "name": "A Fortaleza do Mestre",
   "mapId": "map-campanha-6",
-  "chapter": 6,
+  "chapterId": "chapter-3",
+  "order": 10,
   "permadeath": "casual",
   "units": [
     {

@@ -1,0 +1,61 @@
+{
+  "id": "encounter-campanha-ponte-1",
+  "name": "A Trilha",
+  "mapId": "map-campanha-1",
+  "chapterId": "chapter-1",
+  "order": 1,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "unit-alvo-1",
+      "side": "enemy",
+      "enemyId": "enemy-treino-alvo-guerreiro",
+      "pos": {
+        "x": 11,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

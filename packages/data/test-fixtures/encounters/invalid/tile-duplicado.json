@@ -2,7 +2,8 @@
   "id": "encounter-invalido",
   "name": "Encontro Inválido",
   "mapId": "map-teste",
-  "chapter": 1,
+  "chapterId": "chapter-teste",
+  "order": 1,
   "permadeath": "casual",
   "units": [
     {

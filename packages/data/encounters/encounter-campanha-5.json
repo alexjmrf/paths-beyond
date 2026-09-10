@@ -1,8 +1,9 @@
 {
   "id": "encounter-campanha-5",
-  "name": "Capítulo 5 — A Mensageira",
+  "name": "A Mensageira",
   "mapId": "map-campanha-5",
-  "chapter": 5,
+  "chapterId": "chapter-3",
+  "order": 9,
   "permadeath": "casual",
   "winCondition": {
     "t": "escort",

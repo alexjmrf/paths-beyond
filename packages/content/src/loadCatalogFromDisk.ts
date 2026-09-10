@@ -57,6 +57,7 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     valorSkills: readJsonFiles(typeDir(root, 'valor-skills', layout)),
     summonBlueprints: readJsonFiles(typeDir(root, 'summon-blueprints', layout)),
     comps: readJsonFiles(typeDir(root, 'comps', layout)),
+    chapters: readJsonFiles(typeDir(root, 'chapters', layout)),
     encounters: readJsonFiles(typeDir(root, 'encounters', layout)),
     maps: readJsonFiles(typeDir(root, 'maps', layout)),
     terrains: readJsonFiles(typeDir(root, 'terrains', layout)),

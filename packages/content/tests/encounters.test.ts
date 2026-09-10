@@ -13,12 +13,29 @@ import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
 const catalog = loadCatalogFromDisk();
 
 describe('campanha em capítulos (§10)', () => {
-  it('carrega os 6 encounters da campanha', () => {
-    expect(catalog.encounters).toHaveLength(6);
+  // M27 — a asserção deixou de ser uma CONTAGEM e passou a ser uma propriedade. A demo vai
+  // de 8 para 30 missões na 2/N, e um número literal aqui só produziria a mesma edição
+  // mecânica de novo — sem nunca ter pego um defeito.
+  it('carrega as missões da campanha, e as seis autoradas em M12 continuam lá', () => {
+    expect(catalog.encounters.length).toBeGreaterThanOrEqual(6);
+    for (let i = 1; i <= 6; i++) {
+      expect(
+        catalog.encounters.some((e) => e.id === `encounter-campanha-${i}`),
+        `encounter-campanha-${i}`,
+      ).toBe(true);
+    }
   });
 
-  it('vêm ordenados por capítulo, não pela ordem dos arquivos no disco', () => {
-    expect(catalog.encounters.map((e) => e.chapter)).toEqual([1, 2, 3, 4, 5, 6]);
+  it('vêm ordenados por capítulo e depois por posição, não pela ordem dos arquivos no disco', () => {
+    // A ordem é o par (posição do capítulo, posição da missão). Afirmada como MONOTONIA e
+    // não como lista literal, pelo mesmo motivo acima.
+    const posicao = new Map(catalog.chapters.map((c, i) => [c.id, i] as const));
+    const chaves = catalog.encounters.map((e) => [posicao.get(e.chapterId)!, e.order] as const);
+    for (let i = 1; i < chaves.length; i++) {
+      const [capAnterior, ordemAnterior] = chaves[i - 1]!;
+      const [cap, ordem] = chaves[i]!;
+      expect(cap > capAnterior || (cap === capAnterior && ordem > ordemAnterior), `posição ${i}`).toBe(true);
+    }
   });
 
   it('o herói do jogador está em todos os capítulos, e a party cresce', () => {
@@ -30,14 +47,21 @@ describe('campanha em capítulos (§10)', () => {
     // encolhendo — é o adquirível saindo de dentro dela, que é o que torna os dois
     // capítulos jogáveis por quem não os possui (D14). A party de vagas passou a bater com
     // o núcleo de história em toda a campanha: 4 é o teto.
+    // M27 — a lista literal virou MONOTONIA, pelo mesmo motivo das outras: a demo vai a 30
+    // missões na 2/N. A propriedade que este teste sempre protegeu — a party cresce e nunca
+    // encolhe ao longo da campanha — é afirmável sem depender de quantas missões existem.
     const partySizes = catalog.encounters.map((e) => e.units.filter((u) => u.side === 'player').length);
-    expect(partySizes).toEqual([1, 2, 3, 4, 4, 4]);
+    expect(partySizes[0], 'a campanha começa com uma vaga').toBe(1);
+    expect(Math.max(...partySizes), '4 é o teto — o núcleo de história (D14)').toBe(4);
+    for (let i = 1; i < partySizes.length; i++) {
+      expect(partySizes[i]! >= partySizes[i - 1]!, `a party encolheu na missão ${i + 1}`).toBe(true);
+    }
 
     // E o TABULEIRO não encolheu: os dois capítulos continuam com cinco unidades do lado do
     // jogador, quatro vagas mais o aliado. Sem esta asserção, apagar a NPC deixaria o teste
     // acima verde com o capítulo 5 sem objetivo e o 6 sem quem segura o portão.
     for (const chapter of [5, 6]) {
-      const encounter = catalog.encounters.find((e) => e.chapter === chapter)!;
+      const encounter = catalog.encounters.find((e) => e.id === `encounter-campanha-${chapter}`)!;
       expect(encounter.units.filter((u) => u.side === 'ally'), `capítulo ${chapter}`).toHaveLength(1);
       expect(
         encounter.units.filter((u) => u.side === 'player' || u.side === 'ally'),
@@ -244,9 +268,9 @@ describe('o aliado de cenário na campanha', () => {
   );
 
   it('são dois: a escoltada do capítulo 5 e o couraçado do 6 — os dois adquiríveis da campanha', () => {
-    expect(aliados.map((a) => `${a.encounter.chapter}:${a.unit.unitId}`).sort()).toEqual([
-      '5:ally-mensageira',
-      '6:ally-couracado',
+    expect(aliados.map((a) => `${a.encounter.id}:${a.unit.unitId}`).sort()).toEqual([
+      'encounter-campanha-5:ally-mensageira',
+      'encounter-campanha-6:ally-couracado',
     ]);
   });
 
@@ -264,7 +288,7 @@ describe('o aliado de cenário na campanha', () => {
     // Se a condição voltasse a nomear uma unidade `player`, ela nomearia uma VAGA — e a
     // vaga é preenchida em produção por quem o jogador levar, então o objetivo passaria a
     // ser "escolte quem você escolheu", que não é um objetivo.
-    const capitulo5 = catalog.encounters.find((e) => e.chapter === 5)!;
+    const capitulo5 = catalog.encounters.find((e) => e.id === 'encounter-campanha-5')!;
     const condicao = capitulo5.winCondition;
 
     expect(condicao?.t).toBe('escort');

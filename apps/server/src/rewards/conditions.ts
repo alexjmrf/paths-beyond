@@ -16,7 +16,15 @@ import type { RewardCondition } from '@paths-beyond/content';
 // assim que ela existir.
 
 export interface AccountSnapshot {
+  // M27 — CAPÍTULOS inteiros, não missões. A distinção é a armadilha da migração desta
+  // milestone: `listClearedChapters` guarda o id do que foi limpo, e o que foi limpo passou
+  // a ser uma MISSÃO. Ler `.length` aqui manteria o nome e trocaria o sentido — "A Fortaleza
+  // Caiu" (6, 600 de moeda premium) viraria reivindicável com seis missões em vez de seis
+  // capítulos, e ninguém notaria até a moeda aparecer na conta.
   readonly chaptersCleared: number;
+  // A granularidade que passou a existir. Entra como condição própria em vez de ser
+  // aproximada pela de cima: são perguntas diferentes e as duas são autoráveis.
+  readonly missionsCleared: number;
   readonly dungeonsCleared: number;
   readonly charactersOwned: number;
   // O MAIOR entre os heróis do jogador, não o de um herói nomeado: amarrar a condição a um
@@ -30,6 +38,8 @@ export function meetsCondition(condition: RewardCondition, account: AccountSnaps
   switch (condition.kind) {
     case 'chaptersCleared':
       return account.chaptersCleared >= condition.atLeast;
+    case 'missionsCleared':
+      return account.missionsCleared >= condition.atLeast;
     case 'dungeonsCleared':
       return account.dungeonsCleared >= condition.atLeast;
     case 'charactersOwned':
@@ -49,4 +59,30 @@ export function meetsCondition(condition: RewardCondition, account: AccountSnaps
 // exatamente o que alguém autora quando quer emendar duas janelas.
 export function isWithinWindow(event: { startsAt: number; endsAt: number }, nowMs: number): boolean {
   return nowMs >= event.startsAt && nowMs < event.endsAt;
+}
+
+
+// M27 — quantos CAPÍTULOS estão inteiros, dado o conjunto de missões limpas.
+//
+// Puro e aqui, ao lado de `meetsCondition`, porque é a mesma pergunta vista de outro
+// ângulo: o que o servidor guarda é uma lista de missões, e o que a conquista pergunta é
+// sobre capítulos. A conversão precisa existir num lugar só — duas implementações dariam
+// duas respostas para "o jogador terminou o capítulo 2?", e uma delas pagaria moeda.
+//
+// **Um capítulo sem missão nenhuma não conta.** Ele não é "trivialmente completo": é
+// conteúdo pela metade, e contá-lo pagaria por um capítulo que ninguém jogou. O schema de
+// `packages/data` já reprova esse estado; esta linha é a segunda tranca, porque o catálogo
+// que chega aqui pode ter vindo de outro lugar.
+export function countFullyClearedChapters(
+  chapters: readonly { readonly id: string }[],
+  missions: readonly { readonly chapterId: string; readonly id: string }[],
+  clearedMissionIds: ReadonlySet<string>,
+): number {
+  let total = 0;
+  for (const chapter of chapters) {
+    const suas = missions.filter((mission) => mission.chapterId === chapter.id);
+    if (suas.length === 0) continue;
+    if (suas.every((mission) => clearedMissionIds.has(mission.id))) total += 1;
+  }
+  return total;
 }

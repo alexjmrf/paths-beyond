@@ -206,7 +206,16 @@ export function createPostgresHeroRepository(pool: Pool): HeroRepository {
         'SELECT hero_id, owner_player_id, hero, equipped_items FROM heroes WHERE hero_id = ANY($1)',
         [heroIds],
       );
-      return result.rows.map(rowToStoredHero);
+      // M27 2/N — devolvido na ORDEM PEDIDA, e isso é contrato (ver `types.ts`), não gosto.
+      //
+      // `WHERE hero_id = ANY($1)` não promete ordem nenhuma, e o de memória sempre devolveu
+      // na ordem do pedido. A divergência não some num teste: ela aparece em produção como
+      // "mandei o espadachim para a vaga da frente e ele nasceu atrás" — `assembleChapterBattle`
+      // casa `stored[index]` com `slots[index]`, e quem ocupa qual vaga decide a partida
+      // (medido em M27 2/N: a mesma missão dá 20/20 com hero-jogador+clérigo e 0/20 com
+      // arcanista+arqueiro). Reordenar aqui, e não em cada chamador, porque são seis.
+      const porId = new Map(result.rows.map((row) => [row.hero_id, row] as const));
+      return heroIds.map((id) => porId.get(id)).filter((row): row is HeroRow => row !== undefined).map(rowToStoredHero);
     },
     async listHeroesByOwner(ownerPlayerId) {
       const result = await pool.query<HeroRow>(

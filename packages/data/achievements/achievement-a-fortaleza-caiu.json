@@ -6,6 +6,6 @@
   "platformId": "ACH_A_FORTALEZA_CAIU",
   "condition": {
     "kind": "chaptersCleared",
-    "atLeast": 6
+    "atLeast": 3
   }
 }

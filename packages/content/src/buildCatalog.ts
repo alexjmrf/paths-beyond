@@ -27,6 +27,7 @@ import enemySchema from '@paths-beyond/data/schemas/enemies.schema.js';
 import compSchema from '@paths-beyond/data/schemas/comps.schema.js';
 import effectSchema from '@paths-beyond/data/schemas/effects.schema.js';
 import valorSkillSchema from '@paths-beyond/data/schemas/valor-skills.schema.js';
+import chapterSchema from '@paths-beyond/data/schemas/chapters.schema.js';
 import encounterSchema from '@paths-beyond/data/schemas/encounters.schema.js';
 import dungeonSchema from '@paths-beyond/data/schemas/dungeons.schema.js';
 import dungeonEncounterSchema from '@paths-beyond/data/schemas/dungeon-encounters.schema.js';
@@ -50,6 +51,7 @@ import type {
   ArenaMap,
   BannerContent,
   EventContent,
+  Chapter,
   CharacterContent,
   Composition,
   ContentCatalog,
@@ -94,6 +96,7 @@ export interface ParsedContentFiles {
   // ainda não junta este diretório carrega um catálogo sem invocações, não um erro.
   readonly summonBlueprints?: readonly unknown[];
   readonly comps: readonly unknown[];
+  readonly chapters: readonly unknown[];
   readonly encounters: readonly unknown[];
   readonly maps: readonly unknown[];
   readonly terrains: readonly unknown[];
@@ -120,7 +123,7 @@ const EMPTY_ECONOMY_RULES: EconomyRules = { energy: { max: 0, refillIntervalMs: 
 const EMPTY_PREMIUM_RULES: PremiumRules = {
   summon: { premiumCost: 0, pityThreshold: 1 },
   energyPurchase: { premiumCost: 0, energy: 0 },
-  premiumRewards: { chapterFirstClear: 0, dungeonFirstClear: 0 },
+  premiumRewards: { missionFirstClear: 0, chapterFirstClear: 0, dungeonFirstClear: 0 },
 };
 const EMPTY_ENHANCE_RATES: EnhanceRates = { toThree: 0, toSix: 0, toNine: 0, toTwelve: 0, toFifteen: 0 };
 
@@ -193,11 +196,24 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
   // dentro de cada unidade de uma composição).
   const comps = input.comps.map((raw) => compSchema.parse(raw) as unknown as Composition);
 
-  // Ordenados por `chapter`: `findJsonFiles` não garante ordem entre plataformas, e a
-  // campanha é uma sequência (§10, "campanha em capítulos").
+  // M27 — duas camadas, e as duas ordenadas aqui: `findJsonFiles` não garante ordem entre
+  // plataformas, e a campanha é uma sequência (§10, "campanha em capítulos").
+  const chapters = input.chapters
+    .map((raw) => chapterSchema.parse(raw) as Chapter)
+    .sort((a, b) => a.order - b.order);
+
+  // A ordem da missão é DENTRO do capítulo, então ordenar por `order` sozinho embaralharia
+  // capítulos. A chave é o par (posição do capítulo, posição da missão) — e um `chapterId`
+  // que não existe vai para o fim em vez de derrubar a carga: quem reprova isso é o teste de
+  // catálogo, com a mensagem que nomeia a missão.
+  const posicaoDoCapitulo = new Map(chapters.map((c, i) => [c.id, i] as const));
   const encounters = input.encounters
     .map((raw) => encounterSchema.parse(raw) as unknown as Encounter)
-    .sort((a, b) => a.chapter - b.chapter);
+    .sort(
+      (a, b) =>
+        (posicaoDoCapitulo.get(a.chapterId) ?? Number.MAX_SAFE_INTEGER) -
+          (posicaoDoCapitulo.get(b.chapterId) ?? Number.MAX_SAFE_INTEGER) || a.order - b.order,
+    );
 
   const terrains: Record<string, Terrain> = indexById(input.terrains.map((raw) => terrainSchema.parse(raw) as Terrain));
 
@@ -262,6 +278,7 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     weaponDuelRanges,
     maps,
     comps,
+    chapters,
     encounters,
     dungeons,
     dungeonEncounters,

@@ -125,14 +125,29 @@ async function jogarCapitulo(h: Harness, chapterId = CAPITULO) {
 }
 
 describe('GET /campaign', () => {
-  it('lista os seis capítulos com o que já foi limpo', async () => {
+  // M27 (D23) — a rota passou a devolver DUAS camadas. O que eram "seis capítulos" são seis
+  // MISSÕES distribuídas em três capítulos, e o teste mede a forma nova inteira: se ela
+  // voltasse a ser uma lista plana, a tela do cliente não teria onde pendurar a missão.
+  it('lista os capítulos, cada um com as missões dentro e o que já foi limpo', async () => {
     const h = buildHarness();
     const { status, body } = await get(h, '/campaign');
 
     expect(status).toBe(200);
-    expect(body.chapters).toHaveLength(6);
+    expect(body.chapters.map((c: any) => c.id)).toEqual(catalog.chapters.map((c) => c.id));
+    // A lista de missões sai do CATÁLOGO e não de literais: a demo vai a 30 missões na 2/N,
+    // e um literal aqui só produziria a mesma edição mecânica sem nunca pegar um defeito.
+    expect(body.chapters.flatMap((c: any) => c.missions).map((m: any) => m.id)).toEqual(
+      catalog.encounters.map((e) => e.id),
+    );
+    // E cada missão foi para o capítulo dela, que é o que a camada nova existe para dizer.
+    for (const chapter of body.chapters) {
+      const esperadas = catalog.encounters.filter((e) => e.chapterId === chapter.id).map((e) => e.id);
+      expect(chapter.missions.map((m: any) => m.id), chapter.id).toEqual(esperadas);
+    }
     expect(body.chapters.every((c: any) => c.cleared === false)).toBe(true);
-    expect(body.premiumOnFirstClear).toBe(catalog.premiumRules.premiumRewards.chapterFirstClear);
+    expect(body.chapters.flatMap((c: any) => c.missions).every((m: any) => m.cleared === false)).toBe(true);
+    expect(body.premiumOnFirstClear).toBe(catalog.premiumRules.premiumRewards.missionFirstClear);
+    expect(body.premiumOnChapterClear).toBe(catalog.premiumRules.premiumRewards.chapterFirstClear);
   });
 });
 
@@ -143,28 +158,75 @@ describe('POST /campaign/:id/run — a fonte "avanço de história"', () => {
     expect(status).toBe(404);
   });
 
-  it('a PRIMEIRA vitória paga a moeda premium; a segunda não paga nada', async () => {
+  // M27 — a escolha de D23, que o critério de aceite pede registrada: a primeira completude
+  // paga por MISSÃO (pouco) e o fechamento do CAPÍTULO paga um bônus. Manter os 600 antigos
+  // por unidade jogável daria 18.000 na demo de trinta missões — 36 invocações de graça.
+  it('a PRIMEIRA vitória numa missão paga o valor de MISSÃO; a segunda não paga nada', async () => {
     const h = buildHarness();
 
     const primeira = await jogarCapitulo(h);
     expect(primeira.status).toBe(200);
     expect(primeira.body.outcome).toBe('victory');
-    expect(primeira.body.premiumAwarded).toBe(catalog.premiumRules.premiumRewards.chapterFirstClear);
+    expect(primeira.body.premiumAwarded).toBe(catalog.premiumRules.premiumRewards.missionFirstClear);
 
     const segunda = await jogarCapitulo(h);
     expect(segunda.body.outcome).toBe('victory');
     expect(segunda.body.premiumAwarded).toBe(0);
 
     const player = await h.playerRepository.getPlayerById('player-1');
-    expect(player?.premium).toBe(catalog.premiumRules.premiumRewards.chapterFirstClear);
+    expect(player?.premium).toBe(catalog.premiumRules.premiumRewards.missionFirstClear);
   });
 
-  it('o capítulo vencido aparece como limpo', async () => {
+  it('fechar a ÚLTIMA missão do capítulo paga a missão MAIS o bônus de capítulo', async () => {
+    // O harness leva UM herói (o do encounter-campanha-1) e a missão 2 do capítulo 1 pede
+    // duas vagas — ela não é vencível com este time, e isso é conteúdo real e não defeito.
+    // Então a missão 2 entra como JÁ LIMPA pelo repositório, que é a fonte de verdade do
+    // progresso, e a missão 1 é jogada honestamente: ela vira a chave do capítulo.
+    const h = buildHarness();
+    const { missionFirstClear, chapterFirstClear } = catalog.premiumRules.premiumRewards;
+    // Todas as IRMÃS de `encounter-campanha-1` entram como já limpas pelo repositório, que é
+    // a fonte de verdade do progresso; sobra a jogada de verdade, que vira a chave.
+    for (const irma of catalog.encounters.filter(
+      (e) => e.chapterId === 'chapter-1' && e.id !== 'encounter-campanha-1',
+    )) {
+      await h.rewardsRepository.markChapterCleared('player-1', irma.id);
+    }
+
+    const fecha = await jogarCapitulo(h, 'encounter-campanha-1');
+    expect(fecha.body.outcome).toBe('victory');
+    expect(fecha.body.premiumAwarded).toBe(missionFirstClear + chapterFirstClear);
+
+    const { body } = await get(h, '/campaign');
+    expect(body.chapters.find((c: any) => c.id === 'chapter-1').cleared).toBe(true);
+  });
+
+  it('o bônus de capítulo NÃO paga duas vezes', async () => {
+    // Reprova a versão em que a recontagem roda a cada vitória em vez de só na primeira: um
+    // jogador que repetisse a última missão receberia o bônus de novo, todas as vezes.
+    const h = buildHarness();
+    for (const irma of catalog.encounters.filter(
+      (e) => e.chapterId === 'chapter-1' && e.id !== 'encounter-campanha-1',
+    )) {
+      await h.rewardsRepository.markChapterCleared('player-1', irma.id);
+    }
+    await jogarCapitulo(h, 'encounter-campanha-1');
+    const premiumDepois = (await h.playerRepository.getPlayerById('player-1'))?.premium;
+
+    const denovo = await jogarCapitulo(h, 'encounter-campanha-1');
+    expect(denovo.body.premiumAwarded).toBe(0);
+    expect((await h.playerRepository.getPlayerById('player-1'))?.premium).toBe(premiumDepois);
+  });
+
+  it('a missão vencida aparece como limpa, e o capítulo dela AINDA NÃO', async () => {
+    // As duas metades importam: a de baixo é o progresso do jogador, e a de cima é a regra
+    // de que capítulo só fecha quando todas as missões dele caem.
     const h = buildHarness();
     await jogarCapitulo(h);
 
     const { body } = await get(h, '/campaign');
-    expect(body.chapters.find((c: any) => c.id === CAPITULO).cleared).toBe(true);
+    const capitulo = body.chapters.find((c: any) => c.id === 'chapter-1');
+    expect(capitulo.missions.find((m: any) => m.id === CAPITULO).cleared).toBe(true);
+    expect(capitulo.cleared).toBe(false);
   });
 
   it('§9.4 — o servidor REEXECUTA: comandos que não vencem não pagam nada', async () => {
@@ -233,9 +295,11 @@ describe('o aliado de cenário chega ao tabuleiro (D16)', () => {
   it('o capítulo 5 declara 4 vagas, e levar 5 heróis é recusado', async () => {
     const h = buildHarness();
     const { body } = await get(h, '/campaign');
-    const capitulo5 = body.chapters.find((c: any) => c.chapter === 5);
+    const missao5 = body.chapters
+      .flatMap((c: any) => c.missions)
+      .find((m: any) => m.id === 'encounter-campanha-5');
 
-    expect(capitulo5.slots).toBe(4);
+    expect(missao5.slots).toBe(4);
   });
 });
 
@@ -261,7 +325,12 @@ describe('GET /me/rewards e POST /rewards/:id/claim', () => {
     const conquista = body.rewards.find((r: any) => r.id === 'achievement-primeiro-passo');
 
     expect(conquista.claimable).toBe(true);
-    expect(body.account.chaptersCleared).toBe(1);
+    // M27 — "Primeiro Passo" passou a perguntar por MISSÃO, que é o que o nome dela diz.
+    // `chaptersCleared` continua significando CAPÍTULO INTEIRO, e com uma missão de duas
+    // limpa o capítulo 1 ainda não fechou — é exatamente a distinção que a migração podia
+    // ter perdido em silêncio.
+    expect(body.account.missionsCleared).toBe(1);
+    expect(body.account.chaptersCleared).toBe(0);
   });
 
   // §9.4 (M21, 3/N) — o que o shell precisa para espelhar na plataforma.

@@ -6,6 +6,6 @@
   "platformId": "ACH_A_ESTRADA_ABERTA",
   "condition": {
     "kind": "chaptersCleared",
-    "atLeast": 3
+    "atLeast": 2
   }
 }

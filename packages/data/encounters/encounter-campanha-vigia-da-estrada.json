@@ -1,0 +1,113 @@
+{
+  "id": "encounter-campanha-vigia-da-estrada",
+  "name": "O Vigia da Estrada",
+  "mapId": "map-campanha-3",
+  "chapterId": "chapter-1",
+  "order": 7,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 7
+      },
+      "height": 1
+    },
+    {
+      "unitId": "ally-clerigo",
+      "side": "player",
+      "hero": {
+        "id": "ally-clerigo",
+        "characterId": "ally-clerigo",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 6
+      },
+      "height": 1
+    },
+    {
+      "unitId": "unit-vigia-da-estrada-1",
+      "side": "enemy",
+      "enemyId": "enemy-patrulheiro-guerreiro",
+      "pos": {
+        "x": 12,
+        "y": 7
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "unit-vigia-da-estrada-2",
+      "side": "enemy",
+      "enemyId": "enemy-patrulheiro-arqueiro",
+      "pos": {
+        "x": 13,
+        "y": 9
+      },
+      "height": 0,
+      "aiArchetype": "flank"
+    }
+  ]
+}

@@ -138,6 +138,14 @@ export interface HeroRepository {
   // cascade só existiria no Postgres — a bateria de paridade não teria o que comparar.
   deleteHeroesByOwner(ownerPlayerId: string): Promise<void>;
   getHeroById(heroId: string): Promise<StoredHero | null>;
+  // M27 2/N — devolve NA ORDEM PEDIDA, e os ids desconhecidos simplesmente não aparecem
+  // (é assim que o chamador detecta "herói desconhecido": comparando os tamanhos).
+  //
+  // A ordem faz parte do contrato porque `assembleChapterBattle` e a masmorra casam
+  // `stored[index]` com `slots[index]`: é ela que decide quem ocupa qual vaga, e quem ocupa
+  // qual vaga decide a partida. O de memória sempre respeitou o pedido; o de Postgres
+  // consultava com `= ANY($1)`, que não promete ordem alguma — a divergência só existiria
+  // em produção, que é a categoria de defeito que a bateria de paridade existe para achar.
   getHeroesByIds(heroIds: readonly string[]): Promise<readonly StoredHero[]>;
   // §9.1 (M13, sub-sessão 2/N) — o roster do jogador. `POST /battles` sempre exigiu
   // `attackerHeroIds`, e até aqui não havia como o cliente DESCOBRIR quais são os seus:

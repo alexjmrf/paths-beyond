@@ -1,8 +1,9 @@
 {
   "id": "encounter-campanha-1",
-  "name": "Capítulo 1 — O Bloqueio na Estrada",
+  "name": "O Bloqueio na Estrada",
   "mapId": "map-campanha-1",
-  "chapter": 1,
+  "chapterId": "chapter-1",
+  "order": 2,
   "permadeath": "casual",
   "units": [
     {

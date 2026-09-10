@@ -166,18 +166,32 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const cleared = new Set(await opts.rewardsRepository.listClearedChapters(request.player.id));
 
+    // M27 (D23) — DUAS camadas. O catálogo já vem ordenado por (posição do capítulo,
+    // posição da missão), então aqui não se reordena nada: reordenar de novo seria uma
+    // segunda resposta para "qual é a ordem da campanha", e uma delas ficaria errada.
     return {
-      chapters: opts.catalog.encounters
-        .slice()
-        .sort((a, b) => a.chapter - b.chapter)
-        .map((encounter) => ({
-          id: encounter.id,
-          chapter: encounter.chapter,
-          name: encounter.name,
-          cleared: cleared.has(encounter.id),
-          slots: encounter.units.filter((unit) => unit.side === 'player').length,
-        })),
-      premiumOnFirstClear: opts.catalog.premiumRules.premiumRewards.chapterFirstClear,
+      chapters: opts.catalog.chapters.map((chapter) => {
+        const missions = opts.catalog.encounters.filter((encounter) => encounter.chapterId === chapter.id);
+        return {
+          id: chapter.id,
+          order: chapter.order,
+          name: chapter.name,
+          // O capítulo está limpo quando TODAS as missões dele estão. É a mesma regra que
+          // `countFullyClearedChapters` aplica do lado das conquistas, e ela precisa ser a
+          // mesma nos dois lugares — senão a tela diz "capítulo completo" e a conquista
+          // discorda.
+          cleared: missions.length > 0 && missions.every((mission) => cleared.has(mission.id)),
+          missions: missions.map((mission) => ({
+            id: mission.id,
+            order: mission.order,
+            name: mission.name,
+            cleared: cleared.has(mission.id),
+            slots: mission.units.filter((unit) => unit.side === 'player').length,
+          })),
+        };
+      }),
+      premiumOnFirstClear: opts.catalog.premiumRules.premiumRewards.missionFirstClear,
+      premiumOnChapterClear: opts.catalog.premiumRules.premiumRewards.chapterFirstClear,
     };
   });
 
@@ -245,8 +259,24 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     // A primeira completude paga; a segunda não. `markChapterCleared` devolve se foi a
     // primeira — a checagem e a escrita numa operação só, porque perguntar e depois
     // escrever abriria a fresta em que duas submissões simultâneas pagam duas vezes.
+    //
+    // M27 (D23) — o pagamento tem DUAS granularidades, e a segunda só existe no instante em
+    // que a última missão do capítulo cai. A ordem importa: a marca é escrita ANTES de
+    // recontar, senão a missão que acabou de ser limpa não entraria na conta e o capítulo
+    // nunca pagaria.
     const first = await opts.rewardsRepository.markChapterCleared(player.id, encounter.id);
-    const premiumAwarded = first ? opts.catalog.premiumRules.premiumRewards.chapterFirstClear : 0;
+    let premiumAwarded = first ? opts.catalog.premiumRules.premiumRewards.missionFirstClear : 0;
+
+    if (first) {
+      const cleared = new Set(await opts.rewardsRepository.listClearedChapters(player.id));
+      const irmas = opts.catalog.encounters.filter((e) => e.chapterId === encounter.chapterId);
+      // Fecha o capítulo? Só paga o bônus quem virou a chave — e como este caminho só roda
+      // quando `first` é verdadeiro, ele roda uma vez por missão e portanto uma vez por
+      // capítulo.
+      if (irmas.length > 0 && irmas.every((e) => cleared.has(e.id))) {
+        premiumAwarded += opts.catalog.premiumRules.premiumRewards.chapterFirstClear;
+      }
+    }
     const updated =
       premiumAwarded > 0 ? await opts.repository.updatePremium(player.id, player.premium + premiumAwarded) : player;
 

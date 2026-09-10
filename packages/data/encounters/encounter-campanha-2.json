@@ -1,8 +1,9 @@
 {
   "id": "encounter-campanha-2",
-  "name": "Capítulo 2 — O Acampamento da Serra",
+  "name": "O Acampamento da Serra",
   "mapId": "map-campanha-2",
-  "chapter": 2,
+  "chapterId": "chapter-2",
+  "order": 5,
   "permadeath": "casual",
   "units": [
     {

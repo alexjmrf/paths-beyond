@@ -181,7 +181,11 @@ describe('as fontes autoradas da moeda premium', () => {
   it('a conquista de "fortaleza caiu" pede exatamente os capítulos que existem', () => {
     const fim = achievements.find((a) => a.id === 'achievement-a-fortaleza-caiu');
 
-    expect(fim?.condition).toEqual({ kind: 'chaptersCleared', atLeast: catalog.encounters.length });
+    // M27 — `chaptersCleared` continua significando CAPÍTULO INTEIRO, e a campanha passou a
+    // ter duas camadas: a conquista de fim de linha pede os CAPÍTULOS, não as missões. Ler
+    // `encounters.length` aqui era correto quando capítulo era missão, e viraria uma
+    // conquista inalcançável (30) no dia em que a demo estivesse autorada.
+    expect(fim?.condition).toEqual({ kind: 'chaptersCleared', atLeast: catalog.chapters.length });
   });
 
   it('nenhum id se repete entre conquistas e eventos — eles dividem a tabela de reivindicação', () => {

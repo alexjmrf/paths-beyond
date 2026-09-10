@@ -8,7 +8,7 @@ import {
 } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
-import { playthrough, setupFor } from './campaignPilot.js';
+import { playthrough, setupFor } from '../src/campaignPilot.js';
 
 // M15, sub-sessão 2/N — a prova de que o conteúdo autorado é EXERCIDO, e não só validado.
 // A fatia 1/N ligou quatro campos no motor e travou cada um com teste de unidade; nada
@@ -97,7 +97,7 @@ describe('§5.6 — a invocação chega do catálogo ao estado de batalha', () =
 // D3 — a fortaleza do capítulo 6. Não basta o JSON ter `wall` e `gate`: o teste de dado já
 // mede isso. O que importa aqui é o portão IMPORTAR durante a partida.
 describe('D3 — a muralha e o portão do capítulo 6 mudam a partida', () => {
-  const capitulo6 = catalog.encounters.find((e) => e.chapter === 6)!;
+  const capitulo6 = catalog.encounters.find((e) => e.id === 'encounter-campanha-6')!;
   const PORTAO: Coord = { x: 9, y: 8 };
 
   it('a fortaleza nasce fechada', () => {

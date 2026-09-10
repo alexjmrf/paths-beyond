@@ -234,18 +234,33 @@ export interface EquipResponse {
 // reexecuta os comandos e exige vitória. Quem marca "capítulo limpo" e paga é sempre o
 // servidor — cliente afirmando "limpei" é o vetor de fraude clássico, e aqui pior que o
 // normal, porque a moeda que ele ganharia também se compra com dinheiro real.
-export interface CampaignChapter {
+// M27 (D23) — a MISSÃO. É ela que se joga: o ticket e a run continuam sendo por id de
+// missão, e é o id dela que o servidor guarda como limpo.
+export interface CampaignMission {
   readonly id: string;
-  readonly chapter: number;
+  readonly order: number;
   readonly name: string;
   readonly cleared: boolean;
-  // D16 — o capítulo declara VAGAS, não a party. Quantas o jogador preenche.
+  // D16 — a missão declara VAGAS, não a party. Quantas o jogador preenche.
   readonly slots: number;
+}
+
+// M27 — o CAPÍTULO, camada nova. Não é jogável: ele agrupa missões e fecha quando todas
+// elas caem — a mesma regra que `countFullyClearedChapters` aplica do lado das conquistas.
+export interface CampaignChapter {
+  readonly id: string;
+  readonly order: number;
+  readonly name: string;
+  readonly cleared: boolean;
+  readonly missions: readonly CampaignMission[];
 }
 
 export interface CampaignListResponse {
   readonly chapters: readonly CampaignChapter[];
+  // Por MISSÃO. O bônus de fechar o capítulo vem à parte — ver D23 e o comentário em
+  // `economy-rules.schema.ts` sobre por que são dois números e não um.
   readonly premiumOnFirstClear: number;
+  readonly premiumOnChapterClear: number;
 }
 
 export interface CampaignTicket {

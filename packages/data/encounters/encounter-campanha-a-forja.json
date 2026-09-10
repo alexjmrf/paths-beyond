@@ -1,0 +1,226 @@
+{
+  "id": "encounter-campanha-a-forja",
+  "name": "A Forja",
+  "mapId": "map-campanha-3",
+  "chapterId": "chapter-3",
+  "order": 6,
+  "permadeath": "casual",
+  "units": [
+    {
+      "unitId": "hero-jogador",
+      "side": "player",
+      "hero": {
+        "id": "hero-jogador",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 7
+      },
+      "height": 1
+    },
+    {
+      "unitId": "ally-clerigo",
+      "side": "player",
+      "hero": {
+        "id": "ally-clerigo",
+        "characterId": "ally-clerigo",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 6,
+        "y": 6
+      },
+      "height": 1
+    },
+    {
+      "unitId": "ally-arqueiro",
+      "side": "player",
+      "hero": {
+        "id": "ally-arqueiro",
+        "characterId": "ally-arqueiro",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 5,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "ally-arcanista",
+      "side": "player",
+      "hero": {
+        "id": "ally-arcanista",
+        "characterId": "ally-arcanista",
+        "classId": "class-arcanista",
+        "level": 10,
+        "exp": 0,
+        "awakening": 0,
+        "imprint": 0,
+        "talents": {},
+        "equipment": {
+          "weapon": "item-arma-arcanista",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "arcane",
+        "duelSkills": [
+          "skill-ataque-arcanista",
+          "skill-especial-arcanista"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arcanista",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 7,
+        "y": 7
+      },
+      "height": 0
+    },
+    {
+      "unitId": "unit-a-forja-1",
+      "side": "enemy",
+      "enemyId": "enemy-forja-elite-guarda-espadachim",
+      "pos": {
+        "x": 12,
+        "y": 6
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    },
+    {
+      "unitId": "unit-a-forja-2",
+      "side": "enemy",
+      "enemyId": "enemy-forja-guarda-couracado",
+      "pos": {
+        "x": 12,
+        "y": 5
+      },
+      "height": 0,
+      "aiArchetype": "guard-tile"
+    },
+    {
+      "unitId": "unit-a-forja-3",
+      "side": "enemy",
+      "enemyId": "enemy-forja-elite-arqueiro",
+      "pos": {
+        "x": 13,
+        "y": 9
+      },
+      "height": 0,
+      "aiArchetype": "flank"
+    },
+    {
+      "unitId": "unit-a-forja-4",
+      "side": "enemy",
+      "enemyId": "enemy-forja-elite-arcanista",
+      "pos": {
+        "x": 13,
+        "y": 6
+      },
+      "height": 0,
+      "aiArchetype": "hold-position"
+    },
+    {
+      "unitId": "unit-a-forja-5",
+      "side": "enemy",
+      "enemyId": "enemy-forja-elite-guarda-couracado",
+      "pos": {
+        "x": 11,
+        "y": 8
+      },
+      "height": 0,
+      "aiArchetype": "aggressive"
+    }
+  ]
+}

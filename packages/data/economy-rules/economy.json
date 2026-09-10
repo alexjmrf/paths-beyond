@@ -90,7 +90,8 @@
     "energy": 60
   },
   "premiumRewards": {
-    "chapterFirstClear": 600,
+    "missionFirstClear": 60,
+    "chapterFirstClear": 300,
     "dungeonFirstClear": 200
   }
 }

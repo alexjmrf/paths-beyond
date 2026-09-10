@@ -95,11 +95,25 @@ export interface AllyEncounterUnit extends EncounterUnitCommon {
 
 export type EncounterUnitContent = PlayerEncounterUnit | AllyEncounterUnit | EnemyEncounterUnit;
 
+// M27 (D23) — o CAPÍTULO, camada nova acima da missão. Ele não lista as missões dele: é a
+// missão que aponta para cima, e quem responde "quantas missões tem este capítulo?" é a
+// varredura do diretório, que não tem como estar dessincronizada de si mesma.
+export interface Chapter {
+  readonly id: Id;
+  readonly order: number;
+  readonly name: string;
+}
+
+// M27 — o que até aqui se chamava "capítulo" é a MISSÃO. O nome do tipo não mudou porque
+// `Encounter` sempre descreveu o elenco de um mapa jogado, e é isso que ele continua sendo;
+// o que mudou é que ele deixou de ser o topo da hierarquia.
 export interface Encounter {
   readonly id: Id;
   readonly name: string;
   readonly mapId: Id;
-  readonly chapter: number;
+  readonly chapterId: Id;
+  // A posição DENTRO do capítulo, contígua a partir de 1.
+  readonly order: number;
   readonly permadeath: PermadeathMode;
   // Sobrepõe a condição do layout quando presente (§5.7) — ver DECISIONS.md.
   readonly winCondition?: WinCondition;
@@ -191,6 +205,8 @@ export interface PremiumRules {
   // §10 (M18, 4/N) — duas das quatro FONTES: a primeira completude. Uniformes por tipo,
   // então um número por tipo em vez de um por peça de conteúdo.
   readonly premiumRewards: {
+    // M27 — duas granularidades: a missão paga pouco e o capítulo paga o fechamento.
+    readonly missionFirstClear: number;
     readonly chapterFirstClear: number;
     readonly dungeonFirstClear: number;
   };
@@ -200,6 +216,7 @@ export interface PremiumRules {
 // servidor (é ele que tem o estado de conta); o que mora aqui é a forma.
 export type RewardCondition =
   | { readonly kind: 'chaptersCleared'; readonly atLeast: number }
+  | { readonly kind: 'missionsCleared'; readonly atLeast: number }
   | { readonly kind: 'dungeonsCleared'; readonly atLeast: number }
   | { readonly kind: 'charactersOwned'; readonly atLeast: number }
   | { readonly kind: 'heroImprint'; readonly atLeast: number }
@@ -265,6 +282,7 @@ export interface ContentCatalog {
   readonly maps: Readonly<Record<Id, ArenaMap>>;
   readonly comps: readonly Composition[];
   // §10 (M12) — campanha em capítulos, ordenada por `chapter`.
+  readonly chapters: readonly Chapter[];
   readonly encounters: readonly Encounter[];
   // Ids de Contra-atacar/Defender (§6.4) — antes recebidos prontos de quem montava a
   // batalha (`apps/server`) ou hardcoded (`tools/balance/src/runTournament.ts`); D2 (M9)

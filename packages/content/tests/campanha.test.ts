@@ -1,7 +1,7 @@
 import { tileAt } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
-import { COMMAND_BUDGET, playthrough } from './campaignPilot.js';
+import { playthrough } from '../src/campaignPilot.js';
 
 // M12, sub-sessão 3/N — a evidência do critério de aceite do milestone: "campanha de 6+
 // mapas JOGÁVEL ponta a ponta com pelo menos 3 condições de vitória distintas".
@@ -20,24 +20,42 @@ import { COMMAND_BUDGET, playthrough } from './campaignPilot.js';
 const catalog = loadCatalogFromDisk();
 
 describe('campanha em capítulos (§10) — 6 mapas jogáveis ponta a ponta', () => {
-  it('são 6 capítulos, ordenados', () => {
-    expect(catalog.encounters).toHaveLength(6);
-    expect(catalog.encounters.map((e) => e.chapter)).toEqual([1, 2, 3, 4, 5, 6]);
+  // M27 — o que eram "6 capítulos" viraram 6 MISSÕES distribuídas em 3 capítulos. A ordem
+  // continua sendo a asserção: ela é o par (posição do capítulo, posição da missão), e não a
+  // ordem em que `findJsonFiles` devolve os arquivos.
+  it('toda missão pertence a um capítulo que existe, e a campanha tem as três camadas de D23', () => {
+    expect(catalog.chapters.map((c) => c.id)).toEqual(['chapter-1', 'chapter-2', 'chapter-3']);
+    const ids = new Set(catalog.chapters.map((c) => c.id));
+    for (const missao of catalog.encounters) {
+      expect(ids.has(missao.chapterId), `${missao.id} -> ${missao.chapterId}`).toBe(true);
+    }
+    // Todo capítulo tem missão: um capítulo vazio é uma tela sem saída.
+    for (const capitulo of catalog.chapters) {
+      expect(catalog.encounters.some((e) => e.chapterId === capitulo.id), capitulo.id).toBe(true);
+    }
   });
 
   it('usa mais de 3 condições de vitória distintas — as 5 de §5.7', () => {
+    // Afirmado como CONJUNTO e não como lista posicional: o que importa é que a campanha
+    // exercite mais de uma condição de §5.7, e a posição de cada uma muda a cada missão
+    // autorada. A 2/N vai de 8 para 30 missões.
     const conditions = catalog.encounters.map((e) => (e.winCondition ?? catalog.maps[e.mapId]!.winCondition).t);
-    expect(conditions).toEqual(['rout', 'seize', 'defend', 'surviveRounds', 'escort', 'rout']);
-    expect(new Set(conditions).size).toBeGreaterThanOrEqual(3);
+    expect(new Set(conditions).size).toBeGreaterThanOrEqual(4);
+    for (const esperada of ['rout', 'seize', 'defend', 'surviveRounds', 'escort']) {
+      expect(conditions, `§5.7 — ${esperada}`).toContain(esperada);
+    }
   });
 
-  for (const encounter of catalog.encounters) {
-    it(`${encounter.name}: o piloto automático vence`, () => {
-      const { state, commands } = playthrough(catalog, encounter);
-      expect({ id: encounter.id, outcome: state.outcome }).toEqual({ id: encounter.id, outcome: 'victory' });
-      expect(commands).toBeLessThan(COMMAND_BUDGET);
-    });
-  }
+  // M27 2/N — "o piloto vence na seed 42" SAIU daqui, e o motivo é a demo.
+  //
+  // Com seis missões a asserção era razoável. Com trinta e uma rampa de dificuldade, ela
+  // não distingue "a missão é jogável" de "a missão é fácil": obrigar toda missão a ser
+  // vencível de primeira, numa seed, é obrigar a demo a ser um corredor. A pergunta certa
+  // é a TAXA, e ela vive em `demoDeTrintaMissoes.test.ts` — com o piso de 25% por missão,
+  // o teto de 60% por capítulo, e a ficha da conta nova em vez da vaga autorada.
+  //
+  // O que continua aqui é o que só este arquivo pergunta: o terreno, os arquétipos, as
+  // condições de vitória e a reprodutibilidade da jogada.
 
   it('a jogada inteira é determinística: mesma seed → mesmo estado final', () => {
     for (const encounter of catalog.encounters) {
@@ -167,14 +185,8 @@ describe('a campanha é zerável só com o núcleo de história (critério 3)', 
     }
   });
 
-  it('e o piloto automático vence os SEIS capítulos com essa party', () => {
-    // O piloto joga exatamente o que as vagas declaram, que o teste acima acabou de provar
-    // ser só o núcleo. Se um capítulo passasse a exigir mais do que quatro personagens
-    // conseguem, é aqui que apareceria — e foi assim que o capítulo 5 foi pego, quando a
-    // Mensageira ainda ocupava uma vaga e sumia junto com o objetivo.
-    for (const encounter of catalog.encounters) {
-      const resultado = playthrough(catalog, encounter);
-      expect(resultado.state.outcome, `${encounter.id}`).toBe('victory');
-    }
-  });
+  // A metade JOGÁVEL desta afirmação mudou de arquivo em M27 2/N: quem joga as trinta
+  // missões com o núcleo — e com a ficha que a conta nova de fato recebe, que é mais duro —
+  // é `demoDeTrintaMissoes.test.ts`. Aqui fica a metade da FORMA, que é a que este arquivo
+  // sempre respondeu: nenhuma vaga nomeia quem o jogador talvez não possua.
 });

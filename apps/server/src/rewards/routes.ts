@@ -8,7 +8,7 @@ import type {
   RewardsRepository,
 } from '../repository/types.js';
 import { ownedCharacterIds } from '../summon/ownership.js';
-import { isWithinWindow, meetsCondition, type AccountSnapshot } from './conditions.js';
+import { countFullyClearedChapters, isWithinWindow, meetsCondition, type AccountSnapshot } from './conditions.js';
 
 // §10 (M18, sub-sessão 4/N) — as duas fontes AUTORADAS da moeda premium: conquistas e
 // eventos. As outras duas (primeira completude de capítulo e de masmorra) são pagas no
@@ -40,8 +40,13 @@ async function snapshot(opts: RewardsRoutesOptions, playerId: string, elo: numbe
     opts.heroRepository.listHeroesByOwner(playerId),
   ]);
 
+  // M27 — `chapters` aqui é a lista de MISSÕES limpas (o repositório guarda o id do que foi
+  // limpo, e o que foi limpo virou missão). As duas contagens saem dela, e a de capítulos
+  // passa pelo catálogo: ver `countFullyClearedChapters`.
+  const missoesLimpas = new Set(chapters);
   return {
-    chaptersCleared: chapters.length,
+    chaptersCleared: countFullyClearedChapters(opts.catalog.chapters, opts.catalog.encounters, missoesLimpas),
+    missionsCleared: missoesLimpas.size,
     dungeonsCleared: dungeons.length,
     charactersOwned: owned.size,
     bestImprint: heroes.reduce((best, stored) => Math.max(best, stored.hero.imprint), 0),

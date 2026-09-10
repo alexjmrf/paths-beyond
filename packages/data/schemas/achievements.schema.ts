@@ -16,6 +16,9 @@ import { idSchema } from './shared.js';
 // acumulado, então "junte 10.000 de ouro" viraria uma conquista que some ao gastar.
 const conditionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('chaptersCleared'), atLeast: z.number().int().positive() }).strict(),
+  // M27 — a granularidade nova. `chaptersCleared` continua significando CAPÍTULO INTEIRO;
+  // esta pergunta por missão, que é o passo que o jogador dá.
+  z.object({ kind: z.literal('missionsCleared'), atLeast: z.number().int().positive() }).strict(),
   z.object({ kind: z.literal('dungeonsCleared'), atLeast: z.number().int().positive() }).strict(),
   z.object({ kind: z.literal('charactersOwned'), atLeast: z.number().int().positive() }).strict(),
   // "Algum herói com imprint/awakening pelo menos N" — não um herói nomeado: amarrar a

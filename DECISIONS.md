@@ -6760,3 +6760,380 @@ animação de duelo do tabuleiro (o segundo dos três níveis), e não a cena co
 
 **Com isso o M26 tem os seus critérios de aceite completos** e a milestone fecha em três
 sub-sessões. `packages/core` sem uma linha alterada nas três; `RULES_VERSION` em `0.19.0`.
+
+## M27 — A demo: três capítulos, trinta missões
+
+### M27 — sub-sessão 1/N: a forma, e o buraco que ela achou na rampa
+
+`packages/core` sem uma linha alterada — `git status packages/core` vazio ao fim da sessão — e
+`RULES_VERSION` fica em `0.19.0`. Isto é conteúdo, rota e tela; nenhuma regra foi tocada.
+
+#### A camada nova, e a direção do ponteiro
+
+D23 pede três capítulos de dez missões. Até aqui `encounters` tinha **seis capítulos de um
+encontro cada**: capítulo *era* missão, e `chapter: number` era um campo solto que só ordenava a
+lista. Não existia onde pendurar "a missão 4 do capítulo 2".
+
+**É a missão que aponta para o capítulo, e não o contrário.** Um capítulo que listasse as missões
+dele obrigaria a editar dois arquivos para acrescentar uma, e um índice mantido à mão é a forma
+clássica de o repositório passar a mentir: o diretório tem dez, o índice lista nove, e nada
+reclama. Quem responde "quantas missões tem este capítulo?" é a varredura do diretório, que não
+tem como estar dessincronizada de si mesma.
+
+#### D31 — A primeira completude paga por MISSÃO e por CAPÍTULO
+
+**Decisão do usuário**, e o critério de aceite do M27 pede que ela fique registrada. A aritmética
+que a decidiu: manter os 600 antigos por unidade jogável daria **18.000 de moeda premium na demo
+de trinta missões** — 36 invocações a 500 cada, de graça, e o gacha viraria decoração antes do fim
+do capítulo 1. Ficou **60 por missão e 300 ao fechar o capítulo**: 30×60 + 3×300 = 2.700, uns
+cinco summons na demo inteira.
+
+Duas regras e não uma porque cada uma paga uma coisa diferente: a missão recompensa o passo a
+passo (nove missões seguidas sem nenhum pagamento é um trecho longo e seco para quem está
+começando) e o capítulo mantém o fechamento sendo um momento.
+
+O bônus de capítulo é pago **dentro do caminho que já marca a missão como limpa**, e só quando
+`markChapterCleared` diz que foi a primeira vez — é o que o impede de pagar de novo a cada
+repetição da última missão, e há teste para exatamente isso.
+
+#### A armadilha silenciosa da migração, achada antes de escrever código
+
+`listClearedChapters` guarda **o id do que foi limpo**, e o que foi limpo passou a ser uma MISSÃO.
+Os seis encontros antigos mantiveram os ids, então o progresso do jogador migra de graça — mas
+`chaptersCleared`, que é lido como `.length`, passaria a **contar missões mantendo o nome**.
+"A Fortaleza Caiu" (`atLeast: 6`, 600 de moeda) viraria reivindicável com seis missões em vez de
+seis capítulos, e ninguém notaria até a moeda aparecer na conta.
+
+**A saída:** `chaptersCleared` continua significando CAPÍTULO INTEIRO, derivado por
+`countFullyClearedChapters` (puro, ao lado de `meetsCondition`, num lugar só — duas implementações
+dariam duas respostas para "o jogador terminou o capítulo 2?", e uma delas pagaria moeda). Entrou
+`missionsCleared` como condição própria, que é a granularidade que passou a existir.
+
+As três conquistas foram **retunadas para preservar a intenção que o nome de cada uma declara**:
+"Primeiro Passo" virou `missionsCleared: 1` (é o que o nome diz, e um capítulo de dez missões é
+tarde demais para um primeiro passo); "A Estrada Aberta" foi de 3 para `chaptersCleared: 2`; "A
+Fortaleza Caiu" de 6 para `chaptersCleared: 3`, que é a demo inteira — em 3 capítulos, 6 era
+inalcançável.
+
+**Consequência registrada, e ela é aceitável:** um jogador com todos os seis encontros antigos
+limpos tem os três capítulos completos hoje e continua com as conquistas. Quando a 2/N autorar as
+outras 24 missões, esses capítulos deixam de estar completos e uma conquista NÃO reivindicada
+volta a ficar indisponível. O que já foi reivindicado fica — `claims` é persistido.
+
+#### O buraco que a fatia achou, e que é maior que ela
+
+Ao consertar honestamente a corrente de `primeiraSessao.test.ts` (que assumia "um capítulo paga
+600 e banca a invocação de 500"), a medição achou o seguinte, com o núcleo inicial de uma conta
+nova e a IA de mapa jogando:
+
+| missão | vagas × inimigos | vitórias |
+| --- | --- | --- |
+| `encounter-campanha-1` | 1 × 1 | 17/20 |
+| `encounter-campanha-2` | 2 × 3 | **0/20** |
+
+**`encounter-campanha-2` foi autorado para heróis de nível 10.** Desde o M18 5/N a campanha é por
+VAGAS e o jogador leva os *seus* heróis — que começam no nível 1. A campanha autorada supõe uma
+party progredida que a conta nova não tem, e **nenhum teste pegava isso** porque a corrente da
+primeira sessão parava no capítulo 1. Não é regressão desta fatia: é o critério de aceite 3 do M27
+("uma conta que nunca gasta dinheiro real completa os três capítulos") encontrando cedo o que ele
+existe para fechar.
+
+A medição também mostrou que **a dificuldade da campanha é de NÚMERO e não de força por inimigo**
+(os stats de `enemy-bandido` e `enemy-treino-alvo-guerreiro` são quase idênticos): 1×1 sai em
+20/20, 2×2 em 0/20, 2×1 em 20/20. O piloto automático perde quando não tem vantagem numérica.
+
+> **CORRIGIDO NA 2/N — esta medição inteira está errada, e o que está escrito acima sobre nível e
+> sobre `encounter-campanha-2` é falso.** Ela usava `resolveAutoBattle` como jogador, e nenhum dos
+> cinco arquétipos de §9.1 persegue objetivo de mapa: numa missão de `seize` ou `escort` ele nunca
+> vence, por mais fraco que o inimigo seja. O núcleo inicial é **nível 10**, e `encounter-campanha-2`
+> dá **20/20** com a ficha da conta nova. Ver "M27 — sub-sessão 2/N", adiante.
+
+#### D32 — Os seis autorados vão para o FIM dos capítulos, e duas pontes abrem o capítulo 1
+
+**Decisão do usuário.** Os seis encontros de M12/M15 são conteúdo balanceado, com terreno autorado
+e a condição `escort`; eles ficam, mas não em pares 1-2 / 3-4 / 5-6. Vão para onde a dificuldade
+deles cabe, e as missões da 2/N constroem a subida até eles.
+
+Entraram **duas missões-ponte** calibradas para o núcleo inicial de nível 1 — `A Trilha` (1 vaga ×
+1 alvo) e `O Vau` (2 vagas × 1 alvo) —, reusando `map-campanha-1` com composição diferente, que é
+a decisão de mapas desta milestone. O capítulo 1 ficou **ponte-1 → campanha-1 → ponte-2**, nesta
+ordem porque a party CRESCE (1, 1, 2 vagas) e a ordem inversa a fazia encolher no meio.
+
+`encounter-campanha-2` saiu do capítulo 1 por não ser vencível pelo núcleo inicial. Medido depois
+da mudança: **20/20, 17/20, 20/20** — o capítulo 1 inteiro é vencível por quem acabou de criar a
+conta, e é isso que a corrente da primeira sessão passou a afirmar.
+
+> **CORRIGIDO NA 2/N:** `encounter-campanha-2` É vencível pelo núcleo inicial (20/20). A premissa
+> que tirou ele do capítulo 1 era falsa. **A decisão fica de pé assim mesmo, por escolha do
+> usuário** — as duas pontes e a ordem do capítulo 1 são boa abertura com ou sem aquele número —,
+> mas o motivo registrado acima não vale.
+
+**A corrente ganhou uma perna em vez de perder uma:** a primeira invocação deixou de caber numa
+vitória só, e agora é bancada por DUAS das quatro fontes de M18 4/N trabalhando juntas — a
+campanha e a conquista reivindicada. O teste exercita as duas.
+
+#### As contagens viraram propriedades
+
+Sete asserções de `packages/content` diziam "são 6 encounters", "a ordem é [1,2,3,4,5,6]", "as
+vagas são [1,2,3,4,4,4]". A demo vai de 8 para 30 missões na 2/N, e um literal em cada uma só
+produziria a mesma edição mecânica de novo — sem nunca ter pego um defeito. Viraram monotonia
+(a ordem é crescente no par capítulo/missão; a party nunca encolhe), pertinência (os seis de M12
+continuam lá) e conjunto (as condições de §5.7 aparecem, sem depender de em que posição).
+
+### M27 — sub-sessão 2/N: a medição da 1/N estava errada, e as 22 missões que faltavam
+
+`packages/core` sem uma linha alterada — `git status packages/core` vazio ao fim da sessão — e
+`RULES_VERSION` fica em `0.19.0`.
+
+#### A correção, primeiro, porque o número errado justificou uma decisão
+
+A 1/N mediu a campanha com `resolveAutoBattle` no lugar do jogador. `resolveAutoBattle` decide por
+`decideMapAiCommand`, e **nenhum dos cinco arquétipos de §9.1 persegue objetivo de mapa**. O
+estado final de uma execução de `encounter-campanha-2` (`seize` em 12,7), com o roster gratuito:
+
+```
+outcome= ongoing  rounds= 792  cmds= 800
+  player ...ally-arqueiro    hp=83  pos=12,3     <- vivo, a quatro tiles do objetivo
+  enemy  unit-patrulheiro-1  hp=0
+  enemy  unit-patrulheiro-2  hp=0
+  enemy  unit-patrulheiro-3  hp=0                <- os três mortos
+```
+
+Ele venceu a briga e nunca pisou no tile. Em `encounter-campanha-5` (`escort`) o mesmo arnês leva
+a Mensageira para a emboscada e a perde no round 2. **Os dois 0/20 eram limitação do arnês, não
+dificuldade do conteúdo.**
+
+Três afirmações da 1/N caem com isso, e ficam corrigidas aqui:
+
+1. **"A party real é de nível 1" é falsa.** Os nove personagens declaram `startingHero.level: 10`
+   em `packages/data/characters/*.json`. O núcleo que uma conta nova recebe é nível 10.
+2. **"`encounter-campanha-2` foi autorado para nível 10" é falsa.** Com o piloto que persegue
+   objetivo e a ficha da conta nova ele dá **20/20**.
+3. **"A ficha autorada é mais forte que a da conta nova" é quase falsa.** Medido lado a lado nas
+   oito missões de então: 20/20 contra 20/20, 20/20 contra 20/20, 7/20 contra 8/20, 16/20 contra
+   16/20. O talento alocado a dedo quase não move o resultado.
+
+**O que de fato decide é QUEM ocupa a vaga.** A mesma missão, com a mesma ficha livre: 20/20 com
+hero-jogador + clérigo, 0/20 com arcanista + arqueiro. O `heroes.slice(0, vagas)` do teste
+escolhia por ordem do roster, que é alfabética, e entregava os dois mais frágeis.
+
+**D32 fica de pé, com o motivo trocado (decisão do usuário nesta sub-sessão).** As duas pontes e a
+ordem do capítulo 1 são boa abertura independentemente do número errado que as motivou; o que sai
+é a justificativa.
+
+#### O piloto saiu de `tests/` e virou peça de `packages/content/src`
+
+Uma missão de objetivo só é jogável por quem persegue objetivo, e agora são dois pacotes que
+precisam do mesmo jogador de referência: o teste de conteúdo e a corrente de servidor vazio.
+Deixá-lo sob `tests/` de um deles seria `apps/server` dependendo de um arquivo de teste de
+`packages/content` que nenhum `package.json` declara.
+
+Entrou `playFromSetup(setup, seed)` ao lado de `playthrough(catalog, encounter)`: a corrente do
+servidor não monta o setup — ele vem do ticket, com as VAGAS já substituídas pelos heróis da
+conta. Montá-lo de novo seria a segunda montagem da mesma batalha, que §9.1 chama de bug crítico.
+
+**O que o piloto continua NÃO sendo: IA de jogo.** Nada em `apps/server/src` nem em
+`apps/client/src` pode chamá-lo. Em produção quem decide pelo jogador é o jogador, e quem decide
+pela varredura de masmorra continua sendo `resolveAutoBattle` (M14 2/N).
+
+#### D33 — A banda de dificuldade de uma missão de campanha
+
+**Decisão do usuário**, e é o que o critério "as trinta missões passam pelo `pnpm balance` com os
+dois critérios do M8" vira quando encontra o objeto real. `pnpm balance` é um torneio entre
+composições SIMÉTRICAS de arena; uma missão de campanha é PvE, e exigir dela 40–60% significaria
+o jogador perdendo metade da demo. Então:
+
+- **`pnpm balance` continua sendo regressão da matriz de arena**, com os dois critérios do M8 de
+  pé — é o idioma que M9, M14 e M18 já usavam.
+- **E a missão ganha banda própria**, medida com o piloto e a ficha da conta nova em 40 seeds
+  fixas: **piso de 25% por missão** (abaixo disso a conta que nunca pagou empaca, e a demo passa a
+  depender do que só o pagamento acelera — o critério 3) e **teto por capítulo: cada um tem ao
+  menos uma missão em 60% ou menos** (senão o capítulo é corredor, não jogo).
+
+É a forma piso+teto do M8, pelo mesmo motivo: um só dos dois deixa passar o defeito do outro lado.
+
+**A medição não é estatística.** O piloto é determinístico e as seeds são fixas, então o número de
+vitórias de cada missão é um valor reproduzível — o teste não oscila entre execuções e só falha
+quando o conteúdo muda.
+
+#### As 22 missões, e o que a rampa ensinou
+
+Capítulo 1 ganhou 7 missões (ordens 4–10), o 2 ganhou 8, o 3 ganhou 7. Os seis autorados foram
+para 5 e 10 (capítulo 2) e 8, 9 e 10 (capítulo 3). Os mapas são os mesmos seis, com composição
+diferente — a decisão de mapas de D32.
+
+**A dificuldade é bimodal, e isso é o achado de balanceamento da fatia.** O piloto ou vence a
+corrida de atrito ou colapsa; valores intermediários são difíceis de acertar. Exemplos medidos,
+todos com uma única unidade de diferença:
+
+| missão | composição | winrate |
+| --- | --- | --- |
+| `A Forja` | 4 vagas × 4 inimigos | 100% |
+| `A Forja` | 4 vagas × 5 inimigos | 0% |
+| `A Galeria Inferior` | 3 × 4, um elite | 53% |
+| `A Galeria Inferior` | 3 × 5 | 8% |
+| `A Tocaia` | 2 × 2, o segundo com atk 72 | 100% |
+| `A Tocaia` | 2 × 2, o segundo com atk 102 | 5% |
+
+Quem afinar conteúdo depois deve esperar isso: mexer em um inimigo move a missão 40 pontos, não 5.
+
+**Posicionamento é regra de autoria, não gosto.** `buildInitialState` drena os turnos de IA
+anteriores ao primeiro comando humano, então um inimigo que nasce dentro do próprio alcance ataca
+antes de o jogador jogar. A colocação de cada inimigo passou a recusar tile a `moveRange +
+duelRange` ou menos de qualquer unidade do jogador, e `encounters.test.ts` já reprovava por isso.
+
+#### O que a rampa deixa em aberto, registrado
+
+**O fim do capítulo 3 é a parte mais fácil dele:** 82%, 100% e 97% nas ordens 8, 9 e 10, contra
+35% e 37% no miolo. É consequência de D32 prender `campanha-4`, `-5` e `-6` no fim — eles são
+conteúdo balanceado de M12/M15 e esta fatia não os retunou. **Decisão do usuário: fica como está**,
+e volta a ser assunto quando a história entrar e o capítulo 3 for reescrito com texto.
+
+#### Dois defeitos que a fatia achou fora do conteúdo
+
+**`getHeroesByIds` não devolvia na ordem pedida no Postgres.** `WHERE hero_id = ANY($1)` não
+promete ordem nenhuma; o de memória sempre respeitou o pedido. `assembleChapterBattle` casa
+`stored[index]` com `slots[index]`, então a divergência apareceria só em produção, e como "mandei
+o espadachim para a vaga da frente e ele nasceu atrás" — numa campanha em que quem ocupa qual vaga
+decide a partida. A ordem virou contrato em `repository/types.ts`, a consulta reordena, e a
+bateria de paridade ganhou o `HeroRepository` para cobrar isso dos dois backends.
+
+**A corrente da primeira sessão só afirmava desfecho na ÚLTIMA missão do capítulo.** Com duas
+missões de `seize` entrando no capítulo 1, as duas seriam perdidas oito vezes seguidas e o teste
+seguiria verde. Agora toda missão do capítulo tem asserção de vitória.
+
+#### A tabela de força congelada mudou de chave
+
+`inimigoAutorado.test.ts` guardava um hash por unidade COLOCADA
+(`encounter-campanha-4/unit-cerco-1`). O hash nunca dependeu da posição — ele sai de
+`catalog.enemies[enemyId]` e de mais nada —, então a tabela repetia o mesmo valor em até seis
+linhas e autorar uma missão obrigava a copiá-lo de novo. Passou a ser uma linha por INIMIGO: 41
+em vez de ~110, e agora cobre também os inimigos que nenhum encontro coloca hoje, que antes podiam
+mudar de stat sem nada reclamar.
+
+#### "O piloto vence na seed 42" saiu de `campanha.test.ts`
+
+Com seis missões a asserção era razoável. Com trinta e uma rampa, ela não distingue "a missão é
+jogável" de "a missão é fácil" — e obrigaria a demo inteira a ser vencível de primeira, que é o
+mesmo que obrigá-la a não ter dificuldade. A pergunta virou a taxa, com a banda de D33, em
+`demoDeTrintaMissoes.test.ts`. `campanha.test.ts` fica com o que só ele pergunta: terreno,
+arquétipos, condições de vitória e reprodutibilidade da jogada.
+
+### M27 — sub-sessão 3/N: o fio solto do M23, a demo na tela, e o fechamento
+
+`packages/core` sem uma linha alterada e `RULES_VERSION` fica em `0.19.0`.
+
+#### O fio solto do M23, achado — e a razão de ele nunca reproduzir
+
+`primeiraSessao.test.ts` carregava, no próprio cabeçalho, um achado que o M23 registrou e não
+conseguiu fechar: um `400 {"error":"comando rejeitado: ..."}` que aparecia numa execução da suíte
+completa e sumia em ~200 execuções dirigidas. A fatia começou com a suíte **vermelha no baseline**
+— `1 failed | 2475 passed` — nesse arquivo, e rodando-o isolado ele falhou uma vez em três, com
+uma mensagem diferente da da suíte (`expected 'defeat' to be 'victory'`).
+
+O diagnóstico que o M23 escreveu estava certo: *"a única origem possível é setup ou seed
+diferentes entre o ticket e a submissão"*. A origem era a perna da masmorra, no próprio teste:
+
+```
+resolveAutoBattle({ setup: ticketMasmorra.body.setup, seed: ticketMasmorra.body.seed })
+...
+nonce: 'nonce-primeira-masmorra'      // <- um nonce ESCRITO À MÃO
+```
+
+`POST /dungeons/:id/run` deriva a seed do nonce **submetido** (`deriveSeed(secret, body.nonce)`),
+não do ticket. Planejar com a seed do ticket e submeter outro nonce é planejar numa batalha e ser
+verificado em outra. **Não é defeito do servidor:** o nonce *é* o ticket desde M13 2/N, e derivar
+do que o cliente mandou é o contrato.
+
+**Por que era intermitente, e por que a busca do M23 não podia encontrá-lo.** O arquivo não
+injetava `newNonce`, então `generateNonce` era `crypto.randomUUID`: a batalha do ticket mudava a
+cada execução enquanto a da verificação ficava presa na mesma. Às vezes os comandos ainda eram
+legais no outro tabuleiro e a corrente passava; às vezes viravam `400`; às vezes eram legais e
+perdiam. **A busca do M23 foi feita com seed fixada** — e seed fixada é justamente a condição que
+faz este defeito desaparecer. O conserto tem duas metades: a submissão usa o nonce do ticket, e
+`servidorVazio()` injeta o contador, como `demoCompleta.test.ts` já fazia. Cinco execuções
+seguidas verdes, contra duas em três antes.
+
+**O que isto ensina sobre o arnês, e não sobre o jogo:** um teste que planeja de um lado e
+verifica do outro precisa carregar o *mesmo* identificador nos dois. Onde o nonce é a seed, passar
+o do ticket adiante não é estilo — é a única forma correta.
+
+#### Duas missões do capítulo 2 se chamavam "O Desfiladeiro"
+
+`encounter-campanha-3` (ordem 10, em `map-campanha-3`, cujo nome autorado é "Desfiladeiro de Pedra
+Alta") é o dono legítimo do nome. A missão nova da 2/N na ordem 2 sentava em `map-campanha-2` e
+tinha pegado o mesmo nome emprestado. Na tela, o capítulo listava a mesma entrada duas vezes, e
+nada no jogo distinguia uma da outra — **o jogador não escolhe por id, escolhe por nome.**
+
+Virou `encounter-campanha-encosta` / "A Encosta" — id e arquivo junto com o nome, porque o id
+nunca foi commitado nem referenciado em lugar nenhum, e um id `desfiladeiro` com nome "Encosta"
+seria a mesma dessincronização com outra cara. **Renomear id de conteúdo JÁ PUBLICADO continua
+proibido** pelo mesmo motivo de D31: `listClearedChapters` guarda o id, e renomear apaga progresso
+em silêncio. Aqui não havia progresso a apagar.
+
+A trava é uma propriedade e não um literal: nome de missão é único **dentro do capítulo** — e não
+globalmente, pelo mesmo motivo que a ordem é, porque a campanha pode voltar ao mesmo lugar num
+capítulo seguinte.
+
+#### O critério de aceite 1 tinha só metade da prova
+
+A 1/N travou os seis ids antigos em `packages/data`. Isso é a condição NECESSÁRIA, e não é a
+afirmação: "a campanha antiga migra sem perder o que o jogador já limpou" é uma frase sobre uma
+CONTA, e quem responde por conta é o servidor. Entrou `migracaoDaCampanha.test.ts`, com uma conta
+semeada pelo repositório com os seis ids que a versão de seis capítulos gravaria — que é o único
+jeito de escrever isso, já que a versão antiga não existe mais para produzir o estado.
+
+**Ele cobra o que a trava de ids não alcança:** que `chaptersCleared` continue significando
+capítulo INTEIRO. Trocando `countFullyClearedChapters` por `missoesLimpas.size` — a implementação
+ingênua que D31 descreve — o teste reprova com a conta recebendo **600 de moeda premium** por "A
+Fortaleza Caiu" sem ter fechado capítulo nenhum. É o defeito exato de D31, agora com quem o pegue.
+
+#### O capítulo recolhe (decisão do usuário)
+
+A 1/N desenhou o capítulo como cabeçalho não-clicável — ele não é jogável, e um cabeçalho clicável
+convidaria a um clique sem destino. Continua não sendo jogável; o clique agora abre e fecha, que é
+a única coisa que um agrupamento pode fazer. Com trinta missões, a lista inteira aberta é uma
+rolagem onde "onde eu parei?" vira busca visual, e a demo tem rampa.
+
+Três decisões dentro dessa:
+
+- **Abre o primeiro capítulo com missão por limpar**, e não o primeiro da lista — que mandaria
+  quem já jogou metade da demo de volta ao começo toda vez que a tela abrisse. Com tudo limpo
+  abre o ÚLTIMO: quem terminou e volta quer rejogar o fim.
+- **A escolha do jogador sobrevive ao `refreshCampaign`.** A lista se atualiza sozinha ao vencer
+  uma missão; ressemear o conjunto aberto a cada atualização reabriria, na cara dele, o capítulo
+  que ele acabou de fechar. Só a primeira carga é semeada, e ids que o servidor não manda mais
+  saem do conjunto.
+- **Sem exclusividade:** dois capítulos podem estar abertos. Um de cada vez seria uma regra que
+  nada pede.
+
+**O estado mora no store e não numa `useState` do componente**, pelo mesmo motivo que
+`selectedMissionId` mora: este projeto não tem teste de renderização, e a regra de "onde o jogador
+parou" dentro do componente é regra onde nenhum teste a alcança.
+
+**A fatia não acrescentou uma chave de idioma, e isso é de propósito** — ver a pendência abaixo.
+`▼`, `▶` e o contador `3/10` não têm palavra em língua nenhuma, então `semTextoCru.test.ts`
+continua verde sem os catálogos serem tocados.
+
+#### A camada de idioma da campanha fica FORA do M27 (decisão do usuário)
+
+Registrado como pendência declarada, e não como esquecimento — a varredura desta fatia a achou
+inteira, e a decisão de não fazê-la agora é do usuário, com o texto da história como companhia
+natural:
+
+1. **Os 33 nomes.** Os 3 capítulos e as 30 missões são desenhados crus do dado
+   (`chapter.name`, `mission.name`), em português, numa build cuja língua de lançamento é o inglês
+   (D24). `TipoDeConteudo` já tem `'capitulo'` desde M25 3/N e **nunca teve um chamador**; falta o
+   `'missao'` e as entradas `conteudo.capitulo.*` / `conteudo.missao.*` nos dois catálogos.
+2. **Cinco frases que dizem "capítulo" onde a 1/N pôs missão:** `campanha.entrar`
+   ("Enter chapter"), `campanha.escolha` ("Choose a chapter"), `campanha.abandonar`,
+   `campanha.jogando` (que mostra o id cru da missão) e `campanha.primeiraVitoria` — esta última
+   anuncia a regra de MISSÃO de D31 com o nome de capítulo e ignora o `premiumOnChapterClear` que
+   o servidor já manda e o store já guarda sem que nada o mostre.
+
+#### O que o M27 fecha, e o que fica
+
+Os cinco critérios de aceite batem — a auditoria um a um está em `PROGRESS.md`. Fica fora, e
+declarado: a camada de idioma acima, e **o julgamento do capítulo recolhível na tela**, que não foi
+feito nesta máquina porque o cliente real exige o servidor com Postgres (M19) e o Docker não está
+de pé aqui. O teste do store cobre a regra; o desenho é do usuário.

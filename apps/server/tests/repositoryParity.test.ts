@@ -1,3 +1,4 @@
+import { loadCatalogFromDisk, toStartingHero } from '@paths-beyond/content';
 import type { ItemInstance } from '@paths-beyond/core';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -5,12 +6,14 @@ import { runMigrations } from '../src/migrate.js';
 import {
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
+  createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryRewardsRepository,
 } from '../src/repository/memoryRepository.js';
 import {
   createPostgresCharacterOwnershipRepository,
   createPostgresEconomyRepository,
+  createPostgresHeroRepository,
   createPostgresPlayerRepository,
   createPostgresRewardsRepository,
 } from '../src/repository/postgresRepository.js';
@@ -18,6 +21,7 @@ import type {
   CharacterOwnershipRepository,
   EconomyActionRecord,
   EconomyRepository,
+  HeroRepository,
   PlayerRepository,
   RewardsRepository,
 } from '../src/repository/types.js';
@@ -49,7 +53,10 @@ interface Backend {
   readonly economy: EconomyRepository;
   readonly ownership: CharacterOwnershipRepository;
   readonly rewards: RewardsRepository;
+  readonly heroes: HeroRepository;
 }
+
+const catalog = loadCatalogFromDisk();
 
 // Um item de verdade na forma que o inventário guarda (§7.2). Serializado e lido de volta
 // como `jsonb` no Postgres, então ele existe para provar a ida e a volta inteira.
@@ -285,6 +292,42 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         expect((await backend.players.getPlayerById(PLAYER))?.premium).toBe(1500);
       });
     });
+
+    // M27 2/N — a ORDEM em que os heróis voltam, que é contrato desde esta fatia.
+    //
+    // O de memória sempre devolveu na ordem do pedido; o de Postgres consultava com
+    // `hero_id = ANY($1)`, que não promete ordem nenhuma. `assembleChapterBattle` casa
+    // `stored[index]` com `slots[index]` — então a divergência não aparece como erro, ela
+    // aparece como o jogador mandando o espadachim para a vaga da frente e ele nascendo
+    // atrás. E quem ocupa qual vaga decide a partida: medido nesta fatia, a mesma missão dá
+    // 20/20 com hero-jogador+clérigo e 0/20 com arcanista+arqueiro.
+    describe('heróis', () => {
+      const IDS = [`${PLAYER}-h1`, `${PLAYER}-h2`, `${PLAYER}-h3`];
+
+      it('grava três e devolve NA ORDEM PEDIDA, não na ordem de gravação', async () => {
+        const personagens = Object.values(catalog.characters).slice(0, 3);
+        for (const [i, id] of IDS.entries()) {
+          await backend.heroes.createHero({
+            ownerPlayerId: PLAYER,
+            hero: toStartingHero(personagens[i]!, id),
+            equippedItems: [],
+          });
+        }
+
+        // Pedido ao contrário da inserção de propósito: é a única forma de a asserção
+        // distinguir "respeitou o pedido" de "devolveu na ordem em que estava guardado".
+        const pedido = [IDS[2]!, IDS[0]!, IDS[1]!];
+        const lidos = await backend.heroes.getHeroesByIds(pedido);
+        expect(lidos.map((h) => h.hero.id)).toEqual(pedido);
+      });
+
+      it('id desconhecido some da lista em vez de virar buraco', async () => {
+        // É comparando os tamanhos que a rota detecta "herói desconhecido"; um `undefined`
+        // no meio da lista viraria uma vaga sem herói lá na montagem da batalha.
+        const lidos = await backend.heroes.getHeroesByIds([IDS[0]!, `${PLAYER}-nao-existe`, IDS[1]!]);
+        expect(lidos.map((h) => h.hero.id)).toEqual([IDS[0]!, IDS[1]!]);
+      });
+    });
   });
 }
 
@@ -293,6 +336,7 @@ contrato('memória', () => ({
   economy: createMemoryEconomyRepository(),
   ownership: createMemoryCharacterOwnershipRepository(),
   rewards: createMemoryRewardsRepository(),
+  heroes: createMemoryHeroRepository(),
 }));
 
 // Sem `DATABASE_URL` o bloco inteiro é pulado. O CI define a variável e sobe o serviço, e é
@@ -322,6 +366,9 @@ descrevePostgres('postgres', () => {
       ['banner_pity', 'player_id'],
       ['player_claims', 'player_id'],
       ['campaign_clears', 'player_id'],
+      // M27 2/N — a bateria passou a criar heróis; sem esta linha eles ficariam no banco do
+      // CI e a próxima execução colidiria na chave primária.
+      ['heroes', 'owner_player_id'],
     ] as const) {
       await pool.query(`DELETE FROM ${tabela} WHERE ${coluna} LIKE $1`, [`${PLAYER}%`]).catch(() => undefined);
     }
@@ -334,5 +381,6 @@ descrevePostgres('postgres', () => {
     economy: createPostgresEconomyRepository(pool),
     ownership: createPostgresCharacterOwnershipRepository(pool),
     rewards: createPostgresRewardsRepository(pool),
+    heroes: createPostgresHeroRepository(pool),
   }));
 });

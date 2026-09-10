@@ -5,7 +5,7 @@
   "premium": 150,
   "platformId": "ACH_PRIMEIRO_PASSO",
   "condition": {
-    "kind": "chaptersCleared",
+    "kind": "missionsCleared",
     "atLeast": 1
   }
 }
