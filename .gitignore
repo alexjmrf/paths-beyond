@@ -16,3 +16,8 @@ dist-renderer/
 
 # M21 2/N — os artefatos do empacotamento (app desempacotado e instaladores).
 release/
+
+# M28 2/N — a URL do servidor que o INSTALADOR entrega (`extraResources`). É por ambiente
+# (staging, produção) e é escrita por quem empacota; o modelo versionado é
+# `apps/desktop/ambiente.exemplo.json`.
+apps/desktop/ambiente.json

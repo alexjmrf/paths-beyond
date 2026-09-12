@@ -39,6 +39,10 @@
       {
         "from": "../client/dist",
         "to": "client"
+      },
+      {
+        "from": "ambiente.json",
+        "to": "ambiente.json"
       }
     ],
     "publish": [

@@ -65,6 +65,22 @@ describe('a config do empacotamento', () => {
     expect(existsSync(join(raiz, cliente!.from)), 'rode `pnpm --filter @paths-beyond/client build`').toBe(true);
   });
 
+  it('o `ambiente.json` entra no pacote — sem ele o app instalado não sabe para onde falar', () => {
+    // M28 2/N. A URL do servidor chega a quem INSTALOU por este recurso (ver `ambiente.ts`);
+    // é por ambiente, está no `.gitignore`, e quem empacota o escreve antes. O modelo
+    // versionado é `ambiente.exemplo.json` — e ele precisa ser JSON válido com o campo que
+    // `ambiente.ts` lê, senão vira um modelo que ensina o formato errado.
+    const recursos = pkg.build.extraResources ?? [];
+    const ambiente = recursos.find((r) => r.from === 'ambiente.json');
+
+    expect(ambiente, '`extraResources` não traz o `ambiente.json`').toBeDefined();
+    expect(ambiente!.to).toBe('ambiente.json');
+
+    const exemplo = JSON.parse(readFileSync(join(raiz, 'ambiente.exemplo.json'), 'utf8')) as { apiBaseUrl?: unknown };
+    expect(typeof exemplo.apiBaseUrl).toBe('string');
+    expect(exemplo.apiBaseUrl).toMatch(/^https?:\/\//);
+  });
+
   it('há alvo declarado para as três plataformas', () => {
     // Windows é provado localmente nesta fatia; macOS e Linux ficam configurados e só o CI
     // os executa. Declarar os três aqui é o que faz a ausência de um deles ser visível.

@@ -1,7 +1,10 @@
-import { appendFileSync, existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
+import { resolverApiBaseUrl } from './ambiente.js';
+import { identidadeDeDesenvolvimento } from './identidadeDev.js';
 // **`electron-updater` é CommonJS e este pacote é ESM.** O import NOMEADO compila e falha na
 // carga do app, com "Named export 'autoUpdater' not found" — e o app simplesmente não abre.
 // Custou uma rodada de empacotamento e instalação para aparecer, porque o TypeScript aceita a
@@ -79,29 +82,55 @@ function createWindow(): BrowserWindow {
   return window;
 }
 
-// §9.4 — o ticket de sessão. **Nesta fatia ele ainda é o de desenvolvimento**: o módulo
-// nativo da Steam e o App ID entram na 3/N, junto dos achievements. O que existe aqui é a
-// costura — o renderer pede ao principal, e trocar quem responde não muda uma linha do
-// cliente.
+// Leitura de arquivo que devolve `null` para "não existe" — é o contrato que `ambiente.ts` e
+// `identidadeDev.ts` pedem, e a única coisa que os dois módulos puros não fazem sozinhos.
+function lerArquivoOuNull(caminho: string): string | null {
+  try {
+    return readFileSync(caminho, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+// §9.4 — o ticket de sessão. **Ele ainda é o de desenvolvimento** (D36): o módulo nativo da
+// Steam é pendência do M21, e o hospedado de playtest sobe com `composeServer.ts`. O que
+// existe aqui é a costura — o renderer pede ao principal, e trocar quem responde não muda
+// uma linha do cliente.
 //
-// O identificador vem da máquina e é estável entre execuções pelo mesmo motivo que a ponte
-// de desenvolvimento do navegador guarda o dele: uma identidade nova a cada abertura criaria
-// uma conta nova a cada abertura.
+// A identidade é um UUID gerado uma vez e gravado em `userData` (M28 2/N). Era o comprimento
+// do caminho — estável, mas colidente entre testadores e enumerável; ver `identidadeDev.ts`.
 function sessionTicket(): string {
-  const identidade = process.env.PATHS_BEYOND_DEV_IDENTITY ?? `shell-${app.getPath('userData').length}`;
-  return `dev:${identidade}`;
+  const { id } = identidadeDeDesenvolvimento({
+    env: process.env,
+    userDataDir: app.getPath('userData'),
+    lerArquivo: lerArquivoOuNull,
+    escreverArquivo: (caminho, conteudo) => {
+      mkdirSync(path.dirname(caminho), { recursive: true });
+      writeFileSync(caminho, conteudo, 'utf8');
+    },
+    gerarUuid: randomUUID,
+  });
+  return `dev:${id}`;
 }
 
 ipcMain.handle('paths-beyond:session-ticket', () => sessionTicket());
 
-// §9.4 (M21, 2/N) — para onde o cliente empacotado fala.
+// §9.4 (M21 2/N, M28 2/N) — para onde o cliente empacotado fala.
 //
 // No navegador o Vite encaminha `/api`; empacotado não há proxy, e o cliente abre por
-// `file://`. Quem sabe o endereço é o shell — e por variável de ambiente, para que **o mesmo
-// binário assinado** aponte para produção ou staging sem rebuild. Ausente, o cliente cai no
-// caminho relativo, que é o comportamento do navegador.
+// `file://`. Quem sabe o endereço é o shell. A variável de ambiente continua vencendo (dev
+// num terminal, CI); o que a 2/N do M28 acrescentou é o que chega a quem INSTALOU — o
+// `ambiente.json` que o instalador entrega, e o override por usuário em `userData`. Ausente
+// tudo, o cliente cai no caminho relativo, que é o comportamento do navegador. Ver
+// `ambiente.ts`.
 ipcMain.on('paths-beyond:api-base-url-sync', (evento) => {
-  evento.returnValue = process.env.PATHS_BEYOND_API_URL ?? null;
+  const { url } = resolverApiBaseUrl({
+    env: process.env,
+    userDataDir: app.getPath('userData'),
+    resourcesDir: process.resourcesPath,
+    lerArquivo: lerArquivoOuNull,
+  });
+  evento.returnValue = url;
 });
 
 // §9.4 (M21, 3/N) — as CONQUISTAS chegando à plataforma.

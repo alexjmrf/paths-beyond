@@ -7610,6 +7610,50 @@ público `api.steampowered.com` aceita para `AuthenticateUserTicket`; a chave de
 ID próprio vêm com o Steam Direct (US$ 100, devolvidos a US$ 1.000 em vendas, verificação de
 dias a semanas — começar cedo pelo prazo, não pelo dinheiro).
 
+### M28 — sub-sessão 2/N (shell): o apontamento que chega a quem instalou, e a identidade que não colide
+
+`packages/core`, `packages/data` e `apps/server` **sem uma linha alterada**. A fatia é
+`apps/desktop`, e fecha as duas precondições do critério 3 registradas em "o provedor
+decidido (2026-09-12)".
+
+**O apontamento.** `PATHS_BEYOND_API_URL` continua vencendo — mas ela era o ÚNICO veículo, e
+quem instala não tem terminal para exportá-la. Entrou uma cascata, em `src/ambiente.ts`,
+lida em ordem: a variável; `<userData>/ambiente.json` (override por usuário — o autor testando
+o mesmo build contra dois servidores sem reempacotar); `<resourcesPath>/ambiente.json` (o que o
+instalador entrega, via `extraResources`); e, ausente tudo, o relativo de sempre. **Duas
+decisões de forma:** arquivo malformado é ignorado e a cascata segue (um `ambiente.json`
+ruim no userData não pode derrubar o do instalador, que está são), e só `http(s)://` conta —
+uma URL sem esquema viraria relativa ao `file://` do renderer e falharia com o "fetch failed"
+opaco que `apiBaseUrl.test.ts` do cliente já nomeava como a coisa a evitar. **A consequência
+honesta:** staging e produção viram dois INSTALADORES (mesmo código, `ambiente.json`
+diferente), não um binário só. Para o playtest é irrelevante; para a loja é o esperado.
+`apps/desktop/ambiente.json` está no `.gitignore` e é escrito por quem empacota; o modelo
+versionado é `ambiente.exemplo.json`, e `empacotamento.test.ts` confere que ele é JSON válido
+com o campo certo — um modelo que ensina o formato errado é pior que nenhum.
+
+**A identidade.** `shell-${userData.length}` saiu. Entrou `src/identidadeDev.ts`: um
+`randomUUID()` gerado uma vez, gravado em `<userData>/identidade-dev.json`, relido nas
+execuções seguintes. Estável (o objetivo do M21, preservado), **único** (dois testadores com
+nome de usuário do mesmo tamanho deixam de cair na mesma conta) e **não enumerável** (122
+bits; `dev:shell-52` era adivinhável em segundos). Arquivo corrompido gera de novo e
+SOBRESCREVE — não pode deixar o jogo sem identidade, nem virar uma identidade nova a cada
+abertura. `PATHS_BEYOND_DEV_IDENTITY` continua sendo o override. O ticket segue `dev:<id>`;
+`devIdentity.ts` do servidor não mudou. **Um teste diz o defeito pelo nome:** dois caminhos
+de `userData` do mesmo comprimento (`/Users/Alexandre/x`, `/Users/Guilherme/x`) produzem
+identidades diferentes — é a asserção que o desenho antigo reprovaria.
+
+**Os dois módulos são função pura com contexto injetado**, no padrão de `updates.ts`:
+`main.ts` só monta o contexto real (`readFileSync`, `writeFileSync`, `randomUUID`,
+`app.getPath('userData')`, `process.resourcesPath`). Nenhum dos 14 testes novos toca disco
+nem Electron.
+
+**Suíte: 175 arquivos** (era 173), `apps/desktop` com 49 testes em 5 arquivos; `typecheck`
+limpo; `pnpm --filter @paths-beyond/desktop build` OK.
+
+**O que o critério 3 ainda exige, e não é código:** empacotar com `ambiente.json` apontando
+para o domínio do Railway, instalar em OUTRA máquina e jogar a missão 1. E a metade do
+critério 4: `scripts/restore-drill.sh` contra o banco hospedado.
+
 ## M29 — A camada de idioma da campanha
 
 `packages/core` sem uma linha alterada e `RULES_VERSION` fica em `0.19.0`. É catálogo de
