@@ -1,0 +1,25 @@
+# M28, 1/N — o que nunca entra no contexto de build.
+#
+# `node_modules` é o item que importa: com ele, o `docker build` envia gigabytes ao daemon
+# antes de executar a primeira instrução, e a imagem herdaria os binários compilados para
+# Windows desta máquina em vez dos que o `pnpm install` de dentro do contêiner produz.
+node_modules
+**/node_modules
+
+# Artefatos de build — a imagem produz os seus.
+dist
+**/dist
+dist-renderer
+**/dist-renderer
+release
+coverage
+*.tsbuildinfo
+
+# Segredo local (a chave da PixelLab mora aqui). O `compose.yaml` declara o que o servidor
+# precisa; nada do `.env` desta máquina tem por que atravessar para dentro da imagem.
+.env
+.env.*
+!.env.example
+
+.git
+.github

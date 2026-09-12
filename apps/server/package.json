@@ -14,16 +14,17 @@
     "@paths-beyond/content": "workspace:*",
     "@paths-beyond/core": "workspace:*",
     "@paths-beyond/data": "workspace:*",
+    "@paths-beyond/gacha": "workspace:*",
     "fastify": "^5.11.0",
     "fastify-plugin": "^6.0.0",
-    "pg": "^8.22.0",
-    "@paths-beyond/gacha": "workspace:*"
+    "pg": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/pg": "^8.20.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "yaml": "^2.9.0"
   }
 }

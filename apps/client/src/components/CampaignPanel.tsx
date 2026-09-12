@@ -1,4 +1,5 @@
 import { missaoPorId, useBattleStore } from '../store/battleStore.js';
+import { nomeDeConteudo } from '../i18n/conteudo.js';
 
 // §10/§9.4/D16 (M18, sub-sessão 7/N) — a tela da CAMPANHA, agora jogada contra o servidor.
 //
@@ -35,7 +36,19 @@ export function CampaignPanel() {
     return (
       <section className="campaign-panel">
         <h2>{t('campanha.titulo')}</h2>
-        <p className="campaign-em-curso">{t('campanha.jogando', { capitulo: campaign.ticket.chapterId })}</p>
+        {/* M29 — o NOME da missão, traduzido, no lugar do id cru. `chapterId` é o campo do
+            ticket e continua guardando a missão (o servidor não renomeou nada); o que mudou é
+            que o jogador via `encounter-campanha-barbaca` escrito na tela. */}
+        <p className="campaign-em-curso">
+          {t('campanha.jogando', {
+            missao: nomeDeConteudo(
+              t,
+              'missao',
+              campaign.ticket.chapterId,
+              missaoPorId(campaign.chapters, campaign.ticket.chapterId)?.name ?? campaign.ticket.chapterId,
+            ),
+          })}
+        </p>
         <button type="button" onClick={exitCampaign} disabled={campaign.busy}>
           {t('campanha.abandonar')}
         </button>
@@ -58,8 +71,16 @@ export function CampaignPanel() {
         </button>
       </div>
 
+      {/* M29 — D31 tem DUAS regras e a tela anunciava uma, com a palavra errada: dizia
+          "capítulo" onde a 1/N do M27 pôs missão, e ignorava `premiumOnChapterClear`, que o
+          servidor já mandava e o store já guardava sem que nada o mostrasse. */}
       {campaign.premiumOnFirstClear > 0 ? (
-        <p className="hint">{t('campanha.primeiraVitoria', { premium: campaign.premiumOnFirstClear })}</p>
+        <p className="hint">
+          {t('campanha.primeiraVitoria', {
+            premium: campaign.premiumOnFirstClear,
+            capitulo: campaign.premiumOnChapterClear,
+          })}
+        </p>
       ) : null}
 
       {/* M27 (D23) — DUAS camadas, e o capítulo RECOLHE (3/N). A 1/N o deixou como
@@ -83,7 +104,7 @@ export function CampaignPanel() {
                   aria-expanded={aberto}
                   onClick={() => toggleChapterOpen(chapter.id)}
                 >
-                  {aberto ? '▼' : '▶'} {chapter.name}
+                  {aberto ? '▼' : '▶'} {nomeDeConteudo(t, 'capitulo', chapter.id, chapter.name)}
                   {chapter.cleared ? t('campanha.limpo') : ` ${limpas}/${chapter.missions.length}`}
                 </button>
               </h3>
@@ -96,7 +117,7 @@ export function CampaignPanel() {
                         className="campaign-mission-name"
                         onClick={() => selectChapter(mission.id)}
                       >
-                        {mission.order}. {mission.name}
+                        {mission.order}. {nomeDeConteudo(t, 'missao', mission.id, mission.name)}
                       </button>
                       <span className="pve-locked">
                         {t('campanha.vagas', { vagas: mission.slots })}

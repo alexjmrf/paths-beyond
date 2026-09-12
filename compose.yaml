@@ -1,0 +1,93 @@
+# M28, sub-sessão 1/N — o ambiente local.
+#
+# `docker compose up` sobe Postgres, aplica as migrations e só então sobe o servidor, em
+# `http://127.0.0.1:3000`. O cliente de desenvolvimento (`pnpm --filter @paths-beyond/client
+# dev`) já aponta para lá por padrão — ver `apps/client/vite.config.ts`, e ver o teste que
+# amarra as duas pontas em `apps/server/tests/ambiente.test.ts`.
+#
+# **Este arquivo não é conveniência.** O jogo é sempre-online por decisão (D21) e, até aqui,
+# não havia como executá-lo fora de uma máquina com Postgres montado à mão — o que travava o
+# playtest e travava o próprio autor, que não conseguia julgar na tela o que M23 e M27
+# deixaram pendente.
+#
+# O ambiente HOSPEDADO é a sub-sessão 2/N: este compose é o local.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: paths
+      POSTGRES_PASSWORD: paths
+      POSTGRES_DB: paths_beyond
+    # Sem health check o serviço de migration corre para o banco antes de ele aceitar
+    # conexão. A lição é literalmente a mesma que está escrita em `.github/workflows/ci.yml`
+    # desde o M19; aqui ela é asserção de teste, não só comentário.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U paths -d paths_beyond']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      # Publicada de propósito, e não por descuido. A suíte tem 36 testes que se PULAM
+      # sozinhos sem `DATABASE_URL` (paridade memória×Postgres, o app real contra o banco
+      # real, o limitador compartilhado) — e até aqui o único lugar onde eles rodavam era o
+      # CI. É a mesma ausência que esta milestone existe para remover: ela travava o
+      # playtest e travava o autor. Com a porta publicada:
+      #
+      #   DATABASE_URL=postgres://paths:paths@127.0.0.1:5432/paths_beyond pnpm test
+      #
+      # O banco é local, com senha de brincadeira, e não é o de produção.
+      - '5432:5432'
+    # O volume é o que faz o ambiente local ter MEMÓRIA: sem ele, cada `compose down` apaga
+    # a conta, o progresso da campanha e o inventário — e julgar a tela do capítulo
+    # recolhível exige uma conta que já limpou missões.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Roda uma vez, quando o volume nasce: cria `paths_beyond_test` ao lado do banco do
+      # ambiente. Os testes LIMPAM tabelas entre casos — apontá-los para `paths_beyond`
+      # apagaria, em silêncio, a conta e o progresso que existem para julgar a tela.
+      - ./apps/server/initdb:/docker-entrypoint-initdb.d:ro
+
+  # As migrations como PASSO PRÓPRIO, e não escondidas na subida do servidor.
+  #
+  # O roadmap do M28 registra o buraco com estas palavras: *"existe `migrate.ts` e nada o
+  # chama fora do CI"*. É este serviço. Ele roda até o fim e sai; o servidor espera o
+  # `service_completed_successfully`, que é a diferença entre "o banco está migrado" e "a
+  # migration começou".
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    command: ['pnpm', '--filter', '@paths-beyond/server', 'run', 'migrate']
+    environment:
+      DATABASE_URL: postgres://paths:paths@postgres:5432/paths_beyond
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    # O ponto de entrada do ambiente local: Postgres de verdade, identidade de
+    # desenvolvimento. Não é o `index.ts` de produção, e isso é decisão — ver o cabeçalho de
+    # `src/composeServer.ts` e a decisão do M20 que ele preserva.
+    command: ['pnpm', '--filter', '@paths-beyond/server', 'exec', 'tsx', 'src/composeServer.ts']
+    environment:
+      DATABASE_URL: postgres://paths:paths@postgres:5432/paths_beyond
+      # §9.4 — segredo de DESENVOLVIMENTO, fixo e óbvio ao ler. Ele é fixo de propósito: a
+      # seed da batalha deriva dele, e uma seed que muda a cada `compose up` faria qualquer
+      # roteiro de verificação falar de outra batalha. O valor está aqui, versionado, porque
+      # não protege nada — o segredo de produção nunca mora neste arquivo.
+      BATTLE_TICKET_SECRET: segredo-de-desenvolvimento
+      PORT: '3000'
+    ports:
+      # A porta que o proxy do Vite procura por padrão. Publicar noutra traz o "passo manual"
+      # de volta, e ele volta disfarçado de "não conecta".
+      - '3000:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

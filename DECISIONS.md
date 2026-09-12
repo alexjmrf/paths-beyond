@@ -7315,3 +7315,428 @@ Os cinco critérios de aceite batem — a auditoria um a um está em `PROGRESS.m
 declarado: a camada de idioma acima, e **o julgamento do capítulo recolhível na tela**, que não foi
 feito nesta máquina porque o cliente real exige o servidor com Postgres (M19) e o Docker não está
 de pé aqui. O teste do store cobre a regra; o desenho é do usuário.
+
+## M28 — O ambiente jogável
+
+### M28 — sub-sessão 1/N: o ambiente local, e a ponte que ganhou margem
+
+`packages/core` sem uma linha alterada — `git status packages/core` vazio ao fim da sessão — e
+`RULES_VERSION` fica em `0.19.0`. Isto é infraestrutura: nenhuma regra foi tocada.
+
+**A milestone foi RATIFICADA nesta sessão.** M28–M36 estavam no roadmap como propostas, com o
+aviso de `PROGRESS.md` de que ratificar vinha antes de abrir. O usuário ratificou o M28 junto
+das duas decisões abaixo.
+
+#### D34 — O ambiente local é um TERCEIRO ponto de entrada, e não uma variável de ambiente
+
+**Decisão do usuário.** O compose precisa de Postgres de verdade com identidade de mentira, e
+essa combinação não existia: `devServer.ts` é memória + dev, `index.ts` é Postgres + Steam.
+Numa máquina limpa não há chave da Steam, e `index.ts` falha ao subir sem ela — o que é o
+comportamento certo do M20, e o motivo de não ser aquele o arquivo.
+
+A alternativa recusada foi um `index.ts` só, com `IDENTITY_PROVIDER=dev|steam`. Seria menos
+código e reabriria exatamente a porta que o M20 fechou: **uma configuração errada em produção
+passaria a aceitar ticket `dev:<id>`, e aí qualquer um se autentica como qualquer conta.**
+Falha silenciosa e total, na única superfície onde ela não pode acontecer.
+
+Com dois arquivos, o validador de desenvolvimento **não está no caminho de produção** — não há
+configuração capaz de colocá-lo lá. `tests/ambiente.test.ts` trava a propriedade nos dois
+sentidos: `composeServer.ts` monta o de dev e os repositórios de Postgres (nunca os de
+memória, senão o compose seria o `devServer` num contêiner e não exercitaria migration
+nenhuma), e `index.ts` continua montando o da Steam e não menciona o de dev.
+
+#### D35 — O compose local agora; o hospedado é a 2/N
+
+**Decisão do usuário.** Os critérios 2, 3 e 4 do M28 (ambiente hospedado, outra máquina,
+backup automático) exigem conta de provedor, credenciais e uma segunda pessoa — nada disso
+está do lado do agente. A fatia fecha os critérios **1 e 5** com prova executada, e os outros
+três ficam declarados em aberto em vez de descobertos no fim.
+
+#### O compose declara; o teste confere; nada é enumerado à mão
+
+`ambiente.test.ts` é da família de `migrations.test.ts` (SQL × TypeScript, sem banco) e de
+`empacotamento.test.ts` (a config do instalador, sem instalar): configuração lida como DADO e
+conferida contra o que o código exige. Roda a cada commit, inclusive em máquina sem Docker.
+
+A lista de variáveis vive em `src/env.ts` e é conferida **nas duas direções** — nenhum ponto de
+entrada lê variável fora dela (varredura de `process.env` no fonte), e nenhuma entrada dela
+deixou de ser lida. A primeira metade impede o compose de ficar incompleto em silêncio; a
+segunda impede a lista de virar documentação velha, que é o defeito que listas assim sempre
+desenvolvem.
+
+#### O mutation check achou um defeito NO TESTE, e é o achado da fatia
+
+Três mutantes, e o terceiro passou verde: **apagar `COPY packages/data packages/data` do
+`Dockerfile` não reprovava nada.** A asserção procurava a *menção* ao caminho, e
+`COPY packages/data/package.json packages/data/` — que existe para o `--frozen-lockfile`
+conferir o workspace — também casava.
+
+O modo de falha que ele deixava passar é o pior tipo: `loadCatalogFromDisk` lê `packages/data`
+do disco em tempo de execução, então a imagem subiria, responderia `200` em `/health`, e **não
+teria uma classe, um mapa nem uma missão dentro**. Um servidor sem jogo, que se anuncia
+saudável.
+
+A correção não foi apertar a regex: o teste passou a extrair os diretórios que o `Dockerfile`
+copia INTEIROS, separando-os dos manifestos. Os três mutantes mordem agora.
+
+**A lição, que é a mesma do M29 antes de o M29 existir:** um teste que procura "está
+mencionado?" responde a uma pergunta mais fácil do que a que interessa, e fica verde sobre
+exatamente aquilo que ele foi escrito para impedir.
+
+#### Dois bancos, e não um
+
+A porta do Postgres é publicada de propósito: os **36 testes que se pulam sem `DATABASE_URL`**
+só rodavam no CI, e é a mesma ausência de ambiente que a milestone existe para remover — ela
+travava o playtest e travava o autor. Com o compose de pé a suíte roda completa nesta máquina
+pela primeira vez: **171 arquivos, 2545 testes, zero pulados.**
+
+Mas os testes LIMPAM tabelas entre casos. Apontá-los para `paths_beyond` apagaria a conta e o
+progresso de campanha que existem justamente para o autor julgar a tela — em silêncio, dentro
+de um `pnpm test` que ninguém associa a perder progresso. `apps/server/initdb/` cria
+`paths_beyond_test` ao lado, quando o volume nasce.
+
+#### O ambiente não semeia nada, e isso é decisão
+
+O `devServer` semeia jogador, ouro, pedras e 10.000 de moeda premium porque existe para
+exercitar telas isoladas. O compose sobe um servidor **vazio**, que é o estado real de quem
+instala o jogo: `POST /accounts/session` cria a conta e concede o núcleo de história (M20), e a
+demo paga o resto conforme se joga (D31).
+
+**A consequência prática está documentada e não resolvida:** ver o capítulo recolhível do M27
+fazer o que ele faz exige limpar missões antes. Semear uma conta adiantada aqui seria inventar
+uma primeira sessão que ninguém vai ter — e o M32 vai medir justamente a de verdade.
+
+### M28 — sub-sessão 2/N: o ensaio de restore, e o que dele não depende de provedor
+
+`packages/core` intocado; `RULES_VERSION` fica em `0.19.0`.
+
+**O recorte.** D35 deixou o ambiente hospedado para quando houver conta de provedor. O critério
+4 do M28 — *"o backup roda sozinho e um restore é exercitado contra o ambiente hospedado"* —
+tem, porém, uma metade que não depende de provedor nenhum: **o procedimento**. O M19 exercitou
+backup e restore à mão, uma vez, e o documentou. É assim que todo procedimento de restore
+começa, e é assim que ele apodrece — a flag muda de nome, o cliente diverge do servidor, uma
+tabela nova entra e ninguém confere se ela saiu no dump. Só se descobre no dia em que é preciso
+restaurar, que é o único dia em que não dá para descobrir.
+
+#### O ensaio compara, e não procura um canário
+
+O M19 inseriu uma linha canário na origem e a procurou depois do restore. Isso responde "o
+restore rodou?" — a pergunta fácil — e cobra um preço alto: **escreve no banco de origem**, e
+o banco de origem guarda a moeda comprada com dinheiro real. Um ensaio que muda o banco que
+está ensaiando é um ensaio que ninguém vai querer rodar em produção, e produção é exatamente
+onde ele precisa rodar.
+
+`scripts/restore-drill.sh` faz o contrário: dump → restaura num banco descartável → compara a
+**lista de tabelas, lida do catálogo dos dois lados**, e depois a **contagem de linhas de cada
+uma**. A origem é só lida. É o mesmo idioma da varredura de exclusão do M20, que lê
+`pg_constraint` em vez de uma lista escrita à mão — uma tabela nova entra na conferência
+sozinha, sem ninguém lembrar de acrescentá-la.
+
+**Detalhe de forma com motivo:** o `SELECT` vai inteiro em cada linha do script, e não numa
+variável. "Este ensaio nunca escreve na origem" é a propriedade que decide se ele pode rodar
+em produção, e ela precisa ser legível na linha, sem seguir variável — `restauracao.test.ts` a
+confere derivando do fonte. A primeira versão usava `$LISTA_SQL` e o teste a reprovou; o teste
+estava certo.
+
+#### Provado por mutação, com dois dumps quebrados
+
+- `pg_dump --exclude-table=players` → o restore nem fecha, porque as chaves estrangeiras
+  apontam para a tabela que faltou. Sai 1.
+- `pg_dump --schema-only` → as 18 tabelas existem e todas têm zero linhas contra uma origem
+  com 34. Sai 1, listando cada divergência.
+
+O segundo é o que importa: é o backup que *parece* ter funcionado.
+
+#### O job do CI, e a honestidade sobre a cobertura dele
+
+O script sozinho é uma promessa — que é precisamente o estado em que o M19 deixou o
+procedimento. `ensaio-de-restore` roda a cada commit contra `postgres:16`: migra, roda a suíte
+para o banco ter linhas, e ensaia. `restauracao.test.ts` trava as duas metades: que **alguém o
+executa** (o CI o invoca, e o job tem um Postgres) e que **executá-lo é seguro** (a origem só é
+lida, o banco descartável cai por `trap`, e a divergência vira código de saída em vez de aviso).
+
+**A cobertura de dados é magra, e medi em vez de supor:** a suíte deixa linhas em 3 das 18
+tabelas (`players`, `dungeon_clears`, `schema_migrations`) — 20 linhas. Basta para pegar um
+dump que perde dados; não basta para afirmar que toda tabela sobrevive com conteúdo. Ensaiar
+contra o hospedado, onde as 18 têm dados de verdade, continua sendo parte do critério 4 e
+continua dependendo da 2/N do ambiente.
+
+#### O que o critério 4 ainda NÃO tem
+
+"O backup roda sozinho" continua aberto, e de propósito: **onde ele roda depende do provedor**,
+e provedor gerenciado normalmente já faz backup automático. Escrever um cron container agora
+seria inventar a resposta antes de a pergunta ter dono.
+
+### M28 — o fim da sessão: D36, e o buraco entre o shell e a Steam
+
+Sem código nesta parte. O usuário escolheu **não decidir o provedor agora**, então o ambiente
+hospedado (critérios 2, 3 e a outra metade do 4) fica aberto e o M28 pausa com os critérios 1 e
+5 fechados.
+
+#### D36 — O ambiente hospedado vai subir com identidade de DESENVOLVIMENTO
+
+**Decisão do usuário**, tomada antes de haver provedor, e registrada agora porque governa a
+2/N inteira quando ela abrir.
+
+O hospedado subirá `composeServer.ts` — o mesmo ponto de entrada da 1/N — e não o `index.ts`
+de produção. **O preço está declarado e foi aceito: quem souber a URL pode se autenticar como
+qualquer conta**, porque o validador de dev aceita qualquer `dev:<id>`. Num playtest fechado,
+sem dinheiro real em jogo e sem contas que alguém se importe em perder, isso é aceitável.
+
+**Isto NÃO revoga a decisão do M20.** O que o M20 proíbe é o validador de dev estar no caminho
+de produção — alcançável por configuração errada, em silêncio. Aqui ele é o ponto de entrada
+escolhido de propósito, num ambiente que não é produção, com o custo escrito. A propriedade
+que o M20 protege continua de pé: `index.ts` não tem como montar o de dev.
+
+**Tem prazo de validade.** No dia em que o servidor hospedado guardar uma conta que alguém se
+importe em perder — ou um centavo comprado com dinheiro real —, esta decisão expira e a Steam
+entra antes. Quem reabrir a 2/N precisa conferir se esse dia chegou.
+
+#### O buraco entre o shell e a Steam, achado ao explicar o que é um provedor
+
+Achado nesta sessão, ao verificar se "outra pessoa instala e joga" dependia só de hospedagem.
+**Não dependia**, e as duas metades estavam desencaixadas do mesmo jeito que a ponte do M28:
+
+- `apps/desktop/src/main.ts:88` emite `dev:<identidade>`. O comentário do M21 diz, com todas as
+  letras, que *"o módulo nativo da Steam e o App ID entram na 3/N"* — e a 3/N que aconteceu foi
+  a dos achievements. O ticket de verdade nunca entrou.
+- `apps/server/src/index.ts` monta o validador da Steam e exige `STEAM_WEB_API_KEY` e
+  `STEAM_APP_ID` para subir.
+
+Um estranho instalando o build empacotado e apontando para um servidor de produção levaria
+**401 em toda tentativa de entrar** — e o M20 é explícito em que ticket válido de conta
+inexistente também é 401, então nem a mensagem distinguiria as duas coisas.
+
+D36 é o que contorna isso para o playtest. O que ele **não** resolve, e fica anotado para quem
+for atrás do App ID: ligar `steamworks.js` no shell é trabalho pendente do M21, não do M28.
+
+### M28 — o provedor decidido (2026-09-12): Railway Hobby, e o que D36 exige do shell
+
+**A pausa acabou: o provedor é o Railway, plano Hobby.** Decidido pelo usuário depois de uma
+pesquisa de preços de setembro de 2026, e o argumento não é preço — é tempo. Com nove milestones
+propostas pela frente, o gargalo é o autor, e o Railway é o único dos quatro caminhos que remove
+Dockerfile-tuning, TLS, backup gerenciado e deploy da equação para começar. **E a escolha é
+barata de desfazer por construção:** o `Dockerfile` e o `compose.yaml` da 1/N rodam em qualquer
+um dos quatro, e o cliente empacotado recebe a URL do servidor pelo shell (M21 2/N) — trocar de
+provedor é trocar uma configuração, sem binário novo.
+
+**O que a pesquisa descartou, e por quê, para ninguém reabrir:**
+- **Render free tier** — derruba o serviço após 15 min ocioso e leva ~1 min para acordar. Num
+  playtest, o estranho clica em jogar e o jogo trava por um minuto; o M32 mediria hospedagem em
+  vez de compreensão. Desqualificado para sempre-online.
+- **Supabase free** — pausa o banco após 7 dias sem uso. Playtest é intermitente por natureza.
+- **Fly Managed Postgres** — plano mínimo de US$ 38/mês. Armadilha fácil; no Fly, o banco teria de
+  ser o Neon.
+- **Hetzner** — dois aumentos em 2026, o de 15/06 pesado (CX23 €3,99→€5,49; CPX22 €7,99→€19,49).
+  Continua sendo um VPS honesto a ~€5,5, mas deixou de ser a pechincha que justificaria assumir
+  backup, TLS e atualização à mão nesta fase.
+- **Oracle Always Free** — cortou o ARM pela metade em junho/2026 sem anunciar (4 OCPU/24GB →
+  2/12GB); instâncias foram desligadas sem aviso. Serve como staging secundário, não como o
+  ambiente de que testadores dependem.
+- **Fly.io (GRU) + Neon free** — a conta mais barata que ainda é séria (~US$ 3,19/mês, em São
+  Paulo). Ficou como segunda opção; perdeu por atrito de configuração, não por mérito.
+
+**Custo esperado no Railway:** US$ 5/mês do plano (já com US$ 5 de crédito de consumo) mais RAM a
+~US$ 10/GB/mês e vCPU a ~US$ 20/mês — com um punhado de testadores fazendo alguns POSTs por
+batalha, algo entre US$ 5 e 12.
+
+**A configuração da 2/N, decidida aqui para a sessão não redescobrir:**
+
+1. **Fonte:** o repositório no GitHub. O remote foi criado em 2026-09-12 —
+   `https://github.com/alexjmrf/paths-beyond.git`, HTTPS com o Git Credential Manager (não havia
+   chave SSH na máquina). Antes disso o projeto tinha **zero cópias fora de um disco**.
+2. **Serviços:** um `Postgres` (o do próprio Railway) e um serviço a partir do repo, com **Root
+   Directory = `/`** — é monorepo, e o servidor importa `core`/`content`/`data` por `workspace:*`.
+3. **Builder: `DOCKERFILE`**, apontando para `apps/server/Dockerfile` — a imagem da 1/N, que já
+   instala só o fecho do servidor (`--filter @paths-beyond/server...`) e já copia `packages/data`.
+   Não Railpack: ele instalaria Electron e Playwright, que a 1/N excluiu de propósito.
+4. **Ponto de entrada: `composeServer.ts`**, por D36 — Postgres de verdade, identidade de
+   desenvolvimento. É o `CMD` que o Dockerfile já declara.
+5. **`railway.json` na raiz:**
+
+   ```json
+   {
+     "$schema": "https://railway.com/railway.schema.json",
+     "build": {
+       "builder": "DOCKERFILE",
+       "dockerfilePath": "apps/server/Dockerfile",
+       "watchPatterns": ["apps/server/**", "packages/**", "pnpm-lock.yaml"]
+     },
+     "deploy": {
+       "preDeployCommand": ["pnpm --filter @paths-beyond/server run migrate"],
+       "startCommand": "pnpm --filter @paths-beyond/server exec tsx src/composeServer.ts",
+       "healthcheckPath": "/health",
+       "healthcheckTimeout": 120,
+       "restartPolicyType": "ON_FAILURE",
+       "restartPolicyMaxRetries": 5
+     }
+   }
+   ```
+
+   `preDeployCommand` fecha o buraco que o roadmap nomeou (*"existe `migrate.ts` e nada o chama
+   fora do CI"*) — e é o mesmo passo-próprio que o `compose.yaml` já faz com o serviço
+   `migrate`. `healthcheckPath` faz o Railway só trocar a versão quando `/health` responde.
+6. **Variáveis — só duas, por D36:** `DATABASE_URL = ${{Postgres.DATABASE_URL}}` (referência ao
+   serviço, a URL **privada**, sem SSL — que é o que `new Pool({ connectionString })` já faz) e
+   `BATTLE_TICKET_SECRET` gerado (`openssl rand -hex 32`), **nunca** o valor do compose. `PORT` o
+   Railway injeta. **`STEAM_WEB_API_KEY` e `STEAM_APP_ID` NÃO entram** — `composeServer.ts` não os
+   lê, e `ambiente.test.ts` já confere que nenhum ponto de entrada lê variável fora de `env.ts`.
+7. **Domínio:** *Networking → Generate Domain*. É esse endereço que o shell injeta pelo `preload`.
+8. **Backup (critério 4):** o Postgres do Railway tem backup próprio; o ensaio de restore da 2/N
+   (`scripts/restore-drill.sh`) passa a rodar contra ele, que é o que o critério pede.
+
+**O que D36 não tinha visto, e que vira PRECONDIÇÃO de expor `composeServer.ts` na internet.**
+D36 aceitou o preço "quem souber a URL se autentica como qualquer conta". O preço real é maior,
+porque a identidade que o shell emite hoje é `shell-${app.getPath('userData').length}`
+(`apps/desktop/src/main.ts:91`) — o **comprimento** do caminho da pasta de dados:
+
+- **Colide.** Dois testadores com nome de usuário do mesmo tamanho (`Alexandre` e `Guilherme`)
+  produzem `shell-52` os dois e **caem na mesma conta** — um vê o inventário, a moeda e o
+  progresso do outro. Isso não é risco aceito; é o playtest deixando de medir uma pessoa.
+- **É adivinhável.** `dev:shell-52` é enumerável em segundos. Com o hospedado na internet, D36
+  deixaria de ser "quem souber a URL" para ser "qualquer um que a encontre".
+
+Foi correto para um dev testando sozinho (é estável entre execuções, que era o objetivo). Para
+mais de um testador, o conserto é pequeno e **precede o primeiro estranho**: gerar um UUID uma
+vez, gravar num arquivo em `userData`, reler nas execuções seguintes — estável **e** único **e**
+não enumerável. `PATHS_BEYOND_DEV_IDENTITY` continua valendo como override. Pertence ao shell
+(pendência do M21, como o `steamworks.js`), mas é a 2/N do M28 que a exige.
+
+**A Steam fica para depois do playtest, e a decisão é dita:** ela não acrescenta nada do que o M32
+mede e acrescenta atrito (todo testador com a Steam aberta, logada, com o app na conta). Quando
+entrar — antes do lançamento —, o caminho de teste sem custo é o **App ID 480** (Spacewar, que todo
+usuário possui) com uma **chave de usuário** (steamcommunity.com/dev/apikey), que o endpoint
+público `api.steampowered.com` aceita para `AuthenticateUserTicket`; a chave de publisher e o App
+ID próprio vêm com o Steam Direct (US$ 100, devolvidos a US$ 1.000 em vendas, verificação de
+dias a semanas — começar cedo pelo prazo, não pelo dinheiro).
+
+## M29 — A camada de idioma da campanha
+
+`packages/core` sem uma linha alterada e `RULES_VERSION` fica em `0.19.0`. É catálogo de
+idioma e tela; nenhuma regra foi tocada.
+
+**Ratificada pelo usuário** com um "pode continuar" depois de o M28 pausar por falta de
+provedor. O escopo é o que o roadmap escreveu; nada foi acrescentado.
+
+### A medição bateu com a auditoria, dígito a dígito
+
+81 nomes sem tradução — 10 classes, 28 skills, 10 materiais, 3 capítulos e 30 missões —, ou
+162 entradas somando as duas línguas. As oito masmorras e as dez conquistas já estavam.
+
+### O teste era o defeito, e essa é a parte que dura
+
+`conteudoTraduzido.test.ts` afirmava cobertura com `toHaveLength(10)` e `toHaveLength(8)`: os
+dois tipos que o M25 3/N tinha acabado de traduzir. **Elas nunca falharam, e não podiam** — não
+falavam dos outros quatro tipos declarados em `TipoDeConteudo`. O arquivo existia para impedir
+que conteúdo ficasse sem tradução e estava **vacuamente verde sobre 81 nomes** em português
+numa build cuja língua de lançamento é o inglês (D24).
+
+O conserto tem duas metades:
+
+1. A cobertura **varre o catálogo real**, lido do disco por `tests/nomesAutorados.ts`. Uma
+   missão acrescentada em `packages/data` sem tradução fica vermelha no commit dela.
+2. `TIPOS_DE_CONTEUDO` passou a existir em **runtime**, com o tipo derivado dela — o mesmo
+   idioma de `ECONOMY_ACTION_KINDS` no M19, adotado pelo mesmo motivo. União de tipo não
+   existe em tempo de execução, então nada podia percorrê-la, e um teste que não pode percorrer
+   os tipos só pode enumerá-los à mão — isto é, descrever o passado.
+
+**Eu afirmei uma garantia falsa e a mutação me pegou.** A primeira versão dizia que
+`NOMES_AUTORADOS` ser um `Record<TipoDeConteudo, ...>` fazia um tipo novo **não compilar**.
+Acrescentei `'inimigo'` a `TipoDeConteudo` e `pnpm typecheck` passou: o `tsconfig.json` do
+cliente tem `"include": ["src"]`, e os testes **não são typechecked**. A garantia virou
+asserção de runtime (`Object.keys(NOMES_AUTORADOS)` contra `TIPOS_DE_CONTEUDO`), que é
+verdadeira e não depende de configuração de compilador. Com ela, o mutante reprova.
+
+### As cinco frases, e a que estava errada por dentro
+
+`campanha.entrar`, `campanha.escolha`, `campanha.abandonar` e `campanha.jogando` diziam
+"capítulo" onde a 1/N do M27 pôs missão. `campanha.jogando` ainda mostrava o **id cru**
+(`encounter-campanha-barbaca`) na tela; agora mostra o nome traduzido.
+
+A quinta é de outra natureza: `campanha.primeiraVitoria` anunciava **uma** das duas regras de
+D31, com a palavra errada, e ignorava `premiumOnChapterClear` — que o servidor já mandava e o
+store já guardava **sem que nada o mostrasse**. É o padrão que esta sessão inteira encontrou
+três vezes: duas metades certas que não se encontram.
+
+### O teste que faltava para a categoria inteira
+
+`catalogos.test.ts` já travava chave e marcador iguais entre línguas. Ninguém conferia a outra
+ponta: se **quem chama** fornece os marcadores que a frase declara. Sem isso, o jogador lê
+`{capitulo}` na tela, em produção. `interpolacaoNaTela.test.ts` confere as duas direções, e o
+mutante que remove `premiumOnChapterClear` da chamada reproduz o defeito original do M27 e
+reprova.
+
+**O extrator errou duas vezes antes de acertar, e as duas em falso positivo** — o modo de erro
+certo para um teste novo, mas ainda assim erro:
+
+- O objeto de parâmetros **aninha** (`t('talento.no', { coluna: t('talento.colunaLetra', {…}) })`).
+  Parar no primeiro `}` acusava quatro telas corretas.
+- E usa **atalho** (`{ total, round }`, sem `:`). Um regex de `nome:` acusava outras três.
+
+A versão final parte o corpo nas vírgulas de nível 0 e lê cada segmento. **Um teste que acusa
+código correto é tão inútil quanto um que não acusa código errado** — a diferença é que o
+primeiro é descoberto rápido, porque incomoda.
+
+## M31 — O volume do gacha na demo
+
+`packages/core` sem uma linha alterada e `RULES_VERSION` fica em `0.19.0`. O número que mudou é
+de aquisição, não de combate — nada em `packages/core` o lê, e nenhum replay muda de resultado.
+
+### A medição, refeita de forma independente antes de mexer em qualquer coisa
+
+A auditoria de 2026-09-10 estimou ≈8.950. Recalculei do catálogo e bate **dígito a dígito**:
+
+| Fonte | Conta | Premium |
+| --- | --- | --- |
+| Missões | 30 × 60 | 1.800 |
+| Capítulos | 3 × 300 | 900 |
+| Masmorras | 8 × 200 | 1.600 |
+| Conquistas | as 10 | 3.750 |
+| Eventos | os 2 | 900 |
+| **Total** | | **8.950** |
+
+Com `premiumCost = 500`, **17 rolagens na demo inteira**. E o pool invocável tem `N = 5`
+(`ally-couracado`, `ally-grifeiro`, `ally-guerreiro`, `ally-lanceiro`, `ally-mensageira`) com
+pity `P = 10`, então completar o pool custa `N × P = 50` rolagens no pior caso.
+
+**A consequência que a estimativa não tinha dito em voz alta: a demo não conseguia completar o
+próprio pool.** Quem zerasse tudo, sem pagar nada, podia terminar com dois dos cinco.
+
+### D37 — `summon.premiumCost` passa de 500 para 180
+
+**Decisão do usuário**, com a medição acima na mão. 8.950 ÷ 180 = **49 rolagens**, contra as 50
+do pior caso: o pool completa perto do fim da demo, que é o alvo escrito no roadmap — *"o gacha
+continua vivo do começo ao fim e completa perto do final em vez de morrer no meio"*.
+
+50 é o **teto do azar**, não o caso típico: o pity só age quando a sorte não veio, então na
+prática o pool fecha antes das 49 e o gacha continua sendo uma decisão até lá. 180 e não 179
+porque número redondo em tabela de economia se lê melhor e a diferença é uma rolagem.
+
+**O ajuste foi no CUSTO e não na renda, e isso é escolha de menor toque:** `premiumCost` é um
+número num arquivo de `packages/data`; mexer na renda exigiria os 45 arquivos de recompensa, e
+cada um deles é uma decisão de conteúdo própria.
+
+### O pity NÃO cresceu, e é a parte contraintuitiva
+
+`pityThreshold` fica em **10**. Com pool `N` e pity `P`, completar o pool custa `N × P`
+rolagens; um pity de 30 exigiria 150, que a renda da demo não paga nem de longe — e
+`pool esgotado congela o contador de pity` (M18 1/N) transformaria o excedente em rolagem
+morta. **O pity não pode crescer antes do pool.** O pity maior que o usuário quer chega no M34,
+junto do elenco novo, e é lá que ele se afina, com a conta inteira refeita.
+
+### A medição virou asserção, que é o critério de aceite inteiro
+
+`packages/content/tests/volumeDoGacha.test.ts` deriva as cinco parcelas do catálogo lido do
+disco. O motivo de ser teste e não comentário: **número calculado à mão envelhece no primeiro
+commit de conteúdo**, e o próximo a ler a auditoria acredita nela.
+
+Provado por mutação: acrescentando uma missão ao catálogo, o arquivo reprova em três asserções
+e **diz os números novos** (1.860, 50 rolagens, custo de 180 para o pool) em vez de deixar a
+diferença para alguém procurar. As parcelas ficam separadas de propósito — quando o total
+mudar, a linha vermelha diz qual conteúdo entrou.
+
+### `pnpm balance -- --runs 10000`, pela regra 10
+
+Máximo **57,3% (Guerreiro)** e spd concentrado em **33,0%** nas vencedoras — os dois critérios
+do M8 de pé. **Idênticos aos do M27**, e era o esperado: o custo de invocação não entra na
+resolução de duelo. Rodar mesmo assim é o que separa "não deve ter mudado" de "não mudou".

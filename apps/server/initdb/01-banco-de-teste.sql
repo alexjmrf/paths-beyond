@@ -1,0 +1,17 @@
+-- M28, 1/N — o banco de TESTE, ao lado do banco do ambiente.
+--
+-- **Por que dois bancos e não um.** A suíte tem 36 testes que se pulam sozinhos sem
+-- `DATABASE_URL`, e até o M28 o único lugar onde eles rodavam era o CI — a mesma ausência de
+-- ambiente que travava o playtest travava a suíte completa nesta máquina. Com o compose de
+-- pé eles passam a rodar aqui.
+--
+-- Mas eles LIMPAM as tabelas entre casos. Apontá-los para `paths_beyond` apagaria a conta e o
+-- progresso de campanha que existem justamente para o autor julgar a tela — e apagaria em
+-- silêncio, no meio de um `pnpm test` que ninguém associa a perder progresso.
+--
+-- Este arquivo roda uma vez, quando o volume é criado do zero (o entrypoint do Postgres só
+-- executa `/docker-entrypoint-initdb.d` num diretório de dados vazio). Num volume que já
+-- existe, crie à mão:
+--
+--   docker compose exec postgres createdb -U paths paths_beyond_test
+CREATE DATABASE paths_beyond_test OWNER paths;

@@ -82,7 +82,7 @@
     }
   ],
   "summon": {
-    "premiumCost": 500,
+    "premiumCost": 180,
     "pityThreshold": 10
   },
   "energyPurchase": {

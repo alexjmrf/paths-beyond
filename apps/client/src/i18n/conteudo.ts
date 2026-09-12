@@ -17,7 +17,30 @@ import type { Tradutor } from './idioma.js';
 // convidar alguém a "traduzir" Sylla um dia. O que se traduz é o que descreve — masmorra,
 // conquista, classe, skill, material.
 
-export type TipoDeConteudo = 'masmorra' | 'premio' | 'classe' | 'skill' | 'material' | 'capitulo';
+/**
+ * Os tipos traduzíveis, como CONSTANTE DE RUNTIME — e o tipo derivado dela.
+ *
+ * M29: era uma união de tipo pura, e uma união de tipo não existe em tempo de execução, então
+ * nada podia percorrê-la. `conteudoTraduzido.test.ts` afirmava cobertura tipo a tipo,
+ * enumerando à mão os dois que já estavam prontos, e ficava **vacuamente verde** sobre os
+ * quatro que faltavam — 81 nomes em português numa build de língua inglesa.
+ *
+ * Com a lista existindo em runtime, o teste percorre os tipos em vez de os listar: um valor
+ * novo aqui entra na cobertura sozinho, e fica vermelho até ser traduzido. É a mesma escolha
+ * de `ECONOMY_ACTION_KINDS` no M19, feita pelo mesmo motivo — lá a constante e o `CHECK` do
+ * SQL derivavam em silêncio; aqui era a constante e a tradução.
+ */
+export const TIPOS_DE_CONTEUDO = [
+  'masmorra',
+  'premio',
+  'classe',
+  'skill',
+  'material',
+  'capitulo',
+  'missao',
+] as const;
+
+export type TipoDeConteudo = (typeof TIPOS_DE_CONTEUDO)[number];
 
 /**
  * O nome de uma peça de conteúdo no idioma ativo, ou o nome autorado.

@@ -110,3 +110,60 @@ jobs:
         run: pnpm --filter @paths-beyond/desktop run build
       - name: Determinismo no runtime empacotado
         run: xvfb-run --auto-servernum pnpm --filter @paths-beyond/desktop run determinismo
+
+  # M28, 2/N — o ENSAIO DE RESTORE, a cada commit.
+  #
+  # O M19 exercitou backup e restore à mão, uma vez, e documentou o procedimento. É assim que
+  # todo procedimento de restore começa, e é assim que ele apodrece: a flag muda de nome, o
+  # cliente diverge do servidor, uma tabela nova entra e ninguém confere se ela saiu no dump.
+  # Só se descobre no dia em que é preciso restaurar — o único dia em que não dá para
+  # descobrir.
+  #
+  # O que este job prova NÃO é que o backup de produção existe (isso é o ambiente hospedado, e
+  # depende de conta de provedor). É que **o procedimento continua funcionando** — que é a
+  # metade que apodrece sozinha.
+  ensaio-de-restore:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: paths
+          POSTGRES_PASSWORD: paths
+          POSTGRES_DB: paths_beyond_drill
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://paths:paths@localhost:5432/paths_beyond_drill
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Habilitar corepack
+        run: corepack enable
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      # Sem as migrations o ensaio compararia dois bancos vazios e passaria dizendo nada.
+      - name: Migrar o banco do ensaio
+        run: pnpm --filter @paths-beyond/server run migrate
+
+      # E sem DADOS ele compararia 18 tabelas de zero linhas — o mutante "dump só do schema"
+      # passaria. A suíte com `DATABASE_URL` deixa linhas para trás nas tabelas que exercita.
+      - name: Exercitar o banco
+        run: pnpm test
+
+      - name: Ensaio de restore
+        run: sh scripts/restore-drill.sh

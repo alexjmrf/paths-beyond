@@ -99,3 +99,105 @@ não devem acordar ninguém.
 
 **O log não carrega corpo de requisição nem token**, e isso tem teste. O token É a
 autenticação (§9.4): log que o vaza é pior que log nenhum.
+
+## O ambiente local (M28, 1/N)
+
+> Acrescentado no M28. Até aqui, executar o jogo exigia montar Postgres à mão — e essa
+> ausência travava duas coisas ao mesmo tempo: o playtest e o próprio autor, que não
+> conseguia julgar na tela o que M23 e M27 deixaram pendente.
+
+```bash
+docker compose up          # Postgres + migrations + servidor em http://127.0.0.1:3000
+pnpm --filter @paths-beyond/client dev   # o cliente, já apontado para lá
+```
+
+Não há passo entre os dois. O proxy do Vite cai em `http://127.0.0.1:3000` quando
+`PATHS_BEYOND_SERVER` não está definida, que é exatamente a porta que o compose publica —
+`apps/server/tests/ambiente.test.ts` amarra as duas pontas para que uma não mude sem a outra.
+
+**A ordem de subida é imposta pelo compose, não por sorte:** o Postgres precisa passar no
+health check, o serviço `migrate` precisa **terminar** (`service_completed_successfully`), e só
+então o servidor sobe. Com `service_started` no lugar, o servidor correria em paralelo com a
+migration e o primeiro request bateria numa tabela inexistente — falha de corrida, que é a
+que só aparece na máquina dos outros.
+
+### Como entrar
+
+O ambiente local monta o validador de identidade de **desenvolvimento**: o ticket é
+`dev:<id>`, no cabeçalho `x-platform-ticket`. Numa máquina limpa não existe chave da Steam, e
+é por isso que o compose sobe `src/composeServer.ts` e **não** o `index.ts` de produção — o
+validador de desenvolvimento não está no caminho de produção, e não há configuração capaz de
+colocá-lo lá (decisão do M20, preservada; ver o cabeçalho de `composeServer.ts`).
+
+### O que ele NÃO faz
+
+**Não semeia nada.** O `devServer` em memória semeia jogadores, ouro e moeda premium porque
+existe para exercitar telas isoladas; este sobe um servidor vazio, que é o estado real de quem
+instala o jogo. `POST /accounts/session` cria a conta e concede o núcleo de história; a demo
+paga o resto conforme se joga (D31).
+
+A consequência prática, para quem for julgar a tela: **a campanha começa do zero.** Ver o
+capítulo recolhível fazer o que ele faz exige limpar missões antes.
+
+### O volume
+
+`pgdata` é o que dá memória ao ambiente: sem ele, cada `docker compose down` apagaria conta,
+progresso e inventário. `docker compose down -v` apaga o volume junto — é o jeito de recomeçar
+de um servidor genuinamente vazio.
+
+### Os 36 testes que só rodavam no CI
+
+A suíte tem 36 testes que se pulam sozinhos sem `DATABASE_URL` — paridade memória×Postgres, o
+app real contra o banco real, o limitador compartilhado. Até o M28 o único lugar onde eles
+rodavam era o CI: a mesma ausência de ambiente que travava o playtest travava a suíte
+completa. Com o compose de pé:
+
+```bash
+DATABASE_URL=postgres://paths:paths@127.0.0.1:5432/paths_beyond_test pnpm test
+```
+
+**É `paths_beyond_test`, e não `paths_beyond`.** Os testes limpam tabelas entre casos;
+apontá-los para o banco do ambiente apagaria a conta e o progresso de campanha em silêncio, no
+meio de um `pnpm test` que ninguém associa a perder progresso. O banco de teste é criado
+sozinho quando o volume nasce (`apps/server/initdb/`); num volume que já existe,
+`docker compose exec postgres createdb -U paths paths_beyond_test`.
+
+## O ensaio de restore (M28, 2/N)
+
+> O M19 exercitou backup e restore **à mão, uma vez**, e escreveu o procedimento abaixo. Este
+> ensaio é o que impede esse procedimento de apodrecer entre um incidente e outro.
+
+```bash
+DATABASE_URL=postgres://user:senha@host:porta/banco sh scripts/restore-drill.sh
+```
+
+Ele faz o dump da origem, restaura num banco descartável, e **compara tabela por tabela**: a
+lista de tabelas, lida do catálogo dos dois lados, e depois a contagem de linhas de cada uma.
+Sai com 1 em qualquer divergência. O banco descartável é derrubado por `trap`, mesmo quando o
+ensaio reprova.
+
+**Ele não escreve na origem, e essa é a propriedade que o torna rodável em produção.** O M19
+inseriu uma linha canário no banco de origem — o que responde "o restore rodou?", a pergunta
+fácil, e cobra um preço que ninguém quer pagar no banco que guarda a moeda comprada com
+dinheiro real. Aqui a origem só é lida. `apps/server/tests/restauracao.test.ts` confere isso
+derivando do fonte do script, e é por isso que o `SELECT` vai inteiro em cada linha em vez de
+morar numa variável.
+
+**Provado por mutação:** um dump que exclui `players` reprova no restore (as chaves
+estrangeiras não fecham) e um dump `--schema-only` reprova na contagem — 18 tabelas presentes,
+todas com zero linhas contra uma origem que tinha 34.
+
+### Onde ele roda
+
+O job `ensaio-de-restore` do CI, a cada commit, contra `postgres:16`: migra, roda a suíte para
+o banco ter linhas, e então ensaia. **A cobertura de dados é magra e é honesto dizer:** a suíte
+deixa linhas em 3 das 18 tabelas (`players`, `dungeon_clears`, `schema_migrations`). Isso basta
+para pegar um dump que perde dados; não basta para afirmar que toda tabela sobrevive com
+conteúdo. Rodar o ensaio contra o ambiente hospedado — onde as 18 têm dados de verdade — é
+parte do critério 4 e depende da 2/N.
+
+### O que fica para a 2/N
+
+O ambiente **hospedado** (alcançável pela internet, com as migrations no deploy e backup
+automático) é a sub-sessão 2/N, e depende de uma conta de provedor. Os critérios 2, 3 e 4 do
+M28 continuam abertos.
