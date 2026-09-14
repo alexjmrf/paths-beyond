@@ -1,7 +1,8 @@
 import { toEncounterPlacements } from '@paths-beyond/content/src/encounterPlacements.js';
 import { toSummonBlueprintPlacements } from '@paths-beyond/content/src/summonPlacements.js';
 import type { ContentCatalog } from '@paths-beyond/content/src/types.js';
-import { buildBattleSetupFromHeroes, type BattleSetup, type Coord } from '@paths-beyond/core';
+import { buildBattleSetupFromHeroes, buildInitialState, type BattleSetup, type Coord } from '@paths-beyond/core';
+import { tilesAmeacados } from './ameaca.js';
 
 // M35 2/N (D42) — a PRÉVIA da missão: o tabuleiro de verdade, montado do catálogo, sem ticket.
 //
@@ -25,6 +26,8 @@ export interface PreviaDaMissao {
   readonly vagas: readonly Coord[];
   readonly inimigos: readonly InimigoDaPrevia[];
   readonly artIdByUnitId: Readonly<Record<string, string>>;
+  /** M35 4/N (D44) — a zona de ameaça no estado inicial: §1.1 inteiro antes de entrar. */
+  readonly ameaca: readonly Coord[];
 }
 
 export function previaDaMissao(catalogo: ContentCatalog, missionId: string): PreviaDaMissao | null {
@@ -45,8 +48,7 @@ export function previaDaMissao(catalogo: ContentCatalog, missionId: string): Pre
     }
   }
 
-  return {
-    setup: buildBattleSetupFromHeroes({
+  const setup = buildBattleSetupFromHeroes({
       placements: toEncounterPlacements(doCenario, catalogo),
       map: mapa.grid,
       permadeath: encounter.permadeath,
@@ -60,9 +62,15 @@ export function previaDaMissao(catalogo: ContentCatalog, missionId: string): Pre
       weaponDuelRanges: catalogo.weaponDuelRanges,
       baselineReactionSkillIds: catalogo.baselineReactionSkillIds,
       characterTalentTrees: catalogo.characterTalentTrees,
-    }),
+  });
+
+  return {
+    setup,
     vagas: encounter.units.filter((unit) => unit.side === 'player').map((unit) => unit.pos),
     inimigos,
     artIdByUnitId,
+    // A ameaça não depende de seed: é alcance + terreno + quem está de pé. Seed 0 é só o que
+    // `buildInitialState` exige para montar o estado.
+    ameaca: tilesAmeacados(buildInitialState(setup, 0)),
   };
 }

@@ -22,6 +22,7 @@ import { UnitActionBar } from './components/UnitActionBar.js';
 import { UpdateBanner } from './components/UpdateBanner.js';
 import { VersionGate } from './components/VersionGate.js';
 import { useEffect } from 'react';
+import { PAINEIS_DA_BATALHA } from './logic/ordemDaBatalha.js';
 import { telaDoJogo } from './logic/tela.js';
 import { nomeDeConteudo } from './i18n/conteudo.js';
 import { missaoPorId, useBattleStore } from './store/battleStore.js';
@@ -112,12 +113,25 @@ export function App() {
           <MapCanvas />
           <DuelScene />
           <div className="side-panels">
-            {/* O painel do modo em curso é o que tem a saída da batalha. */}
-            {mode === 'campaign' ? <CampaignPanel /> : mode === 'dungeon' ? <DungeonPanel /> : <PvpPanel />}
-            <ObjectivePanel />
-            <InitiativePanel />
-            <ResourcePanel />
-            <UnitActionBar />
+            {/* M35 4/N (D44) — a ordem vem de `PAINEIS_DA_BATALHA`: decisão e previsão perto do
+                tabuleiro, administração (o painel do modo, com a saída da batalha) por último. */}
+            {PAINEIS_DA_BATALHA.map(({ painel }) =>
+              painel === 'unidade' ? (
+                <UnitActionBar key={painel} />
+              ) : painel === 'iniciativa' ? (
+                <InitiativePanel key={painel} />
+              ) : painel === 'recursos' ? (
+                <ResourcePanel key={painel} />
+              ) : painel === 'objetivo' ? (
+                <ObjectivePanel key={painel} />
+              ) : mode === 'campaign' ? (
+                <CampaignPanel key={painel} />
+              ) : mode === 'dungeon' ? (
+                <DungeonPanel key={painel} />
+              ) : (
+                <PvpPanel key={painel} />
+              ),
+            )}
           </div>
         </main>
       )}

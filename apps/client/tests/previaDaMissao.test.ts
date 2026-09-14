@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { catalog } from '../src/data/catalog.js';
 import { previaDaMissao } from '../src/logic/previaDaMissao.js';
+import { tilesAmeacados } from '../src/logic/ameaca.js';
+import { buildInitialState } from '@paths-beyond/core';
 
 // M35 2/N (D42) — a PRÉVIA da missão: o tabuleiro de verdade, montado do catálogo, sem ticket.
 //
@@ -58,5 +60,28 @@ describe('previaDaMissao', () => {
 
   it('missão desconhecida: null, não exceção — a tela desenha "escolha uma missão"', () => {
     expect(previaDaMissao(catalog, 'encounter-que-nao-existe')).toBeNull();
+  });
+});
+
+// M35 4/N (D44) — a ZONA DE AMEAÇA também na prévia: §1.1 inteiro antes de entrar. É o
+// mesmo cálculo do tabuleiro em batalha (`tilesAmeacados`, que saiu de `MapCanvas` para
+// `logic/ameaca.ts`), sobre o estado inicial do setup — a ameaça não depende de seed.
+describe('a ameaça na prévia (D44)', () => {
+  it('a prévia da missão 1 tem a ameaça do alvo de treino, e ela cobre o tile dele e a vizinhança', () => {
+    const previa = previaDaMissao(catalog, 'encounter-campanha-ponte-1')!;
+    const inimigo = previa.setup.units.find((u) => u.side === 'enemy')!;
+    const chaves = new Set(previa.ameaca.map((c) => `${c.x},${c.y}`));
+    expect(chaves.size).toBeGreaterThan(0);
+    // Adjacente ao inimigo está sempre ameaçado (alcance de duelo ≥ 1 a partir de onde ele está).
+    expect(chaves.has(`${inimigo.pos.x + 1},${inimigo.pos.y}`) || chaves.has(`${inimigo.pos.x - 1},${inimigo.pos.y}`)).toBe(true);
+    // E a ameaça não cobre o mapa inteiro: o canto oposto ao inimigo fica de fora.
+    const longe = inimigo.pos.x > previa.setup.map.width / 2 ? { x: 0, y: 0 } : { x: previa.setup.map.width - 1, y: previa.setup.map.height - 1 };
+    expect(chaves.has(`${longe.x},${longe.y}`)).toBe(false);
+  });
+
+  it('missão sem inimigo de pé não tem ameaça — e não lança', () => {
+    const previa = previaDaMissao(catalog, 'encounter-campanha-ponte-1')!;
+    const semInimigos = { ...previa.setup, units: previa.setup.units.filter((u) => u.side !== 'enemy') };
+    expect(tilesAmeacados({ ...buildInitialState(semInimigos, 0) })).toEqual([]);
   });
 });

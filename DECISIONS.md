@@ -8126,3 +8126,36 @@ segue funcionando — as leituras são independentes (M32 2/N).
 
 **Suíte: 191 arquivos, 2690 testes sem banco** (era 189/2663); `validate:data` 31/281; `typecheck`
 e `lint` limpos.
+
+### Sub-sessão 4/N — a batalha (D44) e o fechamento do código (2026-09-14)
+
+`packages/core` intocado, `RULES_VERSION` em `0.19.0`. Testes antes do código.
+
+**A ordem da coluna ao lado do tabuleiro é uma lista, e a regra é de §1.1.** `logic/ordemDaBatalha.ts`
+declara `PAINEIS_DA_BATALHA` com o papel de cada painel — `unidade` (decisão), `iniciativa`,
+`recursos`, `objetivo` (previsão), `modo` (administração) — e `App.tsx` a itera. Até aqui a coluna
+começava por "Jogando A Trilha · Abandonar missão" e a unidade selecionada, que é a decisão em
+curso, ficava por último. `ordemDaBatalha.test.ts` afirma que nenhuma administração vem antes de
+decisão ou previsão, que a unidade é o primeiro painel, que a iniciativa (§11, "sempre visível")
+vem antes do objetivo e do modo, e — por varredura — que `App.tsx` desenha a partir da lista e não
+de um bloco fixo.
+
+**A zona de ameaça também na prévia.** `computeThreatenedTiles` saiu de `MapCanvas.tsx` para
+`logic/ameaca.ts` (`tilesAmeacados`, puro, sem Pixi, sobre `computeReachableTiles` do core — regra
+3), e `previaDaMissao` passou a devolver `ameaca` calculada sobre `buildInitialState(setup, 0)` — a
+ameaça não depende de seed. É §1.1 inteiro antes de entrar: o jogador vê contra o que vai, onde
+os inimigos estão E até onde chegam. Dois testes novos em `previaDaMissao.test.ts`; visto na tela:
+o mesmo losango tan da batalha aparece na miniatura.
+
+**Daltonismo reverificado, não assumido.** `overlayTheme.test.ts` (18 testes) continua verde,
+inclusive "o registro de cores com significado é exatamente este — nada entrou por fora": a marca
+de vaga da prévia usa a cor de MOVIMENTO do tema com número branco, e a ameaça usa o token de
+ameaça — nenhuma cor nova. O relatório de colisões impresso é o da paleta PADRÃO sob dicromacia,
+que o teste exige que falhe (é o que dá sentido à paleta daltônica passar).
+
+**O que fica para o julgamento do usuário na tela** (critério do briefing): "está misturado?" tem
+de virar "não". Tudo o que o código podia fazer pelo M35 está feito: 1/N menu e abas, 2/N prévia
+e vagas nunca vazias, 3/N presets, 4/N ordem da batalha e ameaça na prévia.
+
+**Suíte: 192 arquivos, 2697 testes sem banco** (era 191/2690); `validate:data` 31/281; `typecheck`
+e `lint` limpos.

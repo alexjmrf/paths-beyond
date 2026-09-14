@@ -37,6 +37,8 @@ export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
     const tileSize = Math.max(TILE_MIN, Math.min(TILE_MAX, Math.floor(LARGURA_MAX / Math.max(map.width, map.height))));
     const theme = themeFor(colorblindMode);
     const objectiveTile = 'target' in previa.setup.winCondition ? (previa.setup.winCondition.target as Coord) : undefined;
+    // M35 4/N (D44) — a ameaça também na prévia, pelo mesmo cálculo da batalha.
+    const ameacados = new Set(previa.ameaca.map((c) => `${c.x},${c.y}`));
 
     const contexto = {
       theme,
@@ -60,7 +62,7 @@ export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
             tileSize,
             theme,
             overlays: {
-              threatened: false,
+              threatened: ameacados.has(`${x},${y}`),
               reachable: false,
               targetable: false,
               gateOpen: false,

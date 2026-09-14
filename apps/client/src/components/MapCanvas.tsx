@@ -1,5 +1,4 @@
 import {
-  computeReachableTiles,
   manhattanDistance,
   openGateCoords,
   type BattleState,
@@ -26,6 +25,7 @@ import {
 import { themeFor } from '../data/overlayTheme.js';
 import { activeUnitRenderer } from '../data/unitRenderer.js';
 import { urlsDeArte } from '../data/unitArt.js';
+import { tilesAmeacados } from '../logic/ameaca.js';
 import { rolagemParaEnquadrar } from '../logic/enquadramento.js';
 import { BASE_LABEL_SIZE, entradaDeRender, paintPrimitives, pintarTile } from '../render/tabuleiro.js';
 import { audioDoJogo } from '../audio/motorCompartilhado.js';
@@ -99,46 +99,6 @@ function tileCenter(coord: Coord, tileSize: number): { x: number; y: number } {
 
 function tileKey(coord: Coord): string {
   return `${coord.x},${coord.y}`;
-}
-
-// §11 — "Overlay de movimento e de ameaça". Ameaça = tiles que uma unidade inimiga viva
-// consegue alcançar (moveRange) e, de lá, engajar (duelRange). Simplificação de M6: não
-// considera ZoC/ocupação ao redor de OUTROS inimigos, só do próprio mapa — refinamento
-// fica pra uma fatia futura de polish.
-function computeThreatenedTiles(battleState: ReturnType<typeof useBattleStore.getState>['battleState']): Set<string> {
-  const threatened = new Set<string>();
-  const enemies = battleState.units.filter((u) => u.side === 'enemy' && u.hp > 0);
-
-  for (const enemy of enemies) {
-    const allies = battleState.units.filter((u) => u.side === enemy.side && u.unitId !== enemy.unitId && u.hp > 0).map((u) => u.pos);
-    const foes = battleState.units.filter((u) => u.side !== enemy.side && u.hp > 0).map((u) => u.pos);
-    const reachable = computeReachableTiles(
-      {
-        map: battleState.map,
-        moveType: enemy.moveType,
-        occupiedByAlly: allies,
-        occupiedByEnemy: foes,
-        // §5.1 (M15) — sem isto a ameaça atravessaria muralha: o jogador se acharia em
-        // perigo atrás de uma parede que o inimigo não pode cruzar.
-        openGates: openGateCoords(battleState),
-      },
-      enemy.pos,
-      enemy.moveRange,
-    );
-    const fromTiles = [enemy.pos, ...reachable.map((r) => r.coord)];
-    for (const from of fromTiles) {
-      for (let dx = -enemy.duelRange; dx <= enemy.duelRange; dx++) {
-        for (let dy = -enemy.duelRange; dy <= enemy.duelRange; dy++) {
-          const candidate = { x: from.x + dx, y: from.y + dy };
-          if (manhattanDistance(from, candidate) > enemy.duelRange) continue;
-          if (candidate.x < 0 || candidate.y < 0 || candidate.x >= battleState.map.width || candidate.y >= battleState.map.height) continue;
-          threatened.add(tileKey(candidate));
-        }
-      }
-    }
-  }
-
-  return threatened;
 }
 
 function unitAt(units: readonly BattleUnit[], coord: Coord): BattleUnit | undefined {
@@ -712,7 +672,7 @@ export function MapCanvas() {
 
     const { map, units } = battleState;
     const reachableSet = new Set(reachableTiles.map((t) => tileKey(t.coord)));
-    const threatened = computeThreatenedTiles(battleState);
+    const threatened = new Set(tilesAmeacados(battleState).map(tileKey));
     const selectedUnit = selectedUnitId ? units.find((u) => u.unitId === selectedUnitId) : undefined;
     const engageableEnemyIds = computeEngageableEnemyIds(units, selectedUnit);
     const targetableSet = new Set((targetingMode?.tiles ?? []).map(tileKey));
