@@ -7980,3 +7980,18 @@ do usuário.
 - Selecionar o INIMIGO mostra os cinco botões de ação (Esperar, Descansar, Editar táticas,
   Inventário, Talentos) — harness, para o M35.
 - "Capítulo concluído!" na tela de vitória de uma MISSÃO — vocabulário pré-D23, texto.
+
+### O julgamento do M32 na tela (2026-09-14) — e o M35 antecipado (D41–D44)
+
+O critério 5 do M32 ("uma próxima ação, identificada sem que ninguém aponte") foi julgado pelo
+usuário com sessão de verdade: **a ação existe, mas "está tudo muito misturado"** — quatro painéis
+lado a lado com o mesmo peso são o hub do M13 com menos coisas. O M32 fecha como está (era
+cirúrgico de propósito) e o veredito vira a especificação do M35, que **sobe para antes do M33**
+sem renumerar: rodar o playtest com esta HUD mediria a HUD e não o jogo — o mesmo argumento que
+criou o M32. As decisões (um menu e uma aba por vez; a missão em três passos com prévia do
+tabuleiro e 8 presets de party no servidor, vagas nunca vazias com o protagonista primeiro; o
+inimigo comum pelo nome autorado `<função> [de <facção>]`, uma nação só; inimigo selecionado sem
+botões de ação) estão em **`docs/milestones/M35-hud-redesenho.md`**, que é normativo para a
+próxima sessão. Direção de história dada junto e que só o M30 usa: os três capítulos acontecem
+dentro de UMA nação, o protagonista começando a jornada do herói, descobrindo os problemas que a
+afligem e construindo o nome.

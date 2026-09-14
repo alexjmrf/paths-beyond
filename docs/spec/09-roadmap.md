@@ -542,6 +542,12 @@ critério 2 do M16; nada do M13 deixa de funcionar (a suíte do cliente segue ve
 ---
 
 ### M33 — O critério 3 do M23, e o veredito da primeira sessão
+> **ORDEM DE EXECUÇÃO (2026-09-14): M32 → M35 → M33 → M34.** O usuário julgou o M32 na tela e o
+> veredito do critério 5 foi "está tudo muito misturado" — o primeiro dado do playtest, e ele já diz
+> onde trava. Rodar o M33 com esta HUD mediria a HUD e não o jogo (o mesmo argumento que criou o
+> M32). O M35 sobe para antes deste; a numeração NÃO muda (já foi trocada uma vez neste dia).
+> Briefing normativo em `docs/milestones/M35-hud-redesenho.md`.
+
 **Este é o único critério de aceite aberto em todo o projeto**, e `PROGRESS.md` o carrega desde
 2026-09-04: *"observar alguém que nunca viu o jogo"*. Não é código — é do usuário, e segue o
 precedente do critério 2 do M16. As três milestones acima existem para que ele seja possível de
@@ -574,6 +580,13 @@ pessoa remota roda ponta a ponta e o relatório sai do dado coletado.
 ---
 
 ### M35 — A HUD: o redesenho
+> **Antecipado para antes do M33 em 2026-09-14** — ver a nota no M33. O parágrafo abaixo diz "vem
+> depois do playtest"; a razão dele (não desenhar no escuro) foi atendida pelo julgamento do dono na
+> tela, e as decisões estão em **`docs/milestones/M35-hud-redesenho.md` (D41–D44)**: um menu e uma
+> aba por vez; a missão em três passos (escolher → prévia com o tabuleiro → quem vai) com 8 presets
+> de party no servidor; inimigo pelo nome autorado (`<função> [de <facção>]`, uma nação só); a
+> batalha sem botões de ação num inimigo selecionado.
+
 **A passagem de HUD que a decisão de arte de 2026-08-28 prometeu, feita com dados.** O M32
 tirou o que estava obviamente errado; este é o desenho de verdade — layout, identidade visual
 coerente com o sprite 2.5D do M26, o que fica na tela durante a batalha e o que some, o que o
