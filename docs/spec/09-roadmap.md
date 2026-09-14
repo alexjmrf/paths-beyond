@@ -417,7 +417,7 @@ viraram 140 e foram commitados em sete commits, de M18 6/N a M24. A árvore est�
 
 ---
 
-> **M28–M33 foram PROPOSTAS pelo agente em 2026-09-10**, depois de uma auditoria do repositório
+> **M28–M35 foram PROPOSTAS pelo agente em 2026-09-10**, depois de uma auditoria do repositório
 > executando as suítes, e com a direção escolhida pelo usuário na mesma sessão: **fechar a demo
 > para ser jogada**. Ratificar antes de abrir, como M19–M27.
 >
@@ -489,14 +489,14 @@ jogo; nenhuma tela nova foi criada e `packages/core` fica intocado; a varredura 
 contra o conteúdo autorado: 30 missões × 60 + 3 capítulos × 300 + 8 masmorras × 200 + 4.650 de
 achievements e eventos = **≈ 8.950 premium**, e com `summon.premiumCost = 500` isso é
 **17 rolagens na demo inteira**. O usuário nomeou o gacha como a peça que prende o jogador; entregar
-17 puxadas ao primeiro estranho que jogar (M32) é testar um jogo que não é este.
+17 puxadas ao primeiro estranho que jogar (M33) é testar um jogo que não é este.
 
 **A restrição que ordena a fatia, e ela contraria a intuição: o pity não pode crescer antes do pool
 crescer.** Com pity `P` e pool `N`, o pior caso para completar o pool é `N × P` rolagens — hoje
 5 × 10 = 50. Um pity de 30 exigiria 150 rolagens, que a renda da demo não paga nem de longe, e
 `pool esgotado CONGELA o contador de pity` (M18 1/N) transformaria o excedente em rolagem morta.
 **Logo esta fatia NÃO é onde o pity cresce** — ela é onde o volume passa a caber no pool que existe.
-O pity maior que o usuário quer chega com o elenco do M34, e é lá que ele deve ser afinado.
+O pity maior que o usuário quer chega com o elenco do M36, e é lá que ele deve ser afinado.
 
 **O ajuste de menor toque é o custo, não a renda:** `summon.premiumCost` é **um número em
 `packages/data`**, contra os 45 arquivos de recompensa que mexer na renda exigiria. O alvo é o
@@ -511,7 +511,37 @@ os números finais (`premiumCost`, `pityThreshold`) vieram do usuário e estão 
 
 ---
 
-### M32 — O critério 3 do M23, e o veredito da primeira sessão
+> **M32 e M35 foram inseridos em 2026-09-14**, a partir do que o usuário viu ao instalar o
+> jogo em outra máquina pela primeira vez (critério 3 do M28): *"a HUD precisa de remodelagem
+> urgente"*. A decisão de arte de 2026-08-28 já dizia *"sprite 2.5D mais uma passagem de HUD"*;
+> o M26 fez o sprite e **a passagem de HUD nunca virou milestone** — não foi adiada, caiu.
+> Escolha do usuário: **uma passagem cirúrgica ANTES do playtest** (M32) e **o redesenho DEPOIS**
+> (M35), com os dados do playtest. O que estava numerado M32–M36 subiu para M33–M38.
+
+### M32 — A HUD de um jogo, não de um harness
+**A tela que o jogador vê é a superfície do M13 — construída para EXERCITAR todos os sistemas,
+nunca desenhada.** Visível no primeiro print do instalador: a barra do topo é um painel de
+desenvolvimento (*Battle scene on engage*, *Instant result mode*, *Erase progress* a um clique no
+cabeçalho, sem confirmação visível); a porta de entrada está escondida dentro de um painel chamado
+*"PvP — arena"*, e Campaign, Dungeons e Summoning dizem *"Sign in on the PvP panel"* — entrar não
+tem nada a ver com PvP, é a primeira ação do jogo; há um tabuleiro vazio com "0 inimigo(s) de pé" e
+"Round 1" antes de existir sessão; o objetivo e as skills de Valor aparecem em português na build
+inglesa (o M29 não os cobriu); e todos os painéis têm o mesmo peso visual — nada diz qual é a
+*próxima ação*. **Esta milestone é cirúrgica de propósito:** sem ela, o playtest (M33) mede a HUD e
+não a compreensão do jogo — o estranho trava no "Sign in on the PvP panel" antes de chegar a
+qualquer regra. Mas redesenhar a HUD inteira antes de ver alguém travar é redesenhar no escuro;
+isso é o M35. **Nenhuma regra muda, `packages/core` fica intocado.**
+**Aceite:** sem sessão, a única coisa na tela é entrar — nenhum tabuleiro, nenhum painel de
+sistema; os controles de desenvolvimento e de acessibilidade saem do cabeçalho para um menu de
+opções, e "apagar progresso" pede confirmação; objetivo de mapa, condição de vitória e skills de
+Valor passam pela camada de idioma do M25, com `conteudoTraduzido.test.ts` derivando a cobertura
+deles como já deriva a das missões; em cada tela existe UMA próxima ação com peso visual maior que
+o resto, e o usuário a identifica sem que ninguém aponte — **julgado por ele na tela**, como o
+critério 2 do M16; nada do M13 deixa de funcionar (a suíte do cliente segue verde).
+
+---
+
+### M33 — O critério 3 do M23, e o veredito da primeira sessão
 **Este é o único critério de aceite aberto em todo o projeto**, e `PROGRESS.md` o carrega desde
 2026-09-04: *"observar alguém que nunca viu o jogo"*. Não é código — é do usuário, e segue o
 precedente do critério 2 do M16. As três milestones acima existem para que ele seja possível de
@@ -529,7 +559,7 @@ continua aberto por inércia.
 
 ---
 
-### M33 — Telemetria e o playtest ampliado
+### M34 — Telemetria e o playtest ampliado
 **Depois de uma pessoa observada, as próximas não estarão na sala.** O servidor tem log estruturado
 desde o M19, e nada mede JOGO: onde o jogador para, quanto tempo leva a missão, quantas vezes
 repete, em que ponto fecha o jogo e não volta. Sem isso, um playtest com dez pessoas remotas
@@ -543,13 +573,31 @@ pessoa remota roda ponta a ponta e o relatório sai do dado coletado.
 
 ---
 
-> **M34–M36 foram PROPOSTAS pelo agente em 2026-09-10**, sobre o desenho de gacha final que o
+### M35 — A HUD: o redesenho
+**A passagem de HUD que a decisão de arte de 2026-08-28 prometeu, feita com dados.** O M32
+tirou o que estava obviamente errado; este é o desenho de verdade — layout, identidade visual
+coerente com o sprite 2.5D do M26, o que fica na tela durante a batalha e o que some, o que o
+duelo mostra e em que ordem. Vem **depois** do playtest (M33) e da telemetria (M34) por uma razão
+só: as duas dizem **onde o jogador travou e o que ele olhou**, e desenhar sem isso é desenhar por
+gosto. O pilar de §1.1 que governa a fatia é *legibilidade tática* — o jogador DEVE conseguir
+prever o resultado antes de confirmar — e é contra ele que cada tela é julgada, não contra
+"ficou bonito". `packages/core` intocado; o cliente só renderiza (regra 3).
+**Aceite:** cada achado de HUD registrado no M33 e medido no M34 tem uma resposta na tela nova ou
+uma justificativa escrita de por que não; durante a batalha, iniciativa, pools de AP/PP, zona de
+ameaça e preview do duelo estão visíveis sem hover (§1.1, requisito duro de §11); a garantia de
+daltonismo do M13 4/N continua valendo e é reverificada, não assumida; **julgado pelo usuário na
+tela**, com a mesma pessoa (ou outra) que jogou no M33 jogando de novo e o que travou antes não
+travando mais; a suíte do cliente segue verde e `semTextoCru.test.ts` continua vazio de exceções.
+
+---
+
+> **M36–M38 foram PROPOSTAS pelo agente em 2026-09-10**, sobre o desenho de gacha final que o
 > usuário fechou na mesma sessão. Decisões, colisões e números abertos em `DECISIONS.md`, seção
 > **"Em aberto (levantadas pelo usuário em 2026-09-10, ao desenhar o gacha final)"**. As três vêm
-> **depois do playtest (M32)** de propósito: elas somam sistema a um jogo cujo M32 existe para
+> **depois do playtest (M33)** de propósito: elas somam sistema a um jogo cujo M33 existe para
 > descobrir se ele já tem regra demais, e o veredito do playtest deve poder mudá-las.
 
-### M34 — Os três tiers: Adventurer, Hero e Legend
+### M36 — Os três tiers: Adventurer, Hero e Legend
 **O elenco deixa de ser plano.** `Adventurer` é o tier de baixo, `Hero` o do meio e `Legend` o topo,
 e **o topo não é invocável**: chega-se nele por evolução. Os caminhos são assimétricos de propósito
 — quem nasce `Hero` sobe direto a `Legend`; quem nasce `Adventurer` sobe a `Hero` e só então a
@@ -576,7 +624,7 @@ divisão do elenco, pity novo) vieram do usuário.
 
 ---
 
-### M35 — Armas assinatura e o banner de armas
+### M37 — Armas assinatura e o banner de armas
 **O equipamento vira alvo de gacha.** Uma arma/artefato assinatura por personagem, **travada por
 CLASSE** — equipável por qualquer personagem da classe de quem ela pertence —, com banner próprio; e
 quando um personagem entra em rotação, a arma dele entra junto. **A máquina de item já existe
@@ -599,7 +647,7 @@ de sidegrade; a decisão sidegrade-vs-upgrade está registrada em `DECISIONS.md`
 
 ---
 
-### M36 — A Soul
+### M38 — A Soul
 **Um item exclusivo do personagem, e o primeiro slot novo desde o M1.** Dois substats roláveis mais
 um **mainstat ligado às habilidades daquele personagem** (2 a 3 possibilidades), num slot que só
 abre depois de o personagem ser upado até certo nível. **O farm dropa material GENÉRICO e a escolha
