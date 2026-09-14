@@ -144,6 +144,19 @@ export interface ArenaDefense {
   readonly units: readonly ArenaDefenseUnit[];
 }
 
+// M35 3/N (D42) — os presets de party: 8 slots por conta, no servidor.
+export interface PartyPreset {
+  readonly ownerPlayerId: string;
+  readonly slot: number;
+  readonly name: string;
+  readonly heroIds: readonly string[];
+}
+
+export interface PartyPresetsResponse {
+  readonly slots: number;
+  readonly presets: readonly PartyPreset[];
+}
+
 export interface BattleOutcomeResponse {
   readonly seed: number;
   readonly result: BattleResult;
@@ -394,6 +407,12 @@ export const api = {
 
   // 404 = "ainda não montei defesa", que é estado normal e não erro: quem chama trata.
   defense: (ticket: string) => request<ArenaDefense>(ticket, '/me/defense'),
+  // M35 3/N (D42) — presets de party.
+  partyPresets: (ticket: string) => request<PartyPresetsResponse>(ticket, '/me/party-presets'),
+  savePartyPreset: (ticket: string, slot: number, name: string, heroIds: readonly string[]) =>
+    request<PartyPreset>(ticket, `/me/party-presets/${slot}`, { method: 'PUT', body: JSON.stringify({ name, heroIds }) }),
+  deletePartyPreset: (ticket: string, slot: number) =>
+    request<{ readonly deleted: boolean }>(ticket, `/me/party-presets/${slot}`, { method: 'DELETE' }),
 
   saveDefense: (ticket: string, mapId: string, units: readonly ArenaDefenseUnit[]) =>
     request<ArenaDefense>(ticket, '/me/defense', { method: 'PUT', body: JSON.stringify({ mapId, units }) }),

@@ -5,6 +5,7 @@ import { createInMemoryRateLimiter, type RateLimiter } from '../src/battle/rateL
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
@@ -52,6 +53,7 @@ function buildAppCom(rateLimiter: RateLimiter, expensiveRateLimiter?: RateLimite
     ]),
     heroRepository: createMemoryHeroRepository([]),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),

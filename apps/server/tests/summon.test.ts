@@ -5,6 +5,7 @@ import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
@@ -68,6 +69,7 @@ function buildHarness(options: { premium?: number } = {}): Harness {
       repository: playerRepository,
       heroRepository: createMemoryHeroRepository(),
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
+      partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,

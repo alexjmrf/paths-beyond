@@ -7,6 +7,7 @@ import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
@@ -187,6 +188,7 @@ function buildFuzzApp() {
     repository,
     heroRepository,
     arenaDefenseRepository,
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     catalog,

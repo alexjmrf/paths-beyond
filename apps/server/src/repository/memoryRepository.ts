@@ -7,6 +7,8 @@ import {
   DEFAULT_STONES,
   type ArenaDefense,
   type ArenaDefenseRepository,
+  type PartyPreset,
+  type PartyPresetRepository,
   type CharacterOwnershipRepository,
   type RewardsRepository,
   type HeroRepository,
@@ -148,6 +150,28 @@ export function createMemoryArenaDefenseRepository(seed: readonly ArenaDefense[]
     },
     async deleteDefenseByOwner(ownerPlayerId) {
       byOwner.delete(ownerPlayerId);
+    },
+  };
+}
+
+// M35 3/N (D42) — presets de party, em memória.
+export function createMemoryPartyPresetRepository(seed: readonly PartyPreset[] = []): PartyPresetRepository {
+  const chave = (owner: string, slot: number) => `${owner}#${slot}`;
+  const porChave = new Map<string, PartyPreset>(seed.map((preset) => [chave(preset.ownerPlayerId, preset.slot), preset]));
+
+  return {
+    async listPresetsByOwner(ownerPlayerId) {
+      return [...porChave.values()].filter((p) => p.ownerPlayerId === ownerPlayerId).sort((a, b) => a.slot - b.slot);
+    },
+    async savePreset(preset) {
+      porChave.set(chave(preset.ownerPlayerId, preset.slot), preset);
+      return preset;
+    },
+    async deletePreset(ownerPlayerId, slot) {
+      return porChave.delete(chave(ownerPlayerId, slot));
+    },
+    async deletePlayerData(ownerPlayerId) {
+      for (const [k, p] of [...porChave.entries()]) if (p.ownerPlayerId === ownerPlayerId) porChave.delete(k);
     },
   };
 }

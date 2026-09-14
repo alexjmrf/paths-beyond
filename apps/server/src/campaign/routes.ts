@@ -17,11 +17,13 @@ import type { FastifyPluginAsync } from 'fastify';
 import { rejectOnRulesVersion } from '../version.js';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
 import { characterIdsForPlacements } from '../battle/artIds.js';
-import type {
-  CharacterOwnershipRepository,
-  HeroRepository,
-  PlayerRepository,
-  RewardsRepository,
+import {
+  MAX_PARTY_PRESETS,
+  type CharacterOwnershipRepository,
+  type HeroRepository,
+  type PartyPresetRepository,
+  type PlayerRepository,
+  type RewardsRepository,
 } from '../repository/types.js';
 import { ownedCharacterIds, unownedAmong } from '../summon/ownership.js';
 
@@ -51,6 +53,8 @@ export interface CampaignRoutesOptions {
   readonly heroRepository: HeroRepository;
   readonly ownershipRepository: CharacterOwnershipRepository;
   readonly rewardsRepository: RewardsRepository;
+  // M35 3/N (D42) — os presets de party.
+  readonly partyPresetRepository: PartyPresetRepository;
   readonly catalog: ContentCatalog;
   readonly ticketSecret: string;
   readonly now: () => number;
@@ -161,7 +165,66 @@ async function assembleChapterBattle(
   };
 }
 
+// M35 3/N (D42) — o tamanho máximo de time é o mesmo da arena e da masmorra (`MAX_TEAM_SIZE`
+// em battle/routes.ts): um preset maior que isso nunca caberia em lugar nenhum.
+const MAX_PRESET_SIZE = 5;
+
+interface PresetBody {
+  readonly name?: unknown;
+  readonly heroIds?: unknown;
+}
+
+function slotDaRota(params: unknown): number | null {
+  const bruto = (params as { slot?: string }).slot ?? '';
+  if (!/^\d+$/.test(bruto)) return null;
+  const slot = Number(bruto);
+  return slot >= 1 && slot <= MAX_PARTY_PRESETS ? slot : null;
+}
+
 export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (fastify, opts) => {
+  // M35 3/N (D42) — os PRESETS de party. Estado de conta, pelo mesmo desenho de `/me/defense`:
+  // o cliente escolhe um preset ao entrar numa missão e ainda troca antes de entrar. O servidor
+  // valida posse (§9.4) e o tamanho de time; NÃO valida contra uma missão, porque o preset é
+  // reutilizado entre missões e quem tem vagas é a missão — a tela apara ao aplicar.
+  fastify.get('/me/party-presets', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const presets = await opts.partyPresetRepository.listPresetsByOwner(request.player.id);
+    return { slots: MAX_PARTY_PRESETS, presets };
+  });
+
+  fastify.put('/me/party-presets/:slot', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const player = request.player;
+    const slot = slotDaRota(request.params);
+    if (slot === null) return reply.code(400).send({ error: `slot precisa estar entre 1 e ${MAX_PARTY_PRESETS}` });
+
+    const body = (request.body ?? {}) as PresetBody;
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (name.length === 0) return reply.code(400).send({ error: 'o preset precisa de um nome' });
+    const heroIds = Array.isArray(body.heroIds) ? body.heroIds.filter((id): id is string => typeof id === 'string') : [];
+    if (heroIds.length === 0 || heroIds.length > MAX_PRESET_SIZE) {
+      return reply.code(400).send({ error: `o preset precisa ter entre 1 e ${MAX_PRESET_SIZE} heróis` });
+    }
+    if (new Set(heroIds).size !== heroIds.length) return reply.code(400).send({ error: 'herói repetido no preset' });
+
+    // §9.4 — posse, como `PUT /me/defense`: um preset com o herói de outra conta seria uma
+    // party que o servidor recusaria na hora de montar a batalha, e é melhor recusar aqui.
+    const heroes = await opts.heroRepository.getHeroesByIds(heroIds);
+    const ownsAll = heroIds.every((id) => heroes.some((h) => h.hero.id === id && h.ownerPlayerId === player.id));
+    if (heroes.length !== heroIds.length || !ownsAll) return reply.code(403).send({ error: 'algum heroId não pertence a você' });
+
+    return opts.partyPresetRepository.savePreset({ ownerPlayerId: player.id, slot, name, heroIds });
+  });
+
+  fastify.delete('/me/party-presets/:slot', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const slot = slotDaRota(request.params);
+    if (slot === null) return reply.code(400).send({ error: `slot precisa estar entre 1 e ${MAX_PARTY_PRESETS}` });
+    const apagado = await opts.partyPresetRepository.deletePreset(request.player.id, slot);
+    if (!apagado) return reply.code(404).send({ error: 'não há preset nesse slot' });
+    return { deleted: true };
+  });
+
   fastify.get('/campaign', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const cleared = new Set(await opts.rewardsRepository.listClearedChapters(request.player.id));

@@ -7,6 +7,7 @@ import { createSteamIdentityValidator } from '../src/identity/steam.js';
 import type { IdentityValidator } from '../src/identity/types.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
@@ -40,6 +41,7 @@ function harness(options: { identity?: IdentityValidator } = {}) {
     repository: playerRepository,
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),

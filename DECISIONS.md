@@ -8089,3 +8089,40 @@ para a 4/N junto do resto de D44).
 
 **Suíte: 189 arquivos, 2663 testes sem banco** (era 187/2649); `validate:data` 31/281; `typecheck`
 e `lint` limpos.
+
+### Sub-sessão 3/N — os presets de party, ponta a ponta (2026-09-14)
+
+`packages/core` intocado, `RULES_VERSION` em `0.19.0`. Testes antes do código, dos dois lados.
+
+**Servidor (`apps/server`).** Migration `0015_party_presets.sql` — tabela `party_presets` com chave
+primária composta (dono, slot), `slot` com `CHECK (1..8)`, `hero_ids` em jsonb. `PartyPreset` e
+`PartyPresetRepository` em `repository/types.ts` (`MAX_PARTY_PRESETS = 8`), implementados em
+memória e em Postgres, com a bateria de paridade do M19 estendida (ordem por slot, substituição,
+apagar um e apagar a conta). Rotas em `campaign/routes.ts`: `GET /me/party-presets` devolve `{ slots,
+presets }` (a tela desenha os oito sem saber o número), `PUT /me/party-presets/:slot` valida slot
+1..8, nome não vazio, 1–5 heróis sem repetição e **posse** (§9.4, 403 — o mesmo contrato de
+`PUT /me/defense`), `DELETE /me/party-presets/:slot` (404 sem preset). **O servidor NÃO valida o
+preset contra uma missão:** o número de vagas é da missão e o preset é reutilizado entre elas; a
+tela apara ao aplicar. A exportação da conta (M20) inclui `partyPresets`, e a exclusão apaga a
+tabela antes do jogador — sem isso reprovaria por integridade. `partyPresets.test.ts` (12 testes)
+e os 23 `buildApp` da suíte ganharam `partyPresetRepository` (obrigatório em `BuildAppDeps`, e não
+opcional com fallback: um fallback em memória em produção perderia dado em silêncio).
+
+**Cliente (`apps/client`).** `api.partyPresets/savePartyPreset/deletePartyPreset`; estado `presets`
+na store, lido com o hub (`carregarHub`); `aplicarPreset(slot)` troca a seleção pelos heróis do
+preset — **só os que o jogador ainda tem**, aparados às vagas da missão — e o jogador ainda troca
+por cima; `salvarPreset(slot, nome)` manda a seleção atual e relê; `apagarPreset`. Nove testes em
+`presetsDeParty.test.ts`. `PresetsDeParty.tsx` desenha os oito slots dentro de "Quem vai", vazios
+inclusive (é onde "salvar aqui" aponta); o nome é `useState` da tela.
+
+**Visto no browser contra o servidor de dev em memória** (o Railway ainda não tem a migration —
+ela entra no próximo deploy): salvar "Estrada" no slot 1 com Aren; desmarcar Aren; "Usar" → "Quem
+vai (1/1)" de volta.
+
+**O que a máquina local não prova:** o backend Postgres dos presets roda na bateria de paridade só
+com `DATABASE_URL` (CI) e a migration 0015 só é aplicada no deploy. Até o deploy, o cliente de dev
+apontado para o Railway mostra um erro no painel de presets (a rota não existe lá) e o resto do hub
+segue funcionando — as leituras são independentes (M32 2/N).
+
+**Suíte: 191 arquivos, 2690 testes sem banco** (era 189/2663); `validate:data` 31/281; `typecheck`
+e `lint` limpos.

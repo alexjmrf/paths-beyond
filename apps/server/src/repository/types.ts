@@ -173,6 +173,30 @@ export interface ArenaDefense {
   readonly units: readonly ArenaDefenseUnit[];
 }
 
+// M35 3/N (D42) — os PRESETS de party: 8 slots por conta, no servidor. O terceiro passo de
+// escolher uma missão ("quem vai") parte de um preset e ainda deixa trocar; é estado de conta
+// pelo mesmo motivo da defesa de arena, e mora ao lado dela. O servidor guarda ids de herói e
+// valida posse na rota (§9.4); a missão é quem tem vagas, e a tela apara ao aplicar.
+export const MAX_PARTY_PRESETS = 8;
+
+export interface PartyPreset {
+  readonly ownerPlayerId: string;
+  readonly slot: number;
+  readonly name: string;
+  readonly heroIds: readonly string[];
+}
+
+export interface PartyPresetRepository {
+  /** Os presets da conta, em ordem de slot. */
+  listPresetsByOwner(ownerPlayerId: string): Promise<readonly PartyPreset[]>;
+  /** Grava ou substitui o slot. */
+  savePreset(preset: PartyPreset): Promise<PartyPreset>;
+  /** `true` se havia o que apagar. */
+  deletePreset(ownerPlayerId: string, slot: number): Promise<boolean>;
+  // §9.4 (M20) — exclusão de conta, mesma semântica dos outros repositórios.
+  deletePlayerData(ownerPlayerId: string): Promise<void>;
+}
+
 export interface ArenaDefenseRepository {
   // §9.4 (M20) — exclusão de conta. Cada repositório apaga o que ele guarda daquele
   // jogador; a rota orquestra os sete. Método por repositório em vez de um `ON DELETE

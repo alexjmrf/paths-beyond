@@ -6,6 +6,7 @@ import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import type { RequestLogLine } from '../src/observability.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
@@ -49,6 +50,7 @@ function harness() {
     ]),
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),

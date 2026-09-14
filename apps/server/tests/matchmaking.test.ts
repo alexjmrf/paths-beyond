@@ -5,6 +5,7 @@ import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
@@ -71,6 +72,7 @@ function buildTestApp(players: readonly Player[], defenses: readonly ArenaDefens
     repository,
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(defenses),
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     catalog: emptyCatalog,

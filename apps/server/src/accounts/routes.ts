@@ -6,6 +6,7 @@ import type { IdentityValidator } from '../identity/types.js';
 import { ensureOwnedHeroes } from '../summon/roster.js';
 import type {
   ArenaDefenseRepository,
+  PartyPresetRepository,
   CharacterOwnershipRepository,
   EconomyRepository,
   HeroRepository,
@@ -35,6 +36,7 @@ export interface AccountRoutesOptions {
   readonly repository: PlayerRepository;
   readonly heroRepository: HeroRepository;
   readonly arenaDefenseRepository: ArenaDefenseRepository;
+  readonly partyPresetRepository: PartyPresetRepository;
   readonly replayRepository: ReplayRepository;
   readonly economyRepository: EconomyRepository;
   readonly ownershipRepository: CharacterOwnershipRepository;
@@ -107,7 +109,7 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
       if (!request.player) return reply.code(401).send({ error: 'missing platform ticket' });
       const player = request.player;
 
-      const [heroes, materials, items, clears, acquired, claims, chapters, defense] = await Promise.all([
+      const [heroes, materials, items, clears, acquired, claims, chapters, defense, partyPresets] = await Promise.all([
         opts.heroRepository.listHeroesByOwner(player.id),
         opts.economyRepository.getMaterials(player.id),
         opts.economyRepository.listItems(player.id),
@@ -116,6 +118,7 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
         opts.rewardsRepository.listClaims(player.id),
         opts.rewardsRepository.listClearedChapters(player.id),
         opts.arenaDefenseRepository.getDefenseByOwner(player.id),
+        opts.partyPresetRepository.listPresetsByOwner(player.id),
       ]);
 
       return {
@@ -125,6 +128,7 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
         acquiredCharacters: acquired,
         rewards: { claims, clearedChapters: chapters },
         arenaDefense: defense,
+        partyPresets,
       };
     });
 
@@ -146,6 +150,8 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
       await opts.idempotencyRepository?.deletePlayerData(playerId);
       await opts.replayRepository.deleteReplaysOfPlayer(playerId);
       await opts.arenaDefenseRepository.deleteDefenseByOwner(playerId);
+      // M35 3/N — os presets apontam para o jogador; sem esta linha a exclusão reprovaria.
+      await opts.partyPresetRepository.deletePlayerData(playerId);
       await opts.heroRepository.deleteHeroesByOwner(playerId);
       const apagado = await opts.repository.deletePlayer(playerId);
 

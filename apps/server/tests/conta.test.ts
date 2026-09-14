@@ -7,6 +7,7 @@ import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { runMigrations } from '../src/migrate.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
@@ -17,6 +18,7 @@ import {
 } from '../src/repository/memoryRepository.js';
 import {
   createPostgresArenaDefenseRepository,
+  createPostgresPartyPresetRepository,
   createPostgresCharacterOwnershipRepository,
   createPostgresEconomyRepository,
   createPostgresHeroRepository,
@@ -58,6 +60,7 @@ function memoria() {
     repository: playerRepository,
     heroRepository,
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),
@@ -223,6 +226,7 @@ descrevePostgres('exclusão da conta, contra Postgres', () => {
       repository: createPostgresPlayerRepository(pool),
       heroRepository: createPostgresHeroRepository(pool),
       arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),
+      partyPresetRepository: createPostgresPartyPresetRepository(pool),
       replayRepository: createPostgresReplayRepository(pool),
       seasonRepository: createPostgresSeasonRepository(pool),
       economyRepository: createPostgresEconomyRepository(pool),

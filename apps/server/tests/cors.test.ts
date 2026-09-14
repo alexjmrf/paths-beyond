@@ -5,6 +5,7 @@ import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryCharacterOwnershipRepository,
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
@@ -38,6 +39,7 @@ function montarApp() {
     repository: createMemoryPlayerRepository([]),
     heroRepository: createMemoryHeroRepository(),
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
+    partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),

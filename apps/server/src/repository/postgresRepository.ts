@@ -9,6 +9,8 @@ import {
   DEFAULT_STONES,
   type ArenaDefense,
   type ArenaDefenseRepository,
+  type PartyPreset,
+  type PartyPresetRepository,
   type HeroRepository,
   type Player,
   type PlayerRepository,
@@ -275,6 +277,46 @@ export function createPostgresArenaDefenseRepository(pool: Pool): ArenaDefenseRe
         [defense.ownerPlayerId, defense.mapId, JSON.stringify(defense.units)],
       );
       return defense;
+    },
+  };
+}
+
+// M35 3/N (D42) — presets de party, em Postgres. `hero_ids` é jsonb: a lista é pequena, é
+// lida inteira, e a chave primária composta (dono, slot) é o que faz "salvar de novo substitui".
+interface PartyPresetRow {
+  readonly owner_player_id: string;
+  readonly slot: number;
+  readonly name: string;
+  readonly hero_ids: readonly string[];
+}
+
+function rowToPartyPreset(row: PartyPresetRow): PartyPreset {
+  return { ownerPlayerId: row.owner_player_id, slot: row.slot, name: row.name, heroIds: row.hero_ids };
+}
+
+export function createPostgresPartyPresetRepository(pool: Pool): PartyPresetRepository {
+  return {
+    async listPresetsByOwner(ownerPlayerId) {
+      const result = await pool.query<PartyPresetRow>(
+        'SELECT owner_player_id, slot, name, hero_ids FROM party_presets WHERE owner_player_id = $1 ORDER BY slot',
+        [ownerPlayerId],
+      );
+      return result.rows.map(rowToPartyPreset);
+    },
+    async savePreset(preset) {
+      await pool.query(
+        `INSERT INTO party_presets (owner_player_id, slot, name, hero_ids) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (owner_player_id, slot) DO UPDATE SET name = $3, hero_ids = $4`,
+        [preset.ownerPlayerId, preset.slot, preset.name, JSON.stringify(preset.heroIds)],
+      );
+      return preset;
+    },
+    async deletePreset(ownerPlayerId, slot) {
+      const result = await pool.query('DELETE FROM party_presets WHERE owner_player_id = $1 AND slot = $2', [ownerPlayerId, slot]);
+      return (result.rowCount ?? 0) > 0;
+    },
+    async deletePlayerData(ownerPlayerId) {
+      await pool.query('DELETE FROM party_presets WHERE owner_player_id = $1', [ownerPlayerId]);
     },
   };
 }

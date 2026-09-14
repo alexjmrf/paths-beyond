@@ -5,6 +5,7 @@ import { createDevIdentityValidator } from './identity/devIdentity.js';
 import { createInMemoryRateLimiter } from './battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
+  createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
@@ -117,6 +118,7 @@ const app = buildApp({
       ],
     },
   ]),
+  partyPresetRepository: createMemoryPartyPresetRepository(),
   replayRepository: createMemoryReplayRepository(),
   seasonRepository: createMemorySeasonRepository(),
   catalog,

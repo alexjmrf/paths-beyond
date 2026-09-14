@@ -2,6 +2,7 @@ import { catalog } from '../data/catalog.js';
 import { nomeDeUnidade, rotuloDeHeroi } from '../logic/rotulos.js';
 import { descreverObjetivo } from '../logic/objetivo.js';
 import { previaDaMissao } from '../logic/previaDaMissao.js';
+import { PresetsDeParty } from './PresetsDeParty.js';
 import { PreviaDoMapa } from './PreviaDoMapa.js';
 import { missaoPorId, proximaMissao, useBattleStore } from '../store/battleStore.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
@@ -154,6 +155,8 @@ export function CampaignPanel() {
           {/* D16 — o capítulo declara VAGAS e o jogador leva quem tem. É por isso que esta
               lista é o ROSTER dele e não um elenco fixo: o que ele possui é a party. */}
           <h3>{t('campanha.quemVai', { escolhidos: campaign.selectedHeroIds.length, vagas: selecionado.slots })}</h3>
+          {/* M35 3/N (D42) — o preset é ponto de partida; a lista abaixo continua sendo a seleção. */}
+          <PresetsDeParty />
           <ul className="campaign-roster">
             {pvp.roster.map((entry) => (
               <li key={entry.hero.id}>

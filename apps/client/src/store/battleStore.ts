@@ -40,6 +40,7 @@ import {
   type DungeonTicket,
   type EconomySnapshot,
   type ArenaDefense,
+  type PartyPreset,
   type ArenaDefenseUnit,
   type OpponentInfo,
   type PlayerInfo,
@@ -556,6 +557,14 @@ interface BattleStore {
   readonly opcoesAbertas: boolean;
   // M35 1/N (D41) — a aba do hub. Só ela está na tela; a batalha não tem menu.
   readonly abaDoHub: AbaDoHub;
+  // M35 3/N (D42) — os presets de party, lidos do servidor com o hub. `slots` vem de lá
+  // (`MAX_PARTY_PRESETS`): a tela desenha os oito sem saber o número.
+  readonly presets: {
+    readonly slots: number;
+    readonly lista: readonly PartyPreset[];
+    readonly busy: boolean;
+    readonly error: string | null;
+  };
   readonly apagarProgressoPendente: boolean;
   readonly targetingMode: TargetingMode | null;
   // §11/§3.4 (M13, sub-sessão 1/N) — a gravação. Todo comando ACEITO entra aqui na ordem;
@@ -631,6 +640,12 @@ interface BattleStore {
   setUiScale: (scale: number) => void;
   abrirOpcoes: () => void;
   escolherAba: (aba: AbaDoHub) => void;
+  lerPresets: () => Promise<void>;
+  /** Troca a seleção da missão pelos heróis do preset (os que o jogador ainda tem, aparados às vagas). */
+  aplicarPreset: (slot: number) => void;
+  /** Manda a seleção atual para o slot, com o nome. */
+  salvarPreset: (slot: number, name: string) => Promise<void>;
+  apagarPreset: (slot: number) => Promise<void>;
   fecharOpcoes: () => void;
   // Os dois passos de apagar. `clearProgress` é o efeito; só `confirmarApagarProgresso` o
   // chama pela tela, e só com a pergunta de pé.
@@ -819,6 +834,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   uiScale: restoredSave?.uiScale ?? DEFAULT_UI_SCALE,
   opcoesAbertas: false,
   abaDoHub: 'campanha',
+  presets: { slots: 8, lista: [], busy: false, error: null },
   apagarProgressoPendente: false,
   targetingMode: null,
   commandLog: [],
@@ -1749,7 +1765,62 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // `summon.error`, `pve.error`), então uma falhar não derruba as outras nem a sessão — o
   // jogador entra e vê no painel o que não carregou, com o botão de tentar de novo.
   carregarHub: async () => {
-    await Promise.all([get().refreshCampaign(), get().lerInvocacao(), get().refreshPve()]);
+    await Promise.all([get().refreshCampaign(), get().lerInvocacao(), get().refreshPve(), get().lerPresets()]);
+  },
+
+  // M35 3/N (D42) — os presets de party. Estado de conta no servidor; aqui só leitura,
+  // aplicação por cima da seleção e os dois gestos (salvar, apagar). Quem valida posse e
+  // tamanho é o servidor; a tela apara às vagas da missão ao aplicar.
+  lerPresets: async () => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    set((s) => ({ presets: { ...s.presets, busy: true, error: null } }));
+    try {
+      const resposta = await api.partyPresets(pvp.token);
+      set((s) => ({ presets: { ...s.presets, slots: resposta.slots, lista: resposta.presets, busy: false } }));
+    } catch (error) {
+      set((s) => ({ presets: { ...s.presets, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  aplicarPreset: (slot) => {
+    const { presets, campaign, pvp } = get();
+    const preset = presets.lista.find((p) => p.slot === slot);
+    const missao = missaoPorId(campaign.chapters, campaign.selectedMissionId);
+    if (!preset || !missao) return;
+    // Só quem o jogador ainda tem: um preset salvo antes de perder um herói (conta apagada e
+    // refeita, dado antigo) não pode mandar um id que o servidor recusaria por posse.
+    const possui = new Set(pvp.roster.map((entry) => entry.hero.id));
+    const selecao = preset.heroIds.filter((id) => possui.has(id)).slice(0, missao.slots);
+    set({ campaign: { ...campaign, selectedHeroIds: selecao, error: null } });
+  },
+
+  salvarPreset: async (slot, name) => {
+    const { pvp, campaign } = get();
+    if (!pvp.token) return;
+    if (campaign.selectedHeroIds.length === 0) {
+      set((s) => ({ presets: { ...s.presets, error: get().t('presets.semSelecao') } }));
+      return;
+    }
+    set((s) => ({ presets: { ...s.presets, busy: true, error: null } }));
+    try {
+      await api.savePartyPreset(pvp.token, slot, name, campaign.selectedHeroIds);
+      await get().lerPresets();
+    } catch (error) {
+      set((s) => ({ presets: { ...s.presets, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  apagarPreset: async (slot) => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    set((s) => ({ presets: { ...s.presets, busy: true, error: null } }));
+    try {
+      await api.deletePartyPreset(pvp.token, slot);
+      await get().lerPresets();
+    } catch (error) {
+      set((s) => ({ presets: { ...s.presets, busy: false, error: describeApiError(error) } }));
+    }
   },
 
   // O servidor é a fonte da verdade da defesa: a tela SEMPRE relê o que está lá antes de

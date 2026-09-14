@@ -12,6 +12,7 @@ import { economyRoutes } from './economy/routes.js';
 import { matchmakingRoutes } from './matchmaking/routes.js';
 import type {
   ArenaDefenseRepository,
+  PartyPresetRepository,
   CharacterOwnershipRepository,
   EconomyRepository,
   HeroRepository,
@@ -34,6 +35,8 @@ export interface BuildAppDeps {
   repository: PlayerRepository;
   heroRepository: HeroRepository;
   arenaDefenseRepository: ArenaDefenseRepository;
+  // M35 3/N (D42) — os presets de party.
+  partyPresetRepository: PartyPresetRepository;
   // §10 (M14, sub-sessão 3/N) — estado de conta do PvE (energia, moedas, materiais,
   // inventário, limpezas e trava de entrada).
   economyRepository: EconomyRepository;
@@ -119,6 +122,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
     repository: deps.repository,
     heroRepository: deps.heroRepository,
     arenaDefenseRepository: deps.arenaDefenseRepository,
+    partyPresetRepository: deps.partyPresetRepository,
     replayRepository: deps.replayRepository,
     economyRepository: deps.economyRepository,
     ownershipRepository: deps.ownershipRepository,
@@ -227,6 +231,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       heroRepository: deps.heroRepository,
       ownershipRepository: deps.ownershipRepository,
       rewardsRepository: deps.rewardsRepository,
+      partyPresetRepository: deps.partyPresetRepository,
       catalog: deps.catalog,
       ticketSecret: deps.ticketSecret,
       now: deps.now ?? (() => Date.now()),

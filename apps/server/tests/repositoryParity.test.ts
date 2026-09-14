@@ -8,6 +8,7 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryPartyPresetRepository,
   createMemoryRewardsRepository,
 } from '../src/repository/memoryRepository.js';
 import {
@@ -15,10 +16,12 @@ import {
   createPostgresEconomyRepository,
   createPostgresHeroRepository,
   createPostgresPlayerRepository,
+  createPostgresPartyPresetRepository,
   createPostgresRewardsRepository,
 } from '../src/repository/postgresRepository.js';
 import type {
   CharacterOwnershipRepository,
+  PartyPresetRepository,
   EconomyActionRecord,
   EconomyRepository,
   HeroRepository,
@@ -54,6 +57,8 @@ interface Backend {
   readonly ownership: CharacterOwnershipRepository;
   readonly rewards: RewardsRepository;
   readonly heroes: HeroRepository;
+  // M35 3/N — os presets de party (D42).
+  readonly presets: PartyPresetRepository;
 }
 
 const catalog = loadCatalogFromDisk();
@@ -328,6 +333,40 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         expect(lidos.map((h) => h.hero.id)).toEqual([IDS[0]!, IDS[1]!]);
       });
     });
+
+    // M35 3/N (D42) — os presets de party. Mesmo contrato nos dois backends: a lista volta
+    // ordenada por slot (a tela desenha os oito na ordem), salvar de novo substitui, apagar
+    // um slot não toca nos outros, e apagar a conta leva todos.
+    describe('presets de party', () => {
+      it('salva, lista em ordem de slot, e a ida e volta pelo jsonb devolve os ids inteiros', async () => {
+        await backend.presets.savePreset({ ownerPlayerId: PLAYER, slot: 4, name: 'Serra', heroIds: [`${PLAYER}-h2`] });
+        await backend.presets.savePreset({ ownerPlayerId: PLAYER, slot: 1, name: 'Estrada', heroIds: [`${PLAYER}-h1`, `${PLAYER}-h3`] });
+
+        expect(await backend.presets.listPresetsByOwner(PLAYER)).toEqual([
+          { ownerPlayerId: PLAYER, slot: 1, name: 'Estrada', heroIds: [`${PLAYER}-h1`, `${PLAYER}-h3`] },
+          { ownerPlayerId: PLAYER, slot: 4, name: 'Serra', heroIds: [`${PLAYER}-h2`] },
+        ]);
+      });
+
+      it('salvar de novo no mesmo slot substitui', async () => {
+        await backend.presets.savePreset({ ownerPlayerId: PLAYER, slot: 4, name: 'Serra II', heroIds: [`${PLAYER}-h3`] });
+        const lidos = await backend.presets.listPresetsByOwner(PLAYER);
+        expect(lidos.find((p) => p.slot === 4)).toEqual({ ownerPlayerId: PLAYER, slot: 4, name: 'Serra II', heroIds: [`${PLAYER}-h3`] });
+        expect(lidos).toHaveLength(2);
+      });
+
+      it('apagar um slot: true; apagar de novo: false; o outro slot fica', async () => {
+        expect(await backend.presets.deletePreset(PLAYER, 4)).toBe(true);
+        expect(await backend.presets.deletePreset(PLAYER, 4)).toBe(false);
+        expect((await backend.presets.listPresetsByOwner(PLAYER)).map((p) => p.slot)).toEqual([1]);
+      });
+
+      it('outra conta não vê nada, e apagar a conta leva tudo', async () => {
+        expect(await backend.presets.listPresetsByOwner(`${PLAYER}-outro`)).toEqual([]);
+        await backend.presets.deletePlayerData(PLAYER);
+        expect(await backend.presets.listPresetsByOwner(PLAYER)).toEqual([]);
+      });
+    });
   });
 }
 
@@ -337,6 +376,7 @@ contrato('memória', () => ({
   ownership: createMemoryCharacterOwnershipRepository(),
   rewards: createMemoryRewardsRepository(),
   heroes: createMemoryHeroRepository(),
+  presets: createMemoryPartyPresetRepository(),
 }));
 
 // Sem `DATABASE_URL` o bloco inteiro é pulado. O CI define a variável e sobe o serviço, e é
@@ -369,6 +409,7 @@ descrevePostgres('postgres', () => {
       // M27 2/N — a bateria passou a criar heróis; sem esta linha eles ficariam no banco do
       // CI e a próxima execução colidiria na chave primária.
       ['heroes', 'owner_player_id'],
+      ['party_presets', 'owner_player_id'],
     ] as const) {
       await pool.query(`DELETE FROM ${tabela} WHERE ${coluna} LIKE $1`, [`${PLAYER}%`]).catch(() => undefined);
     }
@@ -382,5 +423,6 @@ descrevePostgres('postgres', () => {
     ownership: createPostgresCharacterOwnershipRepository(pool),
     rewards: createPostgresRewardsRepository(pool),
     heroes: createPostgresHeroRepository(pool),
+    presets: createPostgresPartyPresetRepository(pool),
   }));
 });

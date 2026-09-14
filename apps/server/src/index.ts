@@ -4,6 +4,7 @@ import { buildApp } from './app.js';
 import { createSteamIdentityValidator } from './identity/steam.js';
 import {
   createPostgresArenaDefenseRepository,
+  createPostgresPartyPresetRepository,
   createPostgresCharacterOwnershipRepository,
   createPostgresEconomyRepository,
   createPostgresIdempotencyRepository,
@@ -52,6 +53,7 @@ const app = buildApp({
   repository: createPostgresPlayerRepository(pool),
   heroRepository: createPostgresHeroRepository(pool),
   arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),
+  partyPresetRepository: createPostgresPartyPresetRepository(pool),
   replayRepository: createPostgresReplayRepository(pool),
   seasonRepository: createPostgresSeasonRepository(pool),
   identityValidator: createSteamIdentityValidator({ apiKey: steamApiKey, appId: steamAppId }),

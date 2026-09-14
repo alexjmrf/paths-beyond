@@ -7,6 +7,7 @@ import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import { runMigrations } from '../src/migrate.js';
 import {
   createPostgresArenaDefenseRepository,
+  createPostgresPartyPresetRepository,
   createPostgresCharacterOwnershipRepository,
   createPostgresEconomyRepository,
   createPostgresHeroRepository,
@@ -66,6 +67,7 @@ descreve('produção: o app montado como em `index.ts`, contra Postgres', () => 
       repository: players,
       heroRepository: createPostgresHeroRepository(pool),
       arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),
+      partyPresetRepository: createPostgresPartyPresetRepository(pool),
       replayRepository: createPostgresReplayRepository(pool),
       seasonRepository: createPostgresSeasonRepository(pool),
       economyRepository: createPostgresEconomyRepository(pool),
