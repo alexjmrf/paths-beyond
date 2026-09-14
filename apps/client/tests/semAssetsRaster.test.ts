@@ -41,7 +41,9 @@ const EXTENSOES_DE_AUDIO = ['.mp3', '.ogg', '.wav', '.m4a', '.flac', '.aac', '.o
 const EXTENSOES_DE_CODIGO = ['.ts', '.tsx', '.css', '.html'];
 
 // Não são o código do projeto: dependências, saída de build e artefatos de ferramenta.
-const IGNORADOS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.vite', 'playwright-report']);
+// `release/` é a saída do empacotador do shell (M21), gitignored: o build de 2026-09-14 pôs 48
+// PNGs em `apps/desktop/release/win-unpacked/` e a varredura os leu como arte fora do lugar.
+const IGNORADOS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.vite', 'playwright-report', 'release']);
 
 function arquivosDe(dir: string, aceita: (caminho: string) => boolean, encontrados: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

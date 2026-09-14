@@ -1,5 +1,7 @@
 import type { BattleCommand } from '@paths-beyond/core';
 import { useEffect } from 'react';
+import { catalog } from '../data/catalog.js';
+import { nomeDeUnidade, nomeDoDesfecho } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §11 — "Replay: reprodução passo a passo com controle de velocidade a partir do
@@ -33,6 +35,7 @@ function describeCommand(command: BattleCommand): string {
 export function ReplayPanel() {
   const viewer = useBattleStore((s) => s.replayViewer);
   const t = useBattleStore((s) => s.t);
+  const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
   const closeReplayViewer = useBattleStore((s) => s.closeReplayViewer);
   const seekReplay = useBattleStore((s) => s.seekReplay);
   const setReplaySpeed = useBattleStore((s) => s.setReplaySpeed);
@@ -74,7 +77,7 @@ export function ReplayPanel() {
             passo: step,
             total,
             round: state.round,
-            desfecho: state.outcome,
+            desfecho: nomeDoDesfecho(t, state.outcome),
           })}
         </p>
         <p className="replay-command">{step === 0 ? 'Estado inicial.' : describeCommand(current!)}</p>
@@ -93,7 +96,7 @@ export function ReplayPanel() {
           <tbody>
             {state.units.map((unit) => (
               <tr key={unit.unitId} className={unit.hp <= 0 ? 'dead' : unit.side}>
-                <td>{unit.unitId}</td>
+                <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</td>
                 <td>
                   {unit.hp}/{unit.stats.hp}
                 </td>

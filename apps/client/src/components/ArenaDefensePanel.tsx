@@ -1,6 +1,7 @@
 import { isControlObject, tileAt, type Coord, type MapAiArchetype } from '@paths-beyond/core';
 import { catalog } from '../data/catalog.js';
 import { themeFor } from '../data/overlayTheme.js';
+import { rotuloDeHeroi } from '../logic/rotulos.js';
 import { defenseMapIds, MAX_DEFENSE_UNITS, useBattleStore } from '../store/battleStore.js';
 
 // §9.1 (M15, sub-sessão 3/N) — **a tela que faltava desde M7**. `PUT /me/defense` existe no
@@ -118,7 +119,8 @@ export function ArenaDefensePanel() {
                     {arming ? t('defesa.cliqueNoTile') : placed ? t('defesa.mover') : t('defesa.posicionar')}
                   </button>
                   <span className="defense-hero">
-                    {entry.hero.id} <span className="hint">({entry.hero.classId})</span>
+                    {rotuloDeHeroi(t, entry.hero, catalog).nome}{' '}
+                    <span className="hint">({rotuloDeHeroi(t, entry.hero, catalog).classe})</span>
                   </span>
                   {placed ? (
                     <>

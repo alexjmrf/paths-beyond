@@ -60,6 +60,7 @@ import { audioDoJogo, definirVolumesDoJogo } from '../audio/motorCompartilhado.j
 import { VOLUMES_PADRAO } from '../audio/sons.js';
 import { CATALOGOS } from '../i18n/catalogos.js';
 import { criarTradutor, idiomaDoNavegador, idiomaValido, type Idioma, type Tradutor } from '../i18n/idioma.js';
+import { nomeDoDesfecho } from '../logic/rotulos.js';
 import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
 import {
   marcarIntroducaoVista,
@@ -213,6 +214,21 @@ export function capituloInicialAberto(chapters: readonly CampaignChapter[]): str
   if (chapters.length === 0) return null;
   const parou = chapters.find((chapter) => chapter.missions.some((missao) => !missao.cleared));
   return (parou ?? chapters[chapters.length - 1]!).id;
+}
+
+// M32 — QUAL missão é a próxima ação quando o jogador ainda não escolheu nenhuma.
+//
+// O hub precisa de UMA coisa com peso visual maior que o resto (critério do M32). Com uma
+// missão selecionada é o botão de entrar nela; sem seleção, é a primeira missão que ainda
+// não foi limpa — onde o jogador parou, pela mesma regra de `capituloInicialAberto` acima.
+// Com tudo limpo não há próxima, e nada ganha o peso: inventar uma seria apontar para o
+// começo de quem já terminou.
+export function proximaMissao(chapters: readonly CampaignChapter[]): string | null {
+  for (const chapter of chapters) {
+    const missao = chapter.missions.find((m) => !m.cleared);
+    if (missao) return missao.id;
+  }
+  return null;
 }
 
 // A hidratação é SÍNCRONA, no boot do módulo. **M18 7/N: sem reconciliação**, porque não
@@ -528,6 +544,15 @@ interface BattleStore {
   // `rem`) e para o mapa, que cresce junto.
   readonly colorblindMode: boolean;
   readonly uiScale: number;
+  // M32 — o menu de opções, e a pergunta "apagar mesmo?" de pé.
+  //
+  // As sete preferências e "apagar progresso" saíram do cabeçalho: lá elas tinham o mesmo
+  // peso que o título do jogo, e apagar a conta local ficava a um clique, sem confirmação.
+  // A confirmação mora na store e não num `window.confirm` — o diálogo nativo não passa pela
+  // camada de idioma, bloqueia a aba inteira e não é testável sem navegador. Nenhum dos dois
+  // vai para o save: são estado de tela.
+  readonly opcoesAbertas: boolean;
+  readonly apagarProgressoPendente: boolean;
   readonly targetingMode: TargetingMode | null;
   // §11/§3.4 (M13, sub-sessão 1/N) — a gravação. Todo comando ACEITO entra aqui na ordem;
   // com o `BattleSetup` do mapa e a seed, isso é um `Replay` completo. Comandos de IA não
@@ -600,6 +625,13 @@ interface BattleStore {
   setDuelSceneEnabled: (value: boolean) => void;
   toggleColorblindMode: () => void;
   setUiScale: (scale: number) => void;
+  abrirOpcoes: () => void;
+  fecharOpcoes: () => void;
+  // Os dois passos de apagar. `clearProgress` é o efeito; só `confirmarApagarProgresso` o
+  // chama pela tela, e só com a pergunta de pé.
+  pedirApagarProgresso: () => void;
+  cancelarApagarProgresso: () => void;
+  confirmarApagarProgresso: () => void;
   clearProgress: () => void;
   buildReplay: () => Replay;
   setPvpToken: (token: string) => void;
@@ -629,6 +661,9 @@ interface BattleStore {
   awakenHero: (heroId: string) => Promise<void>;
   imprintHero: (heroId: string) => Promise<void>;
   refreshSummon: () => Promise<void>;
+  lerInvocacao: () => Promise<void>;
+  // M32 — o que o hub mostra, lido no sign-in: campanha, invocação e masmorras.
+  carregarHub: () => Promise<void>;
   rollSummon: (bannerId: string) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
   purchaseEnergy: () => Promise<void>;
@@ -778,6 +813,8 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   aiTurnReport: null,
   colorblindMode: restoredSave?.colorblindMode ?? false,
   uiScale: restoredSave?.uiScale ?? DEFAULT_UI_SCALE,
+  opcoesAbertas: false,
+  apagarProgressoPendente: false,
   targetingMode: null,
   commandLog: [],
   replayViewer: null,
@@ -1054,11 +1091,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       const run = await api.submitCampaignRun(pvp.token, campaign.ticket.chapterId, corpoDoCapitulo);
       limparPedido();
       set((s) => ({
-        campaign: { ...s.campaign, lastRun: run, busy: false, status: get().t('estado.servidorResolveu', { desfecho: run.outcome }) },
+        campaign: { ...s.campaign, lastRun: run, busy: false, status: get().t('estado.servidorResolveu', { desfecho: nomeDoDesfecho(get().t, run.outcome) }) },
       }));
       // O capítulo pode ter virado "limpo" e a moeda pode ter sido paga: a lista é relida
-      // para a tela não mostrar um estado que o servidor já mudou.
-      await get().refreshCampaign();
+      // para a tela não mostrar um estado que o servidor já mudou. M32 — o hub INTEIRO, e não
+      // só a campanha: a moeda premium da primeira vitória aparece no painel de invocação, que
+      // seguia dizendo "0" ao lado de "+60 de moeda premium" na tela de vitória.
+      await get().carregarHub();
     } catch (error) {
       if (error instanceof ApiError) limparPedido();
       set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
@@ -1077,7 +1116,19 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       duelPreview: null,
       targetingMode: null,
       lastCommandReason: null,
-      campaign: { ...s.campaign, ticket: null, status: null, error: null },
+      campaign: {
+        ...s.campaign,
+        ticket: null,
+        status: null,
+        error: null,
+        // M32 — missão que ficou LIMPA solta a seleção: com ela selecionada, o botão azul
+        // do hub apontaria para jogá-la de novo, e a missão seguinte (a próxima ação de
+        // verdade, D40) ficaria sem destaque. A que não ficou limpa continua selecionada —
+        // quem abandonou ou perdeu provavelmente quer tentar de novo.
+        selectedMissionId: missaoPorId(s.campaign.chapters, s.campaign.ticket?.chapterId ?? null)?.cleared
+          ? null
+          : s.campaign.selectedMissionId,
+      },
     }));
   },
 
@@ -1349,6 +1400,16 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // três botões faria o jogador ver saldo velho ao lado de pity novo: a moeda premium é a
   // mesma nas três respostas, e a última a chegar mandaria.
   refreshSummon: async () => {
+    // A tela de invocação traz moeda premium, banner e o contador de garantia de uma vez.
+    get().dispararIntroducao('primeiro-summon');
+    await get().lerInvocacao();
+  },
+
+  // M32 — a leitura SEM a introdução. `connectPvp` carrega o hub inteiro no sign-in, e a
+  // caixa de "primeiro summon" aparecendo por cima da campanha competiria com a missão 1,
+  // que é a próxima ação de quem chega. A introdução fica com o gesto explícito na tela de
+  // invocação (`refreshSummon`), como antes.
+  lerInvocacao: async () => {
     const { pvp } = get();
     if (!pvp.token) {
       set((s) => ({ summon: { ...s.summon, error: get().t('estado.conecteAntes') } }));
@@ -1356,8 +1417,6 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     }
     set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
     try {
-      // A tela de invocação traz moeda premium, banner e o contador de garantia de uma vez.
-      get().dispararIntroducao('primeiro-summon');
       const [roster, banners, rewards] = await Promise.all([
         api.characterRoster(pvp.token),
         api.banners(pvp.token),
@@ -1670,9 +1729,22 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       // ANTES de decidir atacar alguém. Erro aqui não derruba a conexão — `loadDefense`
       // trata o 404 como estado normal e o resto vira mensagem na própria tela.
       await get().loadDefense();
+
+      // M32 — o hub vem junto do login. Sem isto a campanha aparecia VAZIA depois de entrar,
+      // com um botão "Atualizar" e "Escolha uma missão": a missão 1, que é a próxima ação de
+      // quem chega (D40), só existia depois de um clique num botão de harness. Visto na tela
+      // com sessão de verdade, depois de D38 tirar o tabuleiro do hub.
+      await get().carregarHub();
     } catch (error) {
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
     }
+  },
+
+  // Cada leitura trata o próprio erro e o escreve no próprio painel (`campaign.error`,
+  // `summon.error`, `pve.error`), então uma falhar não derruba as outras nem a sessão — o
+  // jogador entra e vê no painel o que não carregou, com o botão de tentar de novo.
+  carregarHub: async () => {
+    await Promise.all([get().refreshCampaign(), get().lerInvocacao(), get().refreshPve()]);
   },
 
   // O servidor é a fonte da verdade da defesa: a tela SEMPRE relê o que está lá antes de
@@ -1899,7 +1971,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       const outcome = await api.submitBattle(pvp.token, corpoDaArena);
       limparPedido();
       set((s) => ({
-        pvp: { ...s.pvp, outcome, busy: false, status: get().t('estado.servidorResolveu', { desfecho: outcome.result.outcome }) },
+        pvp: { ...s.pvp, outcome, busy: false, status: get().t('estado.servidorResolveu', { desfecho: nomeDoDesfecho(get().t, outcome.result.outcome) }) },
       }));
     } catch (error) {
       if (error instanceof ApiError) limparPedido();
@@ -2051,7 +2123,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           ticket: null,
           activeDungeonId: null,
           busy: false,
-          status: get().t('estado.servidorResolveu', { desfecho: run.outcome }),
+          status: get().t('estado.servidorResolveu', { desfecho: nomeDoDesfecho(get().t, run.outcome) }),
         },
       }));
       await get().refreshPve();
@@ -2071,7 +2143,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ pve: { ...pve, busy: true, error: null, status: get().t('estado.varrendo') } });
     try {
       const run = await api.sweepDungeon(pvp.token, dungeonId, pve.selectedHeroIds);
-      set((s) => ({ pve: { ...s.pve, lastRun: run, busy: false, status: get().t('estado.varredura', { desfecho: run.outcome }) } }));
+      set((s) => ({ pve: { ...s.pve, lastRun: run, busy: false, status: get().t('estado.varredura', { desfecho: nomeDoDesfecho(get().t, run.outcome) }) } }));
       await get().refreshPve();
     } catch (error) {
       set((s) => ({ pve: { ...s.pve, busy: false, status: null, error: describeApiError(error) } }));
@@ -2239,6 +2311,22 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // campanha do zero — o token do PvP também sai, porque ele está no save. As preferências
   // de acessibilidade e o modo instantâneo NÃO saem: apagar progresso é sobre progresso, e
   // desligar o modo daltônico de quem precisa dele seria hostil.
+  // M32 — o menu de opções. Fechar com a pergunta de apagar aberta é uma resposta: "não".
+  // Reabrir não pode encontrar a pergunta ainda de pé, esperando um clique que o jogador
+  // não sabe que está dando.
+  abrirOpcoes: () => set({ opcoesAbertas: true }),
+  fecharOpcoes: () => set({ opcoesAbertas: false, apagarProgressoPendente: false }),
+  pedirApagarProgresso: () => set({ apagarProgressoPendente: true }),
+  cancelarApagarProgresso: () => set({ apagarProgressoPendente: false }),
+  // Só age com a pergunta de pé: um confirmar que funciona sozinho é o botão de um clique de
+  // antes, com outro nome. Fecha o menu junto — sem sessão a única tela é a entrada, e um
+  // menu aberto por cima dela seria a primeira coisa vista depois de apagar tudo.
+  confirmarApagarProgresso: () => {
+    if (!get().apagarProgressoPendente) return;
+    get().clearProgress();
+    set({ apagarProgressoPendente: false, opcoesAbertas: false });
+  },
+
   clearProgress: () => {
     clearSave(saveStorage);
     lastPersisted = null;

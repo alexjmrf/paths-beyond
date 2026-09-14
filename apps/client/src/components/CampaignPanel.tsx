@@ -1,4 +1,6 @@
-import { missaoPorId, useBattleStore } from '../store/battleStore.js';
+import { catalog } from '../data/catalog.js';
+import { rotuloDeHeroi } from '../logic/rotulos.js';
+import { missaoPorId, proximaMissao, useBattleStore } from '../store/battleStore.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
 
 // §10/§9.4/D16 (M18, sub-sessão 7/N) — a tela da CAMPANHA, agora jogada contra o servidor.
@@ -21,15 +23,6 @@ export function CampaignPanel() {
   const toggleCampaignHero = useBattleStore((s) => s.toggleCampaignHero);
   const enterChapter = useBattleStore((s) => s.enterChapter);
   const exitCampaign = useBattleStore((s) => s.exitCampaign);
-
-  if (!pvp.me) {
-    return (
-      <section className="campaign-panel">
-        <h2>{t('campanha.titulo')}</h2>
-        <p className="hint">{t('campanha.conecte')}</p>
-      </section>
-    );
-  }
 
   // Com um ticket aberto, a batalha está na tela: o painel sai da frente e deixa só a saída.
   if (campaign.ticket && mode === 'campaign') {
@@ -60,6 +53,9 @@ export function CampaignPanel() {
   // M27 — o que se seleciona é uma MISSÃO. `missaoPorId` varre as duas camadas num lugar
   // só; procurar aqui de novo seria uma segunda resposta para a mesma pergunta.
   const selecionado = missaoPorId(campaign.chapters, campaign.selectedMissionId) ?? null;
+  // M32 — UMA próxima ação com peso maior que o resto. Com missão escolhida é o botão de
+  // entrar; sem escolha, é a primeira missão por limpar (onde o jogador parou). Nunca as duas.
+  const proxima = selecionado ? null : proximaMissao(campaign.chapters);
 
   return (
     <section className="campaign-panel">
@@ -114,7 +110,7 @@ export function CampaignPanel() {
                     <li key={mission.id} className={mission.id === campaign.selectedMissionId ? 'selected' : ''}>
                       <button
                         type="button"
-                        className="campaign-mission-name"
+                        className={mission.id === proxima ? 'campaign-mission-name acao-principal' : 'campaign-mission-name'}
                         onClick={() => selectChapter(mission.id)}
                       >
                         {mission.order}. {nomeDeConteudo(t, 'missao', mission.id, mission.name)}
@@ -146,7 +142,8 @@ export function CampaignPanel() {
                     checked={campaign.selectedHeroIds.includes(entry.hero.id)}
                     onChange={() => toggleCampaignHero(entry.hero.id)}
                   />
-                  {entry.hero.id} <span className="pve-locked">({entry.hero.classId})</span>
+                  {rotuloDeHeroi(t, entry.hero, catalog).nome}{' '}
+                  <span className="pve-locked">({rotuloDeHeroi(t, entry.hero, catalog).classe})</span>
                 </label>
               </li>
             ))}
@@ -154,6 +151,7 @@ export function CampaignPanel() {
 
           <button
             type="button"
+            className="acao-principal"
             onClick={() => void enterChapter(selecionado.id)}
             disabled={campaign.busy || campaign.selectedHeroIds.length === 0}
           >

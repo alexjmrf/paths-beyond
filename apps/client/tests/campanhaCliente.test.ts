@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { capituloInicialAberto, useBattleStore } from '../src/store/battleStore.js';
+import { capituloInicialAberto, proximaMissao, useBattleStore } from '../src/store/battleStore.js';
 
 // §10/§9.4 (M18, sub-sessão 7/N) — a CAMPANHA do cliente, agora jogada pelo servidor.
 //
@@ -524,5 +524,29 @@ describe('a lista recolhe, e a escolha do jogador é dele', () => {
     useBattleStore.getState().toggleChapterOpen('chapter-inventado');
 
     expect(useBattleStore.getState().campaign.openChapterIds).toEqual([]);
+  });
+});
+
+// M32 — QUAL missão é a próxima ação quando o jogador ainda não escolheu nenhuma.
+//
+// O roadmap pede "em cada tela, UMA próxima ação com peso visual maior que o resto". No hub
+// com uma missão selecionada isso é o botão de entrar; sem seleção, é a primeira missão que
+// ainda não foi limpa — que é onde o jogador parou, pela mesma regra de `capituloInicialAberto`.
+describe('proximaMissao() — a próxima ação do hub', () => {
+  it('é a primeira missão não limpa, na ordem dos capítulos', () => {
+    expect(proximaMissao(TRES_CAPITULOS)).toBe('m-2-2');
+  });
+
+  it('com a demo inteira limpa não há próxima — nada ganha o peso', () => {
+    const tudoLimpo = TRES_CAPITULOS.map((c) => ({
+      ...c,
+      cleared: true,
+      missions: c.missions.map((m) => ({ ...m, cleared: true })),
+    }));
+    expect(proximaMissao(tudoLimpo)).toBeNull();
+  });
+
+  it('sem capítulo nenhum não inventa uma', () => {
+    expect(proximaMissao([])).toBeNull();
   });
 });

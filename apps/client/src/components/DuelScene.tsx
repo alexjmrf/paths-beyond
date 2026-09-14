@@ -16,6 +16,8 @@ import {
 import { themeFor } from '../data/overlayTheme.js';
 import { placeShapes, type Primitive } from '../data/shapes.js';
 import { artIdDeUnidade, arteDeDuelo, urlsDeArte } from '../data/unitArt.js';
+import { catalog } from '../data/catalog.js';
+import { nomeDeUnidade } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // M26 2/N — a TELA DE DUELO.
@@ -332,10 +334,10 @@ export function DuelScene() {
 
   if (!duelScene) return null;
 
-  // O `unitId`, como o painel de iniciativa faz. Nome próprio de unidade não é um problema
-  // desta fatia: `BattleUnit` não carrega nome, e inventar um esquema aqui criaria uma segunda
-  // resposta para "como esta unidade se chama" — a primeira já está no painel ao lado.
-  const nomeDe = (unitId: string) => unitId;
+  // M32 — o nome de quem ela é, como o painel de iniciativa passou a fazer: o herói do jogador
+  // pelo personagem, e quem não tem herói conhecido (inimigo, defesa de outra conta) pelo
+  // `unitId`, como antes. Uma resposta só para "como esta unidade se chama" (`nomeDeUnidade`).
+  const nomeDe = (unitId: string) => nomeDeUnidade(t, unitId, heroesByUnitId, catalog);
 
   return (
     <div className="duel-scene">

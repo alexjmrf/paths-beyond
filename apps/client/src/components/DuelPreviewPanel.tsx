@@ -130,7 +130,7 @@ export function DuelPreviewPanel() {
         )}
 
         <div className="duel-preview-actions">
-          <button type="button" disabled={!fullyRevealed} onClick={confirmEngage}>
+          <button type="button" className="acao-principal" disabled={!fullyRevealed} onClick={confirmEngage}>
             {t('duelo.confirmar')}
           </button>
           <button type="button" onClick={cancelEngage}>

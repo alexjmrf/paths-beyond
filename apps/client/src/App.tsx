@@ -1,12 +1,14 @@
 import { CampaignTransitionOverlay } from './components/CampaignTransitionOverlay.js';
 import { DuelPreviewPanel } from './components/DuelPreviewPanel.js';
 import { DungeonPanel } from './components/DungeonPanel.js';
+import { EntradaPanel } from './components/EntradaPanel.js';
 import { InitiativePanel } from './components/InitiativePanel.js';
 import { IntroducaoOverlay } from './components/IntroducaoOverlay.js';
 import { InventoryPanel } from './components/InventoryPanel.js';
 import { MapCanvas } from './components/MapCanvas.js';
 import { DuelScene } from './components/DuelScene.js';
 import { ObjectivePanel } from './components/ObjectivePanel.js';
+import { OpcoesMenu } from './components/OpcoesMenu.js';
 import { PvpPanel } from './components/PvpPanel.js';
 import { ReplayPanel } from './components/ReplayPanel.js';
 import { ResourcePanel } from './components/ResourcePanel.js';
@@ -18,9 +20,9 @@ import { UnitActionBar } from './components/UnitActionBar.js';
 import { UpdateBanner } from './components/UpdateBanner.js';
 import { VersionGate } from './components/VersionGate.js';
 import { useEffect } from 'react';
-import { UI_SCALES } from './data/overlayTheme.js';
-import { IDIOMAS } from './i18n/idioma.js';
-import { useBattleStore } from './store/battleStore.js';
+import { telaDoJogo } from './logic/tela.js';
+import { nomeDeConteudo } from './i18n/conteudo.js';
+import { missaoPorId, useBattleStore } from './store/battleStore.js';
 
 // Tamanho de fonte raiz em escala 1. Todo o CSS do cliente está em `rem`, então mudar esta
 // raiz escala texto, espaçamento e painéis de uma vez (§11 — "fonte escalável"); o mapa
@@ -28,23 +30,19 @@ import { useBattleStore } from './store/battleStore.js';
 const BASE_ROOT_FONT_PX = 16;
 
 export function App() {
-  const campaignChapter = useBattleStore((s) => s.campaign.ticket?.chapterId ?? null);
+  // M32 — o NOME da missão em curso, e não o id do ticket: o cabeçalho dizia
+  // `encounter-campanha-ponte-1` enquanto o painel ao lado dizia "Jogando A Trilha".
+  const missaoEmCurso = useBattleStore((s) => {
+    const id = s.campaign.ticket?.chapterId;
+    return id ? nomeDeConteudo(s.t, 'missao', id, missaoPorId(s.campaign.chapters, id)?.name ?? id) : null;
+  });
   const mode = useBattleStore((s) => s.mode);
-  const instantResultMode = useBattleStore((s) => s.instantResultMode);
-  const duelSceneEnabled = useBattleStore((s) => s.duelSceneEnabled);
-  const setDuelSceneEnabled = useBattleStore((s) => s.setDuelSceneEnabled);
-  const toggleInstantResultMode = useBattleStore((s) => s.toggleInstantResultMode);
-  const colorblindMode = useBattleStore((s) => s.colorblindMode);
-  const toggleColorblindMode = useBattleStore((s) => s.toggleColorblindMode);
   const uiScale = useBattleStore((s) => s.uiScale);
-  const setUiScale = useBattleStore((s) => s.setUiScale);
-  const clearProgress = useBattleStore((s) => s.clearProgress);
-  const volumeEfeitos = useBattleStore((s) => s.volumeEfeitos);
-  const volumeMusica = useBattleStore((s) => s.volumeMusica);
-  const definirVolume = useBattleStore((s) => s.definirVolume);
-  const idioma = useBattleStore((s) => s.idioma);
-  const definirIdioma = useBattleStore((s) => s.definirIdioma);
+  const abrirOpcoes = useBattleStore((s) => s.abrirOpcoes);
   const t = useBattleStore((s) => s.t);
+  // M32 — QUAL tela: entrada, hub ou batalha. A regra é de `logic/tela.ts`, e é testada lá;
+  // aqui só se escolhe o que desenhar.
+  const tela = useBattleStore((s) => telaDoJogo(s));
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${BASE_ROOT_FONT_PX * uiScale}px`;
@@ -61,108 +59,56 @@ export function App() {
       {/* M23 1/N — a introdução contextual: um cartão ao lado do que está sendo explicado,
           com a tela viva atrás. */}
       <IntroducaoOverlay />
+      {/* M32 — as preferências e "apagar progresso" saíram daqui para o menu de opções. O
+          cabeçalho fica com o que diz ONDE o jogador está, e um botão para o menu. */}
       <header>
         <h1>{t('app.titulo')}</h1>
-        <span className="campaign-progress">
-          {/* M18 7/N — o capítulo em curso vem do TICKET, e não de um índice local: quem
-              sabe em que ponto da campanha o jogador está é o servidor. */}
-          {mode === 'pvp'
-            ? t('app.modo.pvp')
-            : mode === 'dungeon'
-              ? t('app.modo.masmorra')
-              : (campaignChapter ?? t('app.modo.escolhaCapitulo'))}
-        </span>
-        {/* §11 (acessibilidade) — os três itens: resultado instantâneo, modo daltônico e
-            fonte escalável. Nenhum deles toca regra: são preferências de apresentação, e
-            todas sobrevivem à recarga junto com o progresso. */}
-        {/* M26 2/N — o segundo nível, entre assistir a cena e não ver nada. O farm de
-            masmorra vive nesse meio-termo: quem repete a mesma masmorra vinte vezes não
-            quer a cena, mas ainda quer ver o tabuleiro. */}
-        <label className="instant-result-toggle">
-          <input
-            type="checkbox"
-            checked={duelSceneEnabled}
-            onChange={(e) => setDuelSceneEnabled(e.target.checked)}
-          />
-          {t('app.pref.animacaoDeBatalha')}
-        </label>
-        <label className="instant-result-toggle">
-          <input type="checkbox" checked={instantResultMode} onChange={toggleInstantResultMode} />
-          {t('app.pref.resultadoInstantaneo')}
-        </label>
-        <label className="accessibility-toggle">
-          <input type="checkbox" checked={colorblindMode} onChange={toggleColorblindMode} />
-          {t('app.pref.daltonico')}
-        </label>
-        <label className="ui-scale-select">
-          {t('app.pref.tamanho')}
-          <select value={uiScale} onChange={(event) => setUiScale(Number(event.target.value))}>
-            {UI_SCALES.map((scale) => (
-              <option key={scale} value={scale}>
-                {Math.round(scale * 100)}%
-              </option>
-            ))}
-          </select>
-        </label>
-        {/* §11 (M24) — os DOIS volumes, separados. Quem joga ouvindo podcast desliga a
-            música e continua precisando ouvir o golpe: um controle só forçaria a escolha
-            entre as duas coisas. Eles vivem aqui, junto das outras preferências de
-            apresentação, porque é isso que eles são — e é onde o roadmap mandou pô-los. */}
-        <label className="volume-control">
-          {t('app.pref.efeitos')}
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={volumeEfeitos}
-            onChange={(event) => definirVolume('efeitos', Number(event.target.value))}
-          />
-        </label>
-        <label className="volume-control">
-          {t('app.pref.musica')}
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={volumeMusica}
-            onChange={(event) => definirVolume('musica', Number(event.target.value))}
-          />
-        </label>
-        {/* §11/D24 (M25) — o seletor de idioma. Cada língua aparece escrita NELA MESMA: quem
-            procura português numa tela em japonês procura "Português", não a palavra japonesa
-            para português. */}
-        <label className="language-select">
-          {t('app.pref.idioma')}
-          <select value={idioma} onChange={(event) => definirIdioma(event.target.value as typeof idioma)}>
-            {IDIOMAS.map((codigo) => (
-              <option key={codigo} value={codigo}>
-                {t(`idioma.${codigo}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {/* M13, 3/N — o progresso é salvo sozinho; este é o único jeito de desfazê-lo sem
-            abrir o console do navegador. */}
-        <button type="button" className="clear-progress" onClick={clearProgress}>
-          {t('app.pref.apagarProgresso')}
+        {tela === 'entrada' ? null : (
+          <span className="campaign-progress">
+            {/* M18 7/N — o capítulo em curso vem do TICKET, e não de um índice local: quem
+                sabe em que ponto da campanha o jogador está é o servidor. */}
+            {mode === 'pvp'
+              ? t('app.modo.pvp')
+              : mode === 'dungeon'
+                ? t('app.modo.masmorra')
+                : (missaoEmCurso ?? t('app.modo.escolhaCapitulo'))}
+          </span>
+        )}
+        <button type="button" className="abrir-opcoes" onClick={abrirOpcoes}>
+          {t('app.opcoes')}
         </button>
       </header>
-      <main>
-        <MapCanvas />
-        <DuelScene />
-        <div className="side-panels">
-          <CampaignPanel />
-          <ObjectivePanel />
-          <PvpPanel />
-          <DungeonPanel />
-          <SummonPanel />
-          <InitiativePanel />
-          <ResourcePanel />
-          <UnitActionBar />
-        </div>
-      </main>
+      <OpcoesMenu />
+      {tela === 'entrada' ? (
+        // Sem sessão, a única coisa na tela é entrar: nenhum tabuleiro, nenhum painel.
+        <main className="main-entrada">
+          <EntradaPanel />
+        </main>
+      ) : tela === 'hub' ? (
+        // Com sessão e sem batalha: o que se pode fazer, sem grid vazio ao lado. A campanha
+        // vem primeiro porque é a próxima ação de quem chega.
+        <main className="main-hub">
+          <div className="hub-panels">
+            <CampaignPanel />
+            <DungeonPanel />
+            <SummonPanel />
+            <PvpPanel />
+          </div>
+        </main>
+      ) : (
+        <main>
+          <MapCanvas />
+          <DuelScene />
+          <div className="side-panels">
+            {/* O painel do modo em curso é o que tem a saída da batalha. */}
+            {mode === 'campaign' ? <CampaignPanel /> : mode === 'dungeon' ? <DungeonPanel /> : <PvpPanel />}
+            <ObjectivePanel />
+            <InitiativePanel />
+            <ResourcePanel />
+            <UnitActionBar />
+          </div>
+        </main>
+      )}
       <DuelPreviewPanel />
       <TacticsEditor />
       <InventoryPanel />

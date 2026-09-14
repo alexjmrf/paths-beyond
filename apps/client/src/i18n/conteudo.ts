@@ -38,6 +38,8 @@ export const TIPOS_DE_CONTEUDO = [
   'material',
   'capitulo',
   'missao',
+  // M32 — as skills de Valor (§5.6): catálogo próprio, só visível dentro de uma batalha.
+  'valor',
 ] as const;
 
 export type TipoDeConteudo = (typeof TIPOS_DE_CONTEUDO)[number];

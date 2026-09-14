@@ -1,3 +1,5 @@
+import { catalog } from '../data/catalog.js';
+import { nomeDeUnidade, nomeDoDesfecho } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §11 — "Lista de iniciativa sempre visível com a ordem completa do round" (requisito
@@ -5,6 +7,7 @@ import { useBattleStore } from '../store/battleStore.js';
 export function InitiativePanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const t = useBattleStore((s) => s.t);
+  const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
 
@@ -32,7 +35,7 @@ export function InitiativePanel() {
                 .join(' ')}
               onClick={() => !dead && selectUnit(unit.unitId)}
             >
-              <span className="name">{unit.unitId}</span>
+              <span className="name">{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</span>
               <span className="initiative-value">{entry.initiative}</span>
               {dead ? (
                 <span className="status">{t('iniciativa.morto')}</span>
@@ -50,7 +53,7 @@ export function InitiativePanel() {
         {t('iniciativa.valor', { valor: battleState.valor })}{' '}
         <span className="hint">{t('iniciativa.valorHint')}</span>
       </p>
-      <p className="outcome">{t('iniciativa.resultado', { resultado: battleState.outcome })}</p>
+      <p className="outcome">{t('iniciativa.resultado', { resultado: nomeDoDesfecho(t, battleState.outcome) })}</p>
     </aside>
   );
 }

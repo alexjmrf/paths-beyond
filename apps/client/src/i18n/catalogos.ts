@@ -28,6 +28,24 @@ const en: Catalogo = {
   'app.pref.musica': 'Music',
   'app.pref.idioma': 'Language',
   'app.pref.apagarProgresso': 'Erase progress',
+  // M32 — o menu de opções, e "apagar progresso" em dois passos. A pergunta diz o que sai e
+  // o que fica: apagar é sobre progresso, e o modo daltônico de quem precisa dele fica.
+  'app.opcoes': 'Options',
+  'app.opcoes.titulo': 'Options',
+  'app.opcoes.fechar': 'Close',
+  'app.opcoes.acessibilidade': 'Accessibility',
+  'app.opcoes.som': 'Sound',
+  'app.opcoes.conta': 'Account',
+  'app.pref.apagarPergunta':
+    'This erases everything saved on this machine and signs you out. Accessibility and volume settings stay.',
+  'app.pref.apagarConfirmar': 'Yes, erase everything',
+  'app.pref.apagarCancelar': 'Keep my progress',
+
+  // M32 — a entrada. Entrar não tem nada a ver com PvP: é a primeira ação do jogo, e ficava
+  // dentro de um painel chamado "PvP — arena", com as outras telas mandando o jogador para lá.
+  'entrada.chamada': 'Sign in to play the campaign, farm dungeons, summon heroes and fight in the arena.',
+  'entrada.entrar': 'Sign in',
+  'entrada.identidade': 'Platform identity — nothing to type.',
 
   // M26 2/N — a tela de duelo, e o interruptor dela.
   //
@@ -91,7 +109,6 @@ const en: Catalogo = {
 
   // A campanha.
   'campanha.titulo': 'Campaign',
-  'campanha.conecte': 'Sign in on the PvP panel to play the campaign.',
   'campanha.jogando': 'Playing {missao}',
   'campanha.abandonar': 'Leave mission',
   'campanha.atualizar': 'Refresh',
@@ -134,8 +151,27 @@ const en: Catalogo = {
   'iniciativa.valorHint': '— map resource',
   'iniciativa.valorTitle': 'A resource for the whole map. You gain it by capturing objectives and spend it on Valor skills.',
   'iniciativa.resultado': 'Result: {resultado}',
+  // M32 — o desfecho era o enum do core ('ongoing') interpolado cru, nas duas línguas.
+  'desfecho.ongoing': 'in progress',
+  'desfecho.victory': 'victory',
+  'desfecho.defeat': 'defeat',
   'objetivo.titulo': 'Objective',
   'objetivo.round': 'Round {round}',
+  // M32 — as cinco condições de §5.7, que viviam em português dentro de `describeObjective`.
+  // `objetivoNaTela.test.ts` deriva a lista do schema: uma condição nova sem par
+  // `titulo`/`detalhe` aqui fica vermelha.
+  'objetivo.rout.titulo': 'Defeat every enemy',
+  'objetivo.rout.detalhe': '{inimigos} enemy unit(s) still standing.',
+  'objetivo.seize.titulo': 'Seize the objective at {alvo}',
+  'objetivo.seize.detalhe': 'One of your units alive on the marked tile is enough. No need to defeat everyone.',
+  'objetivo.surviveRounds.titulo': 'Survive {n} rounds',
+  'objetivo.surviveRounds.detalhe': '{faltam} round(s) to go. Enemies left on the field do not block the victory.',
+  'objetivo.surviveRounds.cumprido': 'Rounds complete.',
+  'objetivo.escort.titulo': 'Bring {unidade} to {alvo}',
+  'objetivo.escort.detalhe': 'If the escorted unit falls, the battle is lost on the spot.',
+  'objetivo.defend.titulo': 'Hold {alvo} for {rounds} rounds',
+  'objetivo.defend.detalhe':
+    '{faltam} round(s) to go. An enemy on the tile is an immediate defeat — finishing the rounds later does not undo it.',
   'valor.titulo': 'Valor:',
   'valor.semSkills': 'This map declares no Valor skills.',
   'valor.custo': '({custo} Valor)',
@@ -193,8 +229,6 @@ const en: Catalogo = {
 
   // A arena (PvP assíncrono).
   'pvp.titulo': 'PvP — arena',
-  'pvp.entrar': 'Sign in',
-  'pvp.identidade': 'Platform identity — nothing to type.',
   'pvp.eu': '{nome} · ELO {elo} · {marcas} marks',
   'pvp.seuTime': 'Your team',
   'pvp.procurarOponente': 'Find opponent',
@@ -211,7 +245,6 @@ const en: Catalogo = {
 
   // A invocação (gacha).
   'summon.titulo': 'Summoning',
-  'summon.conecte': 'Sign in on the PvP panel to summon.',
   'summon.atualizar': 'Refresh',
   'summon.premium': 'Premium currency {premium} · {possuidos}/{total} characters',
   'summon.pity': 'Guarantee {atual}/{teto} · {estado}',
@@ -268,7 +301,6 @@ const en: Catalogo = {
 
   // A masmorra (farm de §10).
   'masmorra.titulo': 'Dungeons',
-  'masmorra.conecte': 'Sign in on the PvP panel to farm.',
   'masmorra.atualizarConta': 'Refresh account',
   'masmorra.economia': 'Energy {energia}/{teto} · Gold {ouro} · Stones {pedras} · {itens} item(s) in the inventory',
   'masmorra.resultadoLocal': 'Local result: {desfecho}. The server decides — send the commands.',
@@ -536,6 +568,11 @@ const en: Catalogo = {
   'conteudo.missao.encounter-campanha-4': 'Siege in the Woods',
   'conteudo.missao.encounter-campanha-5': 'The Messenger',
   'conteudo.missao.encounter-campanha-6': "The Master's Fortress",
+  // M32 — as skills de Valor (§5.6). Só aparecem dentro de uma batalha, no painel de objetivo.
+  'conteudo.valor.valor-bombardeio': 'Bombardment',
+  'conteudo.valor.valor-brado-de-guerra': 'War Cry',
+  'conteudo.valor.valor-convocar-milicia': 'Muster the Militia',
+  'conteudo.valor.valor-restaurar-recursos': 'Restore Resources',
 };
 
 const pt: Catalogo = {
@@ -550,6 +587,20 @@ const pt: Catalogo = {
   'app.pref.musica': 'Música',
   'app.pref.idioma': 'Idioma',
   'app.pref.apagarProgresso': 'Apagar progresso',
+  'app.opcoes': 'Opções',
+  'app.opcoes.titulo': 'Opções',
+  'app.opcoes.fechar': 'Fechar',
+  'app.opcoes.acessibilidade': 'Acessibilidade',
+  'app.opcoes.som': 'Som',
+  'app.opcoes.conta': 'Conta',
+  'app.pref.apagarPergunta':
+    'Isto apaga tudo o que está salvo nesta máquina e encerra a sessão. As preferências de acessibilidade e de volume ficam.',
+  'app.pref.apagarConfirmar': 'Sim, apagar tudo',
+  'app.pref.apagarCancelar': 'Manter meu progresso',
+
+  'entrada.chamada': 'Entre para jogar a campanha, farmar masmorras, invocar heróis e lutar na arena.',
+  'entrada.entrar': 'Entrar',
+  'entrada.identidade': 'Identidade da plataforma — nada a digitar.',
 
   // M26 2/N — a tela de duelo, e o interruptor dela.
   'app.pref.animacaoDeBatalha': 'Cena de batalha ao engajar',
@@ -599,7 +650,6 @@ const pt: Catalogo = {
   'atualizacao.reiniciarAgora': 'Reiniciar agora',
 
   'campanha.titulo': 'Campanha',
-  'campanha.conecte': 'Conecte-se no painel de PvP para jogar a campanha.',
   'campanha.jogando': 'Jogando {missao}',
   'campanha.abandonar': 'Abandonar missão',
   'campanha.atualizar': 'Atualizar',
@@ -640,8 +690,23 @@ const pt: Catalogo = {
   'iniciativa.valorHint': '— recurso do mapa',
   'iniciativa.valorTitle': 'Recurso do mapa inteiro. Você ganha capturando objetivos e gasta em habilidades de Valor.',
   'iniciativa.resultado': 'Resultado: {resultado}',
+  'desfecho.ongoing': 'em andamento',
+  'desfecho.victory': 'vitória',
+  'desfecho.defeat': 'derrota',
   'objetivo.titulo': 'Objetivo',
   'objetivo.round': 'Round {round}',
+  'objetivo.rout.titulo': 'Derrotar todos os inimigos',
+  'objetivo.rout.detalhe': '{inimigos} inimigo(s) de pé.',
+  'objetivo.seize.titulo': 'Tomar o objetivo em {alvo}',
+  'objetivo.seize.detalhe': 'Basta uma unidade sua viva sobre o tile marcado. Não é preciso derrotar todos.',
+  'objetivo.surviveRounds.titulo': 'Sobreviver {n} rounds',
+  'objetivo.surviveRounds.detalhe': 'Faltam {faltam} round(s). Inimigo vivo em campo não impede a vitória.',
+  'objetivo.surviveRounds.cumprido': 'Rounds cumpridos.',
+  'objetivo.escort.titulo': 'Levar {unidade} até {alvo}',
+  'objetivo.escort.detalhe': 'Se a unidade escoltada cair, a batalha está perdida na hora.',
+  'objetivo.defend.titulo': 'Segurar {alvo} por {rounds} rounds',
+  'objetivo.defend.detalhe':
+    'Faltam {faltam} round(s). Inimigo sobre o tile é derrota imediata — cumprir os rounds depois não desfaz.',
   'valor.titulo': 'Valor:',
   'valor.semSkills': 'Este mapa não declara skills de Valor.',
   'valor.custo': '({custo} Valor)',
@@ -694,8 +759,6 @@ const pt: Catalogo = {
   'replay.fechar': 'Fechar',
 
   'pvp.titulo': 'PvP — arena',
-  'pvp.entrar': 'Entrar',
-  'pvp.identidade': 'Identidade da plataforma — nada a digitar.',
   'pvp.eu': '{nome} · ELO {elo} · {marcas} marcas',
   'pvp.seuTime': 'Seu time',
   'pvp.procurarOponente': 'Procurar oponente',
@@ -711,7 +774,6 @@ const pt: Catalogo = {
   'pvp.marcas': 'Marcas de arena: {marcas}',
 
   'summon.titulo': 'Invocação',
-  'summon.conecte': 'Conecte-se no painel de PvP para invocar.',
   'summon.atualizar': 'Atualizar',
   'summon.premium': 'Moeda premium {premium} · {possuidos}/{total} personagens',
   'summon.pity': 'Garantia {atual}/{teto} · {estado}',
@@ -763,7 +825,6 @@ const pt: Catalogo = {
   'inventario.poderTitle': 'Poder de combate: um resumo dos stats do herói, usado para comparar equipamentos rapidamente.',
 
   'masmorra.titulo': 'Masmorras',
-  'masmorra.conecte': 'Conecte-se no painel de PvP para farmar.',
   'masmorra.atualizarConta': 'Atualizar conta',
   'masmorra.economia': 'Energia {energia}/{teto} · Ouro {ouro} · Pedras {pedras} · {itens} item(ns) no inventário',
   'masmorra.resultadoLocal': 'Resultado local: {desfecho}. O servidor é quem decide — envie os comandos.',
@@ -1015,6 +1076,10 @@ const pt: Catalogo = {
   'conteudo.missao.encounter-campanha-4': 'Cerco no Bosque',
   'conteudo.missao.encounter-campanha-5': 'A Mensageira',
   'conteudo.missao.encounter-campanha-6': 'A Fortaleza do Mestre',
+  'conteudo.valor.valor-bombardeio': 'Bombardeio',
+  'conteudo.valor.valor-brado-de-guerra': 'Brado de Guerra',
+  'conteudo.valor.valor-convocar-milicia': 'Convocar Milícia',
+  'conteudo.valor.valor-restaurar-recursos': 'Restaurar Recursos',
 };
 
 export const CATALOGOS: Readonly<Record<Idioma, Catalogo>> = { en, pt };

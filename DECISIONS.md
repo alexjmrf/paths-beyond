@@ -7815,3 +7815,168 @@ mudar, a linha vermelha diz qual conteúdo entrou.
 Máximo **57,3% (Guerreiro)** e spd concentrado em **33,0%** nas vencedoras — os dois critérios
 do M8 de pé. **Idênticos aos do M27**, e era o esperado: o custo de invocação não entra na
 resolução de duelo. Rodar mesmo assim é o que separa "não deve ter mudado" de "não mudou".
+
+## M32 — A HUD de um jogo, não de um harness
+
+`packages/core` sem uma linha alterada e `RULES_VERSION` fica em `0.19.0`. Nenhuma regra mudou:
+tudo o que esta fatia fez foi decidir O QUE aparece na tela e quando — e isso, pela regra 3,
+mora no cliente. Os cinco pontos do aceite têm teste ou têm dono, e o dono do último é o usuário.
+
+### D38 — a tela é uma função do estado, e são três
+
+`telaDoJogo(estado)` em `apps/client/src/logic/tela.ts` devolve `entrada | hub | batalha`:
+sem `pvp.me`, entrada; com sessão e tabuleiro vazio, hub; com peças no tabuleiro, batalha.
+`App.tsx` só escolhe o que desenhar a partir disso.
+
+**A decisão fora do texto do roadmap, dita antes de codar e aprovada:** o roadmap pede "nenhum
+tabuleiro sem sessão"; o tabuleiro some também no **hub** — com sessão, antes de entrar numa
+missão. Um grid vazio com "0 inimigo(s) de pé" e "Round 1" ao lado da lista de missões é o mesmo
+defeito com outro nome, e contraria "uma próxima ação por tela". "Há batalha" é "há unidades
+em `battleState`": todo caminho que começa uma batalha passa por `buildInitialState` e todo
+caminho que sai volta a `tabuleiroVazio()`; olhar o ticket de cada modo seria três perguntas
+para a mesma coisa.
+
+O sign-in saiu de `PvpPanel` para `EntradaPanel`: **entrar não tem nada a ver com PvP** — é a
+primeira ação do jogo, e o M20 a fez explícita de propósito. As três frases "entre no painel de
+PvP" (`campanha.conecte`, `summon.conecte`, `masmorra.conecte`) saíram do catálogo junto com as
+guardas mortas: os painéis não existem mais sem sessão.
+
+### D39 — "apagar progresso" em dois passos, na store, e nunca como ação principal
+
+As sete preferências (§11, M24, M25) e o botão de apagar saíram do cabeçalho para um menu de
+opções (`OpcoesMenu.tsx`, aberto por um botão só no cabeçalho). Apagar pede confirmação, e a
+confirmação é **estado da store** (`apagarProgressoPendente`) e não `window.confirm`: o diálogo
+nativo não passa pela camada de idioma, bloqueia a aba inteira e não é testável sem navegador.
+`confirmarApagarProgresso` só age com a pergunta de pé — um confirmar que funciona sozinho é o
+botão de um clique de antes, com outro nome — e fechar o menu com a pergunta aberta responde
+"não". `opcoesNaStore.test.ts` afirma as três coisas.
+
+A ação principal do menu é **fechar**; `acaoPrincipal.test.ts` afirma que nenhum dos dois botões
+de apagar carrega a classe. A ação que não se desfaz não pode ser a que salta aos olhos.
+
+### O objetivo e as skills de Valor passam pela camada de idioma — e por que o M29 não os viu
+
+`describeObjective()` vivia dentro de `ObjectivePanel.tsx` com as cinco condições de §5.7 em
+português, **em template literal**: `semTextoCru.test.ts` varre `>texto<` e atributos, não
+strings dentro de função, e por isso nunca acusou. As skills de Valor eram `skill.name` cru de
+um catálogo próprio (`valor-skills/`) que o M29 não percorreu porque não é missão, classe nem
+material.
+
+O conserto segue o desenho do M29: a função virou `logic/objetivo.ts` recebendo `t`, e
+`objetivoNaTela.test.ts` **deriva a lista de condições de `winConditionSchema.options`** — a
+união discriminada de `packages/data` existe em runtime, então uma condição nova fica vermelha
+até ter `objetivo.<t>.titulo` e `.detalhe` nas duas línguas. O tipo `valor` entrou em
+`TIPOS_DE_CONTEUDO` e `NOMES_AUTORADOS.valor` lê `catalogo.valorSkills`; a asserção de runtime
+"nenhum tipo fica fora da conferência" foi o que obrigou as oito entradas a existirem.
+
+**Fica registrado, e não é omissão:** a unidade escoltada aparece pelo `unitId`, que é como toda
+a HUD a chama hoje (iniciativa, recursos, preview). Dar nome às peças é o redesenho (M35).
+
+### D40 — uma classe, `acao-principal`, e uma lista fechada de quem a usa
+
+O peso visual é uma classe só, `.app-layout button.acao-principal` — o seletor carrega
+`.app-layout button` de propósito, porque cada painel dá estilo aos próprios botões e a ação
+principal precisa vencê-los sem `!important`. Quem a usa: a entrada (o único botão), a campanha
+(a primeira missão por limpar quando nada está escolhido — `proximaMissao()`, pela mesma regra de
+`capituloInicialAberto` —, ou "entrar" quando há missão escolhida; nunca as duas), o preview de
+duelo ("confirmar", que é o recurso mais importante do jogo por §11), a arena ("enviar", só com a
+batalha terminada e ainda não enviada) e o menu de opções ("fechar").
+
+`acaoPrincipal.test.ts` afirma que a classe tem `font-weight` E `background` no CSS, e que o
+conjunto de telas que a declaram é **exatamente** essa lista — uma tela nova que ganhe ou perca a
+classe entra num diff que alguém lê. Na batalha sem preview aberto nada carrega a classe: a
+próxima ação é o mapa, e ele já é o maior elemento da tela.
+
+**O que o teste NÃO afirma, e é do usuário:** que a próxima ação se identifica sem que ninguém
+aponte. É julgado na tela, como o critério 2 do M16.
+
+### Um ajuste fora do escopo, declarado: `release/` na varredura de arte
+
+`semAssetsRaster.test.ts` estava vermelho **antes desta fatia**: o build do instalador de
+2026-09-14 (critério 3 do M28) deixou 48 PNGs em `apps/desktop/release/win-unpacked/`, que é
+gitignored e é saída de empacotador — e a varredura os leu como arte fora do lugar. Entrou
+`release` na lista de diretórios ignorados, ao lado de `dist` e `build`. É a única linha desta
+fatia fora do M32, e está aqui porque "a suíte do cliente segue verde" é critério do M32.
+
+### M32 — sub-sessão 2/N: o que a tela com sessão de verdade mostrou (2026-09-14)
+
+A 1/N viu a entrada e o menu de opções no navegador, e NÃO viu o hub nem a batalha — exigem
+sessão, e não havia Postgres nesta máquina. Nesta sub-sessão o dev server apontou para o Railway
+(`PATHS_BEYOND_SERVER`, decisão do usuário: cria uma conta `dev:` no banco hospedado) e as duas
+telas foram vistas. **Quatro defeitos reais, dois deles invisíveis à suíte**, e nenhum deles em
+`packages/core` — `RULES_VERSION` segue `0.19.0`.
+
+**1. A batalha QUEBRAVA — regressão do D38, latente desde o M26.** `MapCanvas.tsx` fazia
+`redraw()` e só DEPOIS `Assets.load(urls)`. Em Pixi v8 `Texture.from(url)` de textura fora do
+cache devolve `undefined`; `textura.source` lançava `TypeError` no primeiro quadro, o
+`Assets.load` que vinha em seguida nunca rodava (a imagem nunca era sequer pedida — a rede
+confirmou: zero requisições de PNG), a peça inimiga não era desenhada ("1 inimigo de pé" num
+tabuleiro só com o herói), e o próximo redraw disparado pelo React (clicar na lista de
+iniciativa) desmontava a árvore inteira — tela preta. **Por que ninguém viu em M26–M31:** o
+tabuleiro montava na carga da página com a batalha-fixture, cujas unidades não têm arte; o
+primeiro redraw passava, o cache enchia, e a batalha real que vinha depois já encontrava as
+texturas. D38 tirou o tabuleiro do hub e a primeira montagem passou a acontecer com
+`hero-jogador`, que tem sprite. É provavelmente também por isso que a segunda metade do critério
+3 do M28 (jogar a missão 1 até o servidor confirmar) ficou aberta. **A correção tem duas
+partes, e as duas importam:** o `Assets.load` vem ANTES da primeira pintura (a ordem antiga
+fazia o pedido depender de a pintura não lançar), e `paintPrimitives` PULA o sprite sem textura
+no cache em vez de lançar — fica o HUD do M16 (disco de lado, barra de HP, pips, plaqueta) até
+a imagem chegar. A decisão "tem textura?" é uma função pura (`logic/spriteSemTextura.ts`,
+`primitivasPintaveis`) porque `paintPrimitives` só existe dentro do Pixi e a suíte não o vê.
+
+**2. Entrar não carregava o hub.** `connectPvp` fazia o sign-in e lia `me` + roster — e só. O
+hub aparecia com a Campanha VAZIA, um botão "Atualizar" e "Escolha uma missão"; a Invocação
+dizia "0/0 personagens". A missão 1, que é a `acao-principal` de quem chega (D40), só existia
+depois de um clique num botão de harness — exatamente o defeito que o M32 existe para tirar. Agora
+`connectPvp` termina em `carregarHub()` (campanha + invocação + masmorras, em paralelo; cada
+leitura escreve o próprio erro no próprio painel, então uma falhar não derruba as outras nem a
+sessão). **Decisão que veio junto:** a introdução de "primeiro summon" NÃO dispara no sign-in —
+ela morava dentro de `refreshSummon`, e uma caixa de texto por cima do hub competiria com a
+missão 1. `refreshSummon` (o gesto explícito na tela de invocação) continua a dispará-la;
+`lerInvocacao` é a leitura muda que o hub usa. `entrarCarregaOHub.test.ts` afirma os quatro
+lados: chapters carregados sem clique, invocação e masmorras junto, introdução quieta, e sessão
+de pé quando uma leitura falha.
+
+**3. Texto cru na batalha, e dez lugares de uma vez.** O cabeçalho dizia
+`encounter-campanha-ponte-1` enquanto o painel ao lado dizia "Jogando A Trilha"; a iniciativa
+dizia "Resultado: ongoing" (a união do core interpolada crua — em DEZ chamadas de `t()`, nas
+duas línguas: o M25 traduziu a frase em volta e deixou o enum no meio); a lista de quem vai à
+missão dizia `dev-wbsobanv-hero-jogador (class-espadachim)`; a iniciativa, o painel de recursos,
+a barra de ação e a cena de duelo diziam `player-dev-wbsobanv-hero-jogador`. **A fixture local
+escondia tudo isso** porque os ids dela são curtos e legíveis. Entrou `logic/rotulos.ts` com
+três respostas: `nomeDoDesfecho` (`desfecho.*` no catálogo, `Record<BattleOutcome, string>`
+exaustivo em compilação), `rotuloDeHeroi` (o nome autorado do personagem — Aren, Vesper — pelo
+`characterId` no catálogo do cliente, e a classe por `conteudo.classe.*`) e `nomeDeUnidade`
+(o herói do jogador pelo personagem; quem não tem herói conhecido continua pelo `unitId`).
+**Nome próprio não se traduz** (decisão do M25, mantida): o que passa pela camada é a classe e o
+desfecho. **Fica para o M35, declarado:** o inimigo continua `unit-alvo-1` na iniciativa e na
+cena de duelo — dar nome a ele exige o servidor mandar um por unidade, e é assunto de conteúdo e
+transporte, não desta fatia. `Inventário — {unitId}` e `Talentos — {unitId}` (dois editores por
+unidade) também ficam.
+
+**4. Depois de vencer, o botão azul apontava para a missão que acabou de ser limpa.** "Voltar
+aos capítulos" devolvia o hub com a missão 1 ainda SELECIONADA — e `proximaMissao` só vira
+`acao-principal` quando nada está selecionado. Quem seguisse o botão jogaria a mesma missão de
+novo. Regra: sair de uma missão que ficou LIMPA solta a seleção; sair de uma que não ficou
+(abandonada, derrota) mantém — o jogador provavelmente quer tentar de novo
+(`proximaMissaoDepoisDaVitoria.test.ts`). E o pós-run relê o hub INTEIRO, não só a campanha: a
+Invocação seguia dizendo "Moeda premium 0" ao lado de "+60 de moeda premium" na tela de vitória.
+
+**A missão 1 foi jogada até o fim contra o Railway** — Aren moveu, o alvo engajou no round 2,
+vitória, "Enviar ao servidor", "O servidor resolveu em 2 round(s). Primeira vez: +60 de moeda
+premium". É a ponte inteira do critério 3 do M28 fechada pelo cliente de dev (a metade que
+faltava era esta: jogar até o `run` confirmar). Não substitui o julgamento pelo instalador, que é
+do usuário.
+
+**Achados que ficam abertos, para o usuário:**
+- O Chrome desta máquina tem **Dark Reader** ligado e ele recolore a página: o azul da
+  `acao-principal` vira cinza com borda. Julgar o critério com ele ligado é julgar outra tela; no
+  shell desktop ele não existe.
+- Com a missão escolhida e **nenhum herói marcado**, "Entrar na missão" fica cinza sem dizer por
+  quê ("Quem vai (0/1)"). Pré-marcar como PvP e masmorra fazem é decisão de design, não de
+  código: com uma vaga, pré-marcar o primeiro do roster (Vesper, arcanista) manda o jogador para
+  a missão 1 com a composição que o M27 2/N mediu em 0/20. Precisa de uma regra ("o protagonista
+  primeiro") que a spec não tem.
+- Selecionar o INIMIGO mostra os cinco botões de ação (Esperar, Descansar, Editar táticas,
+  Inventário, Talentos) — harness, para o M35.
+- "Capítulo concluído!" na tela de vitória de uma MISSÃO — vocabulário pré-D23, texto.

@@ -1,6 +1,7 @@
 import { resolveHeroStatSheet } from '@paths-beyond/core';
 import { catalog } from '../data/catalog.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
+import { nomeDoDesfecho, rotuloDeHeroi } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §10 (M14, sub-sessão 5/N) — a tela do farm: masmorras, conta e o ciclo
@@ -58,15 +59,6 @@ export function DungeonPanel() {
   const battleOver = inDungeon && battleState.outcome !== 'ongoing';
   const heroDoFoco = pve.selectedHeroIds[0] ?? pvp.roster[0]?.hero.id ?? null;
 
-  if (!pvp.me) {
-    return (
-      <section className="dungeon-panel">
-        <h2>{t('masmorra.titulo')}</h2>
-        <p className="hint">{t('masmorra.conecte')}</p>
-      </section>
-    );
-  }
-
   return (
     <section className="dungeon-panel">
       <h2>{t('masmorra.titulo')}</h2>
@@ -96,7 +88,7 @@ export function DungeonPanel() {
           </p>
           {battleOver ? (
             <p className="pve-battle-over">
-              {t('masmorra.resultadoLocal', { desfecho: battleState.outcome })}
+              {t('masmorra.resultadoLocal', { desfecho: nomeDoDesfecho(t, battleState.outcome) })}
             </p>
           ) : null}
           <div className="pve-actions">
@@ -122,7 +114,7 @@ export function DungeonPanel() {
                       checked={pve.selectedHeroIds.includes(entry.hero.id)}
                       onChange={() => togglePveHero(entry.hero.id)}
                     />
-                    {entry.hero.id}{' '}
+                    {rotuloDeHeroi(t, entry.hero, catalog).nome}{' '}
                     {/* M23 3/N — "a3 i1" era ilegível para quem chega: as duas letras são
                         despertar e vínculo, que são justamente os dois botões ao lado. */}
                     <span
@@ -235,7 +227,7 @@ export function DungeonPanel() {
         <div className="pve-result">
           <p>
             {t('masmorra.ultimaRun', {
-              desfecho: pve.lastRun.outcome,
+              desfecho: nomeDoDesfecho(t, pve.lastRun.outcome),
               rounds: pve.lastRun.roundsPlayed,
             })}
           </p>

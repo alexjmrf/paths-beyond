@@ -30,15 +30,6 @@ export function SummonPanel() {
   const claimReward = useBattleStore((s) => s.claimReward);
   const purchaseEnergy = useBattleStore((s) => s.purchaseEnergy);
 
-  if (!pvp.me) {
-    return (
-      <section className="summon-panel">
-        <h2>{t('summon.titulo')}</h2>
-        <p className="hint">{t('summon.conecte')}</p>
-      </section>
-    );
-  }
-
   const possuidos = summon.characters.filter((character) => character.owned).length;
 
   return (

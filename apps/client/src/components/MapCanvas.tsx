@@ -33,6 +33,7 @@ import { patternPrimitives } from '../data/tilePatterns.js';
 import { activeUnitRenderer, type UnitRenderInput, type UnitRenderState } from '../data/unitRenderer.js';
 import { artIdDeUnidade, urlsDeArte } from '../data/unitArt.js';
 import { rolagemParaEnquadrar } from '../logic/enquadramento.js';
+import { primitivasPintaveis } from '../logic/spriteSemTextura.js';
 import { audioDoJogo } from '../audio/motorCompartilhado.js';
 import { somDaBatida, type SomAgendado } from '../audio/sons.js';
 import { classDefForUnit, useBattleStore } from '../store/battleStore.js';
@@ -217,7 +218,10 @@ function computeThreatenedTiles(battleState: ReturnType<typeof useBattleStore.ge
 function paintPrimitives(layer: Container, primitives: readonly Primitive[]): void {
   let g: Graphics | null = null;
 
-  for (const p of primitives) {
+  // M32 — a imagem que ainda não chegou é pulada, não lançada. `Texture.from` de URL fora do
+  // cache devolve `undefined` (e avisa no console), e a primeira pintura da batalha real
+  // acontece antes de o `Assets.load` terminar. Ver `primitivasPintaveis`.
+  for (const p of primitivasPintaveis(primitives, (src) => Assets.cache.has(src))) {
     if (p.t === 'text') continue;
 
     if (p.t === 'sprite') {
@@ -681,19 +685,24 @@ export function MapCanvas() {
         const fx = new Container();
         app.stage.addChild(fx);
         fxLayerRef.current = fx;
-        redraw();
 
         // M26 — as texturas das peças. `Texture.from` lê do cache do Pixi, então sem este
-        // carregamento a primeira pintura sairia com a textura vazia e a unidade apareceria
-        // como um retângulo branco. O `redraw()` acima acontece de qualquer jeito (o tabuleiro
-        // não pode esperar a rede para aparecer) e este segundo troca o glifo pela peça quando
-        // a imagem chega — degradar é sempre um tabuleiro jogável, nunca uma tela vazia.
+        // carregamento a unidade com arte ficaria sem imagem. O `redraw()` abaixo acontece de
+        // qualquer jeito (o tabuleiro não pode esperar a rede para aparecer) e o segundo, no
+        // `then`, troca o vazio pela peça quando a imagem chega — degradar é sempre um
+        // tabuleiro jogável, nunca uma tela vazia.
+        //
+        // M32 — o pedido vem ANTES da primeira pintura, e não depois. Na ordem antiga, se o
+        // `redraw()` lançasse, o `Assets.load` nunca rodava: foi o que aconteceu na primeira
+        // batalha real depois de D38 (o tabuleiro passou a montar já com `hero-jogador`, que
+        // tem sprite), e a imagem nunca era sequer pedida.
         const urls = urlsDeArte();
         if (urls.length > 0) {
           void Assets.load([...urls]).then(() => {
             if (!disposed) redraw();
           });
         }
+        redraw();
       });
 
     return () => {

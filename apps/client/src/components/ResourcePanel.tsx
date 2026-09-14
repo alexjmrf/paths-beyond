@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { catalog } from '../data/catalog.js';
+import { nomeDeUnidade } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // Mesma regra de `applyRest` em packages/core/src/battle/commands.ts: não pode ter
@@ -15,6 +17,7 @@ function canRest(distanceMoved: number, moveRange: number, hasActedThisRound: bo
 export function ResourcePanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const t = useBattleStore((s) => s.t);
+  const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
   const dispararIntroducao = useBattleStore((s) => s.dispararIntroducao);
@@ -54,7 +57,7 @@ export function ResourcePanel() {
                   .join(' ')}
                 onClick={() => selectUnit(unit.unitId)}
               >
-                <td>{unit.unitId}</td>
+                <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</td>
                 <td>{unit.ap}</td>
                 <td>{unit.pp}</td>
                 <td className="tags">

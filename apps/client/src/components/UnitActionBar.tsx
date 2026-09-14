@@ -1,3 +1,5 @@
+import { catalog } from '../data/catalog.js';
+import { nomeDeUnidade } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // §5.4 — "No seu turno, uma unidade faz: mover? + uma das opções." `move`/`engage` já
@@ -6,6 +8,7 @@ import { useBattleStore } from '../store/battleStore.js';
 export function UnitActionBar() {
   const battleState = useBattleStore((s) => s.battleState);
   const t = useBattleStore((s) => s.t);
+  const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const lastCommandReason = useBattleStore((s) => s.lastCommandReason);
   const waitSelectedUnit = useBattleStore((s) => s.waitSelectedUnit);
@@ -38,7 +41,7 @@ export function UnitActionBar() {
 
   return (
     <div className="unit-action-bar">
-      <h3>{unit.unitId}</h3>
+      <h3>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</h3>
       <p>{t('unidade.stats', { hp: unit.hp, ap: unit.ap, pp: unit.pp })}</p>
       <p>{t('unidade.moveu', { andou: distanceMoved, alcance: unit.moveRange })}</p>
       <div className="actions">

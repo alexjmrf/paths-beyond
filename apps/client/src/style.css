@@ -1683,3 +1683,217 @@ button.targeting {
   font: inherit;
   cursor: pointer;
 }
+
+/* ── M32 — a HUD de um jogo, não de um harness ─────────────────────────────────────────── */
+
+/* A ação principal: UMA por tela, com peso maior que o resto. Fonte mais pesada E fundo
+   próprio — um só dos dois seria um botão como os outros com outra cor. O seletor carrega
+   `.app-layout button` de propósito: os painéis dão estilo aos próprios botões
+   (`.dungeon-panel button`, `.duel-preview-actions button:first-child`), e a ação principal
+   precisa vencer todos eles sem `!important`. */
+.app-layout button.acao-principal {
+  background: #2563eb;
+  color: #fff;
+  border: 1px solid #60a5fa;
+  border-radius: 6px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  cursor: pointer;
+}
+
+.app-layout button.acao-principal:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.app-layout button.acao-principal:disabled {
+  background: #374151;
+  border-color: #4b5563;
+  color: #9ca3af;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* A missão que é a próxima ação continua sendo um item de lista, não um botão de bloco. */
+.app-layout button.campaign-mission-name.acao-principal {
+  padding: 0.2rem 0.6rem;
+  font-size: inherit;
+}
+
+/* O cabeçalho ficou com o título, o modo e o botão do menu — nada mais. */
+.abrir-opcoes {
+  margin-left: auto;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  background: #111827;
+  color: #d1d5db;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.abrir-opcoes:hover {
+  border-color: #6b7280;
+}
+
+/* A entrada: sem sessão, a única coisa na tela. Centrada, com um botão. */
+.main-entrada {
+  align-items: center;
+  justify-content: center;
+}
+
+.tela-de-entrada {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  max-width: 28rem;
+  padding: 2rem 2.5rem;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.tela-de-entrada h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.entrada-chamada {
+  margin: 0;
+  color: #d1d5db;
+}
+
+.tela-de-entrada .acao-principal {
+  min-width: 12rem;
+  font-size: 1.05rem;
+}
+
+/* O hub: as quatro telas de gestão, sem tabuleiro ao lado. A campanha vem primeiro e ocupa
+   a coluna larga, porque é a próxima ação de quem chega. */
+.main-hub {
+  justify-content: center;
+}
+
+.hub-panels {
+  display: grid;
+  grid-template-columns: minmax(20rem, 2fr) minmax(16rem, 1fr);
+  gap: 1rem;
+  width: 100%;
+  max-width: 72rem;
+  align-content: start;
+}
+
+.hub-panels > .campaign-panel {
+  grid-row: span 3;
+}
+
+@media (max-width: 56rem) {
+  .hub-panels {
+    grid-template-columns: 1fr;
+  }
+  .hub-panels > .campaign-panel {
+    grid-row: auto;
+  }
+}
+
+/* O menu de opções: um diálogo por cima da tela viva. Fechar é a ação principal dele. */
+.opcoes-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.opcoes-menu {
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1rem 1.25rem 1.25rem;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.opcoes-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: none;
+}
+
+.opcoes-cabecalho h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.opcoes-menu h3 {
+  margin: 0.75rem 0 0.1rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
+.opcoes-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #d1d5db;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.opcoes-linha select,
+.opcoes-linha input[type='range'] {
+  margin-left: auto;
+}
+
+.opcoes-menu .clear-progress {
+  margin-left: 0;
+  align-self: flex-start;
+}
+
+.apagar-confirmacao {
+  padding: 0.75rem;
+  border: 1px solid #7f1d1d;
+  border-radius: 6px;
+  background: rgba(127, 29, 29, 0.15);
+}
+
+.apagar-confirmacao p {
+  margin: 0 0 0.6rem;
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+.apagar-botoes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.apagar-botoes button {
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid #4b5563;
+  background: #1f2937;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.apagar-botoes .clear-progress {
+  border-color: #b91c1c;
+  color: #fca5a5;
+  background: transparent;
+}

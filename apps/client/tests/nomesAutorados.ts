@@ -43,4 +43,8 @@ export const NOMES_AUTORADOS: Readonly<Record<TipoDeConteudo, Readonly<Record<st
   // O tipo que o M27 deixou faltando: as trinta missões da demo são `encounters`, e até o M29
   // elas eram desenhadas cruas do dado, em português, numa build de língua inglesa.
   missao: porId(catalogo.encounters),
+  // M32 — as skills de Valor (§5.6). O painel de objetivo as desenhava com `skill.name` cru,
+  // e o M29 não as viu porque elas não têm nome de missão nem de classe: são um catálogo
+  // próprio, `valor-skills/`, que só aparece dentro de uma batalha.
+  valor: porId(catalogo.valorSkills),
 };
