@@ -8047,3 +8047,45 @@ Personagens custa uma sub-sessão própria (`TalentTreePanel` tem 337 linhas aco
 
 **Suíte: 187 arquivos, 2649 testes sem banco** (era 185/2611); `validate:data` 31 schemas / 281
 arquivos; `typecheck` e `lint` limpos.
+
+### Sub-sessão 2/N — a missão em três passos, sem preset (2026-09-14)
+
+`packages/core` intocado, `RULES_VERSION` em `0.19.0`. Testes antes do código.
+
+**Escolher → prévia → quem vai.** `logic/previaDaMissao.ts` monta a prévia LOCALMENTE, do catálogo
+do cliente, pela mesma `buildBattleSetupFromHeroes` que o servidor usa em `assembleChapterBattle` —
+menos as vagas do jogador, que viram marcas numeradas no tabuleiro; `artIdByUnitId` sai no formato
+do ticket para nome e arte seguirem o mesmo caminho. `previaDaMissao.test.ts` afirma que olhar não
+faz requisição, que toda missão da demo tem prévia com o número de vagas da lista e a condição de
+vitória certa (§5.7), e que missão desconhecida devolve `null`.
+
+**O tabuleiro saiu do componente.** `render/tabuleiro.ts` recebeu, verbatim, o que `MapCanvas.tsx`
+tinha de "como se desenha": `applyPrimitives`, `paintPrimitives`, `terrainMarkPrimitives`, a pintura
+de um tile (`pintarTile`, com os véus de turno como `OverlaysDoTile` booleanos) e a montagem da
+entrada do renderer (`entradaDeRender`, com `ContextoDeRender`). `MapCanvas` continua sendo quem
+liga clique, overlay de turno e FX, e passou a chamar o módulo; `PreviaDoMapa.tsx` chama o mesmo
+módulo sem store, sem handlers e sem animação, com tile de 18–36px para caber num cartão. A
+alternativa — copiar a pintura para um segundo componente — seria a divergência que §9.1 chama de
+bug. Verificado na tela: a batalha desenha igual ao que era antes do refactor (véu de ameaça,
+sprites, alvenaria); a prévia mostra o mesmo mapa com a vaga "1" e o Bandido na posição autorada.
+
+**As vagas nunca começam vazias (D42), e a ordem vem do conteúdo.** `logic/quemVai.ts`:
+`ordemDeAparicao(catalogo)` lê os capítulos e as missões por `order` e devolve os personagens na
+ordem em que a campanha os apresenta como vaga — Aren, Miron, Sylla, Vesper, derivado e não
+escrito; `preenchimentoPadrao(roster, vagas, ordem)` marca o protagonista primeiro, depois o
+núcleo na ordem da história, depois quem não está nela (invocados) na ordem do roster, até o número
+de vagas. `selectChapter` preenche SÓ quando a seleção está vazia; uma seleção que o jogador já fez
+não é sobrescrita — e trocar de missão continua aparando. Sete testes em `quemVai.test.ts`;
+`campanhaCliente.test.ts` foi adaptado à regra (o bloco D16 agora afirma o pré-preenchimento e o
+teste "sem herói escolhido" desmarca antes). Visto na tela: missão 2 com Aren marcado e "Entrar na
+missão" azul sem nenhum clique.
+
+**`descreverObjetivo` afrouxou o tipo do estado** para `Pick<BattleState, 'round'>` + unidades com
+`side`/`hp` — é tudo o que ele lê, e a prévia passa `{ units: setup.units, round: 1 }`.
+
+**Fora desta sub-sessão, declarado:** presets (3/N); a ZONA DE AMEAÇA na prévia (seria §1.1 completo
+antes de entrar — `computeThreatenedTiles` está em `MapCanvas` e depende de `BattleState`; fica
+para a 4/N junto do resto de D44).
+
+**Suíte: 189 arquivos, 2663 testes sem banco** (era 187/2649); `validate:data` 31/281; `typecheck`
+e `lint` limpos.

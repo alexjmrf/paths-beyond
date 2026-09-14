@@ -1826,6 +1826,55 @@ button.targeting {
   width: 100%;
 }
 
+/* M35 2/N (D42) — a prévia da missão: o tabuleiro em miniatura ao lado da ficha. */
+.previa-da-missao {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: #0f172a;
+}
+
+.previa-da-missao h3 {
+  margin: 0 0 0.5rem;
+}
+
+.previa-corpo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.previa-do-mapa canvas {
+  display: block;
+  border: 1px solid #374151;
+  max-width: 100%;
+}
+
+.previa-ficha {
+  flex: 1 1 14rem;
+  min-width: 12rem;
+}
+
+.previa-objetivo {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+  color: #facc15;
+}
+
+.previa-ficha h4 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.previa-inimigos {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+
 .personagens-panel .pve-roster li.em-foco {
   background: #1f2937;
   border-radius: 4px;

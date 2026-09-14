@@ -61,6 +61,7 @@ import { VOLUMES_PADRAO } from '../audio/sons.js';
 import { CATALOGOS } from '../i18n/catalogos.js';
 import { criarTradutor, idiomaDoNavegador, idiomaValido, type Idioma, type Tradutor } from '../i18n/idioma.js';
 import type { AbaDoHub } from '../logic/tela.js';
+import { ordemDeAparicao, preenchimentoPadrao } from '../logic/quemVai.js';
 import { nomeDoDesfecho } from '../logic/rotulos.js';
 import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
 import {
@@ -983,11 +984,18 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     if (!missao) return;
     // Trocar de capítulo APARA a seleção em vez de zerá-la: quem escolheu quatro e clicou
     // num capítulo de duas vagas não quer recomeçar a escolha, quer as duas primeiras.
+    //
+    // M35 2/N (D42) — e a seleção NUNCA começa vazia: sem nada marcado, as vagas vêm
+    // preenchidas com o protagonista primeiro e depois quem a campanha apresenta
+    // (`preenchimentoPadrao`). Uma seleção que o jogador já fez não é sobrescrita — só a
+    // vazia é preenchida. É apresentação: quem valida a party continua sendo o servidor.
+    const aparada = campaign.selectedHeroIds.slice(0, missao.slots);
     set({
       campaign: {
         ...campaign,
         selectedMissionId: chapterId,
-        selectedHeroIds: campaign.selectedHeroIds.slice(0, missao.slots),
+        selectedHeroIds:
+          aparada.length > 0 ? aparada : preenchimentoPadrao(get().pvp.roster, missao.slots, ordemDeAparicao(catalog)),
         error: null,
       },
     });

@@ -25,7 +25,11 @@ function coordenada(alvo: { readonly x: number; readonly y: number }): string {
   return `(${alvo.x}, ${alvo.y})`;
 }
 
-export function descreverObjetivo(t: Tradutor, condicao: WinCondition, estado: BattleState): ObjetivoNaTela {
+// M35 2/N — o estado é só o que se lê dele (unidades e round): a prévia da missão passa o
+// `BattleSetup` do catálogo com `round: 1`, antes de existir batalha.
+export type EstadoDoObjetivo = Pick<BattleState, 'round'> & { readonly units: readonly Pick<BattleState['units'][number], 'side' | 'hp'>[] };
+
+export function descreverObjetivo(t: Tradutor, condicao: WinCondition, estado: EstadoDoObjetivo): ObjetivoNaTela {
   switch (condicao.t) {
     case 'rout':
       return {

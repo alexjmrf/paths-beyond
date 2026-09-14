@@ -1,5 +1,8 @@
 import { catalog } from '../data/catalog.js';
-import { rotuloDeHeroi } from '../logic/rotulos.js';
+import { nomeDeUnidade, rotuloDeHeroi } from '../logic/rotulos.js';
+import { descreverObjetivo } from '../logic/objetivo.js';
+import { previaDaMissao } from '../logic/previaDaMissao.js';
+import { PreviaDoMapa } from './PreviaDoMapa.js';
 import { missaoPorId, proximaMissao, useBattleStore } from '../store/battleStore.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
 
@@ -55,6 +58,7 @@ export function CampaignPanel() {
   // M32 — UMA próxima ação com peso maior que o resto. Com missão escolhida é o botão de
   // entrar; sem escolha, é a primeira missão por limpar (onde o jogador parou). Nunca as duas.
   const proxima = selecionado ? null : proximaMissao(campaign.chapters);
+  const previa = selecionado ? previaDaMissao(catalog, selecionado.id) : null;
 
   return (
     <section className="campaign-panel">
@@ -123,6 +127,30 @@ export function CampaignPanel() {
 
       {selecionado ? (
         <>
+          {/* M35 2/N (D42) — a PRÉVIA antes de escolher quem vai: o tabuleiro de verdade em
+              miniatura, montado do catálogo (sem ticket), com o objetivo, os inimigos pelo nome
+              e as vagas marcadas. §1.1 antes de entrar. */}
+          {previa ? (
+            <div className="previa-da-missao">
+              <h3>{t('previa.titulo', { missao: nomeDeConteudo(t, 'missao', selecionado.id, selecionado.name) })}</h3>
+              <div className="previa-corpo">
+                <PreviaDoMapa previa={previa} />
+                <div className="previa-ficha">
+                  <p className="previa-objetivo">{descreverObjetivo(t, previa.setup.winCondition, { units: previa.setup.units, round: 1 }).titulo}</p>
+                  <p className="hint">{t('previa.vagas', { vagas: previa.vagas.length })}</p>
+                  <h4>{t('previa.inimigos', { total: previa.inimigos.length })}</h4>
+                  <ul className="previa-inimigos">
+                    {previa.inimigos.map((inimigo) => (
+                      <li key={inimigo.unitId}>
+                        {nomeDeUnidade(t, inimigo.unitId, {}, previa.artIdByUnitId, catalog)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* D16 — o capítulo declara VAGAS e o jogador leva quem tem. É por isso que esta
               lista é o ROSTER dele e não um elenco fixo: o que ele possui é a party. */}
           <h3>{t('campanha.quemVai', { escolhidos: campaign.selectedHeroIds.length, vagas: selecionado.slots })}</h3>

@@ -151,17 +151,32 @@ describe('a lista de capítulos vem do servidor', () => {
   });
 });
 
-describe('a escolha de quem preenche as VAGAS (D16)', () => {
-  it('seleciona e desseleciona um herói do roster', () => {
+describe('a escolha de quem preenche as VAGAS (D16) — que nunca começam vazias (M35 2/N, D42)', () => {
+  // M35 2/N — escolher a missão já vem com as vagas preenchidas: o protagonista primeiro e
+  // depois quem a campanha apresenta (`preenchimentoPadrao`). O achado do M32 2/N era o botão
+  // "Entrar na missão" cinza sem dizer por quê; a regra de QUEM vem marcado está em
+  // `quemVai.test.ts`. Aqui o que se afirma é o encaixe na store: marcar e desmarcar continuam
+  // funcionando por cima do preenchimento, e o teto de vagas continua valendo.
+  it('vem pré-marcado ao escolher; desmarcar tira, marcar de novo põe', () => {
     conectado();
     const store = useBattleStore.getState();
 
-    store.selectChapter('encounter-campanha-2');
-    store.toggleCampaignHero('h-aren');
-    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-aren']);
+    store.selectChapter('encounter-campanha-2'); // 2 vagas
+    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-aren', 'h-miron']);
 
     useBattleStore.getState().toggleCampaignHero('h-aren');
-    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual([]);
+    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-miron']);
+
+    useBattleStore.getState().toggleCampaignHero('h-aren');
+    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-miron', 'h-aren']);
+  });
+
+  it('uma seleção que o jogador já fez NÃO é sobrescrita ao trocar de missão', () => {
+    conectado();
+    useBattleStore.getState().selectChapter('encounter-campanha-2');
+    useBattleStore.getState().toggleCampaignHero('h-aren'); // fica só Miron
+    useBattleStore.getState().selectChapter('encounter-campanha-2');
+    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-miron']);
   });
 
   // O capítulo declara N vagas e o servidor recusa com 400 quem manda mais (provado em
@@ -169,9 +184,8 @@ describe('a escolha de quem preenche as VAGAS (D16)', () => {
   // defesa de arena em M15 3/N.
   it('não deixa passar do número de vagas do capítulo', () => {
     conectado();
-    useBattleStore.getState().selectChapter('encounter-campanha-1'); // 1 vaga
+    useBattleStore.getState().selectChapter('encounter-campanha-1'); // 1 vaga, já com Aren
 
-    useBattleStore.getState().toggleCampaignHero('h-aren');
     useBattleStore.getState().toggleCampaignHero('h-miron');
 
     expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-aren']);
@@ -184,19 +198,17 @@ describe('a escolha de quem preenche as VAGAS (D16)', () => {
 
     useBattleStore.getState().toggleCampaignHero('h-de-outro-jogador');
 
-    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual([]);
+    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-aren', 'h-miron']);
   });
 
   it('trocar de capítulo apara a seleção que não cabe mais', () => {
     conectado();
     useBattleStore.getState().selectChapter('encounter-campanha-2'); // 2 vagas
-    useBattleStore.getState().toggleCampaignHero('h-aren');
-    useBattleStore.getState().toggleCampaignHero('h-miron');
     expect(useBattleStore.getState().campaign.selectedHeroIds).toHaveLength(2);
 
     useBattleStore.getState().selectChapter('encounter-campanha-1'); // 1 vaga
 
-    expect(useBattleStore.getState().campaign.selectedHeroIds).toHaveLength(1);
+    expect(useBattleStore.getState().campaign.selectedHeroIds).toEqual(['h-aren']);
   });
 });
 
@@ -210,8 +222,7 @@ describe('entrar no capítulo', () => {
       setup: SETUP,
       chapterId: 'encounter-campanha-1',
     });
-    useBattleStore.getState().selectChapter('encounter-campanha-1');
-    useBattleStore.getState().toggleCampaignHero('h-aren');
+    useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
     const state = useBattleStore.getState();
@@ -238,8 +249,7 @@ describe('entrar no capítulo', () => {
       characterIdByUnitId: { 'player-h-aren': 'hero-jogador' },
       chapterId: 'encounter-campanha-1',
     });
-    useBattleStore.getState().selectChapter('encounter-campanha-1');
-    useBattleStore.getState().toggleCampaignHero('h-aren');
+    useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
 
@@ -259,8 +269,7 @@ describe('entrar no capítulo', () => {
       characterIdByUnitId: { 'player-h-aren': 'hero-jogador' },
       chapterId: 'encounter-campanha-1',
     });
-    useBattleStore.getState().selectChapter('encounter-campanha-1');
-    useBattleStore.getState().toggleCampaignHero('h-aren');
+    useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
     expect(useBattleStore.getState().artIdByUnitId).not.toEqual({});
 
@@ -272,6 +281,7 @@ describe('entrar no capítulo', () => {
   it('sem herói escolhido não manda requisição', async () => {
     conectado();
     useBattleStore.getState().selectChapter('encounter-campanha-1');
+    useBattleStore.getState().toggleCampaignHero('h-aren'); // desmarca o pré-marcado
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
 
@@ -282,8 +292,7 @@ describe('entrar no capítulo', () => {
   it('erro do servidor aparece na tela em vez de sumir', async () => {
     conectado();
     responder('/api/campaign/encounter-campanha-1/ticket', { error: 'você não possui: ally-grifeiro' }, 400);
-    useBattleStore.getState().selectChapter('encounter-campanha-1');
-    useBattleStore.getState().toggleCampaignHero('h-aren');
+    useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
 
@@ -301,8 +310,7 @@ describe('submeter o capítulo', () => {
       setup: SETUP,
       chapterId: 'encounter-campanha-1',
     });
-    useBattleStore.getState().selectChapter('encounter-campanha-1');
-    useBattleStore.getState().toggleCampaignHero('h-aren');
+    useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
   }
 
