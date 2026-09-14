@@ -8,6 +8,7 @@ export function InitiativePanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const t = useBattleStore((s) => s.t);
   const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
+  const artIdByUnitId = useBattleStore((s) => s.artIdByUnitId);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
 
@@ -35,7 +36,7 @@ export function InitiativePanel() {
                 .join(' ')}
               onClick={() => !dead && selectUnit(unit.unitId)}
             >
-              <span className="name">{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</span>
+              <span className="name">{nomeDeUnidade(t, unit.unitId, heroesByUnitId, artIdByUnitId, catalog)}</span>
               <span className="initiative-value">{entry.initiative}</span>
               {dead ? (
                 <span className="status">{t('iniciativa.morto')}</span>

@@ -60,6 +60,7 @@ import { audioDoJogo, definirVolumesDoJogo } from '../audio/motorCompartilhado.j
 import { VOLUMES_PADRAO } from '../audio/sons.js';
 import { CATALOGOS } from '../i18n/catalogos.js';
 import { criarTradutor, idiomaDoNavegador, idiomaValido, type Idioma, type Tradutor } from '../i18n/idioma.js';
+import type { AbaDoHub } from '../logic/tela.js';
 import { nomeDoDesfecho } from '../logic/rotulos.js';
 import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
 import {
@@ -552,6 +553,8 @@ interface BattleStore {
   // camada de idioma, bloqueia a aba inteira e não é testável sem navegador. Nenhum dos dois
   // vai para o save: são estado de tela.
   readonly opcoesAbertas: boolean;
+  // M35 1/N (D41) — a aba do hub. Só ela está na tela; a batalha não tem menu.
+  readonly abaDoHub: AbaDoHub;
   readonly apagarProgressoPendente: boolean;
   readonly targetingMode: TargetingMode | null;
   // §11/§3.4 (M13, sub-sessão 1/N) — a gravação. Todo comando ACEITO entra aqui na ordem;
@@ -626,6 +629,7 @@ interface BattleStore {
   toggleColorblindMode: () => void;
   setUiScale: (scale: number) => void;
   abrirOpcoes: () => void;
+  escolherAba: (aba: AbaDoHub) => void;
   fecharOpcoes: () => void;
   // Os dois passos de apagar. `clearProgress` é o efeito; só `confirmarApagarProgresso` o
   // chama pela tela, e só com a pergunta de pé.
@@ -660,7 +664,6 @@ interface BattleStore {
   equipInventoryItem: (heroId: string, itemId: string) => Promise<void>;
   awakenHero: (heroId: string) => Promise<void>;
   imprintHero: (heroId: string) => Promise<void>;
-  refreshSummon: () => Promise<void>;
   lerInvocacao: () => Promise<void>;
   // M32 — o que o hub mostra, lido no sign-in: campanha, invocação e masmorras.
   carregarHub: () => Promise<void>;
@@ -814,6 +817,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   colorblindMode: restoredSave?.colorblindMode ?? false,
   uiScale: restoredSave?.uiScale ?? DEFAULT_UI_SCALE,
   opcoesAbertas: false,
+  abaDoHub: 'campanha',
   apagarProgressoPendente: false,
   targetingMode: null,
   commandLog: [],
@@ -1399,16 +1403,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // §10 (M18, 6/N) — a tela de aquisição lê as TRÊS superfícies de uma vez. Separá-las em
   // três botões faria o jogador ver saldo velho ao lado de pity novo: a moeda premium é a
   // mesma nas três respostas, e a última a chegar mandaria.
-  refreshSummon: async () => {
-    // A tela de invocação traz moeda premium, banner e o contador de garantia de uma vez.
-    get().dispararIntroducao('primeiro-summon');
-    await get().lerInvocacao();
-  },
-
-  // M32 — a leitura SEM a introdução. `connectPvp` carrega o hub inteiro no sign-in, e a
-  // caixa de "primeiro summon" aparecendo por cima da campanha competiria com a missão 1,
-  // que é a próxima ação de quem chega. A introdução fica com o gesto explícito na tela de
-  // invocação (`refreshSummon`), como antes.
+  // M32 — a leitura SEM introdução: `connectPvp` carrega o hub inteiro no sign-in, e a caixa
+  // de "primeiro summon" por cima da campanha competiria com a missão 1. M35 1/N — a
+  // introdução dispara ao ABRIR a aba de invocação (`escolherAba`); o botão Atualizar morreu.
   lerInvocacao: async () => {
     const { pvp } = get();
     if (!pvp.token) {
@@ -1468,7 +1465,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       }));
       // Relê tudo: o personagem que acabou de sair tem de aparecer possuído sem recarregar
       // a página, e o pity mudou. O saldo já veio na resposta e é o que vale até lá.
-      await get().refreshSummon();
+      await get().lerInvocacao();
 
       // E o roster de HERÓIS junto, quando saiu personagem novo. Os dois rosters são
       // coisas diferentes (um diz quem o jogador tem, o outro quais instâncias ele leva ao
@@ -1505,7 +1502,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       set((s) => ({
         summon: { ...s.summon, premium: resposta.premium, busy: false, status: get().t('estado.premiumGanho', { premium: resposta.premiumAwarded }) },
       }));
-      await get().refreshSummon();
+      await get().lerInvocacao();
     } catch (error) {
       set((s) => ({ summon: { ...s.summon, busy: false, error: describeApiError(error) } }));
     }
@@ -2315,6 +2312,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // Reabrir não pode encontrar a pergunta ainda de pé, esperando um clique que o jogador
   // não sabe que está dando.
   abrirOpcoes: () => set({ opcoesAbertas: true }),
+  // A introdução de "primeiro summon" morava no botão Atualizar da invocação, que morreu (D41):
+  // abrir a aba é o momento em que moeda premium, banner e pity aparecem pela primeira vez.
+  escolherAba: (aba) => {
+    set({ abaDoHub: aba });
+    if (aba === 'invocacao') get().dispararIntroducao('primeiro-summon');
+  },
   fecharOpcoes: () => set({ opcoesAbertas: false, apagarProgressoPendente: false }),
   pedirApagarProgresso: () => set({ apagarProgressoPendente: true }),
   cancelarApagarProgresso: () => set({ apagarProgressoPendente: false }),

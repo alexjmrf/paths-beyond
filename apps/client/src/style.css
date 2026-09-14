@@ -1772,32 +1772,63 @@ button.targeting {
   font-size: 1.05rem;
 }
 
-/* O hub: as quatro telas de gestão, sem tabuleiro ao lado. A campanha vem primeiro e ocupa
-   a coluna larga, porque é a próxima ação de quem chega. */
+/* M35 1/N (D41) — o hub: um menu e UMA aba por vez. O veredito do M32 na tela foi "está tudo
+   muito misturado"; a forma de referência do gênero é a barra de abas com a aba escolhida
+   ocupando a tela. A aba ativa não é ação principal — é lugar. */
 .main-hub {
-  justify-content: center;
-}
-
-.hub-panels {
-  display: grid;
-  grid-template-columns: minmax(20rem, 2fr) minmax(16rem, 1fr);
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
+}
+
+.menu-do-hub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
   width: 100%;
-  max-width: 72rem;
-  align-content: start;
+  max-width: 64rem;
+  border-bottom: 1px solid #374151;
+  padding-bottom: 0.25rem;
 }
 
-.hub-panels > .campaign-panel {
-  grid-row: span 3;
+.menu-do-hub .aba {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.95rem;
+  color: #9ca3af;
+  cursor: pointer;
 }
 
-@media (max-width: 56rem) {
-  .hub-panels {
-    grid-template-columns: 1fr;
-  }
-  .hub-panels > .campaign-panel {
-    grid-row: auto;
-  }
+.menu-do-hub .aba:hover {
+  color: #e5e7eb;
+  background: #1f2937;
+}
+
+.menu-do-hub .aba.ativa {
+  color: #f9fafb;
+  background: #111827;
+  border-color: #374151;
+  font-weight: 700;
+  /* Cobre a linha da barra: a aba ativa é a que "continua" na tela abaixo. */
+  margin-bottom: -0.3rem;
+  padding-bottom: 0.85rem;
+}
+
+.aba-do-hub {
+  width: 100%;
+  max-width: 64rem;
+}
+
+.aba-do-hub > section {
+  width: 100%;
+}
+
+.personagens-panel .pve-roster li.em-foco {
+  background: #1f2937;
+  border-radius: 4px;
 }
 
 /* O menu de opções: um diálogo por cima da tela viva. Fechar é a ação principal dele. */

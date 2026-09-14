@@ -32,7 +32,7 @@ export interface RotuloDeHeroi {
   readonly classe: string;
 }
 
-type CatalogoDeRotulos = Pick<ContentCatalog, 'characters' | 'classes'>;
+type CatalogoDeRotulos = Pick<ContentCatalog, 'characters' | 'classes' | 'enemies'>;
 
 // O personagem vem do catálogo do CLIENTE (`data/catalog.ts`, o mesmo `packages/data` lido
 // por `import.meta.glob`), e não do servidor: o roster carrega `characterId`, e quem sabe o
@@ -52,14 +52,20 @@ export function rotuloDeHeroi(
 }
 
 // A unidade do tabuleiro pelo nome de quem ela é. `heroesByUnitId` só existe do lado do
-// jogador (ver a nota no store), então inimigos e a defesa de outra conta continuam com o
-// `unitId` — dar nome a eles exige o servidor mandar um, e é assunto do M35.
+// jogador (ver a nota no store); o inimigo vem por `artIdByUnitId` — o mapa do ticket cobre os
+// DOIS lados, e do lado inimigo o valor é o id de `enemies/`, que tem nome autorado desde o M27
+// (M35 1/N, D43: `<função> [de <facção>]`, traduzido por `conteudo.inimigo.*`). Quem não é
+// nem um nem outro (replay antigo, id desconhecido) continua com o `unitId`.
 export function nomeDeUnidade(
   t: Tradutor,
   unitId: string,
   heroesByUnitId: Readonly<Record<string, Hero>>,
+  artIdByUnitId: Readonly<Record<string, string>>,
   catalogo: CatalogoDeRotulos,
 ): string {
   const hero = heroesByUnitId[unitId];
-  return hero ? rotuloDeHeroi(t, hero, catalogo).nome : unitId;
+  if (hero) return rotuloDeHeroi(t, hero, catalogo).nome;
+  const artId = artIdByUnitId[unitId];
+  const inimigo = artId ? catalogo.enemies[artId] : undefined;
+  return inimigo && artId ? nomeDeConteudo(t, 'inimigo', artId, inimigo.name) : unitId;
 }

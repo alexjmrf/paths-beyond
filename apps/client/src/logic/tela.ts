@@ -31,3 +31,19 @@ export function telaDoJogo(estado: EstadoDaTela): TelaDoJogo {
   // `tabuleiroVazio()`. Olhar o ticket de cada modo seria três perguntas para a mesma coisa.
   return estado.battleState.units.length > 0 ? 'batalha' : 'hub';
 }
+
+// M35 1/N (D41) — o hub é UM menu e UMA aba por vez.
+//
+// O veredito do usuário sobre o M32, com sessão de verdade: "está tudo muito misturado".
+// Quatro painéis lado a lado com o mesmo peso são o hub do M13 com menos coisas. A forma de
+// referência do gênero (Epic Seven, Summoners War) é um menu com abas e só a aba escolhida na
+// tela. A aba é estado da store pelo mesmo motivo de `telaDoJogo`: decisão que só existe no
+// componente só se prova abrindo o navegador.
+//
+// Cinco abas, por decisão do usuário ao aprovar o plano: Personagens contém o elenco E o
+// equipamento — "só isso mesmo"; Equipamento não é aba. A campanha vem primeiro porque é a
+// próxima ação de quem chega (D40). Lista em runtime com o tipo derivado dela, como
+// `TIPOS_DE_CONTEUDO`: o menu a itera, e uma aba nova sem rótulo fica vermelha no catálogo.
+export const ABAS_DO_HUB = ['campanha', 'masmorras', 'arena', 'personagens', 'invocacao'] as const;
+
+export type AbaDoHub = (typeof ABAS_DO_HUB)[number];

@@ -36,6 +36,7 @@ export function ReplayPanel() {
   const viewer = useBattleStore((s) => s.replayViewer);
   const t = useBattleStore((s) => s.t);
   const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
+  const artIdByUnitId = useBattleStore((s) => s.artIdByUnitId);
   const closeReplayViewer = useBattleStore((s) => s.closeReplayViewer);
   const seekReplay = useBattleStore((s) => s.seekReplay);
   const setReplaySpeed = useBattleStore((s) => s.setReplaySpeed);
@@ -96,7 +97,7 @@ export function ReplayPanel() {
           <tbody>
             {state.units.map((unit) => (
               <tr key={unit.unitId} className={unit.hp <= 0 ? 'dead' : unit.side}>
-                <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</td>
+                <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, artIdByUnitId, catalog)}</td>
                 <td>
                   {unit.hp}/{unit.stats.hp}
                 </td>

@@ -7995,3 +7995,55 @@ botões de ação) estão em **`docs/milestones/M35-hud-redesenho.md`**, que é 
 próxima sessão. Direção de história dada junto e que só o M30 usa: os três capítulos acontecem
 dentro de UMA nação, o protagonista começando a jornada do herói, descobrindo os problemas que a
 afligem e construindo o nome.
+
+## M35 — A HUD: o redesenho
+
+### Sub-sessão 1/N — o menu e as cinco abas, com o que já existe (2026-09-14)
+
+Briefing normativo em `docs/milestones/M35-hud-redesenho.md` (D41–D44). `packages/core` intocado,
+`RULES_VERSION` em `0.19.0`. Testes antes do código, todos vermelhos pelo motivo certo.
+
+**Cinco abas, não seis — decisão do usuário ao aprovar o plano.** O briefing tinha Equipamento como
+aba própria; o usuário: "o Personagem Panel tem que ser um próprio, que aí nele teria a questão do
+Personagem e do Equipamento, mas só isso mesmo". `ABAS_DO_HUB = campanha · masmorras · arena ·
+personagens · invocacao`, lista de runtime com o tipo derivado (o idioma de `TIPOS_DE_CONTEUDO`), a
+aba é estado da store (`abaDoHub`, `escolherAba`) e `telaDoJogo` continua devolvendo `hub` — a aba é
+uma segunda pergunta, não uma quarta tela. `MenuDoHub.tsx` itera a lista; `App.tsx` desenha a aba
+escolhida e nada mais. **A aba ativa não carrega `acao-principal`:** o menu é lugar, e a ação de
+cada aba mora dentro dela — dois pesos no mesmo nível seriam "tudo misturado" de novo.
+
+**`DungeonPanel` foi dividido.** Ele misturava "Seu time" (poder, despertar, vínculo), as masmorras e
+o inventário. O elenco e o equipamento viraram `PersonagensPanel` (o herói "em foco" para equipar é
+seleção de tela, `useState`, como o slot aberto em `InventoryPanel`); o painel de masmorras ficou
+com a lista, quem vai (só o nome e a classe) e a saída da batalha.
+
+**Os botões de atualizar morreram, e um teste proíbe a volta deles.** `campanha.atualizar`,
+`summon.atualizar`, `masmorra.atualizarConta` e `defesa.recarregar` saíram dos dois catálogos;
+`refreshSummon` (que só existia para o botão e disparava a introdução) saiu da store — a introdução
+de "primeiro summon" dispara ao ABRIR a aba (`escolherAba('invocacao')`), que é quando moeda
+premium, banner e pity aparecem pela primeira vez. `semAtualizar.test.ts` varre `src/components/`:
+nenhum componente pode citar `refreshCampaign`, `refreshPve`, `lerInvocacao`, `carregarHub` ou
+`loadDefense`. As leituras existem; a store as chama.
+
+**O inimigo pelo nome autorado (D43), sem servidor.** O ticket já levava o id de `enemies/` por
+unidade (`characterIdByUnitId`, guardado como `artIdByUnitId`); `nomeDeUnidade` passou a receber
+esse mapa e a olhar `catalog.enemies`. Entrou o tipo `inimigo` em `TIPOS_DE_CONTEUDO` e
+`nomesAutorados.ts` (`Record` exaustivo: não compila sem dizer de onde vêm os nomes), com 41 entradas
+em PT (o nome autorado, copiado) e **41 em inglês traduzidas pelo agente, autorizado pelo usuário**
+("aprovo... e a tradução por mim") — Forge Guard, Lode Looter, Patrol Lancer, Bone Chanter,
+Praetorian Guard, "The Tyrant, Awakened". `conteudoTraduzido.test.ts` passou a cobrir o tipo sem
+uma linha nova, que é o desenho do M29 funcionando a favor. Visto na tela: "Bandido" na lista de
+iniciativa da missão 2.
+
+**O inimigo selecionado mostra a ficha e nenhuma ação (D44).** `logic/acoesDaUnidade.ts` é a
+decisão pura por lado (`player` → cinco ações; `enemy` → nenhuma); `UnitActionBar` só desenha o que
+ela devolve, e as skills de mapa seguem junto porque são ação. Visto na tela: "Bandido · HP 560 ·
+AP 3 · PP 1 · Moveu 4/4", sem botão.
+
+**Fora desta sub-sessão, declarado:** prévia do mapa, presets e o preenchimento padrão das vagas
+(2/N–3/N); os editores de talentos e táticas continuam abrindo só na batalha — trazê-los para
+Personagens custa uma sub-sessão própria (`TalentTreePanel` tem 337 linhas acoplado a `unitId`);
+`Inventário — {unitId}` e `Talentos — {unitId}` seguem como estavam.
+
+**Suíte: 187 arquivos, 2649 testes sem banco** (era 185/2611); `validate:data` 31 schemas / 281
+arquivos; `typecheck` e `lint` limpos.

@@ -80,14 +80,29 @@ describe('o rótulo de um herói é o personagem e a classe, não os ids', () =>
 describe('o nome de uma unidade do tabuleiro', () => {
   const t = criarTradutor('en', CATALOGOS);
   const heroesByUnitId = { 'player-dev-wbsobanv-hero-jogador': ESPADACHIM };
+  // O ticket já leva o id por unidade dos DOIS lados (`characterIdByUnitId`, que a store guarda
+  // como `artIdByUnitId`): personagem do lado do jogador, inimigo de `enemies/` do outro.
+  const artIdByUnitId = { 'player-dev-wbsobanv-hero-jogador': 'hero-jogador', 'unit-alvo-1': 'enemy-treino-alvo-espadachim' };
 
   it('unidade do jogador: o nome do personagem', () => {
-    expect(nomeDeUnidade(t, 'player-dev-wbsobanv-hero-jogador', heroesByUnitId, catalog)).toBe(
+    expect(nomeDeUnidade(t, 'player-dev-wbsobanv-hero-jogador', heroesByUnitId, artIdByUnitId, catalog)).toBe(
       catalog.characters['hero-jogador']!.name,
     );
   });
 
-  it('unidade sem herói conhecido (inimigo, defesa de outra conta): o id, como antes', () => {
-    expect(nomeDeUnidade(t, 'unit-alvo-1', heroesByUnitId, catalog)).toBe('unit-alvo-1');
+  // M35 1/N (D43) — o inimigo comum pelo NOME AUTORADO, traduzido. `unit-alvo-1` era o que a
+  // lista de iniciativa e a cena de duelo mostravam com sessão de verdade; o nome existe em
+  // `packages/data/enemies/` desde o M27 e o ticket já o transportava — faltava olhar.
+  it('inimigo: o nome autorado de enemies/, pela camada de idioma', () => {
+    const en = nomeDeUnidade(criarTradutor('en', CATALOGOS), 'unit-alvo-1', heroesByUnitId, artIdByUnitId, catalog);
+    const pt = nomeDeUnidade(criarTradutor('pt', CATALOGOS), 'unit-alvo-1', heroesByUnitId, artIdByUnitId, catalog);
+    expect(pt).toBe(catalog.enemies['enemy-treino-alvo-espadachim']!.name);
+    expect(en).not.toBe(pt);
+    expect(en).not.toContain('conteudo.');
+    expect(en).not.toBe('unit-alvo-1');
+  });
+
+  it('unidade sem herói E sem id de arte (replay antigo, defesa de outra conta): o id, como antes', () => {
+    expect(nomeDeUnidade(t, 'unit-misterio', heroesByUnitId, {}, catalog)).toBe('unit-misterio');
   });
 });

@@ -40,6 +40,9 @@ export const TIPOS_DE_CONTEUDO = [
   'missao',
   // M32 — as skills de Valor (§5.6): catálogo próprio, só visível dentro de uma batalha.
   'valor',
+  // M35 1/N (D43) — os inimigos comuns de `enemies/`: nome autorado `<função> [de <facção>]`,
+  // que o ticket já transportava e a tela não olhava.
+  'inimigo',
 ] as const;
 
 export type TipoDeConteudo = (typeof TIPOS_DE_CONTEUDO)[number];

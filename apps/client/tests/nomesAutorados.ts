@@ -47,4 +47,6 @@ export const NOMES_AUTORADOS: Readonly<Record<TipoDeConteudo, Readonly<Record<st
   // e o M29 não as viu porque elas não têm nome de missão nem de classe: são um catálogo
   // próprio, `valor-skills/`, que só aparece dentro de uma batalha.
   valor: porId(catalogo.valorSkills),
+  // M35 1/N (D43) — os 41 inimigos comuns. O nome existia desde o M27 e nunca chegou à tela.
+  inimigo: porId(catalogo.enemies),
 };

@@ -28,15 +28,16 @@ vez**, e a missão escolhida em três passos. `packages/core` intocado; o client
 ## 2. As decisões, já tomadas
 
 **D41 — Um menu, uma tela por vez.** O hub de painéis lado a lado morre. A tela com sessão tem
-um **menu** (barra fixa) com as abas, e **só a aba escolhida** está na tela:
+um **menu** (barra fixa) com as abas, e **só a aba escolhida** está na tela. **Cinco abas, e não
+seis — decisão do usuário ao aprovar o plano da 1/N:** Personagens é uma aba própria que contém o
+elenco E o equipamento, "só isso mesmo"; Equipamento não é aba.
 
 | Aba | O que mostra | De onde vem hoje |
 | --- | --- | --- |
 | Campanha | capítulos e missões; é a aba inicial de quem entra | `CampaignPanel` |
 | Masmorras | as masmorras, energia, varrer/entrar | `DungeonPanel` (parte) |
 | Arena | encontrar oponente, atacar, defesa | `PvpPanel` + `ArenaDefensePanel` |
-| Personagens | o elenco: nível, despertar, vínculo, talentos, táticas | `DungeonPanel` ("Seu time"), `TalentTreePanel`, `TacticsEditor` |
-| Equipamento | inventário, equipar, enhance, sets | `InventoryPanel` |
+| Personagens | o elenco (nível, despertar, vínculo, poder) E o equipamento (inventário, aprimorar, equipar) | `DungeonPanel` ("Seu time" + inventário) — feito na 1/N como `PersonagensPanel` |
 | Invocação | banners, pity, prêmios, energia | `SummonPanel` |
 
 A aba é **estado da store** (`telaDoJogo` passa a devolver `hub` com uma sub-tela, ou vira um
@@ -124,7 +125,7 @@ mostra a ficha dele (HP, AP/PP, alcance) e nada que seja ação.
 
 ## 4. Ordem sugerida das sub-sessões
 
-1. **1/N — O menu e as seis abas, com o que já existe.** `telaDoJogo` com a aba; menu;
+1. **1/N — O menu e as cinco abas, com o que já existe** (FEITA em 2026-09-14, ver `DECISIONS.md`). `telaDoJogo` com a aba; menu;
    `DungeonPanel` dividido; "Atualizar" some de todo painel; nome dos inimigos na tela (tipo
    `inimigo`, 82 entradas); inimigo selecionado sem botões de ação. Testes: `telaDoJogo`,
    `acaoPrincipal`, `rotulosNaTela`, `conteudoTraduzido`. **Visto no browser contra o Railway**

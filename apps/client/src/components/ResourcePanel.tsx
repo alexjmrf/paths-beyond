@@ -18,6 +18,7 @@ export function ResourcePanel() {
   const battleState = useBattleStore((s) => s.battleState);
   const t = useBattleStore((s) => s.t);
   const heroesByUnitId = useBattleStore((s) => s.heroesByUnitId);
+  const artIdByUnitId = useBattleStore((s) => s.artIdByUnitId);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const selectUnit = useBattleStore((s) => s.selectUnit);
   const dispararIntroducao = useBattleStore((s) => s.dispararIntroducao);
@@ -57,7 +58,7 @@ export function ResourcePanel() {
                   .join(' ')}
                 onClick={() => selectUnit(unit.unitId)}
               >
-                <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, catalog)}</td>
+                <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, artIdByUnitId, catalog)}</td>
                 <td>{unit.ap}</td>
                 <td>{unit.pp}</td>
                 <td className="tags">

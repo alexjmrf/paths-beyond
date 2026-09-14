@@ -6,9 +6,11 @@ import { InitiativePanel } from './components/InitiativePanel.js';
 import { IntroducaoOverlay } from './components/IntroducaoOverlay.js';
 import { InventoryPanel } from './components/InventoryPanel.js';
 import { MapCanvas } from './components/MapCanvas.js';
+import { MenuDoHub } from './components/MenuDoHub.js';
 import { DuelScene } from './components/DuelScene.js';
 import { ObjectivePanel } from './components/ObjectivePanel.js';
 import { OpcoesMenu } from './components/OpcoesMenu.js';
+import { PersonagensPanel } from './components/PersonagensPanel.js';
 import { PvpPanel } from './components/PvpPanel.js';
 import { ReplayPanel } from './components/ReplayPanel.js';
 import { ResourcePanel } from './components/ResourcePanel.js';
@@ -37,6 +39,7 @@ export function App() {
     return id ? nomeDeConteudo(s.t, 'missao', id, missaoPorId(s.campaign.chapters, id)?.name ?? id) : null;
   });
   const mode = useBattleStore((s) => s.mode);
+  const abaDoHub = useBattleStore((s) => s.abaDoHub);
   const uiScale = useBattleStore((s) => s.uiScale);
   const abrirOpcoes = useBattleStore((s) => s.abrirOpcoes);
   const t = useBattleStore((s) => s.t);
@@ -85,14 +88,23 @@ export function App() {
           <EntradaPanel />
         </main>
       ) : tela === 'hub' ? (
-        // Com sessão e sem batalha: o que se pode fazer, sem grid vazio ao lado. A campanha
-        // vem primeiro porque é a próxima ação de quem chega.
+        // M35 1/N (D41) — com sessão e sem batalha: um menu e UMA aba. O veredito do M32 na
+        // tela foi "está tudo muito misturado": quatro painéis lado a lado com o mesmo peso.
+        // A aba é estado da store (`abaDoHub`); aqui só se escolhe o que desenhar.
         <main className="main-hub">
-          <div className="hub-panels">
-            <CampaignPanel />
-            <DungeonPanel />
-            <SummonPanel />
-            <PvpPanel />
+          <MenuDoHub />
+          <div className="aba-do-hub">
+            {abaDoHub === 'campanha' ? (
+              <CampaignPanel />
+            ) : abaDoHub === 'masmorras' ? (
+              <DungeonPanel />
+            ) : abaDoHub === 'arena' ? (
+              <PvpPanel />
+            ) : abaDoHub === 'personagens' ? (
+              <PersonagensPanel />
+            ) : (
+              <SummonPanel />
+            )}
           </div>
         </main>
       ) : (

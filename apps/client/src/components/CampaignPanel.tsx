@@ -17,7 +17,6 @@ export function CampaignPanel() {
   const t = useBattleStore((s) => s.t);
   const pvp = useBattleStore((s) => s.pvp);
   const mode = useBattleStore((s) => s.mode);
-  const refreshCampaign = useBattleStore((s) => s.refreshCampaign);
   const selectChapter = useBattleStore((s) => s.selectChapter);
   const toggleChapterOpen = useBattleStore((s) => s.toggleChapterOpen);
   const toggleCampaignHero = useBattleStore((s) => s.toggleCampaignHero);
@@ -60,12 +59,6 @@ export function CampaignPanel() {
   return (
     <section className="campaign-panel">
       <h2>{t('campanha.titulo')}</h2>
-
-      <div className="pve-actions">
-        <button type="button" onClick={() => void refreshCampaign()} disabled={campaign.busy}>
-          {t('campanha.atualizar')}
-        </button>
-      </div>
 
       {/* M29 — D31 tem DUAS regras e a tela anunciava uma, com a palavra errada: dizia
           "capítulo" onde a 1/N do M27 pôs missão, e ignorava `premiumOnChapterClear`, que o

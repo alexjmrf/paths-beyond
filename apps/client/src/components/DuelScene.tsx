@@ -337,7 +337,7 @@ export function DuelScene() {
   // M32 — o nome de quem ela é, como o painel de iniciativa passou a fazer: o herói do jogador
   // pelo personagem, e quem não tem herói conhecido (inimigo, defesa de outra conta) pelo
   // `unitId`, como antes. Uma resposta só para "como esta unidade se chama" (`nomeDeUnidade`).
-  const nomeDe = (unitId: string) => nomeDeUnidade(t, unitId, heroesByUnitId, catalog);
+  const nomeDe = (unitId: string) => nomeDeUnidade(t, unitId, heroesByUnitId, artIdByUnitId, catalog);
 
   return (
     <div className="duel-scene">

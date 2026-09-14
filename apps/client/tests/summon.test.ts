@@ -111,7 +111,7 @@ describe('a tela de invocação lê o servidor e não inventa nada', () => {
   it('carrega banner, roster de personagens e prêmios numa atualização só', async () => {
     useBattleStore.setState((s) => ({ pvp: { ...s.pvp, token: TOKEN } }));
 
-    await useBattleStore.getState().refreshSummon();
+    await useBattleStore.getState().lerInvocacao();
     const { summon } = useBattleStore.getState();
 
     expect(summon.banners).toHaveLength(1);
@@ -123,7 +123,7 @@ describe('a tela de invocação lê o servidor e não inventa nada', () => {
   it('sem token, nem tenta: a recusa não vira requisição', async () => {
     useBattleStore.setState((s) => ({ pvp: { ...s.pvp, token: '' } }));
 
-    await useBattleStore.getState().refreshSummon();
+    await useBattleStore.getState().lerInvocacao();
 
     expect(chamadas).toHaveLength(0);
     expect(useBattleStore.getState().summon.error).toBeTruthy();

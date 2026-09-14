@@ -38,7 +38,6 @@ export function ArenaDefensePanel() {
   const t = useBattleStore((s) => s.t);
   const colorblindMode = useBattleStore((s) => s.colorblindMode);
 
-  const loadDefense = useBattleStore((s) => s.loadDefense);
   const setDefenseMap = useBattleStore((s) => s.setDefenseMap);
   const armDefenseHero = useBattleStore((s) => s.armDefenseHero);
   const placeDefenseAt = useBattleStore((s) => s.placeDefenseAt);
@@ -84,9 +83,6 @@ export function ArenaDefensePanel() {
             ))}
           </select>
         </label>
-        <button type="button" onClick={() => void loadDefense()} disabled={pvp.busy}>
-          {t('defesa.recarregar')}
-        </button>
         <button type="button" onClick={() => void saveDefense()} disabled={pvp.busy || draft.units.length === 0}>
           {t('defesa.salvar')}
         </button>

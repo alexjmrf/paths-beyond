@@ -25,7 +25,6 @@ export function SummonPanel() {
   const summon = useBattleStore((s) => s.summon);
   const t = useBattleStore((s) => s.t);
   const pvp = useBattleStore((s) => s.pvp);
-  const refreshSummon = useBattleStore((s) => s.refreshSummon);
   const rollSummon = useBattleStore((s) => s.rollSummon);
   const claimReward = useBattleStore((s) => s.claimReward);
   const purchaseEnergy = useBattleStore((s) => s.purchaseEnergy);
@@ -35,12 +34,6 @@ export function SummonPanel() {
   return (
     <section className="summon-panel">
       <h2>{t('summon.titulo')}</h2>
-
-      <div className="pve-actions">
-        <button type="button" onClick={() => void refreshSummon()} disabled={summon.busy}>
-          {t('summon.atualizar')}
-        </button>
-      </div>
 
       <p className="summon-premium">
         {t('summon.premium', {
