@@ -6,7 +6,6 @@
     "watchPatterns": ["apps/server/**", "packages/**", "pnpm-lock.yaml", "railway.json"]
   },
   "deploy": {
-    "startCommand": "/bin/sh -c \"pnpm --filter @paths-beyond/server run migrate && exec pnpm --filter @paths-beyond/server exec tsx src/composeServer.ts\"",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

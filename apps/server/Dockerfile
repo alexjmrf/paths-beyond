@@ -54,5 +54,13 @@ COPY packages/gacha packages/gacha
 # O `compose.yaml` escolhe o comando: `migrate` para o serviço de migration e
 # `composeServer.ts` para o servidor. A imagem é a mesma nos dois — uma imagem por serviço
 # faria a migration rodar contra um código que não é o que vai subir.
+#
+# O `CMD` padrão (M28 2/N) é o do CONTÊINER ÚNICO: migra e só então sobe. É o que um
+# provedor que roda a imagem sem compose executa — e é o que o Railway executou, ignorando
+# a seção `deploy` do `railway.json` (nem `preDeployCommand` nem `startCommand` rodaram; o
+# servidor subiu calado, `/health` respondeu 200 e o banco ficou sem uma tabela). Pôr a
+# migration aqui é pô-la onde nenhuma configuração de painel a esconde. É idempotente
+# (`schema_migrations`), a saída vai ao log do contêiner, e migration que falha derruba o
+# start — que é o comportamento certo. O `exec` faz do servidor o processo 1, não do shell.
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@paths-beyond/server", "exec", "tsx", "src/composeServer.ts"]
+CMD ["/bin/sh", "-c", "pnpm --filter @paths-beyond/server run migrate && exec pnpm --filter @paths-beyond/server exec tsx src/composeServer.ts"]
