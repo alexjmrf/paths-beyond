@@ -7654,6 +7654,37 @@ limpo; `pnpm --filter @paths-beyond/desktop build` OK.
 para o domínio do Railway, instalar em OUTRA máquina e jogar a missão 1. E a metade do
 critério 4: `scripts/restore-drill.sh` contra o banco hospedado.
 
+### M28 — sub-sessão 2/N (servidor): CORS, o bug que só existe na máquina do jogador
+
+**O que o critério 3 pegou na primeira tentativa.** O instalador foi para outra máquina,
+abriu, e o "Sign in" devolveu *"Failed to fetch"* — falha antes de qualquer resposta HTTP.
+Causa: **o servidor não tinha CORS nenhum**, e nunca precisou. No laço de desenvolvimento o
+Vite faz proxy de `/api`, cliente e servidor são a mesma origem e o navegador não pergunta
+nada. Empacotado, o renderer carrega por `file://` — origem `null` para o Chromium — e o
+servidor está em `https://…railway.app`. O cliente manda `x-platform-ticket` (header
+customizado, M20), o que obriga a um PREFLIGHT `OPTIONS` antes do `POST`; sem
+`Access-Control-*` na resposta, o navegador bloqueia e o `fetch` reporta a mensagem opaca sem
+nunca chegar à rota. **É a primeira vez que o cliente empacotado falou com um servidor
+remoto, e foi a primeira vez que isto foi visível.** Nenhum teste anterior podia pegar: o
+`inject` do Fastify não faz preflight, e o navegador em dev não precisava.
+
+**A política é estreita, e é decisão:** `@fastify/cors` registrado antes de qualquer rota
+(vale para todas, `/health` incluso, pelo mesmo motivo do log do M19). Aceita requisição
+**sem** `Origin` (curl, servidor a servidor, a própria suíte — nada muda para elas) e
+`Origin: null` (o Electron por `file://`). **Qualquer outra origem é recusada.** `credentials`
+nunca. O argumento: a autenticação é por header e não por cookie, então CORS aqui não protege
+contra CSRF — o que ele decide é QUEM o navegador deixa falar com este servidor, e uma página
+qualquer na web não deve poder. Se um dia o shell carregar o renderer por um esquema próprio
+(`app://`), essa origem entra na lista e `null` sai.
+
+**Uma asserção que quase ficou de fora:** o preflight de rota PROTEGIDA (`/me`, a chamada
+seguinte ao sign-in) também precisa de 204 — o `OPTIONS` não carrega o ticket, e se o hook
+de auth rodasse antes do CORS responderia 401 e o navegador bloquearia a chamada real. O
+`@fastify/cors` responde o preflight no `onRequest` da raiz, antes do escopo protegido;
+`cors.test.ts` afirma isso explicitamente em vez de confiar na ordem de registro.
+
+`cors.test.ts`: 6 testes. Suíte do servidor: 32 arquivos (1 pulado sem `DATABASE_URL`).
+
 ## M29 — A camada de idioma da campanha
 
 `packages/core` sem uma linha alterada e `RULES_VERSION` fica em `0.19.0`. É catálogo de

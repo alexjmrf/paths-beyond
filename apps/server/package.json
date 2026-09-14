@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
     "@paths-beyond/content": "workspace:*",
     "@paths-beyond/core": "workspace:*",
     "@paths-beyond/data": "workspace:*",

@@ -1,4 +1,5 @@
 import type { ContentCatalog } from '@paths-beyond/content';
+import fastifyCors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { authPlugin } from './auth.js';
 import { registerRateLimit, type RateLimiter } from './battle/rateLimit.js';
@@ -81,6 +82,34 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
   // escopo protegido deixaria `/health` e as recusas por token ausente fora do log — que
   // são justamente as duas coisas que se olha quando o serviço parece morto.
   registerRequestLogging(app, { sink: deps.logSink });
+
+  // §9.4 (M28, 2/N) — CORS, para o cliente EMPACOTADO.
+  //
+  // No laço de desenvolvimento o Vite faz proxy de `/api` e cliente e servidor são a mesma
+  // origem; o navegador nunca pergunta nada. Empacotado, o renderer carrega por `file://`
+  // — origem `null` para o Chromium — e o servidor está noutro host. O cliente manda
+  // `x-platform-ticket`, header customizado, e isso obriga a um PREFLIGHT antes do `POST`;
+  // sem `Access-Control-*` na resposta o navegador bloqueia e o `fetch` diz "Failed to
+  // fetch" sem nunca chegar à rota. Visto pela primeira vez no critério 3 do M28, que é a
+  // primeira vez que o cliente empacotado falou com um servidor remoto.
+  //
+  // A política é estreita: sem `Origin` (curl, servidor a servidor, a suíte) passa como
+  // sempre; `null` (o Electron por `file://`) é aceita; qualquer outra origem é recusada.
+  // `credentials` nunca — a autenticação é por header, não por cookie, então CORS aqui não
+  // protege contra CSRF; o que ele decide é QUEM o navegador deixa falar com este servidor.
+  // Registrado ANTES das rotas pelo mesmo motivo do log: vale para todas, `/health` incluso.
+  void app.register(fastifyCors, {
+    origin: (origem, cb) => {
+      if (origem === undefined || origem === 'null') {
+        cb(null, true);
+        return;
+      }
+      cb(null, false);
+    },
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['content-type', 'x-platform-ticket'],
+  });
 
   app.get('/health', async () => ({ status: 'ok' }));
 
