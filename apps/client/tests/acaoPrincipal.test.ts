@@ -21,6 +21,8 @@ const COMPONENTES = join(SRC, 'components');
 // Tela → o que é a próxima ação nela.
 const TELAS_COM_ACAO_PRINCIPAL: Readonly<Record<string, string>> = {
   'EntradaPanel.tsx': 'entrar',
+  // M35 5/N — no lobby a próxima ação de quem chega é a campanha.
+  'LobbyPanel.tsx': 'entrar na campanha',
   'CampaignPanel.tsx': 'a próxima missão, ou entrar na missão escolhida',
   'DuelPreviewPanel.tsx': 'confirmar o duelo',
   'PvpPanel.tsx': 'enviar a batalha terminada',

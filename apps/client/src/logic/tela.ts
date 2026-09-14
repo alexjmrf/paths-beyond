@@ -47,3 +47,8 @@ export function telaDoJogo(estado: EstadoDaTela): TelaDoJogo {
 export const ABAS_DO_HUB = ['campanha', 'masmorras', 'arena', 'personagens', 'invocacao'] as const;
 
 export type AbaDoHub = (typeof ABAS_DO_HUB)[number];
+
+// M35 5/N — o hub é um LOBBY com botões (julgamento do usuário na tela, 2026-09-14): quem entra
+// cai nele, cada botão leva a uma das cinco telas por uma transição, e cada tela tem um "voltar".
+// A barra de abas da 1/N era a forma errada para a ideia certa.
+export type TelaDoHub = AbaDoHub | 'lobby';

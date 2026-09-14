@@ -6,7 +6,9 @@ import { InitiativePanel } from './components/InitiativePanel.js';
 import { IntroducaoOverlay } from './components/IntroducaoOverlay.js';
 import { InventoryPanel } from './components/InventoryPanel.js';
 import { MapCanvas } from './components/MapCanvas.js';
-import { MenuDoHub } from './components/MenuDoHub.js';
+import { LobbyPanel } from './components/LobbyPanel.js';
+import { CabecalhoDaTela } from './components/CabecalhoDaTela.js';
+import { TransicaoOverlay } from './components/TransicaoOverlay.js';
 import { DuelScene } from './components/DuelScene.js';
 import { ObjectivePanel } from './components/ObjectivePanel.js';
 import { OpcoesMenu } from './components/OpcoesMenu.js';
@@ -83,30 +85,36 @@ export function App() {
         </button>
       </header>
       <OpcoesMenu />
+      <TransicaoOverlay />
       {tela === 'entrada' ? (
         // Sem sessão, a única coisa na tela é entrar: nenhum tabuleiro, nenhum painel.
         <main className="main-entrada">
           <EntradaPanel />
         </main>
       ) : tela === 'hub' ? (
-        // M35 1/N (D41) — com sessão e sem batalha: um menu e UMA aba. O veredito do M32 na
-        // tela foi "está tudo muito misturado": quatro painéis lado a lado com o mesmo peso.
-        // A aba é estado da store (`abaDoHub`); aqui só se escolhe o que desenhar.
+        // M35 1/N (D41) — com sessão e sem batalha: UMA tela por vez. M35 5/N — o hub é um LOBBY
+        // com botões (julgamento do usuário): quem entra cai nele, cada botão leva a uma tela por
+        // uma transição, e cada tela tem "voltar". A tela é estado da store (`abaDoHub`); aqui
+        // só se escolhe o que desenhar.
         <main className="main-hub">
-          <MenuDoHub />
-          <div className="aba-do-hub">
-            {abaDoHub === 'campanha' ? (
-              <CampaignPanel />
-            ) : abaDoHub === 'masmorras' ? (
-              <DungeonPanel />
-            ) : abaDoHub === 'arena' ? (
-              <PvpPanel />
-            ) : abaDoHub === 'personagens' ? (
-              <PersonagensPanel />
-            ) : (
-              <SummonPanel />
-            )}
-          </div>
+          {abaDoHub === 'lobby' ? (
+            <LobbyPanel />
+          ) : (
+            <div className="aba-do-hub">
+              <CabecalhoDaTela tela={abaDoHub} />
+              {abaDoHub === 'campanha' ? (
+                <CampaignPanel />
+              ) : abaDoHub === 'masmorras' ? (
+                <DungeonPanel />
+              ) : abaDoHub === 'arena' ? (
+                <PvpPanel />
+              ) : abaDoHub === 'personagens' ? (
+                <PersonagensPanel />
+              ) : (
+                <SummonPanel />
+              )}
+            </div>
+          )}
         </main>
       ) : (
         <main>

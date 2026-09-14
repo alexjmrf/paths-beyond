@@ -61,7 +61,7 @@ import { audioDoJogo, definirVolumesDoJogo } from '../audio/motorCompartilhado.j
 import { VOLUMES_PADRAO } from '../audio/sons.js';
 import { CATALOGOS } from '../i18n/catalogos.js';
 import { criarTradutor, idiomaDoNavegador, idiomaValido, type Idioma, type Tradutor } from '../i18n/idioma.js';
-import type { AbaDoHub } from '../logic/tela.js';
+import type { AbaDoHub, TelaDoHub } from '../logic/tela.js';
 import { ordemDeAparicao, preenchimentoPadrao } from '../logic/quemVai.js';
 import { nomeDoDesfecho } from '../logic/rotulos.js';
 import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
@@ -555,8 +555,14 @@ interface BattleStore {
   // camada de idioma, bloqueia a aba inteira e não é testável sem navegador. Nenhum dos dois
   // vai para o save: são estado de tela.
   readonly opcoesAbertas: boolean;
-  // M35 1/N (D41) — a aba do hub. Só ela está na tela; a batalha não tem menu.
-  readonly abaDoHub: AbaDoHub;
+  // M35 1/N (D41) — a tela do hub. Só ela está na tela; a batalha não tem menu. M35 5/N — o
+  // hub é um LOBBY com botões (julgamento do usuário na tela): `'lobby'` é onde quem entra cai,
+  // e as cinco telas de `ABAS_DO_HUB` são para onde os botões levam.
+  readonly abaDoHub: TelaDoHub;
+  // M35 5/N — a transição entre lobby e tela: ESTADO, não relógio. `escolherAba` abre, o overlay
+  // que a desenha chama `concluirTransicao` quando o véu terminou (é o único lugar com tempo), e
+  // só então a tela troca. Assim a sequência lobby → transição → tela se prova sem browser.
+  readonly transicao: { readonly para: TelaDoHub } | null;
   // M35 3/N (D42) — os presets de party, lidos do servidor com o hub. `slots` vem de lá
   // (`MAX_PARTY_PRESETS`): a tela desenha os oito sem saber o número.
   readonly presets: {
@@ -640,6 +646,8 @@ interface BattleStore {
   setUiScale: (scale: number) => void;
   abrirOpcoes: () => void;
   escolherAba: (aba: AbaDoHub) => void;
+  voltarAoLobby: () => void;
+  concluirTransicao: () => void;
   lerPresets: () => Promise<void>;
   /** Troca a seleção da missão pelos heróis do preset (os que o jogador ainda tem, aparados às vagas). */
   aplicarPreset: (slot: number) => void;
@@ -833,7 +841,8 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   colorblindMode: restoredSave?.colorblindMode ?? false,
   uiScale: restoredSave?.uiScale ?? DEFAULT_UI_SCALE,
   opcoesAbertas: false,
-  abaDoHub: 'campanha',
+  abaDoHub: 'lobby',
+  transicao: null,
   presets: { slots: 8, lista: [], busy: false, error: null },
   apagarProgressoPendente: false,
   targetingMode: null,
@@ -2391,11 +2400,16 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // Reabrir não pode encontrar a pergunta ainda de pé, esperando um clique que o jogador
   // não sabe que está dando.
   abrirOpcoes: () => set({ opcoesAbertas: true }),
-  // A introdução de "primeiro summon" morava no botão Atualizar da invocação, que morreu (D41):
-  // abrir a aba é o momento em que moeda premium, banner e pity aparecem pela primeira vez.
-  escolherAba: (aba) => {
-    set({ abaDoHub: aba });
-    if (aba === 'invocacao') get().dispararIntroducao('primeiro-summon');
+  // M35 5/N — escolher abre a transição; a tela só troca em `concluirTransicao`. A introdução
+  // de "primeiro summon" (que morava no botão Atualizar, morto na 1/N) dispara ao CHEGAR: é
+  // quando moeda premium, banner e pity aparecem pela primeira vez — não por cima do véu.
+  escolherAba: (aba) => set({ transicao: { para: aba } }),
+  voltarAoLobby: () => set({ transicao: { para: 'lobby' } }),
+  concluirTransicao: () => {
+    const { transicao } = get();
+    if (!transicao) return;
+    set({ abaDoHub: transicao.para, transicao: null });
+    if (transicao.para === 'invocacao') get().dispararIntroducao('primeiro-summon');
   },
   fecharOpcoes: () => set({ opcoesAbertas: false, apagarProgressoPendente: false }),
   pedirApagarProgresso: () => set({ apagarProgressoPendente: true }),

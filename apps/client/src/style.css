@@ -1781,40 +1781,111 @@ button.targeting {
   gap: 1rem;
 }
 
-.menu-do-hub {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
+/* M35 5/N — o LOBBY: um botão por tela, em grade; a campanha com peso de ação principal. A
+   transição é um véu com o nome do destino. Estrutura, não estilo: cor e arte são passagem futura. */
+.lobby {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
   width: 100%;
   max-width: 64rem;
-  border-bottom: 1px solid #374151;
-  padding-bottom: 0.25rem;
+  padding-top: 2rem;
 }
 
-.menu-do-hub .aba {
-  background: transparent;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  padding: 0.6rem 1.1rem;
-  font-size: 0.95rem;
-  color: #9ca3af;
+.app-layout button.lobby-botao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-height: 6.5rem;
+  padding: 1rem 1.2rem;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  color: #e5e7eb;
+  text-align: left;
   cursor: pointer;
 }
 
-.menu-do-hub .aba:hover {
-  color: #e5e7eb;
+.app-layout button.lobby-botao:hover {
+  border-color: #6b7280;
   background: #1f2937;
 }
 
-.menu-do-hub .aba.ativa {
-  color: #f9fafb;
-  background: #111827;
-  border-color: #374151;
+/* A campanha é a ação principal: mesma tinta de `.acao-principal`, redeclarada porque a regra
+   do botão de lobby acima tem a mesma especificidade e vem depois. */
+.app-layout button.lobby-botao.acao-principal {
+  min-height: 8rem;
+  grid-column: 1 / -1;
+  background: #2563eb;
+  border-color: #60a5fa;
+  color: #fff;
+}
+
+.app-layout button.lobby-botao.acao-principal:hover {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+}
+
+.lobby-nome {
+  font-size: 1.15rem;
   font-weight: 700;
-  /* Cobre a linha da barra: a aba ativa é a que "continua" na tela abaixo. */
-  margin-bottom: -0.3rem;
-  padding-bottom: 0.85rem;
+}
+
+.lobby-resumo {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.app-layout button.lobby-botao.acao-principal .lobby-resumo {
+  color: #dbeafe;
+}
+
+.cabecalho-da-tela {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #374151;
+  padding-bottom: 0.4rem;
+}
+
+.cabecalho-da-tela .voltar {
+  background: transparent;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  color: #d1d5db;
+  cursor: pointer;
+}
+
+.cabecalho-nome {
+  font-weight: 700;
+}
+
+.transicao {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #030712;
+  animation: transicao-veu 450ms ease-in-out forwards;
+}
+
+.transicao-nome {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #f9fafb;
+  letter-spacing: 0.04em;
+}
+
+@keyframes transicao-veu {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .aba-do-hub {

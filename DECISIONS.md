@@ -8159,3 +8159,35 @@ e vagas nunca vazias, 3/N presets, 4/N ordem da batalha e ameaça na prévia.
 
 **Suíte: 192 arquivos, 2697 testes sem banco** (era 191/2690); `validate:data` 31/281; `typecheck`
 e `lint` limpos.
+
+### O julgamento do M35 na tela, e a sub-sessão 5/N — o lobby (2026-09-14)
+
+**Veredito do usuário, com as quatro sub-sessões na tela:** *"já está melhor"* — e duas
+correções de rumo. (1) **Estilo é depois:** "uma remodelagem para deixar visualmente bonito seria
+interessante, mas essa parte é mais pra frente". Registrado como passagem futura (cor, tipografia,
+arte de botão, animação além do véu), a ser aberta como milestone própria depois do playtest — não
+entra no M35. (2) **D41 revisada — a forma das abas:** não uma barra sempre visível, mas **um lobby
+(tela principal) com botões**; clicar leva a uma **telinha de transição** e à tela correspondente;
+lá dentro há **voltar** para o lobby. "Padrão Epic Seven." A barra de abas da 1/N era a forma
+errada para a ideia certa.
+
+**5/N — o que mudou.** `abaDoHub` passou a `TelaDoHub = AbaDoHub | 'lobby'`, e quem entra cai no
+lobby. A **transição é estado** (`transicao: { para }`): `escolherAba` abre, `voltarAoLobby` abre
+para o lobby, e só `concluirTransicao` troca a tela — chamada pelo `TransicaoOverlay`, que é o único
+lugar com relógio (450 ms de véu com o nome do destino). Assim a sequência lobby → transição → tela
+→ voltar se prova sem browser (`abaDoHub.test.ts`, 9 testes). A introdução de "primeiro summon"
+dispara ao **chegar** na invocação, não ao clicar — senão apareceria por cima do véu.
+`LobbyPanel.tsx` desenha um botão por tela de `ABAS_DO_HUB`, cada um com uma linha do que há lá
+dentro lida da store que o sign-in já carregou (capítulo em curso e missões limpas, energia, ELO,
+número de personagens, moeda premium); **a Campanha é a ação principal do lobby** (D40, a lista
+fechada de `acaoPrincipal.test.ts` ganhou `LobbyPanel.tsx`). `CabecalhoDaTela.tsx` é a barra fina
+com "← Voltar" e o nome da tela. `MenuDoHub.tsx` foi removido.
+
+**Achado de CSS, para não repetir:** `.app-layout button.lobby-botao` tem a mesma especificidade de
+`.app-layout button.acao-principal` e vem depois — o botão da campanha saiu cinza na primeira
+verificação. A tinta da ação principal foi redeclarada em `.lobby-botao.acao-principal`.
+
+**Visto no browser** (servidor em memória): lobby com as cinco linhas certas; clicar em Campanha →
+véu "Campanha" → tela com "← Voltar · Campanha"; voltar → véu "Lobby" → lobby.
+
+**Suíte: 192 arquivos, 2704 testes sem banco** (era 192/2697).
