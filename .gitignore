@@ -21,3 +21,6 @@ release/
 # (staging, produção) e é escrita por quem empacota; o modelo versionado é
 # `apps/desktop/ambiente.exemplo.json`.
 apps/desktop/ambiente.json
+
+# Temporários que o Vite/Vitest deixam quando uma execução é interrompida.
+*.timestamp-*.mjs

@@ -92,10 +92,26 @@ describe('resolverApiBaseUrl()', () => {
     expect(r.origem).toBe('recursos');
   });
 
-  it('URL que não é http(s) é tratada como ausente', () => {
-    // `apiBaseUrl: "producao.example.com"` (sem esquema) daria `fetch('producao.example.com/api/...')`
-    // — relativo ao `file://` do renderer, falhando com a mesma mensagem opaca.
-    for (const ruim of ['"producao.example.com"', '""', '42', 'null', '"ftp://x"']) {
+  it('host SEM esquema ganha `https://` — é o erro humano mais provável, e o critério 3 o cometeu', () => {
+    // O primeiro instalador do M28 saiu com `"apiBaseUrl": "paths-beyond-production.up.railway.app"`.
+    // A primeira versão desta função recusava e caía no relativo — `file:///api`, "Failed to
+    // fetch" — e a guarda escondeu o erro em vez de mostrá-lo. Para um host remoto o único
+    // esquema sensato é https; completar é mais honesto que recusar em silêncio.
+    for (const [escrito, esperado] of [
+      ['paths-beyond-production.up.railway.app', 'https://paths-beyond-production.up.railway.app'],
+      ['x.example.com/', 'https://x.example.com'],
+      ['x.example.com:8443', 'https://x.example.com:8443'],
+    ]) {
+      const r = resolverApiBaseUrl(
+        contexto({ lerArquivo: arquivoEm({ [`/resources/${ARQUIVO_DE_AMBIENTE}`]: JSON.stringify({ apiBaseUrl: escrito }) }) }),
+      );
+
+      expect(r.url, escrito).toBe(esperado);
+    }
+  });
+
+  it('valor que não é URL nem host é tratado como ausente', () => {
+    for (const ruim of ['""', '42', 'null', '"ftp://x"', '"não é um host"', '"/api"']) {
       const r = resolverApiBaseUrl(
         contexto({ lerArquivo: arquivoEm({ [`/resources/${ARQUIVO_DE_AMBIENTE}`]: `{"apiBaseUrl":${ruim}}` }) }),
       );

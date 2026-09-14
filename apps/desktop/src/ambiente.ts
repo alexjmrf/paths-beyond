@@ -37,14 +37,22 @@ export interface UrlResolvida {
   readonly origem: OrigemDaUrl;
 }
 
-// Só http(s), e sem barra final: o cliente concatena `/api/...` por cima. Qualquer outra
-// coisa é tratada como ausente — uma URL sem esquema viraria relativa ao `file://` do
-// renderer e falharia com a mesma mensagem opaca que esta cascata existe para evitar.
+// Sem barra final: o cliente concatena `/api/...` por cima.
+//
+// **Host sem esquema ganha `https://`.** A primeira versão recusava — e o primeiro instalador
+// do M28 saiu exatamente assim (`"paths-beyond-production.up.railway.app"`), caiu no relativo
+// (`file:///api`) e falhou com "Failed to fetch" sem pista: a guarda escondeu o erro que
+// existia para evitar. Para um host remoto o único esquema sensato é https; completar é mais
+// honesto que recusar em silêncio. O que continua sendo recusado é o que não pode ser um
+// host: vazio, número, `ftp://`, caminho relativo, texto com espaço.
 function normalizar(valor: unknown): string | null {
   if (typeof valor !== 'string') return null;
   const aparado = valor.trim();
-  if (!/^https?:\/\/\S+$/.test(aparado)) return null;
-  return aparado.replace(/\/+$/, '');
+  if (/^https?:\/\/\S+$/.test(aparado)) return aparado.replace(/\/+$/, '');
+  if (/^[a-z0-9.-]+(:\d+)?(\/\S*)?$/i.test(aparado) && aparado.includes('.')) {
+    return `https://${aparado}`.replace(/\/+$/, '');
+  }
+  return null;
 }
 
 function lerDoArquivo(ctx: ContextoDoShell, dir: string): string | null {
