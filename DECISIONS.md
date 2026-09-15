@@ -8191,3 +8191,18 @@ verificação. A tinta da ação principal foi redeclarada em `.lobby-botao.acao
 véu "Campanha" → tela com "← Voltar · Campanha"; voltar → véu "Lobby" → lobby.
 
 **Suíte: 192 arquivos, 2704 testes sem banco** (era 192/2697).
+
+### O fechamento do M35, o push, o instalador — e os 65% adiados pelo usuário (2026-09-15)
+
+**M35 fechado** com a auditoria dos seis critérios do briefing §5 (tabela em `PROGRESS.md`). Na
+mesma sessão: o push (`5a1ee79..d3e6ff9`), o Railway na versão atual com a migration 0015
+aplicada, e o instalador NSIS reconstruído com o M35 e autoverificado (`--determinismo`,
+`hash c3a404a0`). **O usuário confirmou que o `.exe` funcionou.**
+
+**Decisão do usuário sobre os 65% da primeira batalha (o achado do M23):** *"essas partes de
+balanceamento vamos pensar bem mais pra frente, isso de WR"*. Fica registrado como **adiado de
+propósito**, não como "deliberado" nem como "corrigir": o aceite do M33 pede que a decisão esteja
+tomada, e a decisão tomada é **não mexer em balanceamento/winrate agora** — nem a primeira missão,
+nem a ficha inicial, nem `pnpm balance` com esse objetivo. O item sai da lista do M33 e volta quando
+o usuário abrir a passagem de balanceamento, depois do playtest. Nenhuma sessão deve reabri-lo por
+conta própria.
