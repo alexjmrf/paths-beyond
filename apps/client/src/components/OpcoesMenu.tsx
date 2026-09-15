@@ -1,5 +1,6 @@
 import { UI_SCALES } from '../data/overlayTheme.js';
 import { IDIOMAS } from '../i18n/idioma.js';
+import { rotuloDoCampo } from '../logic/telemetria.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // M32 — o MENU DE OPÇÕES: as preferências de apresentação e "apagar progresso", fora do
@@ -35,6 +36,9 @@ export function OpcoesMenu() {
   const pedirApagarProgresso = useBattleStore((s) => s.pedirApagarProgresso);
   const cancelarApagarProgresso = useBattleStore((s) => s.cancelarApagarProgresso);
   const confirmarApagarProgresso = useBattleStore((s) => s.confirmarApagarProgresso);
+  const telemetria = useBattleStore((s) => s.telemetria);
+  const definirTelemetria = useBattleStore((s) => s.definirTelemetria);
+  const token = useBattleStore((s) => s.pvp.token);
 
   if (!aberto) return null;
 
@@ -119,6 +123,35 @@ export function OpcoesMenu() {
 
         {/* M13 3/N — o progresso é salvo sozinho; este é o único jeito de desfazê-lo sem abrir
             o console. M32: em dois passos, porque é a única ação da tela que não se desfaz. */}
+        {/* M34 2/N (D45) — a MEDIÇÃO: a declaração do que o servidor registra (a lista vem dele,
+            travada contra as tabelas; a tela traduz) e o interruptor de recusar. Só com sessão:
+            é estado de conta, e sem conta não há o que medir nem o que recusar. */}
+        {token ? (
+          <>
+            <h3>{t('app.opcoes.telemetria')}</h3>
+            <p className="telemetria-declaracao">{t('app.pref.telemetriaDeclaracao')}</p>
+            {telemetria.optOut === null ? (
+              <p className="error">{telemetria.error ?? t('app.pref.telemetriaIndisponivel')}</p>
+            ) : (
+              <>
+                <p className="telemetria-campos">
+                  {t('app.pref.telemetriaCampos')} {telemetria.collected.map((campo) => rotuloDoCampo(t, campo)).join(' · ')}
+                </p>
+                <label className="opcoes-linha">
+                  <input
+                    type="checkbox"
+                    checked={telemetria.optOut}
+                    disabled={telemetria.busy}
+                    onChange={(e) => void definirTelemetria(e.target.checked)}
+                  />
+                  {t('app.pref.telemetriaRecusar')}
+                </label>
+                {telemetria.error ? <p className="error">{telemetria.error}</p> : null}
+              </>
+            )}
+          </>
+        ) : null}
+
         <h3>{t('app.opcoes.conta')}</h3>
         {apagarPendente ? (
           <div className="apagar-confirmacao">

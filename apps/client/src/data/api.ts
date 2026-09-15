@@ -157,6 +157,13 @@ export interface PartyPresetsResponse {
   readonly presets: readonly PartyPreset[];
 }
 
+// M34 2/N (D45) — a telemetria: a escolha de recusar e a DECLARAÇÃO do que é coletado, que
+// é do servidor (ele a trava contra as próprias tabelas) e a tela só traduz.
+export interface TelemetryResponse {
+  readonly optOut: boolean;
+  readonly collected: readonly string[];
+}
+
 export interface BattleOutcomeResponse {
   readonly seed: number;
   readonly result: BattleResult;
@@ -413,6 +420,11 @@ export const api = {
     request<PartyPreset>(ticket, `/me/party-presets/${slot}`, { method: 'PUT', body: JSON.stringify({ name, heroIds }) }),
   deletePartyPreset: (ticket: string, slot: number) =>
     request<{ readonly deleted: boolean }>(ticket, `/me/party-presets/${slot}`, { method: 'DELETE' }),
+
+  // M34 2/N (D45) — telemetria.
+  telemetry: (ticket: string) => request<TelemetryResponse>(ticket, '/me/telemetry'),
+  setTelemetry: (ticket: string, optOut: boolean) =>
+    request<TelemetryResponse>(ticket, '/me/telemetry', { method: 'PUT', body: JSON.stringify({ optOut }) }),
 
   saveDefense: (ticket: string, mapId: string, units: readonly ArenaDefenseUnit[]) =>
     request<ArenaDefense>(ticket, '/me/defense', { method: 'PUT', body: JSON.stringify({ mapId, units }) }),

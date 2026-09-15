@@ -571,6 +571,14 @@ interface BattleStore {
     readonly busy: boolean;
     readonly error: string | null;
   };
+  // M34 2/N (D45) — a telemetria: a escolha (`null` = ainda não lida) e a declaração que o
+  // servidor manda. Estado de conta, como os presets; lida com o hub.
+  readonly telemetria: {
+    readonly optOut: boolean | null;
+    readonly collected: readonly string[];
+    readonly busy: boolean;
+    readonly error: string | null;
+  };
   readonly apagarProgressoPendente: boolean;
   readonly targetingMode: TargetingMode | null;
   // §11/§3.4 (M13, sub-sessão 1/N) — a gravação. Todo comando ACEITO entra aqui na ordem;
@@ -654,6 +662,9 @@ interface BattleStore {
   /** Manda a seleção atual para o slot, com o nome. */
   salvarPreset: (slot: number, name: string) => Promise<void>;
   apagarPreset: (slot: number) => Promise<void>;
+  lerTelemetria: () => Promise<void>;
+  /** Recusar (`true`) apaga o coletado e para de gravar; `false` volta a gravar dali em diante. */
+  definirTelemetria: (optOut: boolean) => Promise<void>;
   fecharOpcoes: () => void;
   // Os dois passos de apagar. `clearProgress` é o efeito; só `confirmarApagarProgresso` o
   // chama pela tela, e só com a pergunta de pé.
@@ -844,6 +855,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   abaDoHub: 'lobby',
   transicao: null,
   presets: { slots: 8, lista: [], busy: false, error: null },
+  telemetria: { optOut: null, collected: [], busy: false, error: null },
   apagarProgressoPendente: false,
   targetingMode: null,
   commandLog: [],
@@ -1774,7 +1786,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // `summon.error`, `pve.error`), então uma falhar não derruba as outras nem a sessão — o
   // jogador entra e vê no painel o que não carregou, com o botão de tentar de novo.
   carregarHub: async () => {
-    await Promise.all([get().refreshCampaign(), get().lerInvocacao(), get().refreshPve(), get().lerPresets()]);
+    await Promise.all([get().refreshCampaign(), get().lerInvocacao(), get().refreshPve(), get().lerPresets(), get().lerTelemetria()]);
   },
 
   // M35 3/N (D42) — os presets de party. Estado de conta no servidor; aqui só leitura,
@@ -1789,6 +1801,31 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       set((s) => ({ presets: { ...s.presets, slots: resposta.slots, lista: resposta.presets, busy: false } }));
     } catch (error) {
       set((s) => ({ presets: { ...s.presets, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  // M34 2/N (D45) — a telemetria. Só leitura e a escolha; a declaração vem do servidor.
+  lerTelemetria: async () => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    set((s) => ({ telemetria: { ...s.telemetria, busy: true, error: null } }));
+    try {
+      const resposta = await api.telemetry(pvp.token);
+      set((s) => ({ telemetria: { ...s.telemetria, optOut: resposta.optOut, collected: resposta.collected, busy: false } }));
+    } catch (error) {
+      set((s) => ({ telemetria: { ...s.telemetria, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  definirTelemetria: async (optOut) => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    set((s) => ({ telemetria: { ...s.telemetria, busy: true, error: null } }));
+    try {
+      const resposta = await api.setTelemetry(pvp.token, optOut);
+      set((s) => ({ telemetria: { ...s.telemetria, optOut: resposta.optOut, collected: resposta.collected, busy: false } }));
+    } catch (error) {
+      set((s) => ({ telemetria: { ...s.telemetria, busy: false, error: describeApiError(error) } }));
     }
   },
 

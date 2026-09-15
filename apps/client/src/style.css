@@ -2015,6 +2015,16 @@ button.targeting {
   align-self: flex-start;
 }
 
+/* M34 2/N (D45) — a declaração da medição: texto corrido, menor que o resto do menu, e a
+   lista do que é registrado numa linha só. */
+.telemetria-declaracao,
+.telemetria-campos {
+  margin: 0 0 0.6rem;
+  font-size: 0.85em;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
 .apagar-confirmacao {
   padding: 0.75rem;
   border: 1px solid #7f1d1d;

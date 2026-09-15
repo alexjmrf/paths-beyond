@@ -73,6 +73,19 @@ const en: Catalogo = {
     'This erases everything saved on this machine and signs you out. Accessibility and volume settings stay.',
   'app.pref.apagarConfirmar': 'Yes, erase everything',
   'app.pref.apagarCancelar': 'Keep my progress',
+  // M34 2/N (D45) — the telemetry: what the server measures, declared, and the switch to refuse.
+  'app.opcoes.telemetria': 'Measurement',
+  'app.pref.telemetriaDeclaracao':
+    'To find out where players get stuck, the server records, per account: which mission you started, when you started and finished it, whether you won and in how many rounds, and when you were last signed in. Nothing about your machine, your network or your clicks. The request log (who asked for what, and how it ended) is server operation and stays either way.',
+  'app.pref.telemetriaCampos': 'Recorded:',
+  'app.pref.telemetriaCampo.missionId': 'which mission',
+  'app.pref.telemetriaCampo.issuedAt': 'when it started',
+  'app.pref.telemetriaCampo.finishedAt': 'when it ended',
+  'app.pref.telemetriaCampo.outcome': 'win or loss',
+  'app.pref.telemetriaCampo.rounds': 'how many rounds',
+  'app.pref.telemetriaCampo.lastSeenAt': 'last sign-in',
+  'app.pref.telemetriaRecusar': "Don't measure my account (also erases what was already recorded)",
+  'app.pref.telemetriaIndisponivel': 'The measurement setting could not be loaded.',
 
   // M32 — a entrada. Entrar não tem nada a ver com PvP: é a primeira ação do jogo, e ficava
   // dentro de um painel chamado "PvP — arena", com as outras telas mandando o jogador para lá.
@@ -700,6 +713,18 @@ const pt: Catalogo = {
     'Isto apaga tudo o que está salvo nesta máquina e encerra a sessão. As preferências de acessibilidade e de volume ficam.',
   'app.pref.apagarConfirmar': 'Sim, apagar tudo',
   'app.pref.apagarCancelar': 'Manter meu progresso',
+  'app.opcoes.telemetria': 'Medição',
+  'app.pref.telemetriaDeclaracao':
+    'Para descobrir onde os jogadores travam, o servidor registra, por conta: qual missão você começou, quando começou e terminou, se venceu e em quantos rounds, e quando entrou pela última vez. Nada sobre sua máquina, sua rede ou seus cliques. O log de requisições (quem pediu o quê, e como terminou) é operação do servidor e fica de qualquer jeito.',
+  'app.pref.telemetriaCampos': 'Registrado:',
+  'app.pref.telemetriaCampo.missionId': 'qual missão',
+  'app.pref.telemetriaCampo.issuedAt': 'quando começou',
+  'app.pref.telemetriaCampo.finishedAt': 'quando terminou',
+  'app.pref.telemetriaCampo.outcome': 'vitória ou derrota',
+  'app.pref.telemetriaCampo.rounds': 'quantos rounds',
+  'app.pref.telemetriaCampo.lastSeenAt': 'última entrada',
+  'app.pref.telemetriaRecusar': 'Não medir minha conta (também apaga o que já foi registrado)',
+  'app.pref.telemetriaIndisponivel': 'Não foi possível carregar a escolha de medição.',
 
   'entrada.chamada': 'Entre para jogar a campanha, farmar masmorras, invocar heróis e lutar na arena.',
   'entrada.entrar': 'Entrar',
