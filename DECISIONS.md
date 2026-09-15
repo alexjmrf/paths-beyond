@@ -8206,3 +8206,14 @@ tomada, e a decisão tomada é **não mexer em balanceamento/winrate agora** —
 nem a ficha inicial, nem `pnpm balance` com esse objetivo. O item sai da lista do M33 e volta quando
 o usuário abrir a passagem de balanceamento, depois do playtest. Nenhuma sessão deve reabri-lo por
 conta própria.
+
+### O veredito do M33, dado pelo usuário — e o M23 fechado (2026-09-15)
+
+O aceite do M33 é do usuário: observar alguém que nunca viu o jogo e escrever o que travou. Com o
+instalador do M35 funcionando em outra máquina, o veredito foi: *"não acho que tenha nada travando
+quando jogam"*. **Registro literal: nenhum item de travamento a anotar.** Isso fecha o critério 3 do
+M23 (o único aberto desde 2026-09-04) pelo mesmo precedente do critério 2 do M16 — julgado pelo
+dono, não autocertificado — e fecha o M33 sem desdobrar milestone nova. O achado dos 65% foi
+adiado na entrada anterior. **Próximo, pela ordem de 2026-09-14 (M32 → M35 → M33 → M34): M34 —
+Telemetria e o playtest ampliado.** Ressalva honesta, registrada para o M34: um veredito de
+observação direta não substitui número — é exatamente o que o M34 existe para dar.
