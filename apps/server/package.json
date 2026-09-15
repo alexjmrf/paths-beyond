@@ -8,6 +8,7 @@
     "dev:memory": "tsx src/devServer.ts",
     "start": "tsx src/index.ts",
     "migrate": "tsx src/migrate.ts",
+    "relatorio": "tsx src/relatorio.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

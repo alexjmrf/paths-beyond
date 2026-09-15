@@ -15,6 +15,7 @@
     "validate:data": "pnpm --filter @paths-beyond/data run validate:data",
     "sim": "tsx packages/sim-cli/src/cli.ts",
     "balance": "tsx tools/balance/src/cli.ts",
+    "relatorio": "pnpm --filter @paths-beyond/server run relatorio",
     "test:browser": "pnpm --filter @paths-beyond/core run test:browser",
     "browsers:install": "pnpm --filter @paths-beyond/core exec playwright install --with-deps",
     "art": "tsx tools/art/src/cli.ts"
