@@ -496,7 +496,7 @@ crescer.** Com pity `P` e pool `N`, o pior caso para completar o pool é `N × P
 5 × 10 = 50. Um pity de 30 exigiria 150 rolagens, que a renda da demo não paga nem de longe, e
 `pool esgotado CONGELA o contador de pity` (M18 1/N) transformaria o excedente em rolagem morta.
 **Logo esta fatia NÃO é onde o pity cresce** — ela é onde o volume passa a caber no pool que existe.
-O pity maior que o usuário quer chega com o elenco do M36, e é lá que ele deve ser afinado.
+O pity maior que o usuário quer chega com o elenco do M37, e é lá que ele deve ser afinado.
 
 **O ajuste de menor toque é o custo, não a renda:** `summon.premiumCost` é **um número em
 `packages/data`**, contra os 45 arquivos de recompensa que mexer na renda exigiria. O alvo é o
@@ -604,13 +604,44 @@ travando mais; a suíte do cliente segue verde e `semTextoCru.test.ts` continua 
 
 ---
 
-> **M36–M38 foram PROPOSTAS pelo agente em 2026-09-10**, sobre o desenho de gacha final que o
+> **M36 foi inserido em 2026-09-15 por D47**, e é a maior reversão de desenho do projeto: o
+> inimigo passa a ser desconhecido, o duelo resolve no servidor, e o preview — que §11 chamava de
+> *"o recurso mais importante do jogo"* — sai. Entra **antes dos tiers** porque tiers, armas e Soul
+> são três tipos novos de dado oculto. O que estava numerado M36–M38 subiu para M37–M39.
+
+### M36 — O inimigo desconhecido: a batalha viva no servidor
+**Informação oculta e simulação no cliente não coexistem** — se o cliente simula, ele tem o dado,
+e o dado se lê. Então o servidor passa a resolver cada duelo e cada turno de IA, e o cliente
+recebe o log do **visível**: posição, HP, AP, PP, lugar na iniciativa, e o nome da skill no
+instante em que dispara. Stats, skills, equipamento, artefatos, scripts, `moveType` e alcance do
+inimigo nunca saem do servidor. **O modelo `ticket → joga tudo → run` é aposentado**: entra a
+batalha viva (`matches`), com `ticket` devolvendo o setup redigido, cada comando como rota, o log
+acumulado no servidor e o replay construído dele. Campanha, masmorra e arena passam pelo mesmo
+caminho. `DuelPreviewPanel` e o overlay de ameaça saem; `applyCommandAndAdvance` é partido em
+"avançar" e "IA como passo com log". **`packages/core` não muda de regra** — `resolveDuel`,
+`applyCommand`, iniciativa e agregação ficam; muda o que atravessa a rede. **A spec é reescrita
+nesta milestone**, com o texto de D47 como ponto de partida: o pilar de §1.1, a linha de preview
+de §11, e §9.1.
+**Aceite:** um teste prova que **nenhuma resposta de rota** de batalha carrega stat, skill, item,
+script, `moveType` ou alcance de unidade inimiga — por forma (o tipo redigido não tem os campos),
+não por varredura; campanha, masmorra e arena jogam ponta a ponta pelo caminho vivo, provado a
+partir de servidor vazio no idioma de `primeiraSessao.test.ts`; o replay de uma batalha viva
+reproduz o mesmo resultado que a batalha produziu; o cliente não importa mais `resolveDuel` nem
+`simulate` (asserção sobre os imports, no espírito de `ambiente.test.ts`); §1.1, §11 e §9.1 estão
+reescritos e `docs/spec/00-visao-e-pilares.md` não tem mais a frase "prever o resultado"; a
+reconexão do M22 sobrevive à batalha viva (cair no meio de um duelo não o perde nem o repete);
+`pnpm balance` inalterado — o torneio roda com dados completos, como sempre; `RULES_VERSION` sobe
+se e só se alguma regra mudar (a expectativa é que não).
+
+---
+
+> **M37–M39 foram PROPOSTAS pelo agente em 2026-09-10**, sobre o desenho de gacha final que o
 > usuário fechou na mesma sessão. Decisões, colisões e números abertos em `DECISIONS.md`, seção
 > **"Em aberto (levantadas pelo usuário em 2026-09-10, ao desenhar o gacha final)"**. As três vêm
 > **depois do playtest (M33)** de propósito: elas somam sistema a um jogo cujo M33 existe para
 > descobrir se ele já tem regra demais, e o veredito do playtest deve poder mudá-las.
 
-### M36 — Os três tiers: Adventurer, Hero e Legend
+### M37 — Os três tiers: Adventurer, Hero e Legend
 **O elenco deixa de ser plano.** `Adventurer` é o tier de baixo, `Hero` o do meio e `Legend` o topo,
 e **o topo não é invocável**: chega-se nele por evolução. Os caminhos são assimétricos de propósito
 — quem nasce `Hero` sobe direto a `Legend`; quem nasce `Adventurer` sobe a `Hero` e só então a
@@ -637,7 +668,7 @@ divisão do elenco, pity novo) vieram do usuário.
 
 ---
 
-### M37 — Armas assinatura e o banner de armas
+### M38 — Armas assinatura e o banner de armas
 **O equipamento vira alvo de gacha.** Uma arma/artefato assinatura por personagem, **travada por
 CLASSE** — equipável por qualquer personagem da classe de quem ela pertence —, com banner próprio; e
 quando um personagem entra em rotação, a arma dele entra junto. **A máquina de item já existe
@@ -660,7 +691,7 @@ de sidegrade; a decisão sidegrade-vs-upgrade está registrada em `DECISIONS.md`
 
 ---
 
-### M38 — A Soul
+### M39 — A Soul
 **Um item exclusivo do personagem, e o primeiro slot novo desde o M1.** Dois substats roláveis mais
 um **mainstat ligado às habilidades daquele personagem** (2 a 3 possibilidades), num slot que só
 abre depois de o personagem ser upado até certo nível. **O farm dropa material GENÉRICO e a escolha

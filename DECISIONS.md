@@ -8344,3 +8344,91 @@ fecha a pergunta com a resposta que mantém as duas portas abertas sem pagar por
 velocidade de iteração, nem tela feia. Se o gatilho for um desses, a resposta continua sendo
 M32/M35.
 
+
+## O combate com informação oculta
+
+### D47 — o inimigo é desconhecido: o duelo resolve no servidor, e o preview sai (2026-09-15)
+
+**A decisão do usuário, nas palavras dele:** *"você tem noção das habilidades que seu personagem
+tem e como ele vai ativá-las, mas não teria noção dos status do personagem inimigo e suas
+habilidades e ordem; você engajaria no combate sem a certeza de quais habilidades, equipamentos,
+artefatos ele teria — no máximo vida, AP, PP e a ordem dos turnos."* Três perguntas fecharam o
+tamanho: **zona de ameaça — não** (ela deriva de `moveType` e alcance da arma, que ficam ocultos);
+**PvE esconde também — sim** (um modelo só); **o preview não mostra nada** — "deixa só a questão de
+engajar mesmo".
+
+**É a maior reversão de desenho da história do projeto, e vai registrada como tal.** §11 chama o
+preview de duelo de *"o recurso mais importante do jogo"*; §1.1 tem um pilar inteiro —
+*legibilidade tática* — cuja primeira frase é *"o jogador DEVE conseguir prever o resultado antes
+de confirmar"*; §6.7 escolheu rolagem única de acurácia **para** o preview ser legível. Nada
+disso é ignorado: é **reescrito**, porque pilar é o que desempata decisão ambígua neste projeto e
+um pilar morto que continua escrito desempataria para o lado errado.
+
+**O teorema que força a arquitetura.** Informação oculta e simulação no cliente não coexistem:
+se o cliente simula o duelo, ele tem os dados do inimigo, e um editor de memória ou um sniffer os
+lê — o "oculto" seria só uma tela que não mostra (é o bot do Pokémon GO que raspava o time
+adversário em segundos). Logo **o servidor resolve o duelo e manda só o que aconteceu**, e o
+cliente **reproduz** — não simula. A frase de §9.1, *"o cliente simula só para animar"*, deixa de
+ser verdade.
+
+#### O que muda
+
+1. **O duelo resolve no servidor.** O cliente manda `engage(unidade, alvo)`; o servidor roda
+   `resolveDuel` com os dados completos e devolve o log do **visível** — golpes, dano, HP, e o
+   nome da skill no instante em que dispara (revelar ao disparar é a única forma de o jogador
+   aprender o que enfrentou). O M16 já anima a partir de um `DuelResult`; o mesmo caminho recebe o
+   objeto do servidor. **Os turnos da IA também resolvem no servidor** (os scripts dela são
+   ocultos), e chegam como log de movimento e engajamento.
+2. **`ticket → joga tudo → run` morre.** Vira uma **batalha viva no servidor**: `ticket` devolve o
+   setup **redigido** (do inimigo: posição, HP, AP, PP, lugar na iniciativa — nada mais); cada
+   comando é uma rota; o servidor acumula o log; o replay é o log construído no servidor. A tabela
+   `matches` que o PvP síncrono pediria passa a ser necessária **agora**, para o assíncrono e para
+   a campanha — e é o que faz o síncrono virar só "trocar quem emite metade dos comandos".
+3. **Campanha, masmorra e arena passam pelo mesmo modelo.** Um caminho de duelo, não dois.
+4. **O cliente perde as chamadas de simulação que precisam do inimigo.** Ficam as de dados
+   próprios (`computeReachableTiles` das suas unidades). `DuelPreviewPanel` e o overlay de
+   ameaça saem; `PreviaDoMapa` mostra só o que é visível.
+5. **`applyCommandAndAdvance` é partido.** Ele aplica o comando, fecha o round **e chama a IA**
+   numa função só (`simulate.ts:88`). O servidor de batalha viva precisa de "avançar sem IA"
+   como função própria, e a IA como passo separado que produz log. `applyCommand` puro já existe;
+   é extrair, não reescrever.
+
+#### O que reescreve na spec (parte da milestone, com o texto abaixo como ponto de partida)
+
+- **§1.1, pilar "Legibilidade tática" →** *"O jogador DEVE conseguir ler o seu próprio
+  compromisso antes de confirmar: suas skills, seus recursos, quem age em que ordem, e o estado
+  visível do inimigo (posição, HP, AP, PP). O que o inimigo carrega — stats, skills, equipamento,
+  scripts, alcance — é desconhecido até se manifestar. Engajar é uma aposta informada, não um
+  cálculo."*
+- **§11, linha "Preview de duelo" → sai.** A linha "Mapa" perde "overlay de ameaça"; a lista de
+  iniciativa e os AP/PP no tile continuam obrigatórios — são exatamente o visível.
+- **§9.1 →** *"o servidor resolve; o cliente reproduz o log."*
+- **§6.7** não muda de número: rolagem única continua, agora por simplicidade e não por preview.
+
+#### O que compra
+
+- **Cheating de informação vira impossível por construção.** O servidor nunca manda o oculto.
+- **O PvP síncrono fica mais simples**, não mais difícil: o servidor já é o único com estado.
+- **A divergência de engine deixa de ser risco de resultado no cliente** — ele não calcula
+  desfecho. O job `determinismo-navegadores` perde o papel de guardar o placar (fica como guarda
+  das funções que o cliente ainda roda); o determinismo do **servidor** entre deploys segue sendo
+  o que `rulesVersion` e o replay canônico protegem.
+- **Abre um sistema:** o que você já viu de um adversário — reconhecimento por combate,
+  informação como recurso. Não decidido; registrado como horizonte.
+
+#### O que custa, dito sem suavizar
+
+**É a reformulação do transporte de batalha** — a única coisa que a revisão de PvP de 2026-09-15
+tinha dito que não precisaria de reformulação. A exigência mudou a resposta. O core (`resolveDuel`,
+`applyCommand`, iniciativa, agregação) fica inteiro; o que muda é como a batalha atravessa a rede,
+o que o cliente recebe e o que a tela mostra. É uma milestone inteira, e entra **antes dos tiers
+(M36 antigo)**: tiers, armas assinatura e Soul são três tipos novos de dado oculto, e construí-los
+sobre o transporte atual para depois esconder é fazer duas vezes.
+
+**Latência por engajamento.** Cada `engage` e cada turno de IA é uma ida ao servidor (~100 ms do
+Brasil ao Railway em São Paulo). Aceitável para turno; sempre-online já é decisão (D21).
+
+**O que reabre esta decisão:** nada arquitetural. Se um dia o preview voltar, ele volta como
+*estimativa a partir do conhecido* (o seu lado + o que você já viu), nunca como cálculo do
+oculto — o teorema não muda.
+
