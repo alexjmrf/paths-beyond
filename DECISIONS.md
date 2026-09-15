@@ -8265,3 +8265,82 @@ rodar `pnpm relatorio`.
 
 **Suíte: 195 arquivos, 2740 testes sem banco** (era 192/2704); `validate:data` 31/281;
 `typecheck` e `lint` limpos; `packages/core` intocado, `RULES_VERSION` em `0.19.0`.
+
+## A stack, reexaminada com o jogo instalado
+
+### D46 — a stack fica; o cliente é mantido PORTÁVEL, não portado (2026-09-15)
+
+**A pergunta, e de onde ela veio.** Depois de instalar o jogo em outra máquina pela primeira vez
+(critério 3 do M28) e ver a HUD, o usuário perguntou se ainda valia seguir sem motor — Godot,
+Unity, Unreal, RPG Maker — e pediu pesquisa intensa com jogos comparáveis. A pergunta é legítima
+e a hora era certa. A resposta foi pesquisada, não opinada, e está aqui para não ser reaberta a
+cada tela feia.
+
+**O que a HUD tem a ver com isso: nada.** Nenhum motor entrega uma HUD para este jogo; todos
+entregam um toolkit. Symphony of War é RPG Maker e parece RPG Maker; Fell Seal é Unity e parece
+Fell Seal porque alguém desenhou. A HUD é M32/M35 em qualquer motor. O que um motor daria de
+verdade é **velocidade de iteração visual** (editor de cena contra escrever React), e isso é
+custo real da stack atual — de velocidade, não de teto.
+
+**O que jogos comparáveis usam, e a leitura.** Wargroove: Halley (C++ próprio). Into the Breach:
+C++/SDL/Lua próprio. Dark Deity: GameMaker. Fell Seal e Triangle Strategy: Unity. Symphony of
+War: RPG Maker VX Ace — com a review dizendo *"pretty good, considering the limits"*. CrossCode:
+HTML5/NW.js, 93% positivo. Cookie Clicker: **Electron**, 96% positivo em 70 mil reviews. **Não
+existe motor consensual para tactics indie**; o motor não é o que separa os bons dos ruins.
+**Vampire Survivors é o caso inteiro:** sucesso no PC em Phaser (web), portado para Unity **só**
+porque precisou de Xbox, Switch e mobile — e o autor, perguntado se usaria Unity de novo:
+*"lol no thank you"*.
+
+**O que uma migração custaria, medido no repositório.** O cliente **não é thin**: importa 27
+símbolos do core e faz 23 chamadas de simulação, porque o fluxo é `ticket → o cliente joga a
+batalha inteira → run`, e preview de duelo, tiles alcançáveis e zona de ameaça são calculados
+nele. Logo o core tem de rodar no cliente, e migrar o cliente para Godot/Unity é **portar o core
+para C#** — 7.333 linhas de fonte, 11.492 de teste, e a prova de determinismo — e passar a ter
+duas implementações (TS no servidor, C# no cliente) que precisam dar o **mesmo hash byte a byte a
+cada batalha**, porque o servidor re-simula. É exatamente a classe de bug que o ponto fixo, o
+PRNG próprio e os três jobs de determinismo existem para eliminar. A alternativa é portar o
+servidor também: reescrita total, meses, redescobrindo M13–M27 num código que ainda muda
+(M36–M38 vão mexer em elenco e slot).
+
+**Os candidatos.** RPG Maker: não — máquina de JRPG com batalha embutida contra a qual cada
+mecânica daqui lutaria, e sem história de servidor. Unreal: não — 3D AAA para tactics 2D com
+sprites; nenhum comparável usa. Unity: o candidato sério, padrão do gênero gacha, Switch/mobile
+de primeira classe, licença Personal grátis até US$ 200k (Runtime Fee cancelado em 2024). Godot
+4: sem licença, C# via .NET, consoles só por terceiros — e a API de multiplayer dele é tempo
+real, **inútil aqui**: em Godot só se usaria renderer e UI; o servidor continua Node.
+
+**O único argumento que vence: consoles.** Todo comparável de tactics indie que deu certo está
+no Switch, e **Electron nunca vai para console** — não é lento, é impossível.
+
+**A decisão do usuário: desktop + mobile agora; console TALVEZ, se o jogo sair do papel.** Isso
+fecha a pergunta com a resposta que mantém as duas portas abertas sem pagar por nenhuma:
+
+1. **A stack fica.** TypeScript, core puro, Pixi + React, Electron no desktop, Fastify no
+   servidor. Cookie Clicker e CrossCode são a prova de que ela chega a 90%+ na Steam.
+2. **Mobile entra pela mesma stack**, com o mesmo bundle web num wrapper (Capacitor), não por
+   porta. Consequências que já valem para o desenho: a HUD do M35 precisa nascer com toque em
+   mente; `IdentityProvider` ganha os provedores móveis (o tipo já é a extensão prevista pelo
+   M20); e **o WebView do iOS é JavaScriptCore** — a divergência de engine que o Electron
+   eliminou no desktop volta no mobile, e é o job `determinismo-navegadores` (WebKit) que a
+   guarda. Ele deixa de ser paranoia e vira a prova do mobile.
+3. **Console, se vier, é PORTA do cliente, depois do playtest, com o core TS como
+   especificação.** A porta para C# seria mecânica — o core não tem float, DOM nem dependência,
+   e os 11k de teste dizem linha a linha quando ela errou. O momento certo é depois de (a) o
+   playtest validar o jogo, (b) console ser decisão tomada, (c) o conteúdo estabilizar. Antes
+   disso é portar um alvo em movimento.
+
+**As travas que tornam a porta barata, e que passam a valer a partir daqui:**
+- Regra 3 continua absoluta: **nenhuma regra no cliente.** É o que faz o cliente ser
+  reescrevível sem tocar no jogo.
+- `packages/core` continua sem float, sem DOM, sem dependência (regra 1) — ele é o documento
+  que a porta lê.
+- O Pixi fica confinado à costura de render (`render/tabuleiro.ts`, `MapCanvas`, `DuelScene`,
+  `PreviaDoMapa`); React fica nos menus. Numa porta, o React vira a UI do motor e a costura de
+  render vira o renderer do motor — as duas metades trocam separadas.
+- `battleStore.ts` não ganha lógica de jogo; ganha só estado de exibição. Ele já foi apontado
+  como o lugar onde a regra 3 pode erodir em silêncio.
+
+**O que reabre esta decisão:** console virar decisão tomada. Nada mais — nem HUD, nem
+velocidade de iteração, nem tela feia. Se o gatilho for um desses, a resposta continua sendo
+M32/M35.
+
