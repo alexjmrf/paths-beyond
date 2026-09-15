@@ -8217,3 +8217,51 @@ dono, não autocertificado — e fecha o M33 sem desdobrar milestone nova. O ach
 adiado na entrada anterior. **Próximo, pela ordem de 2026-09-14 (M32 → M35 → M33 → M34): M34 —
 Telemetria e o playtest ampliado.** Ressalva honesta, registrada para o M34: um veredito de
 observação direta não substitui número — é exatamente o que o M34 existe para dar.
+
+## M34 — Telemetria e o playtest ampliado
+
+### D45 — a telemetria: só servidor, recusa por conta que apaga, relatório como script (2026-09-15)
+
+A spec não cobre telemetria fora da entrada do roadmap; as três decisões abaixo foram propostas
+com recomendação e **aprovadas pelo usuário** antes de codar.
+
+**(1) A fonte do dado é só o servidor; o cliente não manda evento nenhum.** O achado que
+decidiu: `POST /campaign/:id/ticket` já é "a missão começou" e `POST /campaign/:id/run` já é
+"terminou" (com `outcome` e `roundsPlayed`) — o que faltava era o ticket ser stateless (a seed
+sai do HMAC do nonce) e nada guardar QUANDO foi emitido. Guardar isso responde ao aceite inteiro
+sem confiar no cliente e sem rota de ingestão nova. Consequência declarada: **abandono = ticket
+sem run**, o que inclui fechar o jogo no meio e cair a internet — o número é "não terminou",
+não "desistiu". Masmorra fica fora: é farm, e o aceite pergunta pela demo (a campanha).
+
+**(2) A recusa é por conta, no menu de opções, e recusar APAGA o já coletado.** Opt-out e não
+opt-in, porque um playtest fechado com dez pessoas que precisam achar um interruptor antes de
+jogar mede zero; e apagar, porque "pode recusar" deixando o passado no banco é recusa pela
+metade. O **log de requisição do M19 fica nos dois casos** e a declaração na tela diz isso: é
+operação (quem pediu o quê, como terminou), não medição de jogo. A DECLARAÇÃO é uma lista em
+código (`CAMPOS_COLETADOS`), devolvida pela rota e traduzida pela tela — `migrations.test.ts`
+confere que ela é exatamente o conjunto de colunas de comportamento das duas tabelas, para
+não mentir por esquecimento. Nada coletado identifica além do `player_id` (§9.4): nem máquina,
+nem rede, nem clique.
+
+**(3) O relatório é `pnpm relatorio`, script local contra `DATABASE_URL`, só leitura.** Uma
+rota de admin exigiria um conceito de admin que não existe. Medianas e não médias (uma
+tentativa deixada aberta a noite inteira arrastaria a média); ordem das missões pelo catálogo
+(capítulo por `order`, missão por `order`) e não por id — `encounter-campanha-1` é a SEGUNDA
+missão do capítulo 1 desde o M27.
+
+**As três fatias.** 1/N servidor: migration `0016_telemetry.sql` (`telemetry_accounts`,
+`mission_attempts`), `TelemetryRepository` memória + Postgres com paridade, o serviço
+`telemetry/telemetria.ts` (a única porta; nenhum verbo lança — medir nunca custa a partida),
+`GET/PUT /me/telemetry`, exportação e exclusão de conta; `telemetryRepository` é OPCIONAL em
+`buildApp` como `idempotencyRepository` — sem ele o servidor é o de antes (teste). 2/N cliente:
+a seção "Medição" no menu de opções (declaração, a lista traduzida do que o servidor manda com
+o campo cru visível se faltar tradução, o interruptor), lida com o hub; visto no browser contra
+o servidor em memória. 3/N: `telemetry/relatorio.ts` como função pura (por missão, funil de
+"onde parou" = última missão vencida por conta, presença em faixas de 1/7 dias) e o `cli`.
+
+**O que fica para o usuário (4/N):** o playtest com mais de uma pessoa remota e o relatório
+saindo do dado — exige o push (migration 0016 no Railway) e `DATABASE_URL` do provedor para
+rodar `pnpm relatorio`.
+
+**Suíte: 195 arquivos, 2740 testes sem banco** (era 192/2704); `validate:data` 31/281;
+`typecheck` e `lint` limpos; `packages/core` intocado, `RULES_VERSION` em `0.19.0`.
