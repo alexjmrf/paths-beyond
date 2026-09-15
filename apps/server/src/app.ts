@@ -13,6 +13,7 @@ import { matchmakingRoutes } from './matchmaking/routes.js';
 import type {
   ArenaDefenseRepository,
   PartyPresetRepository,
+  TelemetryRepository,
   CharacterOwnershipRepository,
   EconomyRepository,
   HeroRepository,
@@ -30,6 +31,7 @@ import { registerIdempotency } from './idempotency.js';
 import { registerRequestLogging, type RequestLogLine } from './observability.js';
 import type { ShopCatalog } from './shop/catalog.js';
 import { shopRoutes } from './shop/routes.js';
+import { createTelemetria, telemetryRoutes } from './telemetry/telemetria.js';
 
 export interface BuildAppDeps {
   repository: PlayerRepository;
@@ -37,6 +39,9 @@ export interface BuildAppDeps {
   arenaDefenseRepository: ArenaDefenseRepository;
   // M35 3/N (D42) — os presets de party.
   partyPresetRepository: PartyPresetRepository;
+  // M34 1/N (D45) — a telemetria. Opcional pelo mesmo motivo de `idempotencyRepository`:
+  // sem ela o servidor é o de antes e nada é medido; com ela, `/me/telemetry` existe.
+  telemetryRepository?: TelemetryRepository;
   // §10 (M14, sub-sessão 3/N) — estado de conta do PvE (energia, moedas, materiais,
   // inventário, limpezas e trava de entrada).
   economyRepository: EconomyRepository;
@@ -79,6 +84,10 @@ export interface BuildAppDeps {
 
 export function buildApp(deps: BuildAppDeps): FastifyInstance {
   const app = Fastify();
+  const now = deps.now ?? (() => Date.now());
+  // M34 1/N — um serviço só, compartilhado pelo sign-in (fora do escopo protegido) e pelas
+  // rotas de campanha (dentro): é ele que sabe se a conta recusou.
+  const telemetria = createTelemetria(deps.telemetryRepository, now);
 
   // M19 — registrado ANTES de qualquer rota, e no escopo raiz: um hook `onResponse` daqui
   // vale para toda rota registrada depois, inclusive as protegidas. Registrá-lo dentro do
@@ -123,6 +132,8 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
     heroRepository: deps.heroRepository,
     arenaDefenseRepository: deps.arenaDefenseRepository,
     partyPresetRepository: deps.partyPresetRepository,
+    ...(deps.telemetryRepository ? { telemetryRepository: deps.telemetryRepository } : {}),
+    telemetria,
     replayRepository: deps.replayRepository,
     economyRepository: deps.economyRepository,
     ownershipRepository: deps.ownershipRepository,
@@ -232,9 +243,10 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       ownershipRepository: deps.ownershipRepository,
       rewardsRepository: deps.rewardsRepository,
       partyPresetRepository: deps.partyPresetRepository,
+      telemetria,
       catalog: deps.catalog,
       ticketSecret: deps.ticketSecret,
-      now: deps.now ?? (() => Date.now()),
+      now,
       ...(deps.newNonce ? { newNonce: deps.newNonce } : {}),
     });
 
@@ -257,6 +269,11 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       ticketSecret: deps.ticketSecret,
       now: deps.now ?? (() => Date.now()),
     });
+
+    // M34 1/N (D45) — a declaração e a recusa. Só existe quando há onde gravar.
+    if (deps.telemetryRepository) {
+      await protectedRoutes.register(telemetryRoutes, { repository: deps.telemetryRepository });
+    }
 
     await protectedRoutes.register(shopRoutes, {
       repository: deps.repository,

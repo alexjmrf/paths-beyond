@@ -9,6 +9,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryPartyPresetRepository,
+  createMemoryTelemetryRepository,
   createMemoryRewardsRepository,
 } from '../src/repository/memoryRepository.js';
 import {
@@ -17,11 +18,13 @@ import {
   createPostgresHeroRepository,
   createPostgresPlayerRepository,
   createPostgresPartyPresetRepository,
+  createPostgresTelemetryRepository,
   createPostgresRewardsRepository,
 } from '../src/repository/postgresRepository.js';
 import type {
   CharacterOwnershipRepository,
   PartyPresetRepository,
+  TelemetryRepository,
   EconomyActionRecord,
   EconomyRepository,
   HeroRepository,
@@ -59,6 +62,8 @@ interface Backend {
   readonly heroes: HeroRepository;
   // M35 3/N — os presets de party (D42).
   readonly presets: PartyPresetRepository;
+  // M34 1/N — a telemetria (D45).
+  readonly telemetry: TelemetryRepository;
 }
 
 const catalog = loadCatalogFromDisk();
@@ -367,6 +372,55 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         expect(await backend.presets.listPresetsByOwner(PLAYER)).toEqual([]);
       });
     });
+
+    // M34 1/N (D45) — a telemetria. O contrato que a rota e o relatório dependem: a conta
+    // sem linha lê como "não recusou, nunca visto"; as tentativas voltam em ordem de emissão;
+    // fechar um nonce desconhecido diz `false` em vez de inventar linha; e apagar a conta
+    // leva tentativas e escolha.
+    describe('telemetria', () => {
+      const OUTRO = `${PLAYER}-outro`;
+
+      it('conta sem linha: não recusou, nunca vista', async () => {
+        expect(await backend.telemetry.getAccount(PLAYER)).toEqual({ playerId: PLAYER, optOut: false, lastSeenAt: null });
+      });
+
+      it('tocar o último visto cria a linha e move o instante; a escolha sobrevive ao toque', async () => {
+        await backend.telemetry.touchLastSeen(PLAYER, 1_000);
+        await backend.telemetry.touchLastSeen(PLAYER, 2_000);
+        expect(await backend.telemetry.getAccount(PLAYER)).toEqual({ playerId: PLAYER, optOut: false, lastSeenAt: 2_000 });
+
+        await backend.telemetry.setOptOut(PLAYER, true);
+        await backend.telemetry.touchLastSeen(PLAYER, 3_000);
+        expect(await backend.telemetry.getAccount(PLAYER)).toEqual({ playerId: PLAYER, optOut: true, lastSeenAt: 3_000 });
+        await backend.telemetry.setOptOut(PLAYER, false);
+      });
+
+      it('as tentativas: abertas em ordem de emissão, fechadas pelo nonce', async () => {
+        await backend.telemetry.recordIssued({ playerId: PLAYER, missionId: 'm-2', nonce: `${PLAYER}-n2`, issuedAt: 200 });
+        await backend.telemetry.recordIssued({ playerId: PLAYER, missionId: 'm-1', nonce: `${PLAYER}-n1`, issuedAt: 100 });
+        expect(await backend.telemetry.recordFinished(`${PLAYER}-n1`, { finishedAt: 150, outcome: 'victory', rounds: 4 })).toBe(true);
+        expect(await backend.telemetry.recordFinished(`${PLAYER}-inexistente`, { finishedAt: 1, outcome: 'defeat', rounds: 1 })).toBe(false);
+
+        expect(await backend.telemetry.listAttemptsByPlayer(PLAYER)).toEqual([
+          { playerId: PLAYER, missionId: 'm-1', nonce: `${PLAYER}-n1`, issuedAt: 100, finishedAt: 150, outcome: 'victory', rounds: 4 },
+          { playerId: PLAYER, missionId: 'm-2', nonce: `${PLAYER}-n2`, issuedAt: 200, finishedAt: null, outcome: null, rounds: null },
+        ]);
+      });
+
+      it('o relatório lê tudo: todas as tentativas e todas as contas com linha', async () => {
+        const todas = await backend.telemetry.listAllAttempts();
+        expect(todas.filter((a) => a.playerId === PLAYER)).toHaveLength(2);
+        const contas = await backend.telemetry.listAccounts();
+        expect(contas.find((c) => c.playerId === PLAYER)).toEqual({ playerId: PLAYER, optOut: false, lastSeenAt: 3_000 });
+      });
+
+      it('outra conta não vê nada, e apagar a conta leva tentativas e escolha', async () => {
+        expect(await backend.telemetry.listAttemptsByPlayer(OUTRO)).toEqual([]);
+        await backend.telemetry.deletePlayerData(PLAYER);
+        expect(await backend.telemetry.listAttemptsByPlayer(PLAYER)).toEqual([]);
+        expect(await backend.telemetry.getAccount(PLAYER)).toEqual({ playerId: PLAYER, optOut: false, lastSeenAt: null });
+      });
+    });
   });
 }
 
@@ -377,6 +431,7 @@ contrato('memória', () => ({
   rewards: createMemoryRewardsRepository(),
   heroes: createMemoryHeroRepository(),
   presets: createMemoryPartyPresetRepository(),
+  telemetry: createMemoryTelemetryRepository(),
 }));
 
 // Sem `DATABASE_URL` o bloco inteiro é pulado. O CI define a variável e sobe o serviço, e é
@@ -410,6 +465,8 @@ descrevePostgres('postgres', () => {
       // CI e a próxima execução colidiria na chave primária.
       ['heroes', 'owner_player_id'],
       ['party_presets', 'owner_player_id'],
+      ['mission_attempts', 'player_id'],
+      ['telemetry_accounts', 'player_id'],
     ] as const) {
       await pool.query(`DELETE FROM ${tabela} WHERE ${coluna} LIKE $1`, [`${PLAYER}%`]).catch(() => undefined);
     }
@@ -424,5 +481,6 @@ descrevePostgres('postgres', () => {
     rewards: createPostgresRewardsRepository(pool),
     heroes: createPostgresHeroRepository(pool),
     presets: createPostgresPartyPresetRepository(pool),
+    telemetry: createPostgresTelemetryRepository(pool),
   }));
 });

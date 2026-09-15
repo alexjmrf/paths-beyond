@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ECONOMY_ACTION_KINDS } from '../src/repository/types.js';
+import { CAMPOS_COLETADOS, ECONOMY_ACTION_KINDS } from '../src/repository/types.js';
 
 // M19 — o SQL e o TypeScript conferidos um contra o outro, SEM banco.
 //
@@ -68,5 +68,36 @@ describe('as migrations conversam com o TypeScript', () => {
 
     expect(prefixos).toEqual([...prefixos].sort());
     expect(new Set(prefixos).size).toBe(prefixos.length);
+  });
+});
+
+// M34 1/N (D45) — a DECLARAÇÃO do que a telemetria coleta é uma lista em código
+// (`CAMPOS_COLETADOS`), que a rota devolve e a tela mostra. Se alguém acrescentar uma coluna
+// à tabela sem acrescentar à lista, a declaração passa a mentir — e é este teste que reprova.
+// As colunas fora da lista são as que NÃO são dado de comportamento: a chave (nonce), a conta
+// (player_id, que o servidor já tem) e a própria escolha de recusar.
+function colunasDaTabela(sql: string, tabela: string): readonly string[] {
+  const trecho = new RegExp(`CREATE TABLE ${tabela} \\(([^;]*)\\)`, 'i').exec(sql)?.[1] ?? '';
+  return trecho
+    .split('\n')
+    .map((linha) => linha.trim())
+    .filter((linha) => /^[a-z_]+\s/.test(linha) && !/^(PRIMARY|FOREIGN|CHECK|UNIQUE)/i.test(linha))
+    .map((linha) => linha.split(/\s+/)[0]!);
+}
+
+function snake(campo: string): string {
+  return campo.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+describe('a declaração da telemetria bate com as tabelas', () => {
+  const sql = sqlDasMigrations();
+  const FORA_DA_DECLARACAO = new Set(['nonce', 'player_id', 'opt_out']);
+
+  it('toda coluna de comportamento de mission_attempts e telemetry_accounts está declarada, e nada a mais', () => {
+    const colunas = [...colunasDaTabela(sql, 'mission_attempts'), ...colunasDaTabela(sql, 'telemetry_accounts')].filter(
+      (c) => !FORA_DA_DECLARACAO.has(c),
+    );
+    expect(colunas.length).toBeGreaterThan(0);
+    expect([...colunas].sort()).toEqual([...CAMPOS_COLETADOS].map(snake).sort());
   });
 });

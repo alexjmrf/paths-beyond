@@ -9,6 +9,10 @@ import {
   type ArenaDefenseRepository,
   type PartyPreset,
   type PartyPresetRepository,
+  type MissionAttempt,
+  type MissionOutcome,
+  type TelemetryAccount,
+  type TelemetryRepository,
   type CharacterOwnershipRepository,
   type RewardsRepository,
   type HeroRepository,
@@ -401,6 +405,51 @@ export function createMemoryIdempotencyRepository(): IdempotencyRepository {
     },
     async deletePlayerData(playerId) {
       porJogador.delete(playerId);
+    },
+  };
+}
+
+// M34 1/N (D45) — telemetria, em memória. Contas sem linha leem como "não recusou, nunca
+// vista"; as tentativas voltam em ordem de emissão (é a ordem que o relatório conta).
+export function createMemoryTelemetryRepository(): TelemetryRepository {
+  const contas = new Map<string, TelemetryAccount>();
+  const tentativas = new Map<string, MissionAttempt>();
+
+  const conta = (playerId: string): TelemetryAccount =>
+    contas.get(playerId) ?? { playerId, optOut: false, lastSeenAt: null };
+  const porEmissao = (a: MissionAttempt, b: MissionAttempt) => a.issuedAt - b.issuedAt || a.nonce.localeCompare(b.nonce);
+
+  return {
+    async getAccount(playerId) {
+      return conta(playerId);
+    },
+    async setOptOut(playerId, optOut) {
+      contas.set(playerId, { ...conta(playerId), optOut });
+    },
+    async touchLastSeen(playerId, at) {
+      contas.set(playerId, { ...conta(playerId), lastSeenAt: at });
+    },
+    async recordIssued(attempt) {
+      tentativas.set(attempt.nonce, { ...attempt, finishedAt: null, outcome: null, rounds: null });
+    },
+    async recordFinished(nonce, fim) {
+      const aberta = tentativas.get(nonce);
+      if (!aberta) return false;
+      tentativas.set(nonce, { ...aberta, finishedAt: fim.finishedAt, outcome: fim.outcome, rounds: fim.rounds });
+      return true;
+    },
+    async listAttemptsByPlayer(playerId) {
+      return [...tentativas.values()].filter((t) => t.playerId === playerId).sort(porEmissao);
+    },
+    async listAllAttempts() {
+      return [...tentativas.values()].sort(porEmissao);
+    },
+    async listAccounts() {
+      return [...contas.values()].sort((a, b) => a.playerId.localeCompare(b.playerId));
+    },
+    async deletePlayerData(playerId) {
+      contas.delete(playerId);
+      for (const [nonce, t] of [...tentativas.entries()]) if (t.playerId === playerId) tentativas.delete(nonce);
     },
   };
 }

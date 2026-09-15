@@ -5,6 +5,7 @@ import { createDevIdentityValidator } from './identity/devIdentity.js';
 import {
   createPostgresArenaDefenseRepository,
   createPostgresPartyPresetRepository,
+  createPostgresTelemetryRepository,
   createPostgresCharacterOwnershipRepository,
   createPostgresEconomyRepository,
   createPostgresIdempotencyRepository,
@@ -70,6 +71,7 @@ const app = buildApp({
   heroRepository: createPostgresHeroRepository(pool),
   arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),
   partyPresetRepository: createPostgresPartyPresetRepository(pool),
+  telemetryRepository: createPostgresTelemetryRepository(pool),
   replayRepository: createPostgresReplayRepository(pool),
   seasonRepository: createPostgresSeasonRepository(pool),
   identityValidator: createDevIdentityValidator(),

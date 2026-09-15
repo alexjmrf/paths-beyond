@@ -3,10 +3,12 @@ import type { FastifyPluginAsync } from 'fastify';
 import { authPlugin, PLATFORM_TICKET_HEADER } from '../auth.js';
 import { registerRateLimit, type RateLimiter } from '../battle/rateLimit.js';
 import type { IdentityValidator } from '../identity/types.js';
+import type { Telemetria } from '../telemetry/telemetria.js';
 import { ensureOwnedHeroes } from '../summon/roster.js';
 import type {
   ArenaDefenseRepository,
   PartyPresetRepository,
+  TelemetryRepository,
   CharacterOwnershipRepository,
   EconomyRepository,
   HeroRepository,
@@ -37,6 +39,10 @@ export interface AccountRoutesOptions {
   readonly heroRepository: HeroRepository;
   readonly arenaDefenseRepository: ArenaDefenseRepository;
   readonly partyPresetRepository: PartyPresetRepository;
+  // M34 1/N (D45) — o serviço mede o sign-in ("último visto"); o repositório entra na
+  // exportação e na exclusão. Opcional como em `buildApp`.
+  readonly telemetria: Telemetria;
+  readonly telemetryRepository?: TelemetryRepository;
   readonly replayRepository: ReplayRepository;
   readonly economyRepository: EconomyRepository;
   readonly ownershipRepository: CharacterOwnershipRepository;
@@ -86,6 +92,9 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
     // `ensureOwnedHeroes` da 6/N — o que mudou é que ele é chamado aqui, e não num `GET`.
     await ensureOwnedHeroes(opts.heroRepository, opts.ownershipRepository, opts.catalog, player.id);
 
+    // M34 1/N — o sign-in é "a conta foi vista": é o que responde "fechou o jogo e não voltou".
+    await opts.telemetria.sessao(player.id);
+
     return { ...player, created: existente === null };
   });
 
@@ -109,7 +118,7 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
       if (!request.player) return reply.code(401).send({ error: 'missing platform ticket' });
       const player = request.player;
 
-      const [heroes, materials, items, clears, acquired, claims, chapters, defense, partyPresets] = await Promise.all([
+      const [heroes, materials, items, clears, acquired, claims, chapters, defense, partyPresets, telemetryAccount, missionAttempts] = await Promise.all([
         opts.heroRepository.listHeroesByOwner(player.id),
         opts.economyRepository.getMaterials(player.id),
         opts.economyRepository.listItems(player.id),
@@ -119,6 +128,9 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
         opts.rewardsRepository.listClearedChapters(player.id),
         opts.arenaDefenseRepository.getDefenseByOwner(player.id),
         opts.partyPresetRepository.listPresetsByOwner(player.id),
+        // M34 1/N — "o que vocês guardam de mim" inclui o que a telemetria guarda.
+        opts.telemetryRepository?.getAccount(player.id) ?? null,
+        opts.telemetryRepository?.listAttemptsByPlayer(player.id) ?? [],
       ]);
 
       return {
@@ -129,6 +141,7 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
         rewards: { claims, clearedChapters: chapters },
         arenaDefense: defense,
         partyPresets,
+        telemetry: { account: telemetryAccount, missionAttempts },
       };
     });
 
@@ -152,6 +165,8 @@ export const accountRoutes: FastifyPluginAsync<AccountRoutesOptions> = async (fa
       await opts.arenaDefenseRepository.deleteDefenseByOwner(playerId);
       // M35 3/N — os presets apontam para o jogador; sem esta linha a exclusão reprovaria.
       await opts.partyPresetRepository.deletePlayerData(playerId);
+      // M34 1/N — a telemetria aponta para o jogador; sem esta linha a exclusão reprovaria.
+      await opts.telemetryRepository?.deletePlayerData(playerId);
       await opts.heroRepository.deleteHeroesByOwner(playerId);
       const apagado = await opts.repository.deletePlayer(playerId);
 

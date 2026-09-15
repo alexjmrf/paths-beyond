@@ -16,6 +16,7 @@ import {
 import type { FastifyPluginAsync } from 'fastify';
 import { rejectOnRulesVersion } from '../version.js';
 import { deriveSeed, generateNonce } from '../battle/ticket.js';
+import type { Telemetria } from '../telemetry/telemetria.js';
 import { characterIdsForPlacements } from '../battle/artIds.js';
 import {
   MAX_PARTY_PRESETS,
@@ -55,6 +56,8 @@ export interface CampaignRoutesOptions {
   readonly rewardsRepository: RewardsRepository;
   // M35 3/N (D42) — os presets de party.
   readonly partyPresetRepository: PartyPresetRepository;
+  // M34 1/N (D45) — o ticket abre a tentativa, a run fecha. O serviço sabe se a conta recusou.
+  readonly telemetria: Telemetria;
   readonly catalog: ContentCatalog;
   readonly ticketSecret: string;
   readonly now: () => number;
@@ -272,6 +275,7 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     if ('error' in assembled) return reply.code(400).send({ error: assembled.error });
 
     const nonce = (opts.newNonce ?? generateNonce)();
+    await opts.telemetria.missaoIniciada({ playerId: player.id, missionId: encounter.id, nonce });
     return {
       nonce,
       seed: deriveSeed(opts.ticketSecret, nonce),
@@ -315,6 +319,7 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     }
 
     const outcome = state.outcome === 'victory' ? 'victory' : 'defeat';
+    await opts.telemetria.missaoTerminada({ nonce: body.nonce, outcome, rounds: state.round });
     if (outcome !== 'victory') {
       return reply.code(200).send({ outcome, roundsPlayed: state.round, premiumAwarded: 0, premium: player.premium });
     }

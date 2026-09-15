@@ -395,3 +395,68 @@ export interface IdempotencyRepository {
   save(entry: StoredResponse): Promise<void>;
   deletePlayerData(playerId: string): Promise<void>;
 }
+
+// M34 1/N (D45) — TELEMETRIA. O que o servidor mede do jogo, e a escolha do jogador de não
+// ser medido.
+//
+// A regra de ouro: nada aqui identifica alguém além do `playerId` que toda tabela já tem
+// (§9.4, M20). O que se guarda é comportamento de JOGO — qual missão, quando começou, quando
+// e como terminou, quando a conta foi vista por último — e nada de máquina, rede ou clique.
+//
+// `CAMPOS_COLETADOS` é a declaração: a rota devolve a lista, a tela mostra, e
+// `migrations.test.ts` confere que ela é exatamente o conjunto de colunas de comportamento
+// das duas tabelas — se alguém acrescentar uma coluna sem acrescentar aqui, a declaração
+// passa a mentir e o teste reprova.
+export const CAMPOS_COLETADOS = ['missionId', 'issuedAt', 'finishedAt', 'outcome', 'rounds', 'lastSeenAt'] as const;
+export type CampoColetado = (typeof CAMPOS_COLETADOS)[number];
+
+export type MissionOutcome = 'victory' | 'defeat';
+
+export interface MissionAttempt {
+  readonly playerId: string;
+  // O id do ENCOUNTER (a missão, desde M27) — o mesmo `:id` de `/campaign/:id/ticket`.
+  readonly missionId: string;
+  // O nonce do ticket: é o que casa o começo (ticket) com o fim (run).
+  readonly nonce: string;
+  // Epoch em ms, do `now()` injetado. `finishedAt`/`outcome`/`rounds` nulos = abandonada.
+  readonly issuedAt: number;
+  readonly finishedAt: number | null;
+  readonly outcome: MissionOutcome | null;
+  readonly rounds: number | null;
+}
+
+// O tipo-guarda de que a declaração cobre os campos de comportamento de `MissionAttempt`
+// (tudo menos a chave e a conta) e o `lastSeenAt` da conta. Compila, ou não compila.
+type CamposDeComportamento = Exclude<keyof MissionAttempt, 'playerId' | 'nonce'> | 'lastSeenAt';
+const _declaracaoCobreTudo: Record<CamposDeComportamento, true> = {
+  missionId: true,
+  issuedAt: true,
+  finishedAt: true,
+  outcome: true,
+  rounds: true,
+  lastSeenAt: true,
+} satisfies Record<CampoColetado, true>;
+void _declaracaoCobreTudo;
+
+export interface TelemetryAccount {
+  readonly playerId: string;
+  readonly optOut: boolean;
+  readonly lastSeenAt: number | null;
+}
+
+export interface TelemetryRepository {
+  /** Sem linha: `{ optOut: false, lastSeenAt: null }` — não recusou, nunca vista. */
+  getAccount(playerId: string): Promise<TelemetryAccount>;
+  setOptOut(playerId: string, optOut: boolean): Promise<void>;
+  touchLastSeen(playerId: string, at: number): Promise<void>;
+  recordIssued(attempt: Pick<MissionAttempt, 'playerId' | 'missionId' | 'nonce' | 'issuedAt'>): Promise<void>;
+  /** `false` se não há tentativa aberta com esse nonce — nunca inventa linha. */
+  recordFinished(nonce: string, fim: { finishedAt: number; outcome: MissionOutcome; rounds: number }): Promise<boolean>;
+  /** As tentativas da conta, em ordem de emissão. */
+  listAttemptsByPlayer(playerId: string): Promise<readonly MissionAttempt[]>;
+  // Para o relatório (3/N): tudo, em ordem de emissão; e toda conta com linha.
+  listAllAttempts(): Promise<readonly MissionAttempt[]>;
+  listAccounts(): Promise<readonly TelemetryAccount[]>;
+  // §9.4 (M20) — exclusão de conta; também o que "recusar" chama para apagar o coletado.
+  deletePlayerData(playerId: string): Promise<void>;
+}

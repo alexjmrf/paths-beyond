@@ -11,6 +11,10 @@ import {
   type ArenaDefenseRepository,
   type PartyPreset,
   type PartyPresetRepository,
+  type MissionAttempt,
+  type MissionOutcome,
+  type TelemetryAccount,
+  type TelemetryRepository,
   type HeroRepository,
   type Player,
   type PlayerRepository,
@@ -796,6 +800,101 @@ export function createPostgresRateLimiter(pool: Pool, options: RateLimiterOption
       } finally {
         client.release();
       }
+    },
+  };
+}
+
+// M34 1/N (D45) — telemetria, em Postgres. Os instantes são `bigint` em ms e voltam do driver
+// como string — o `Number()` é o mesmo cuidado de `energy_as_of`.
+interface TelemetryAccountRow {
+  readonly player_id: string;
+  readonly opt_out: boolean;
+  readonly last_seen_at: string | null;
+}
+
+interface MissionAttemptRow {
+  readonly nonce: string;
+  readonly player_id: string;
+  readonly mission_id: string;
+  readonly issued_at: string;
+  readonly finished_at: string | null;
+  readonly outcome: MissionOutcome | null;
+  readonly rounds: number | null;
+}
+
+function rowToTelemetryAccount(row: TelemetryAccountRow): TelemetryAccount {
+  return { playerId: row.player_id, optOut: row.opt_out, lastSeenAt: row.last_seen_at === null ? null : Number(row.last_seen_at) };
+}
+
+function rowToMissionAttempt(row: MissionAttemptRow): MissionAttempt {
+  return {
+    playerId: row.player_id,
+    missionId: row.mission_id,
+    nonce: row.nonce,
+    issuedAt: Number(row.issued_at),
+    finishedAt: row.finished_at === null ? null : Number(row.finished_at),
+    outcome: row.outcome,
+    rounds: row.rounds,
+  };
+}
+
+const COLUNAS_DA_TENTATIVA = 'nonce, player_id, mission_id, issued_at, finished_at, outcome, rounds';
+
+export function createPostgresTelemetryRepository(pool: Pool): TelemetryRepository {
+  return {
+    async getAccount(playerId) {
+      const result = await pool.query<TelemetryAccountRow>(
+        'SELECT player_id, opt_out, last_seen_at FROM telemetry_accounts WHERE player_id = $1',
+        [playerId],
+      );
+      const row = result.rows[0];
+      return row ? rowToTelemetryAccount(row) : { playerId, optOut: false, lastSeenAt: null };
+    },
+    async setOptOut(playerId, optOut) {
+      await pool.query(
+        `INSERT INTO telemetry_accounts (player_id, opt_out) VALUES ($1, $2)
+         ON CONFLICT (player_id) DO UPDATE SET opt_out = $2`,
+        [playerId, optOut],
+      );
+    },
+    async touchLastSeen(playerId, at) {
+      await pool.query(
+        `INSERT INTO telemetry_accounts (player_id, last_seen_at) VALUES ($1, $2)
+         ON CONFLICT (player_id) DO UPDATE SET last_seen_at = $2`,
+        [playerId, at],
+      );
+    },
+    async recordIssued(attempt) {
+      await pool.query(
+        'INSERT INTO mission_attempts (nonce, player_id, mission_id, issued_at) VALUES ($1, $2, $3, $4)',
+        [attempt.nonce, attempt.playerId, attempt.missionId, attempt.issuedAt],
+      );
+    },
+    async recordFinished(nonce, fim) {
+      const result = await pool.query(
+        'UPDATE mission_attempts SET finished_at = $2, outcome = $3, rounds = $4 WHERE nonce = $1',
+        [nonce, fim.finishedAt, fim.outcome, fim.rounds],
+      );
+      return (result.rowCount ?? 0) > 0;
+    },
+    async listAttemptsByPlayer(playerId) {
+      const result = await pool.query<MissionAttemptRow>(
+        `SELECT ${COLUNAS_DA_TENTATIVA} FROM mission_attempts WHERE player_id = $1 ORDER BY issued_at, nonce`,
+        [playerId],
+      );
+      return result.rows.map(rowToMissionAttempt);
+    },
+    async listAllAttempts() {
+      const result = await pool.query<MissionAttemptRow>(`SELECT ${COLUNAS_DA_TENTATIVA} FROM mission_attempts ORDER BY issued_at, nonce`);
+      return result.rows.map(rowToMissionAttempt);
+    },
+    async listAccounts() {
+      const result = await pool.query<TelemetryAccountRow>('SELECT player_id, opt_out, last_seen_at FROM telemetry_accounts ORDER BY player_id');
+      return result.rows.map(rowToTelemetryAccount);
+    },
+    async deletePlayerData(playerId) {
+      await pool.query('DELETE FROM mission_attempts WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM telemetry_accounts WHERE player_id = $1', [playerId]);
     },
   };
 }

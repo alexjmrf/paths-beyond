@@ -6,6 +6,7 @@ import { createInMemoryRateLimiter } from './battle/rateLimit.js';
 import {
   createMemoryArenaDefenseRepository,
   createMemoryPartyPresetRepository,
+  createMemoryTelemetryRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
   createMemoryReplayRepository,
@@ -119,6 +120,7 @@ const app = buildApp({
     },
   ]),
   partyPresetRepository: createMemoryPartyPresetRepository(),
+  telemetryRepository: createMemoryTelemetryRepository(),
   replayRepository: createMemoryReplayRepository(),
   seasonRepository: createMemorySeasonRepository(),
   catalog,

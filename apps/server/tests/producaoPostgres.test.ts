@@ -8,6 +8,7 @@ import { runMigrations } from '../src/migrate.js';
 import {
   createPostgresArenaDefenseRepository,
   createPostgresPartyPresetRepository,
+  createPostgresTelemetryRepository,
   createPostgresCharacterOwnershipRepository,
   createPostgresEconomyRepository,
   createPostgresHeroRepository,
@@ -68,6 +69,7 @@ descreve('produção: o app montado como em `index.ts`, contra Postgres', () => 
       heroRepository: createPostgresHeroRepository(pool),
       arenaDefenseRepository: createPostgresArenaDefenseRepository(pool),
       partyPresetRepository: createPostgresPartyPresetRepository(pool),
+      telemetryRepository: createPostgresTelemetryRepository(pool),
       replayRepository: createPostgresReplayRepository(pool),
       seasonRepository: createPostgresSeasonRepository(pool),
       economyRepository: createPostgresEconomyRepository(pool),
