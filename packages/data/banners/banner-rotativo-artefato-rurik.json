@@ -1,0 +1,69 @@
+{
+  "id": "banner-rotativo-artefato-rurik",
+  "kind": "rotatingArtifact",
+  "name": "Artefato em destaque: Machado do Tirano",
+  "activeFrom": "2026-09-25T00:00:00Z",
+  "activeUntil": "2026-10-09T00:00:00Z",
+  "featuredArtifactId": "artifact-machado-do-tirano",
+  "pityThresholds": {
+    "adventurer": 10,
+    "hero": 60
+  },
+  "softPity": {
+    "baseRate": 7,
+    "softStart": 50,
+    "step": 70
+  },
+  "pool": [
+    {
+      "artifactId": "artifact-machado-do-tirano",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-machado-do-tirano"
+    },
+    {
+      "artifactId": "artifact-aljava-da-batedora",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-aljava-da-batedora"
+    },
+    {
+      "artifactId": "artifact-broquel-de-sena",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-broquel-de-sena"
+    },
+    {
+      "artifactId": "artifact-elmo-da-sentinela",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-elmo-da-sentinela"
+    },
+    {
+      "artifactId": "artifact-foco-de-vesper",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-foco-de-vesper"
+    },
+    {
+      "artifactId": "artifact-machadinha-de-halla",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-machadinha-de-halla"
+    },
+    {
+      "artifactId": "artifact-pena-de-grifo",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-pena-de-grifo"
+    },
+    {
+      "artifactId": "artifact-ponta-do-piqueiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-ponta-do-piqueiro"
+    },
+    {
+      "artifactId": "artifact-rosario-do-acolito",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-rosario-do-acolito"
+    },
+    {
+      "artifactId": "artifact-semente-de-wren",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-artifact-semente-de-wren"
+    }
+  ]
+}

@@ -496,7 +496,18 @@ export function generateComp(profile: ClassProfile) {
           classId: personagem.classId,
           level: 10,
           exp: 0,
-          awakening: 0,
+          // M37 4/N (D49) — **awakening 3, e não 0.** É o ponto MÍNIMO em que todo comp
+          // tem o mesmo rank corrente: com o elenco partido em `Adventurer` e `Hero`,
+          // `rankCorrente(base, 3)` é `hero` para os dois. Medir um `adventurer` contra
+          // um `hero` e ler como balanceamento de personagem seria ler INVESTIMENTO como
+          // desenho (DECISIONS.md §3), e é critério de aceite do milestone que não seja.
+          //
+          // O 3 está escrito aqui como literal porque `packages/data` só depende do zod —
+          // ele NÃO importa `packages/core`, e por isso não alcança `AWAKENING_PARA_HERO`.
+          // Quem confere que os dois concordam é `matrizDeBalanceamento.test.ts`, em
+          // `packages/content`, o único pacote que enxerga catálogo e motor ao mesmo tempo:
+          // se o limiar mudar no core, os comps do disco ficam vermelhos lá.
+          awakening: 3,
           imprint: 0,
           // §8.2 — o caminho inteiro por uma coluna, gastando os 9 pontos. A coluna não é
           // escolhida por gosto: é a que concede `skill-assistir`, que não é baseline por

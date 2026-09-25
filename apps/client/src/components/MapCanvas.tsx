@@ -25,12 +25,12 @@ import {
 import { themeFor } from '../data/overlayTheme.js';
 import { activeUnitRenderer } from '../data/unitRenderer.js';
 import { urlsDeArte } from '../data/unitArt.js';
-import { tilesAmeacados } from '../logic/ameaca.js';
 import { rolagemParaEnquadrar } from '../logic/enquadramento.js';
 import { BASE_LABEL_SIZE, entradaDeRender, paintPrimitives, pintarTile } from '../render/tabuleiro.js';
 import { audioDoJogo } from '../audio/motorCompartilhado.js';
 import { somDaBatida, type SomAgendado } from '../audio/sons.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { ehVisivelPorInteiro, type UnidadeVisivel } from '../data/api.js';
 
 // Tamanho do tile em escala 1. O tamanho real é este vezes a escala de UI (§11 — "fonte
 // escalável"): o mapa cresce junto com os painéis, senão o rótulo de AP/PP no tile, que
@@ -73,7 +73,10 @@ interface FxSegment {
   readonly startMs: number;
   readonly motion: Motion;
   readonly origin: { readonly px: number; readonly py: number };
-  readonly unit: BattleUnit;
+  // M36 4/N (D47) — `UnidadeVisivel`: a peça animada pode ser a do inimigo, e dela o cliente
+  // tem posição, HP e o tipo de unidade (que é o que dá PESO ao movimento). Nada mais é
+  // preciso para desenhar alguém andando ou apanhando.
+  readonly unit: UnidadeVisivel;
 }
 
 // Uma unidade dentro de uma sequência de animação, com os trechos que a movem ao longo dela.
@@ -101,15 +104,21 @@ function tileKey(coord: Coord): string {
   return `${coord.x},${coord.y}`;
 }
 
-function unitAt(units: readonly BattleUnit[], coord: Coord): BattleUnit | undefined {
+function unitAt(units: readonly UnidadeVisivel[], coord: Coord): UnidadeVisivel | undefined {
   return units.find((u) => u.hp > 0 && u.pos.x === coord.x && u.pos.y === coord.y);
 }
 
 // Inimigos que a unidade selecionada pode engajar agora mesmo (dentro do duelRange, a
 // partir da posição atual — sem contar movimento pendente).
-function computeEngageableEnemyIds(units: readonly BattleUnit[], selectedUnit: BattleUnit | undefined): Set<string> {
+// M36 4/N (D47) — quem dá para engajar sai do alcance da MINHA unidade, e só dela. O alcance do
+// inimigo não entra nesta conta e nunca entrou; o que mudou é que agora ele também não existe
+// aqui para ser consultado por engano.
+function computeEngageableEnemyIds(
+  units: readonly UnidadeVisivel[],
+  selectedUnit: UnidadeVisivel | undefined,
+): Set<string> {
   const ids = new Set<string>();
-  if (!selectedUnit || selectedUnit.hasActedThisRound) return ids;
+  if (!selectedUnit || !ehVisivelPorInteiro(selectedUnit) || selectedUnit.hasActedThisRound) return ids;
   for (const unit of units) {
     if (unit.hp <= 0 || unit.side === selectedUnit.side) continue;
     if (manhattanDistance(selectedUnit.pos, unit.pos) <= selectedUnit.duelRange) ids.add(unit.unitId);
@@ -138,24 +147,14 @@ export function MapCanvas() {
   // "é de outra batalha" se resolve por comparação; esta ref resolve a outra metade, "já
   // contei este", que sem ela faria a cadeia inteira tocar de novo a cada mudança de seleção.
   const relatoConsumidoRef = useRef<ReturnType<typeof useBattleStore.getState>['aiTurnReport']>(null);
-  // O estado e o preview do quadro ANTERIOR. É como o mapa descobre que um duelo foi confirmado
-  // sem que o painel de preview (quem tem o botão) precise saber que existe canvas: o preview
-  // sumiu e o estado mudou, logo foi confirmado; sumiu e o estado é o mesmo, foi cancelado. A
-  // animação precisa das unidades de ANTES — o duelo já matou uma delas no estado novo, e uma
-  // peça que não existe mais não tem como cair na tela.
-  const previousRef = useRef<{
-    state: BattleState;
-    preview: ReturnType<typeof useBattleStore.getState>['duelPreview'];
-  } | null>(null);
 
   const battleState = useBattleStore((s) => s.battleState);
   const selectedUnitId = useBattleStore((s) => s.selectedUnitId);
   const reachableTiles = useBattleStore((s) => s.reachableTiles);
-  const duelPreview = useBattleStore((s) => s.duelPreview);
   const instantResultMode = useBattleStore((s) => s.instantResultMode);
   const selectUnit = useBattleStore((s) => s.selectUnit);
   const moveSelectedUnitTo = useBattleStore((s) => s.moveSelectedUnitTo);
-  const previewEngage = useBattleStore((s) => s.previewEngage);
+  const engageTarget = useBattleStore((s) => s.engageTarget);
   const targetingMode = useBattleStore((s) => s.targetingMode);
   const confirmTargetAt = useBattleStore((s) => s.confirmTargetAt);
   const colorblindMode = useBattleStore((s) => s.colorblindMode);
@@ -370,7 +369,7 @@ export function MapCanvas() {
     soar: (som: SomAgendado) => void = () => {},
   ): number {
     const unidade = (id: string) => scene.stateBefore.units.find((u) => u.unitId === id);
-    const posicionar = (unit: BattleUnit) => ({ px: unit.pos.x * tileSize, py: unit.pos.y * tileSize });
+    const posicionar = (unit: UnidadeVisivel) => ({ px: unit.pos.x * tileSize, py: unit.pos.y * tileSize });
     // Quem está de pé no instante desta cena. É o que impede o número de dano de nascer em cima
     // de outra peça — ver `damageAnchorDirection`.
     const ocupados = new Set(scene.stateBefore.units.filter((u) => u.hp > 0).map((u) => tileKey(u.pos)));
@@ -444,7 +443,7 @@ export function MapCanvas() {
   // O movimento do jogador é a única sequência que roda ANTES do commit — é dela que o clique
   // no tile sai. O estado do core só muda quando a animação termina (`moveSelectedUnitTo` no
   // `onDone`), nunca durante: apresentação por cima do que o core já calculou.
-  function animateAndMove(unit: BattleUnit, path: readonly Coord[], destination: Coord) {
+  function animateAndMove(unit: UnidadeVisivel, path: readonly Coord[], destination: Coord) {
     if (!appRef.current || !fxLayerRef.current || path.length < 2) {
       moveSelectedUnitTo(destination);
       return;
@@ -525,14 +524,6 @@ export function MapCanvas() {
       app.renderer.resize(width, height);
     }
 
-    // O duelo que acabou de ser confirmado, deduzido da transição: havia preview, não há mais, e
-    // o estado mudou. Cancelar deixa o estado igual, e é o que separa os dois casos sem precisar
-    // de um campo novo no store nem de o painel de preview saber que existe um canvas.
-    const anterior = previousRef.current;
-    previousRef.current = { state: battleState, preview: duelPreview };
-    const confirmado =
-      anterior && anterior.preview && !duelPreview && battleState !== anterior.state ? anterior.preview : null;
-
     redraw();
     enquadrarSelecionada();
 
@@ -571,12 +562,17 @@ export function MapCanvas() {
       return;
     }
 
-    // A cadeia do quadro, na ordem em que aconteceu: o duelo que o jogador confirmou e, em
-    // seguida, o turno que a IA jogou em resposta. Até 3/N a segunda metade não existia e os
-    // inimigos teletransportavam.
+    // A cadeia do quadro, na ordem em que aconteceu: o duelo que o JOGADOR abriu e, em seguida,
+    // o turno que a IA jogou em resposta. Até M16 3/N a segunda metade não existia e os inimigos
+    // teletransportavam.
+    //
+    // M36 4/N (D47) — o duelo do jogador vem DECLARADO no relato (`meuDuelo`), e não mais
+    // deduzido da transição do preview ("havia preview, não há mais, e o estado mudou"). O
+    // preview saiu com a informação oculta; o que o substituiu é o servidor dizendo o que
+    // aconteceu, que é mais direto do que a dedução era.
     const scenes: AiScene[] = [];
-    if (confirmado && anterior) {
-      scenes.push({ kind: 'duel', stateBefore: anterior.state, duelResult: confirmado.duelResult });
+    if (relato?.meuDuelo) {
+      scenes.push({ kind: 'duel', stateBefore: relato.meuDuelo.estadoAntes, duelResult: relato.meuDuelo.duelResult });
     }
     if (relato) scenes.push(...narrateAiTurns(relato.steps));
 
@@ -590,7 +586,6 @@ export function MapCanvas() {
     battleState,
     selectedUnitId,
     reachableTiles,
-    duelPreview,
     targetingMode,
     colorblindMode,
     uiScale,
@@ -672,7 +667,13 @@ export function MapCanvas() {
 
     const { map, units } = battleState;
     const reachableSet = new Set(reachableTiles.map((t) => tileKey(t.coord)));
-    const threatened = new Set(tilesAmeacados(battleState).map(tileKey));
+    // M36 4/N (D47) — **a ZONA DE AMEAÇA SAIU.** Ela era o conjunto de tiles que um inimigo
+    // alcança e de onde engaja, e derivava de `moveType`, `moveRange` e `duelRange` dele — os
+    // três agora ocultos. Não é uma perda por limitação: D47 tirou a zona de ameaça de
+    // propósito, porque ela é exatamente o cálculo que o desconhecido não permite. O overlay
+    // continua existindo no tema e no renderer (um replay antigo pode tê-lo), e aqui ninguém o
+    // acende.
+    const threatened = new Set<string>();
     const selectedUnit = selectedUnitId ? units.find((u) => u.unitId === selectedUnitId) : undefined;
     const engageableEnemyIds = computeEngageableEnemyIds(units, selectedUnit);
     const targetableSet = new Set((targetingMode?.tiles ?? []).map(tileKey));
@@ -682,7 +683,9 @@ export function MapCanvas() {
       'target' in battleState.winCondition ? (battleState.winCondition.target as Coord) : undefined;
     // §5.1/§5.6 (M15) — portões já abertos e objetivos já capturados. Os dois vêm do
     // ESTADO da batalha, não do mapa: o mapa é a fase, isto é a partida.
-    const openGateSet = new Set(openGateCoords(battleState).map(tileKey));
+    // `openGateCoords` lê só `map` e `gateState`, e os dois atravessam a redação — portão é
+    // tabuleiro, não build.
+    const openGateSet = new Set(openGateCoords(battleState as never).map(tileKey));
     const capturedSet = new Set(battleState.capturedObjectives ?? []);
 
     for (let y = 0; y < map.height; y++) {
@@ -706,7 +709,6 @@ export function MapCanvas() {
         g.eventMode = 'static';
         g.cursor = 'pointer';
         g.on('pointertap', () => {
-          if (duelPreview) return; // precisa confirmar/cancelar o preview antes de outra ação
           if (fxRunningRef.current) return; // uma sequência de animação já está em andamento
           // Em mira, o clique é o alvo — inclusive em cima de unidade (artilharia mira o
           // tile, e o tile pode estar ocupado).
@@ -717,7 +719,9 @@ export function MapCanvas() {
           const occupant = unitAt(units, { x, y });
           if (occupant) {
             if (selectedUnit && engageableEnemyIds.has(occupant.unitId)) {
-              previewEngage(occupant.unitId);
+              // M36 4/N (D47) — engajar em UM tempo: não há mais preview entre o clique e o
+              // duelo, porque não há mais como calcular o que vai acontecer.
+              engageTarget(occupant.unitId);
             } else {
               selectUnit(occupant.unitId);
             }

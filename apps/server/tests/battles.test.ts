@@ -10,6 +10,7 @@ import {
   createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -100,6 +101,7 @@ const catalog: ContentCatalog = {
   dungeons: {},
   dungeonEncounters: {},
   materials: {},
+  artifacts: {},
   economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
   substatWeights: [],
   mainstatWeights: [],
@@ -108,7 +110,7 @@ const catalog: ContentCatalog = {
   // aqui é o que o tipo obrigatório de `ContentCatalog` cobra (esquecer vira erro de tipo).
   banners: {},
   premiumRules: {
-    summon: { premiumCost: 500, pityThreshold: 10 },
+    summon: { premiumCost: 500, pityThresholds: { adventurer: 10, hero: 90 } },
     energyPurchase: { premiumCost: 100, energy: 60 },
     premiumRewards: { missionFirstClear: 60, chapterFirstClear: 600, dungeonFirstClear: 200 },
   },
@@ -163,9 +165,17 @@ function buildTestApp(
   const defense: ArenaDefense = {
     ownerPlayerId: 'player-defensor',
     mapId: 'mapa-teste',
-    // adjacente ao atacante (pos {x:0,y:0}, duelRange=1) — precisa estar em alcance pro
-    // comando `engage` do teste de "roda a batalha" funcionar.
-    units: [{ heroId: 'heroi-defensor', pos: { x: 1, y: 0 }, height: 0, aiArchetype: 'hold-position' }],
+    // A DOIS tiles do atacante (pos {x:0,y:0}, duelRange=1), e não adjacente (M36 2/N).
+    //
+    // Adjacente, `hold-position` engajava no turno de IA que precede o primeiro comando e a
+    // batalha nascia decidida — o que era invisível enquanto `POST /battles` resolvia tudo em
+    // lote, porque `simulate` ignora comando com a batalha terminada e devolvia `victory` do
+    // mesmo jeito. A asserção "roda a batalha" ficava verde sem o comando do jogador ter sido
+    // aplicado UMA vez. Com a batalha viva isso apareceu na primeira execução.
+    //
+    // A dois tiles, o atacante anda e engaja: são os comandos DELE que decidem. O caso da
+    // batalha decidida na abertura continua coberto, com defesa própria, mais abaixo.
+    units: [{ heroId: 'heroi-defensor', pos: { x: 2, y: 0 }, height: 0, aiArchetype: 'hold-position' }],
   };
   const arenaDefenseRepository = createMemoryArenaDefenseRepository([defense]);
 
@@ -178,6 +188,7 @@ function buildTestApp(
     arenaDefenseRepository,
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     catalog,
     shopCatalog: {},
@@ -278,330 +289,111 @@ describe('GET /me/defense', () => {
   });
 });
 
-describe('POST /battles', () => {
-  const validBody = {
-    attackerHeroIds: ['heroi-atacante'],
-    defenderPlayerId: 'player-defensor',
-    // convenção do endpoint: unitId de cada unidade É o próprio heroId (previsível pro
-    // cliente montar o BattleCommand sem precisar perguntar ao servidor "qual é meu
-    // unitId" antes de agir).
-    commands: [{ t: 'engage', unitId: 'heroi-atacante', targetId: 'heroi-defensor' }],
-    rulesVersion: RULES_VERSION,
-    nonce: 'nonce-teste-1',
-  };
+// M36 2/N (D47) — `POST /battles/ticket` e `POST /battles` saíram; a arena passa pela BATALHA
+// VIVA. Cada asserção abaixo é a mesma de antes, contra o caminho novo: o que se validava ao
+// emitir o ticket agora se valida ao ABRIR a partida, e o que se afirmava sobre o resultado da
+// submissão agora se afirma sobre o comando que FECHA a batalha.
 
+const COMO_ATACANTE = { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}` };
+const COMO_DEFENSOR = { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}` };
+// `rulesVersion` é OBRIGATÓRIA ao abrir (M36 2/N): a versão é conferida antes de o jogador
+// investir uma batalha inteira, e não depois. No modelo antigo o ticket não a pedia e a
+// submissão pedia — o cliente desatualizado jogava tudo para ser recusado no fim.
+const CONFRONTO = {
+  attackerHeroIds: ['heroi-atacante'],
+  defenderPlayerId: 'player-defensor',
+  rulesVersion: RULES_VERSION,
+};
+
+type TestApp = ReturnType<typeof buildTestApp>;
+
+async function abrirArena(app: TestApp, payload: Record<string, unknown> = CONFRONTO) {
+  return app.inject({ method: 'POST', url: '/arena/matches', headers: COMO_ATACANTE, payload });
+}
+
+describe('POST /arena/matches — abrir a partida contra uma defesa', () => {
   it('rejeita sem autenticação', async () => {
     const app = buildTestApp();
-    const response = await app.inject({ method: 'POST', url: '/battles', payload: validBody });
-    expect(response.statusCode).toBe(401);
+    const res = await app.inject({ method: 'POST', url: '/arena/matches', payload: CONFRONTO });
+    expect(res.statusCode).toBe(401);
   });
 
   it('rejeita rulesVersion diferente da do servidor', async () => {
     const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, rulesVersion: 'versao-errada' },
-    });
-    expect(response.statusCode).toBe(409);
+    const res = await abrirArena(app, { ...CONFRONTO, rulesVersion: 'versao-errada' });
+    expect(res.statusCode).toBe(409);
   });
 
-  it('rejeita replay da RULES_VERSION ANTERIOR com 409 (critério 4 do M17)', async () => {
-    // §9.4 — "recusar replays de versão diferente". O teste acima usa uma string que nunca
-    // foi versão de nada, e prova que o campo é comparado; este prova a coisa que o
-    // critério de aceite pede, que é diferente: uma versão **anterior de verdade**, bem
-    // formada, que era a corrente até este milestone.
-    //
-    // A distinção importa porque M17 foi o primeiro bump em que a incompatibilidade é REAL
-    // e não disciplina de processo (ver `packages/core/src/rulesVersion.ts`), e M18 2/N é o
-    // segundo: a chave do fragmento de imprint saiu da instância de herói e foi para o
-    // personagem, sem caminho de migração. Um cliente que ainda estivesse em 0.17.0
-    // mandaria comandos jogados sobre outra regra, e aceitar isso seria §9.1 — divergência
-    // entre o que o cliente jogou e o que o servidor reexecuta.
+  it('rejeita cliente da RULES_VERSION ANTERIOR com 409 (critério 4 do M17)', async () => {
+    // §9.4 — "recusar replays de versão diferente". O teste acima usa uma string que nunca foi
+    // versão de nada, e prova que o campo é comparado; este prova a coisa que o critério pede,
+    // que é diferente: uma versão **anterior de verdade**, bem formada, que já foi a corrente.
+    // Um cliente parado nela jogaria sobre outra regra, e aceitá-lo seria §9.1 acontecendo.
     const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, rulesVersion: '0.17.0' },
-    });
+    const res = await abrirArena(app, { ...CONFRONTO, rulesVersion: '0.17.0' });
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json().error).toContain(RULES_VERSION);
-    // E a versão anterior tem de ser mesmo anterior: se alguém reverter o bump sem reverter
-    // o resto do milestone, este teste passa a medir nada e precisa reprovar.
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toContain(RULES_VERSION);
     expect(RULES_VERSION).not.toBe('0.17.0');
   });
 
   it('rejeita herói atacante que não pertence ao chamador', async () => {
     const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, attackerHeroIds: ['heroi-defensor'] },
-    });
-    expect(response.statusCode).toBe(403);
+    const res = await abrirArena(app, { ...CONFRONTO, attackerHeroIds: ['heroi-defensor'] });
+    expect(res.statusCode).toBe(403);
   });
 
-  // §9.4 (M18, 3/N) — a checagem de POSSE, que é diferente da de dono da instância acima.
-  // As duas fazem falta: aquela diz que a instância é sua, esta diz que você adquiriu quem
-  // ela representa. Sem esta, um cliente adulterado que conseguisse criar uma instância
-  // jogaria com um personagem que nunca puxou.
+  // §9.4 (M18, 3/N) — a checagem de POSSE, diferente da de dono da instância acima. As duas
+  // fazem falta: aquela diz que a instância é sua, esta diz que você adquiriu quem ela
+  // representa. Sem esta, um cliente adulterado que conseguisse criar uma instância jogaria
+  // com um personagem que nunca puxou.
   it('rejeita herói cujo PERSONAGEM o jogador não possui, ainda que a instância seja dele', async () => {
     const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, attackerHeroIds: ['heroi-personagem'] },
-    });
+    const res = await abrirArena(app, { ...CONFRONTO, attackerHeroIds: ['heroi-personagem'] });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.json().error).toContain(PERSONAGEM_ADQUIRIVEL);
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toContain(PERSONAGEM_ADQUIRIVEL);
   });
 
   it('com o personagem adquirido, o mesmo herói passa — a recusa era da posse e de nada mais', async () => {
-    // O recíproco. Sem ele, a asserção acima ficaria verde mesmo se a rota estivesse
-    // recusando por outro motivo qualquer.
     const ownership = createMemoryCharacterOwnershipRepository();
     await ownership.grant('player-atacante', PERSONAGEM_ADQUIRIVEL);
     const app = buildTestApp(undefined, ownership);
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, attackerHeroIds: ['heroi-personagem'] },
-    });
-
-    expect(response.statusCode).toBe(200);
+    const res = await abrirArena(app, { ...CONFRONTO, attackerHeroIds: ['heroi-personagem'] });
+    expect(res.statusCode).toBe(201);
   });
 
   it('rejeita quando o defensor não tem uma defesa configurada', async () => {
     const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, defenderPlayerId: 'ninguem' },
-    });
-    expect(response.statusCode).toBe(404);
+    const res = await abrirArena(app, { ...CONFRONTO, defenderPlayerId: 'ninguem' });
+    expect(res.statusCode).toBe(404);
   });
 
-  it('roda a batalha no servidor e devolve um resultado autoritativo, com seed gerado pelo servidor', async () => {
+  it('devolve o estado VISÍVEL e o mapa de arte — e nenhuma seed', async () => {
     const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(typeof body.seed).toBe('number');
-    // atacante forte vs defensor fraco (hp=1) — engajar já devia matar o defensor.
-    expect(body.result.outcome).toBe('victory');
-  });
+    const res = await abrirArena(app);
 
-  it('atualiza o ELO dos dois jogadores quando a batalha chega a uma conclusão', async () => {
-    const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-    const body = response.json();
-    // atacante venceu -> ganha ELO, defensor perdeu -> perde ELO (ambos começam em 1200).
-    expect(body.elo.attacker).toBeGreaterThan(1200);
-    expect(body.elo.defender).toBeLessThan(1200);
-
-    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`} });
-    expect(meResponse.json().elo).toBe(body.elo.attacker);
-  });
-
-  it('credita marcas de arena nos dois jogadores quando a batalha chega a uma conclusão — mais pro vencedor', async () => {
-    const app = buildTestApp();
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-    const body = response.json();
-    // atacante venceu -> ganha mais marcas; defensor perdeu -> ganha menos, nunca zero
-    // (ambos começam em 0).
-    expect(body.arenaMarks.attacker).toBeGreaterThan(0);
-    expect(body.arenaMarks.defender).toBeGreaterThan(0);
-    expect(body.arenaMarks.attacker).toBeGreaterThan(body.arenaMarks.defender);
-
-    const meResponse = await app.inject({ method: 'GET', url: '/me', headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`} });
-    expect(meResponse.json().arenaMarks).toBe(body.arenaMarks.attacker);
-  });
-
-  it('o cliente nunca envia stats — só ids e comandos — e o servidor resolve tudo sozinho', async () => {
-    // Prova indireta: o body de requisição válido (`validBody`) não tem NENHUM campo de
-    // stat/HP/dano — só heroIds e comandos por unitId — e mesmo assim a batalha roda
-    // corretamente (teste anterior), porque o servidor resolveu os stats reais a partir
-    // do HeroRepository + catálogo, nunca do que o cliente mandou.
-    expect(Object.keys(validBody)).toEqual(['attackerHeroIds', 'defenderPlayerId', 'commands', 'rulesVersion', 'nonce']);
-  });
-
-  it('rejeita sem nonce', async () => {
-    const app = buildTestApp();
-    const { nonce: _nonce, ...withoutNonce } = validBody;
-    const response = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: withoutNonce,
-    });
-    expect(response.statusCode).toBe(400);
-  });
-
-  it('rejeita reenvio do mesmo nonce (anti-replay, §9.4)', async () => {
-    const app = buildTestApp();
-    const first = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-    expect(first.statusCode).toBe(200);
-
-    const second = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-    expect(second.statusCode).toBe(409);
-  });
-
-  it('rejeita quando o limite de tentativas por minuto é excedido (rate limiting, §9.4)', async () => {
-    const app = buildTestApp(createInMemoryRateLimiter({ maxRequests: 1, windowMs: 60_000 }));
-
-    const first = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-    expect(first.statusCode).toBe(200);
-
-    const second = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, nonce: 'nonce-teste-2' },
-    });
-    expect(second.statusCode).toBe(429);
-  });
-});
-
-describe('GET /battles/:nonce', () => {
-  const validBody = {
-    attackerHeroIds: ['heroi-atacante'],
-    defenderPlayerId: 'player-defensor',
-    commands: [{ t: 'engage', unitId: 'heroi-atacante', targetId: 'heroi-defensor' }],
-    rulesVersion: RULES_VERSION,
-    nonce: 'nonce-replay-1',
-  };
-
-  it('o replay guardado devolve o mesmo mapa, derivado na leitura', async () => {
-    // Derivado e não gravado: é o que dá arte também aos replays que já estavam no banco
-    // antes desta milestone. Ver `characterIdsForReplayUnits`.
-    const app = buildTestApp();
-    const nonce = 'nonce-do-replay-com-arte';
-    const jogar = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...validBody, nonce },
-    });
-    expect(jogar.statusCode).toBe(200);
-
-    const res = await app.inject({
-      method: 'GET',
-      url: `/battles/${nonce}`,
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-    });
-
-    expect(res.statusCode).toBe(200);
-    expect(res.json().characterIdByUnitId).toEqual({ 'heroi-defensor': 'enemy-tirano' });
-  });
-
-  it('404 pra nonce desconhecido', async () => {
-    const app = buildTestApp();
-    const response = await app.inject({
-      method: 'GET',
-      url: '/battles/nao-existe',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-    });
-    expect(response.statusCode).toBe(404);
-  });
-
-  it('o atacante e o defensor conseguem ler o replay depois da batalha; ninguém mais pode', async () => {
-    const app = buildTestApp();
-    await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: validBody,
-    });
-
-    const asAttacker = await app.inject({
-      method: 'GET',
-      url: `/battles/${validBody.nonce}`,
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-    });
-    expect(asAttacker.statusCode).toBe(200);
-    expect(asAttacker.json()).toMatchObject({ nonce: validBody.nonce, attackerPlayerId: 'player-atacante', defenderPlayerId: 'player-defensor' });
-
-    const asDefender = await app.inject({
-      method: 'GET',
-      url: `/battles/${validBody.nonce}`,
-      headers: { 'x-platform-ticket': `dev:${DEFENDER_TOKEN}`},
-    });
-    expect(asDefender.statusCode).toBe(200);
-  });
-});
-
-// M13, sub-sessão 2/N — o "ticket de batalha". §9.1 diz que "o atacante joga a camada de
-// grid manualmente contra essa defesa"; sem o setup montado e a seed ANTES da partida, o
-// cliente só conseguiria submeter comandos às cegas. Ver `battle/ticket.ts` e DECISIONS.md.
-describe('POST /battles/ticket', () => {
-  const ticketBody = { attackerHeroIds: ['heroi-atacante'], defenderPlayerId: 'player-defensor' };
-
-  it('rejeita sem autenticação', async () => {
-    const app = buildTestApp();
-    const res = await app.inject({ method: 'POST', url: '/battles/ticket', payload: ticketBody });
-    expect(res.statusCode).toBe(401);
-  });
-
-  it('devolve nonce, seed, rulesVersion e o setup montado do confronto', async () => {
-    const app = buildTestApp();
-    const res = await app.inject({
-      method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: ticketBody,
-    });
-
-    expect(res.statusCode).toBe(200);
-    const ticket = res.json();
-    expect(typeof ticket.nonce).toBe('string');
-    expect(Number.isInteger(ticket.seed)).toBe(true);
-    expect(ticket.rulesVersion).toBe(RULES_VERSION);
-    expect(ticket.defenderPlayerId).toBe('player-defensor');
-    // O setup vem inteiro: é com ele que o cliente monta a batalha localmente.
-    expect(ticket.setup.units.map((u: { unitId: string }) => u.unitId).sort()).toEqual([
+    expect(res.statusCode).toBe(201);
+    const corpo = res.json();
+    expect(typeof corpo.nonce).toBe('string');
+    expect(corpo.rulesVersion).toBe(RULES_VERSION);
+    expect(corpo.kind).toBe('arena');
+    expect(corpo.refId).toBe('player-defensor');
+    // As duas peças estão no tabuleiro...
+    expect(corpo.visivel.units.map((u: { unitId: string }) => u.unitId).sort()).toEqual([
       'heroi-atacante',
       'heroi-defensor',
     ]);
-    expect(ticket.setup.units.find((u: { unitId: string }) => u.unitId === 'heroi-atacante').side).toBe('player');
+    // ...mas só a minha vem inteira. É o milestone numa linha.
+    const minha = corpo.visivel.units.find((u: { unitId: string }) => u.unitId === 'heroi-atacante');
+    const dele = corpo.visivel.units.find((u: { unitId: string }) => u.unitId === 'heroi-defensor');
+    expect(minha.side).toBe('player');
+    expect(minha.stats).toBeDefined();
+    expect(dele.stats).toBeUndefined();
+    // E a seed não sai: quem resolve é o servidor (D47).
+    expect(corpo.seed).toBeUndefined();
+    expect(corpo.visivel.seed).toBeUndefined();
   });
 
   // M26 3/N — a arte. A função que monta o mapa é pura e tem teste próprio
@@ -612,18 +404,14 @@ describe('POST /battles/ticket', () => {
     await ownership.grant('player-atacante', PERSONAGEM_ADQUIRIVEL);
     const app = buildTestApp(undefined, ownership);
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { attackerHeroIds: ['heroi-personagem'], defenderPlayerId: 'player-defensor' },
-    });
+    const res = await abrirArena(app, { ...CONFRONTO, attackerHeroIds: ['heroi-personagem'] });
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(201);
     expect(res.json().characterIdByUnitId).toEqual({
       'heroi-personagem': PERSONAGEM_ADQUIRIVEL,
-      // Esta linha é a milestone inteira: 'heroi-defensor' é uma instância da conta do
-      // defensor, e o roster do atacante não a contém nem em princípio.
+      // Esta linha é a decisão de D48: identidade não é build. 'heroi-defensor' é uma instância
+      // da conta do defensor, e o roster do atacante não a contém nem em princípio — sem este
+      // mapa a peça dele seria um glifo anônimo.
       'heroi-defensor': 'enemy-tirano',
     });
   });
@@ -633,127 +421,215 @@ describe('POST /battles/ticket', () => {
     // arte faria o cliente procurar no manifesto uma entrada que nunca vai existir — e a
     // diferença entre isso e o glifo do M16 só apareceria na tela.
     const app = buildTestApp();
-    const res = await app.inject({
-      method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: ticketBody,
-    });
-
+    const res = await abrirArena(app);
     expect(res.json().characterIdByUnitId).toEqual({ 'heroi-defensor': 'enemy-tirano' });
   });
 
-  it('aplica as mesmas validações de posse e de defesa que POST /battles', async () => {
-    const app = buildTestApp();
-    const alheio = await app.inject({
-      method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...ticketBody, attackerHeroIds: ['heroi-defensor'] },
-    });
-    expect(alheio.statusCode).toBe(403);
-
-    const semDefesa = await app.inject({
-      method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...ticketBody, defenderPlayerId: 'player-atacante' },
-    });
-    expect(semDefesa.statusCode).toBe(404);
-  });
-
-  it('a seed do ticket é a MESMA que a batalha usa — é o que faz a partida jogada valer', async () => {
-    // Sem isto o cliente jogaria com uma seed e o servidor resolveria com outra: os duelos
-    // que o jogador viu não seriam os que contam. §9.1 chama divergência assim de bug
-    // crítico.
-    const app = buildTestApp();
-    const ticket = (
-      await app.inject({
-        method: 'POST',
-        url: '/battles/ticket',
-        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-        payload: ticketBody,
-      })
-    ).json();
-
-    const battle = await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...ticketBody, nonce: ticket.nonce, rulesVersion: RULES_VERSION, commands: [] },
-    });
-
-    expect(battle.statusCode).toBe(200);
-    expect(battle.json().seed).toBe(ticket.seed);
-  });
-
-  it('o setup do ticket é o MESMO que o servidor usa pra simular', async () => {
-    const app = buildTestApp();
-    const ticket = (
-      await app.inject({
-        method: 'POST',
-        url: '/battles/ticket',
-        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-        payload: ticketBody,
-      })
-    ).json();
-
-    await app.inject({
-      method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: { ...ticketBody, nonce: ticket.nonce, rulesVersion: RULES_VERSION, commands: [] },
-    });
-
-    const replay = (
-      await app.inject({
-        method: 'GET',
-        url: `/battles/${ticket.nonce}`,
-        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      })
-    ).json();
-
-    expect(replay.seed).toBe(ticket.seed);
-    expect(replay.initialState).toEqual(ticket.setup);
-  });
-
-  it('nonces diferentes dão seeds diferentes — o ticket não é um carimbo fixo', async () => {
-    const app = buildTestApp();
-    const pedir = async () =>
-      (
-        await app.inject({
-          method: 'POST',
-          url: '/battles/ticket',
-          headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-          payload: ticketBody,
-        })
-      ).json();
-
-    const a = await pedir();
-    const b = await pedir();
-    expect(a.nonce).not.toBe(b.nonce);
-    expect(a.seed).not.toBe(b.seed);
-  });
-
-  it('consome a mesma cota de rate limit da batalha (§9.4)', async () => {
-    // Pedir ticket em série é exatamente o que um grinder de seed faria; a contenção é o
-    // rate limiter, e por isso a emissão passa por ele.
+  it('abrir consome a cota do rate limiter (§9.4)', async () => {
+    // Abrir partida em série é o que um grinder de seed faria; a contenção é o rate limiter —
+    // e desde D48 há uma segunda, que é o custo cobrado ao entrar.
     const app = buildTestApp(createInMemoryRateLimiter({ maxRequests: 1, windowMs: 60_000 }));
-    const primeiro = await app.inject({
-      method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: ticketBody,
-    });
-    expect(primeiro.statusCode).toBe(200);
+    expect((await abrirArena(app)).statusCode).toBe(201);
+    expect((await abrirArena(app)).statusCode).toBe(429);
+  });
 
-    const segundo = await app.inject({
+  it('uma partida em andamento por jogador: a segunda abertura devolve o nonce da primeira', async () => {
+    const app = buildTestApp();
+    const primeira = await abrirArena(app);
+    expect(primeira.statusCode).toBe(201);
+
+    const segunda = await abrirArena(app);
+    expect(segunda.statusCode).toBe(409);
+    expect(segunda.json().nonce).toBe(primeira.json().nonce);
+
+    // Depois de desistir dá para abrir outra, e ela é OUTRA — abrir não é um carimbo fixo.
+    await app.inject({ method: 'POST', url: `/matches/${primeira.json().nonce}/forfeit`, headers: COMO_ATACANTE });
+    const terceira = await abrirArena(app);
+    expect(terceira.statusCode).toBe(201);
+    expect(terceira.json().nonce).not.toBe(primeira.json().nonce);
+  });
+});
+
+// Atacante forte contra defensor de 1 de HP, a dois tiles: andar um passo e engajar mata e fecha
+// a batalha. É o mesmo confronto que `POST /battles` resolvia em lote, agora comando a comando.
+const APROXIMAR = {
+  command: { t: 'move', unitId: 'heroi-atacante', path: [{ x: 0, y: 0 }, { x: 1, y: 0 }] },
+};
+const ENGAJAR = { command: { t: 'engage', unitId: 'heroi-atacante', targetId: 'heroi-defensor' } };
+
+async function abrirEEngajar(app: TestApp) {
+  const abertura = await abrirArena(app);
+  expect(abertura.statusCode, abertura.body).toBe(201);
+  const nonce = abertura.json().nonce as string;
+
+  const andou = await app.inject({
+    method: 'POST',
+    url: `/matches/${nonce}/commands`,
+    headers: COMO_ATACANTE,
+    payload: APROXIMAR,
+  });
+  expect(andou.statusCode, andou.body).toBe(200);
+
+  const jogada = await app.inject({
+    method: 'POST',
+    url: `/matches/${nonce}/commands`,
+    headers: COMO_ATACANTE,
+    payload: ENGAJAR,
+  });
+  return { nonce, jogada, corpo: jogada.json() };
+}
+
+describe('POST /matches/:nonce/commands — a arena resolvida no servidor', () => {
+  it('o desfecho é do SERVIDOR e chega no comando que o produziu', async () => {
+    const app = buildTestApp();
+    const { jogada, corpo } = await abrirEEngajar(app);
+
+    expect(jogada.statusCode, jogada.body).toBe(200);
+    expect(corpo.outcome).toBe('victory');
+    // E o duelo vem junto: revelar o que ACONTECEU é a única forma de o jogador aprender o que
+    // enfrentou (D47).
+    expect(corpo.duelResult.attackerId).toBe('heroi-atacante');
+    expect(corpo.duelResult.trocas.length).toBeGreaterThan(0);
+  });
+
+  it('atualiza o ELO dos dois jogadores quando a batalha chega a uma conclusão', async () => {
+    const app = buildTestApp();
+    const { corpo } = await abrirEEngajar(app);
+
+    // atacante venceu -> ganha ELO, defensor perdeu -> perde ELO (ambos começam em 1200).
+    expect(corpo.liquidacao.elo.attacker).toBeGreaterThan(1200);
+    expect(corpo.liquidacao.elo.defender).toBeLessThan(1200);
+
+    const me = await app.inject({ method: 'GET', url: '/me', headers: COMO_ATACANTE });
+    expect(me.json().elo).toBe(corpo.liquidacao.elo.attacker);
+  });
+
+  it('credita marcas de arena nos dois jogadores — mais pro vencedor, nunca zero pro perdedor', async () => {
+    const app = buildTestApp();
+    const { corpo } = await abrirEEngajar(app);
+
+    expect(corpo.liquidacao.arenaMarks.attacker).toBeGreaterThan(0);
+    expect(corpo.liquidacao.arenaMarks.defender).toBeGreaterThan(0);
+    expect(corpo.liquidacao.arenaMarks.attacker).toBeGreaterThan(corpo.liquidacao.arenaMarks.defender);
+
+    const me = await app.inject({ method: 'GET', url: '/me', headers: COMO_ATACANTE });
+    expect(me.json().arenaMarks).toBe(corpo.liquidacao.arenaMarks.attacker);
+  });
+
+  it('o cliente nunca envia stats — só um comando por unitId — e o servidor resolve tudo sozinho', async () => {
+    // A prova é a forma do que se manda: um `BattleCommand`, e nada mais. Nenhum campo de stat,
+    // HP ou dano atravessa a rede na direção do servidor — e desde D47, quase nada atravessa na
+    // direção contrária.
+    expect(Object.keys(ENGAJAR)).toEqual(['command']);
+    expect(Object.keys(ENGAJAR.command).sort()).toEqual(['t', 'targetId', 'unitId'].sort());
+
+    const app = buildTestApp();
+    const { jogada } = await abrirEEngajar(app);
+    expect(jogada.statusCode).toBe(200);
+    expect(jogada.json().outcome).toBe('victory');
+  });
+
+  it('a batalha já fechada não aceita comando de novo (anti-reenvio, §9.4)', async () => {
+    // O nonce continua sendo a identidade da tentativa, e o que ele protege continua sendo o
+    // mesmo: uma batalha só mexe no ELO uma vez. O que mudou é que a trava não é mais "este
+    // nonce já foi usado" e sim "esta partida já terminou".
+    const app = buildTestApp();
+    const { nonce } = await abrirEEngajar(app);
+
+    const denovo = await app.inject({
       method: 'POST',
-      url: '/battles/ticket',
-      headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-      payload: ticketBody,
+      url: `/matches/${nonce}/commands`,
+      headers: COMO_ATACANTE,
+      payload: ENGAJAR,
     });
-    expect(segundo.statusCode).toBe(429);
+    expect(denovo.statusCode).toBe(409);
+  });
+});
+
+describe('a batalha que nasce decidida', () => {
+  it('o turno de IA da abertura pode fechar a partida — e ela liquida ali mesmo', async () => {
+    // Este caso só existe porque a batalha viva o revelou. O turno de IA que precede o primeiro
+    // comando é uma jogada de verdade: com a defesa ADJACENTE, `hold-position` engaja, morre no
+    // contra-ataque e `rout` fecha a partida antes de o jogador tocar em nada.
+    //
+    // No modelo antigo isso passava despercebido — `simulate` ignorava os comandos e devolvia o
+    // desfecho do mesmo jeito. Na batalha viva, sem tratar este caso, a partida ficaria para
+    // sempre `ongoing` no banco: nada a pagar, nada a cobrar, e o jogador travado, porque é uma
+    // partida por vez.
+    const app = buildTestApp();
+    await app.inject({
+      method: 'PUT',
+      url: '/me/defense',
+      headers: COMO_DEFENSOR,
+      payload: {
+        mapId: 'mapa-teste',
+        units: [{ heroId: 'heroi-defensor', pos: { x: 1, y: 0 }, height: 0, aiArchetype: 'hold-position' }],
+      },
+    });
+
+    const abertura = await abrirArena(app);
+    expect(abertura.statusCode, abertura.body).toBe(201);
+    const corpo = abertura.json();
+
+    expect(corpo.outcome).toBe('victory');
+    expect(corpo.liquidacao.elo.attacker).toBeGreaterThan(1200);
+    // E o jogador não fica preso: a partida fechada libera a próxima.
+    expect((await abrirArena(app)).statusCode).toBe(201);
+  });
+});
+
+describe('GET /battles/:nonce — o replay, agora construído do log do servidor', () => {
+  it('o replay guardado devolve o mesmo mapa de arte, derivado na leitura', async () => {
+    // Derivado e não gravado: é o que dá arte também aos replays que já estavam no banco antes
+    // desta milestone. Ver `characterIdsForReplayUnits`.
+    const app = buildTestApp();
+    const { nonce } = await abrirEEngajar(app);
+
+    const res = await app.inject({ method: 'GET', url: `/battles/${nonce}`, headers: COMO_ATACANTE });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().characterIdByUnitId).toEqual({ 'heroi-defensor': 'enemy-tirano' });
+  });
+
+  it('404 pra nonce desconhecido', async () => {
+    const app = buildTestApp();
+    const res = await app.inject({ method: 'GET', url: '/battles/nao-existe', headers: COMO_ATACANTE });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('o atacante e o defensor conseguem ler o replay depois da batalha; ninguém mais pode', async () => {
+    const app = buildTestApp();
+    const { nonce } = await abrirEEngajar(app);
+
+    const comoAtaca = await app.inject({ method: 'GET', url: `/battles/${nonce}`, headers: COMO_ATACANTE });
+    expect(comoAtaca.statusCode).toBe(200);
+    expect(comoAtaca.json()).toMatchObject({
+      nonce,
+      attackerPlayerId: 'player-atacante',
+      defenderPlayerId: 'player-defensor',
+    });
+
+    const comoDefende = await app.inject({ method: 'GET', url: `/battles/${nonce}`, headers: COMO_DEFENSOR });
+    expect(comoDefende.statusCode).toBe(200);
+  });
+
+  it('o replay guarda a receita inteira: setup completo, seed e os comandos que o jogador mandou', async () => {
+    // O `initialState` do replay é o setup COM os dois lados inteiros — e está certo que
+    // esteja. O replay é resposta de uma rota que só o atacante e o defensor abrem, depois de a
+    // batalha ter acabado; esconder o que já aconteceu não protegeria nada, e tiraria do jogador
+    // a única chance de estudar o que enfrentou.
+    const app = buildTestApp();
+    const { nonce } = await abrirEEngajar(app);
+
+    const replay = (await app.inject({ method: 'GET', url: `/battles/${nonce}`, headers: COMO_ATACANTE })).json();
+
+    expect(Number.isInteger(replay.seed)).toBe(true);
+    expect(replay.initialState.units.map((u: { unitId: string }) => u.unitId).sort()).toEqual([
+      'heroi-atacante',
+      'heroi-defensor',
+    ]);
+    expect(replay.commands).toEqual([APROXIMAR.command, ENGAJAR.command]);
+    expect(replay.result.outcome).toBe('victory');
   });
 });
 

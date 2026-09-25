@@ -48,6 +48,8 @@ function instalarFetch(): void {
     'GET /api/me/roster': PERSONAGENS,
     'GET /api/summon/banners': { premium: 180, banners: [] },
     'GET /api/me/rewards': { premium: 180, rewards: [] },
+    // M38 4/N — os artefatos da conta entram no sign-in, ao lado do roster de heróis.
+    'GET /api/me/artifacts': { artifacts: [] },
     'GET /api/me/economy': {
       energy: { stored: 10, asOfMs: 0 },
       energyMax: 10,

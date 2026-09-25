@@ -85,13 +85,16 @@ export interface DungeonRunRewards {
 // fragmento por instância não teria como ser autorado como conteúdo.
 //
 // `forCharacterId` é o que impede fragmento de um personagem virar imprint de outro.
-export type MaterialKind = 'awakening' | 'heroFragment' | 'generic';
+// M38 (D53): `artifactFragment` é a duplicata de ARTEFATO, com `forArtifactId` pelo mesmo
+// motivo de `forCharacterId` — sem dono, viraria imprint de qualquer artefato.
+export type MaterialKind = 'awakening' | 'heroFragment' | 'artifactFragment' | 'generic';
 
 export interface MaterialDef {
   readonly id: Id;
   readonly name: string;
   readonly kind: MaterialKind;
   readonly forCharacterId?: Id;
+  readonly forArtifactId?: Id;
 }
 
 // §10 — "Energia de conta limita o farm diário." Decisão do usuário: regeneração contínua
@@ -134,6 +137,12 @@ export interface EconomyRules {
   readonly imprint: readonly ImprintStep[];
   // Um custo por marco de enhance (§7.3: +0→+3, +3→+6, +6→+9, +9→+12, +12→+15).
   readonly enhance: readonly EnhanceCost[];
+  // M38 2/N (D54) — a evolução do ARTEFATO: awakening próprio (ouro + núcleo de artefato) e
+  // imprint por fragmento do artefato. Opcionais no tipo para que um `EconomyRules` montado
+  // à mão (testes de servidor) continue válido; o catálogo real sempre os preenche, e
+  // `awakenArtifact` recusa alto uma tabela vazia.
+  readonly artifactAwakening?: readonly AwakeningStep[];
+  readonly artifactImprint?: readonly ImprintStep[];
 }
 
 // M14 2/N — calendário e trava de tempo.

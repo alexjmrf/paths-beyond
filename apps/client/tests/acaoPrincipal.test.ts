@@ -24,8 +24,9 @@ const TELAS_COM_ACAO_PRINCIPAL: Readonly<Record<string, string>> = {
   // M35 5/N — no lobby a próxima ação de quem chega é a campanha.
   'LobbyPanel.tsx': 'entrar na campanha',
   'CampaignPanel.tsx': 'a próxima missão, ou entrar na missão escolhida',
-  'DuelPreviewPanel.tsx': 'confirmar o duelo',
-  'PvpPanel.tsx': 'enviar a batalha terminada',
+  // M36 4/N (D47) — `DuelPreviewPanel.tsx` SAIU: o preview de duelo foi removido, e com ele o
+  // botão de confirmar. Engajar virou um comando só.
+  'PvpPanel.tsx': 'voltar da batalha terminada',
   'OpcoesMenu.tsx': 'fechar o menu — apagar progresso NUNCA é a ação principal',
 };
 

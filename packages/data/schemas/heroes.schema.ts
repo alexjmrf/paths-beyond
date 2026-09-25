@@ -50,6 +50,10 @@ const heroSchema = z.object({
   imprint: imprintSchema,
   talents: talentAllocationSchema,
   equipment: equipmentSchema,
+  // M38 (D53) — o 7º slot: a instância de artefato equipada. Fora de `equipment` porque o
+  // artefato não é item de gear (sem set, enhance nem substat). Opcional: todo herói gravado
+  // antes do M38 continua válido, e ausente = `null` = slot vazio.
+  artifact: idSchema.nullable().optional(),
   weaponType: weaponTypeSchema,
   duelSkills: z.array(idSchema).max(5),
   mapSkills: z.array(idSchema).max(2),

@@ -17,8 +17,8 @@
 
 | Tela | Requisitos duros |
 |---|---|
-| Mapa | Overlay de movimento e de ameaça; **lista de iniciativa sempre visível** com a ordem completa do round; AP/PP de cada unidade legíveis no próprio tile (sem hover). |
-| Preview de duelo | Antes de confirmar, rodar `simulateDuel` com a **seed real** e exibir troca a troca: quem age, qual linha do script disparou, dano previsto, HP final, assistências que vão entrar e recursos que serão gastos. **Este é o recurso mais importante do jogo.** |
+| Mapa | Overlay de movimento (o alcance das SUAS unidades); **lista de iniciativa sempre visível** com a ordem completa do round; AP/PP de cada unidade legíveis no próprio tile (sem hover); do inimigo, a barra de HP e os efeitos ativos. |
+| Log do duelo | DEPOIS do engajamento, exibir troca a troca o que aconteceu: quem agiu, **qual skill disparou** (é assim que o jogador aprende o que enfrentou), dano, HP final, assistências que entraram e recursos gastos. |
 | Editor de táticas | Drag & drop das linhas, condições em dropdown, e botão **"Testar"** contra um manequim configurável (HP, tipo, arma, PP). |
 | Painel de recursos | Visão do exército inteiro: AP/PP de todos, quem pode `rest`, quem está sem PP (vulnerável a Emboscada). |
 | Inventário | Filtro por set/slot/substat, comparação lado a lado, **ganho de dano real** (não só CP) ao equipar. |

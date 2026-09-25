@@ -13,15 +13,22 @@ import { useBattleStore } from '../src/store/battleStore.js';
 
 const TOKEN = 'token-de-teste';
 
+// D50 (M37, 2/N) — o pity de DOIS ANDARES, como o servidor o entrega. Os dois contadores
+// com valores DIFERENTES de propósito: iguais, uma tela que lesse o andar errado passaria.
+// M38 3/N — o genérico, que é o banner sempre ativo; os campos próprios de cada tipo têm os
+// testes deles em `artefatosNoCliente.test.ts`.
 const BANNER = {
   id: 'banner-elenco',
+  kind: 'generic',
   name: 'Invocação do Elenco',
-  pityThreshold: 10,
+  baseRate: 6,
+  choice: { every: 180, rolls: 0, pending: 0 },
+  pityThresholds: { adventurer: 10, hero: 90 },
   premiumCost: 500,
-  rollsSinceNew: 7,
+  rollsSince: { adventurer: 7, hero: 41 },
   pool: [
-    { characterId: 'ally-grifeiro', weight: 1 },
-    { characterId: 'ally-guerreiro', weight: 1 },
+    { characterId: 'ally-grifeiro', rank: 'adventurer', weight: 1 },
+    { characterId: 'ally-guerreiro', rank: 'hero', weight: 1 },
   ],
 };
 
@@ -74,6 +81,8 @@ function instalarFetch(): void {
   responder('/api/me/roster', { premium: 1000, characters: PERSONAGENS });
   responder('/api/summon/banners', { premium: 1000, banners: [BANNER] });
   responder('/api/me/rewards', { premium: 1000, account: {}, rewards: PREMIOS });
+  // M38 4/N — a invocação também relê os artefatos da conta.
+  responder('/api/me/artifacts', { artifacts: [] });
 
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
@@ -129,14 +138,22 @@ describe('a tela de invocação lê o servidor e não inventa nada', () => {
     expect(useBattleStore.getState().summon.error).toBeTruthy();
   });
 
-  // O pity é do SERVIDOR: o contador mora na conta (D18). A tela mostra o que recebeu, e
-  // a única conta que ela faz é "quantas faltam" — que é subtração, não regra.
-  it('mostra o pity como o servidor o entrega, e quantas rolagens faltam', () => {
+  // O pity é do SERVIDOR: os contadores moram na conta (D18/D50). A tela mostra o que
+  // recebeu, e a única conta que ela faz é "quantas faltam" — que é subtração, não regra.
+  it('mostra os DOIS andares do pity como o servidor os entrega, e quantas faltam em cada', () => {
     conectado();
     const banner = useBattleStore.getState().summon.banners[0]!;
 
-    expect(banner.rollsSinceNew).toBe(7);
-    expect(banner.pityThreshold - banner.rollsSinceNew).toBe(3);
+    expect(banner.rollsSince).toEqual({ adventurer: 7, hero: 41 });
+    expect(banner.pityThresholds.adventurer - banner.rollsSince.adventurer).toBe(3);
+    expect(banner.pityThresholds.hero - banner.rollsSince.hero).toBe(49);
+  });
+
+  it('cada entrada do pool chega com o RANK, que é de qual garantia ela paga (D49)', () => {
+    conectado();
+    const banner = useBattleStore.getState().summon.banners[0]!;
+
+    expect(banner.pool.map((entrada) => entrada.rank)).toEqual(['adventurer', 'hero']);
   });
 });
 
@@ -144,15 +161,19 @@ describe('invocar', () => {
   it('gasta a moeda e mostra o personagem que saiu', async () => {
     conectado(500);
     responder('/api/summon', {
-      outcome: { kind: 'character', characterId: 'ally-grifeiro' },
+      outcome: { kind: 'character', characterId: 'ally-grifeiro', rank: 'adventurer' },
       premium: 0,
-      rollsSinceNew: 0,
+      guaranteed: null,
+      rollsSince: { adventurer: 0, hero: 42 },
     });
     responder('/api/me/roster', {
       premium: 0,
       characters: PERSONAGENS.map((c) => (c.id === 'ally-grifeiro' ? { ...c, owned: true } : c)),
     });
-    responder('/api/summon/banners', { premium: 0, banners: [{ ...BANNER, rollsSinceNew: 0 }] });
+    responder('/api/summon/banners', {
+      premium: 0,
+      banners: [{ ...BANNER, rollsSince: { adventurer: 0, hero: 42 } }],
+    });
     responder('/api/me/rewards', { premium: 0, account: {}, rewards: PREMIOS });
     responder('/api/me/heroes', [
       { hero: { id: 'player-1-ally-grifeiro', characterId: 'ally-grifeiro', classId: 'class-grifeiro' }, equippedItems: [] },
@@ -161,7 +182,11 @@ describe('invocar', () => {
     await useBattleStore.getState().rollSummon('banner-elenco');
     const { summon } = useBattleStore.getState();
 
-    expect(summon.lastResult?.outcome).toEqual({ kind: 'character', characterId: 'ally-grifeiro' });
+    expect(summon.lastResult?.outcome).toEqual({
+      kind: 'character',
+      characterId: 'ally-grifeiro',
+      rank: 'adventurer',
+    });
     expect(summon.premium).toBe(0);
     // E o roster foi relido: o personagem novo aparece possuído sem recarregar a página.
     expect(summon.characters.find((c) => c.id === 'ally-grifeiro')?.owned).toBe(true);
@@ -176,15 +201,41 @@ describe('invocar', () => {
       outcome: {
         kind: 'duplicate',
         characterId: 'ally-grifeiro',
+        rank: 'adventurer',
         fragmentMaterialId: 'material-fragmento-ally-grifeiro',
       },
       premium: 0,
-      rollsSinceNew: 8,
+      guaranteed: null,
+      rollsSince: { adventurer: 8, hero: 42 },
     });
 
     await useBattleStore.getState().rollSummon('banner-elenco');
 
     expect(useBattleStore.getState().summon.lastResult?.outcome.kind).toBe('duplicate');
+  });
+
+  it('uma DUPLICATA pela garantia continua dizendo que a garantia disparou (D50)', async () => {
+    // O caso que D50 tornou possível e D18 não permitia: a garantia promete o RANK, não a
+    // novidade. Sem esta informação na tela, o jogador lê a duplicata como a garantia tendo
+    // falhado — e o contador zerado do lado não explica nada sozinho.
+    conectado(500);
+    responder('/api/summon', {
+      outcome: {
+        kind: 'duplicate',
+        characterId: 'ally-grifeiro',
+        rank: 'adventurer',
+        fragmentMaterialId: 'material-fragmento-ally-grifeiro',
+      },
+      premium: 0,
+      guaranteed: 'adventurer',
+      rollsSince: { adventurer: 0, hero: 42 },
+    });
+
+    await useBattleStore.getState().rollSummon('banner-elenco');
+
+    const resultado = useBattleStore.getState().summon.lastResult;
+    expect(resultado?.outcome.kind).toBe('duplicate');
+    expect(resultado?.guaranteed).toBe('adventurer');
   });
 
   // A recusa por saldo é do servidor (§9.4, quem decide é ele), mas a tela tem de impedir
@@ -201,9 +252,10 @@ describe('invocar', () => {
   it('o nonce é do cliente e é diferente a cada invocação', async () => {
     conectado(2000);
     responder('/api/summon', {
-      outcome: { kind: 'character', characterId: 'ally-grifeiro' },
+      outcome: { kind: 'character', characterId: 'ally-grifeiro', rank: 'adventurer' },
       premium: 1500,
-      rollsSinceNew: 0,
+      guaranteed: null,
+      rollsSince: { adventurer: 0, hero: 42 },
     });
 
     await useBattleStore.getState().rollSummon('banner-elenco');

@@ -1419,6 +1419,19 @@ button.targeting {
   color: #fbbf24;
 }
 
+/* M38 4/N — os três banners em abas; a aberta se distingue pela borda, como o pity acima. */
+.summon-abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.summon-abas button.ativa {
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
 .summon-banner {
   margin-top: 0.5rem;
   padding-top: 0.4rem;

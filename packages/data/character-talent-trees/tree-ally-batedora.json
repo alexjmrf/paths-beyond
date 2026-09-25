@@ -1,0 +1,186 @@
+{
+  "characterId": "ally-batedora",
+  "depth": 5,
+  "nodes": [
+    {
+      "id": "talent-ilvi-tiro-tenso",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-passo-leve",
+      "column": "b",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 6
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-flecha-marcada",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-arqueiro",
+          "patch": {
+            "multiplier": 1250
+          }
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-leitura-do-campo",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-folego",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-olho-firme",
+      "column": "a",
+      "row": 3,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "chc",
+          "flat": 60
+        },
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-avanco",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-segundo-folego",
+      "column": "middle",
+      "row": 4,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-cobertura",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 25
+        },
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-maestria-do-arco",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-arqueiro-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-ilvi-caca-longa",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-arqueiro",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    }
+  ]
+}

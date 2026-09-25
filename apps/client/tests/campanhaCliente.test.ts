@@ -212,43 +212,49 @@ describe('a escolha de quem preenche as VAGAS (D16) — que nunca começam vazia
   });
 });
 
+function vistaDaPartida(extra: Record<string, unknown> = {}) {
+  return {
+    nonce: 'n-1',
+    kind: 'campaign',
+    refId: 'encounter-campanha-1',
+    rulesVersion: 'x',
+    outcome: 'ongoing',
+    visivel: { ...SETUP, initiativeOrder: [], round: 1, valor: 5, outcome: 'ongoing', distanceMovedThisTurn: {} },
+    characterIdByUnitId: {},
+    aberturaDaIa: [],
+    ...extra,
+  };
+}
+
 describe('entrar no capítulo', () => {
-  it('pede o ticket e o setup do SERVIDOR vira o tabuleiro', async () => {
+  // M36 4/N (D47) — entrar ABRE UMA PARTIDA VIVA. O ticket saiu: o servidor não manda mais o
+  // `BattleSetup` montado, manda o tabuleiro REDIGIDO e guarda o resto.
+  it('abre a partida e o tabuleiro VISÍVEL do servidor vira a tela', async () => {
     conectado();
-    responder('/api/campaign/encounter-campanha-1/ticket', {
-      nonce: 'n-1',
-      seed: 7,
-      rulesVersion: 'x',
-      setup: SETUP,
-      chapterId: 'encounter-campanha-1',
-    });
+    responder('/api/campaign/encounter-campanha-1/matches', vistaDaPartida());
     useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
     const state = useBattleStore.getState();
 
     expect(state.mode).toBe('campaign');
-    expect(state.campaign.ticket?.nonce).toBe('n-1');
+    expect(state.partida?.nonce).toBe('n-1');
     // O tabuleiro é o que o servidor mandou, e não um setup montado aqui: §9.1 chama de bug
-    // crítico a divergência entre o que o cliente jogou e o que o servidor reexecuta.
+    // crítico a divergência entre o que o cliente jogou e o que o servidor resolve.
     expect(state.battleState.units.map((u) => u.unitId)).toEqual(['player-h-aren']);
     expect(state.commandLog).toEqual([]);
 
-    const pedido = chamadas.find((c) => c.url.includes('/ticket'))!;
+    const pedido = chamadas.find((c) => c.url.includes('/matches'))!;
     expect(pedido.body.heroIds).toEqual(['h-aren']);
   });
 
   // M26 3/N — a arte que vem junto do setup.
-  it('guarda o mapa de arte do ticket, e ele sobrevive à montagem do tabuleiro', async () => {
+  it('guarda o mapa de arte da abertura, e ele sobrevive à montagem do tabuleiro', async () => {
     conectado();
-    responder('/api/campaign/encounter-campanha-1/ticket', {
-      nonce: 'n-1',
-      seed: 7,
-      rulesVersion: 'x',
-      setup: SETUP,
-      characterIdByUnitId: { 'player-h-aren': 'hero-jogador' },
-      chapterId: 'encounter-campanha-1',
-    });
+    responder(
+      '/api/campaign/encounter-campanha-1/matches',
+      vistaDaPartida({ characterIdByUnitId: { 'player-h-aren': 'hero-jogador' } }),
+    );
     useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
@@ -261,19 +267,16 @@ describe('entrar no capítulo', () => {
 
   it('sair do capítulo esvazia o mapa — arte de outra batalha no tabuleiro seguinte é pior que glifo', async () => {
     conectado();
-    responder('/api/campaign/encounter-campanha-1/ticket', {
-      nonce: 'n-1',
-      seed: 7,
-      rulesVersion: 'x',
-      setup: SETUP,
-      characterIdByUnitId: { 'player-h-aren': 'hero-jogador' },
-      chapterId: 'encounter-campanha-1',
-    });
+    responder(
+      '/api/campaign/encounter-campanha-1/matches',
+      vistaDaPartida({ characterIdByUnitId: { 'player-h-aren': 'hero-jogador' } }),
+    );
+    responder('/api/matches/n-1/forfeit', { outcome: 'defeat', forfeited: true });
     useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
     expect(useBattleStore.getState().artIdByUnitId).not.toEqual({});
 
-    useBattleStore.getState().exitPvp();
+    await useBattleStore.getState().desistirDaPartida();
 
     expect(useBattleStore.getState().artIdByUnitId).toEqual({});
   });
@@ -285,13 +288,13 @@ describe('entrar no capítulo', () => {
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
 
-    expect(chamadas.filter((c) => c.url.includes('/ticket'))).toHaveLength(0);
+    expect(chamadas.filter((c) => c.url.includes('/matches'))).toHaveLength(0);
     expect(useBattleStore.getState().campaign.error).toBeTruthy();
   });
 
   it('erro do servidor aparece na tela em vez de sumir', async () => {
     conectado();
-    responder('/api/campaign/encounter-campanha-1/ticket', { error: 'você não possui: ally-grifeiro' }, 400);
+    responder('/api/campaign/encounter-campanha-1/matches', { error: 'você não possui: ally-grifeiro' }, 400);
     useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
 
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
@@ -300,44 +303,58 @@ describe('entrar no capítulo', () => {
   });
 });
 
-describe('submeter o capítulo', () => {
+// M36 4/N (D47) — **não há mais submissão.** `submitCampaignRun` saiu: o desfecho é do servidor
+// e chega no comando que o produziu, junto com a `liquidacao` (o que a missão pagou). O que este
+// bloco mede agora é o caminho novo: mandar UM comando e receber o tabuleiro de volta.
+describe('jogar a missão, um comando por vez', () => {
   async function entrar() {
     conectado();
-    responder('/api/campaign/encounter-campanha-1/ticket', {
-      nonce: 'n-1',
-      seed: 7,
-      rulesVersion: 'x',
-      setup: SETUP,
-      chapterId: 'encounter-campanha-1',
-    });
+    responder('/api/campaign/encounter-campanha-1/matches', vistaDaPartida());
     useBattleStore.getState().selectChapter('encounter-campanha-1'); // Aren vem marcado (D42)
     await useBattleStore.getState().enterChapter('encounter-campanha-1');
   }
 
-  it('manda o nonce do ticket, os heróis e os comandos jogados', async () => {
+  it('manda o comando para a partida, e o tabuleiro que volta é o do servidor', async () => {
     await entrar();
-    responder('/api/campaign/encounter-campanha-1/run', {
-      outcome: 'victory',
-      roundsPlayed: 3,
-      premiumAwarded: 600,
-      premium: 600,
+    const depois = {
+      ...SETUP,
+      initiativeOrder: [],
+      round: 2,
+      valor: 5,
+      outcome: 'ongoing',
+      distanceMovedThisTurn: {},
+    };
+    responder('/api/matches/n-1/commands', {
+      outcome: 'ongoing',
+      roundsPlayed: 2,
+      visivel: depois,
+      passosDaIa: [],
     });
 
-    await useBattleStore.getState().submitCampaignRun();
+    await useBattleStore.getState().enviarComando({ t: 'wait', unitId: 'player-h-aren' });
 
-    const envio = chamadas.find((c) => c.url.endsWith('/run'))!;
-    expect(envio.body.nonce).toBe('n-1');
-    expect(envio.body.heroIds).toEqual(['h-aren']);
-    expect(Array.isArray(envio.body.commands)).toBe(true);
+    const envio = chamadas.find((c) => c.url.endsWith('/commands'))!;
+    expect(envio.body.command).toEqual({ t: 'wait', unitId: 'player-h-aren' });
+    expect(useBattleStore.getState().battleState.round).toBe(2);
+    expect(useBattleStore.getState().commandLog).toHaveLength(1);
   });
 
-  it('o desfecho do servidor é o que a tela mostra, inclusive a moeda paga', async () => {
+  it('o comando que FECHA a batalha traz a liquidação, e a tela mostra a moeda paga', async () => {
     await entrar();
-    responder('/api/campaign/encounter-campanha-1/run', {
+    const fim = {
+      ...SETUP,
+      initiativeOrder: [],
+      round: 3,
+      valor: 5,
+      outcome: 'victory',
+      distanceMovedThisTurn: {},
+    };
+    responder('/api/matches/n-1/commands', {
       outcome: 'victory',
       roundsPlayed: 3,
-      premiumAwarded: 600,
-      premium: 600,
+      visivel: fim,
+      passosDaIa: [],
+      liquidacao: { premiumAwarded: 600, premium: 600 },
     });
     // M27 — a releitura devolve as duas camadas, com a MISSÃO limpa dentro do capítulo.
     responder('/api/campaign', {
@@ -349,21 +366,22 @@ describe('submeter o capítulo', () => {
       premiumOnChapterClear: 300,
     });
 
-    await useBattleStore.getState().submitCampaignRun();
-    const { campaign } = useBattleStore.getState();
+    await useBattleStore.getState().enviarComando({ t: 'wait', unitId: 'player-h-aren' });
+    await Promise.resolve();
 
+    const { campaign, liquidacao } = useBattleStore.getState();
+    expect(liquidacao?.premiumAwarded).toBe(600);
     expect(campaign.lastRun?.outcome).toBe('victory');
     expect(campaign.lastRun?.premiumAwarded).toBe(600);
-    // E a lista foi relida: a missão aparece limpa sem recarregar a página.
-    expect(
-      campaign.chapters.flatMap((c) => c.missions).find((m) => m.id === 'encounter-campanha-1')?.cleared,
-    ).toBe(true);
   });
 
-  it('sem ticket não manda nada', async () => {
+  it('sem partida aberta não manda comando nenhum', async () => {
     conectado();
-    await useBattleStore.getState().submitCampaignRun();
-    expect(chamadas.filter((c) => c.url.endsWith('/run'))).toHaveLength(0);
+    // A store é um singleton de módulo: o teste anterior deixou uma partida aberta, e "sem
+    // partida" tem de ser o estado de verdade para a asserção querer dizer alguma coisa.
+    useBattleStore.getState().limparTabuleiro();
+    await useBattleStore.getState().enviarComando({ t: 'wait', unitId: 'x' });
+    expect(chamadas.filter((c) => c.url.endsWith('/commands'))).toHaveLength(0);
   });
 });
 

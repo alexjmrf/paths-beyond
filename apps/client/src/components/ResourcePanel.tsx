@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { catalog } from '../data/catalog.js';
 import { nomeDeUnidade } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { ehVisivelPorInteiro } from '../data/api.js';
 
 // Mesma regra de `applyRest` em packages/core/src/battle/commands.ts: não pode ter
 // andado mais que metade do moveRange. Aqui é só leitura pra exibição — quem de fato
@@ -47,7 +48,12 @@ export function ResourcePanel() {
         <tbody>
           {playerUnits.map((unit) => {
             const distanceMoved = battleState.distanceMovedThisTurn[unit.unitId] ?? 0;
-            const restable = canRest(distanceMoved, unit.moveRange, unit.hasActedThisRound);
+            // `playerUnits` já filtra pelo lado do jogador, e do lado dele a unidade é completa —
+            // o painel de recursos nunca falou do inimigo. A guarda torna isso uma afirmação do
+            // tipo (M36 4/N).
+            const restable = ehVisivelPorInteiro(unit)
+              ? canRest(distanceMoved, unit.moveRange, unit.hasActedThisRound)
+              : false;
             const vulnerable = unit.pp === 0;
 
             return (

@@ -209,4 +209,69 @@
 // validação de PREPARAÇÃO e `simulate` não a chama — nenhuma batalha muda de resultado, e
 // os scripts autorados no conteúdo (máximo de 2 linhas) passam todos. O que muda é o que o
 // jogador pode SALVAR, que é onde a regra faltava.
-export const RULES_VERSION = '0.19.0';
+// M37, sub-sessão 1/N: **o elenco deixa de ser plano — entram os ranks `Adventurer`, `Hero` e
+// `Legend`.** O rank de BASE passa a ser campo obrigatório do catálogo de personagem, e o rank
+// CORRENTE vira uma função de regra, `rankCorrente(base, awakening)`, com os limiares em 3
+// (Adventurer → Hero) e 6 (qualquer um → Legend).
+//
+// **É mudança de regra e não adição**, por duas razões: um personagem autorado na forma antiga
+// (sem `rank`) é RECUSADO pelo schema em vez de validar com um padrão, e o rank corrente passa a
+// ser derivado por uma regra que o servidor aplica — duas versões com limiares diferentes
+// promoveriam a mesma conta em momentos diferentes.
+//
+// **O rank NÃO carrega poder**, e essa é a trava do milestone: o que ele descreve é a
+// profundidade da árvore (D9 já travou o orçamento em 9 pontos para todos) e o custo de
+// evolução. Nenhum número novo multiplica stat.
+//
+// M37, sub-sessão 2/N (D50): **o pity de DOIS ANDARES**, e ele entra na MESMA versão porque é
+// a mesma decisão vista do outro lado. O banner deixa de ter um contador e passa a ter um por
+// rank — `Adventurer` em 10, `Hero` em 90 —, e a garantia muda de PROMESSA: ela entrega
+// qualquer um daquele rank, não um personagem novo. Isso REVERTE D18 de propósito, e é
+// mudança de regra pelo critério de sempre: duas versões com semânticas diferentes dariam
+// prêmios diferentes para a mesma sequência de rolagens.
+//
+// A regra mora em `packages/gacha` (D15), não aqui — mas `RULES_VERSION` é a versão do jogo e
+// não a do diretório, e o servidor recusa o cliente que discorde dela.
+//
+// **Não observável em `pnpm balance` nem no GOLDEN_HASH:** `rankCorrente` é função de
+// progressão, `rollSummon` é aquisição, e `simulate` não chama nenhuma das duas — nenhuma
+// batalha muda de resultado. O que muda é o que o catálogo aceita, o que o banner entrega e o
+// que o servidor responde sobre uma conta.
+//
+// M38, sub-sessão 1/N (D53): **o ARTEFATO entra como 7º slot**, separado da arma. Travado por
+// CLASSE, com rank de base no catálogo e rank corrente derivado de um awakening PRÓPRIO (a
+// mesma regra `rankCorrente` do personagem), `atk` fixo + um stat variável, uma passiva de
+// vocabulário fechado (`stat`, `startingPool`, `reaction`) e imprint por duplicata que mexe
+// só no número dela. Os status entram no passo 3 de §4.1 e o % da passiva no passo 4 — o
+// artefato é equipamento e a ordem de agregação não ganha passo novo, mas o stat sheet de um
+// herói com artefato muda, e é isso que faz disto mudança de regra.
+//
+// **Não observável em `pnpm balance` nem no GOLDEN_HASH nesta fatia:** o campo é opcional,
+// nenhum conteúdo de `packages/data` declara artefato ainda e nenhuma comp o equipa. Medir
+// com e sem é o critério do fechamento do M38.
+//
+// M38, sub-sessão 3/N (D54/D55): **os TRÊS banners.** O rank que sai passa a ser decidido
+// pela curva de SOFT PITY (a de Genshin, com a tabela de D54), o limiar N passa a garantir a
+// N-ésima rolagem e não a seguinte, o pity é guardado por TIPO de banner (entre banners), e
+// entram o token de 1,5·P por banner rotativo e a escolha a cada 180 do genérico. A regra mora
+// em `packages/gacha` (D15), mas a mesma sequência de rolagens daria prêmios diferentes nas
+// duas versões.
+//
+// **Não observável em `pnpm balance` nem no GOLDEN_HASH:** `simulate` não chama a rolagem.
+//
+// M38, sub-sessão 5/N (D57): **as reações CONCEDIDAS (talento e artefato) passam na frente
+// das baseline** no script de reação. O duelo escolhe a primeira linha que bate, e com a
+// baseline na frente uma reação concedida de mesmo gatilho que `contra-atacar` nunca
+// disparava — medido: zerar a magnitude das quatro passivas de reação dos artefatos não mudava
+// nenhum resultado do torneio. **Observável em `pnpm balance`** (a matriz sem artefato também
+// muda, porque as reações de talento passam a disparar); o GOLDEN_HASH não muda, porque o
+// replay canônico não tem reação concedida.
+//
+// Na mesma versão, e pelo mesmo motivo: **a reação concedida `onDamaged` RESERVA a troca**
+// (D57). §6.4 permite uma reação por troca e o `onAttacked` é decidido antes do dano, então a
+// baseline sem condição gastava a troca e a Bênção do Relicário / o Fôlego de Combate nunca
+// disparavam. Com uma concedida `onDamaged` de PP e condições em dia, só as linhas concedidas
+// concorrem ao `onAttacked` (`ReactionLine.granted`, marcada pelo perfil). Reação de 0 PP
+// NÃO reserva (o Fôlego de Combate reservaria toda troca). E entre as concedidas, o artefato
+// vem antes do talento.
+export const RULES_VERSION = '0.23.0';

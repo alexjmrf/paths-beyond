@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalog } from '../src/data/catalog.js';
-import { ordemDeAparicao, preenchimentoPadrao } from '../src/logic/quemVai.js';
+import { preenchimentoPadrao } from '../src/logic/quemVai.js';
 
 // M35 2/N (D42) — as vagas de uma missão NUNCA começam vazias, e o protagonista vem primeiro.
 //
@@ -20,20 +19,15 @@ const roster = (...characterIds: string[]) =>
     equippedItems: [],
   }));
 
-describe('ordemDeAparicao — derivada da campanha autorada', () => {
-  const ordem = ordemDeAparicao(catalog);
-
-  it('o protagonista é o primeiro, e os quatro do núcleo de história (D14) vêm na ordem dos capítulos', () => {
-    expect(ordem[0]).toBe('hero-jogador');
-    const nucleo = ordem.filter((id) => ['hero-jogador', 'ally-clerigo', 'ally-arqueiro', 'ally-arcanista'].includes(id));
-    expect(nucleo).toEqual(['hero-jogador', 'ally-clerigo', 'ally-arqueiro', 'ally-arcanista']);
-  });
-
-  it('cobre todo personagem que aparece como vaga na campanha, sem repetir', () => {
-    expect(new Set(ordem).size).toBe(ordem.length);
-    for (const id of ordem) expect(catalog.characters[id], id).toBeDefined();
-  });
-});
+// M36 3/N (D48) — `ordemDeAparicao` MUDOU DE LADO, e com ela os dois testes que estavam aqui.
+//
+// Ela derivava de `catalog.encounters`, e `encounters` saiu do bundle do cliente junto com a
+// ficha dos inimigos que mora nos mesmos arquivos. A regra não mudou uma vírgula — ela é
+// derivada do mesmo conteúdo autorado, agora no servidor, e chega em `GET /campaign` como
+// `castOrder`. As asserções que estavam aqui estão em
+// `apps/server/tests/previaDaMissao.test.ts`, palavra por palavra.
+//
+// O que ficou é o que sempre foi do cliente: dada a ordem, QUEM vem marcado.
 
 describe('preenchimentoPadrao — quem vem marcado ao escolher a missão', () => {
   const ordem = ['hero-jogador', 'ally-clerigo', 'ally-arqueiro', 'ally-arcanista'];

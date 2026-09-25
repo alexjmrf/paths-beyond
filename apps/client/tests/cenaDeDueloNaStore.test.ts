@@ -54,15 +54,7 @@ const DEPOIS = {
   outcome: 'ongoing',
 };
 
-function prepararEngajamento(overrides: Record<string, unknown> = {}) {
-  useBattleStore.setState({
-    battleState: { units: [ATACANTE, DEFENSOR], outcome: 'ongoing' },
-    duelPreview: { nextState: DEPOIS, duelResult: DUEL_RESULT, command: { t: 'engage' }, aiSteps: [] },
-    duelScene: null,
-    commandLog: [],
-    ...overrides,
-  } as never);
-}
+
 
 const ANTES = { units: [ATACANTE, DEFENSOR], outcome: 'ongoing' };
 
@@ -109,26 +101,45 @@ describe('abrir a cena a partir do estado de ANTES do duelo', () => {
   });
 });
 
-describe('confirmar o engajamento não decide sobre a cena', () => {
+describe('o duelo do JOGADOR chega no relato, e a cena continua sendo de quem anima (M36 4/N)', () => {
   beforeEach(() => {
     useBattleStore.setState({ instantResultMode: false, duelSceneEnabled: true, duelScene: null } as never);
   });
 
-  it('commita o estado e o comando, e deixa a cena para quem anima', () => {
-    // A decisão mora num lugar só (o `MapCanvas`), porque é lá que o duelo do jogador e o da IA
-    // já viravam a mesma lista de cenas desde M16 4/N.
-    prepararEngajamento();
-    useBattleStore.getState().confirmEngage();
+  it('o relato do turno carrega `meuDuelo` com o estado de ANTES, e nenhuma cena é aberta aqui', () => {
+    // A decisão de virar cena mora num lugar só (o `MapCanvas`), porque é lá que o duelo do
+    // jogador e o da IA já viravam a mesma lista desde M16 4/N.
+    //
+    // O que mudou em M36 4/N: o duelo do jogador não é mais DEDUZIDO da transição do preview
+    // (que não existe), e sim declarado pelo servidor na resposta do comando. O `estadoAntes` é
+    // o tabuleiro que o cliente tinha antes de aplicar a resposta — os dois de pé, como a cena
+    // precisa.
+    useBattleStore.setState({
+      aiTurnReport: {
+        state: DEPOIS,
+        steps: [],
+        meuDuelo: { estadoAntes: ANTES, duelResult: DUEL_RESULT },
+      },
+    } as never);
 
-    expect(useBattleStore.getState().battleState.units.find((u) => u.unitId === DEFENSOR.unitId)!.hp).toBe(0);
-    expect(useBattleStore.getState().commandLog).toHaveLength(1);
+    const relato = useBattleStore.getState().aiTurnReport!;
+    expect(relato.meuDuelo!.estadoAntes).toBe(ANTES);
+    expect(relato.meuDuelo!.duelResult).toBe(DUEL_RESULT);
     expect(useBattleStore.getState().duelScene).toBeNull();
   });
 
-  it('cancelar o preview não deixa cena nenhuma', () => {
-    prepararEngajamento();
-    useBattleStore.getState().cancelEngage();
-    expect(useBattleStore.getState().duelScene).toBeNull();
+  it('e o `estadoAntes` do relato monta a cena com os DOIS de pé', () => {
+    useBattleStore.setState({
+      aiTurnReport: { state: DEPOIS, steps: [], meuDuelo: { estadoAntes: ANTES, duelResult: DUEL_RESULT } },
+    } as never);
+
+    const relato = useBattleStore.getState().aiTurnReport!;
+    expect(useBattleStore.getState().abrirCenaDeDuelo(relato.meuDuelo!.estadoAntes, relato.meuDuelo!.duelResult)).toBe(
+      true,
+    );
+    const cena = useBattleStore.getState().duelScene!;
+    expect(cena.atacante.hp).toBeGreaterThan(0);
+    expect(cena.defensor.hp).toBeGreaterThan(0);
   });
 });
 

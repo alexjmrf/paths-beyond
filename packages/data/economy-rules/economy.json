@@ -81,9 +81,67 @@
       "stones": 24
     }
   ],
+  "artifactAwakening": [
+    {
+      "gold": 500,
+      "materials": {
+        "material-nucleo-de-artefato": 2
+      }
+    },
+    {
+      "gold": 1000,
+      "materials": {
+        "material-nucleo-de-artefato": 4
+      }
+    },
+    {
+      "gold": 2000,
+      "materials": {
+        "material-nucleo-de-artefato": 6
+      }
+    },
+    {
+      "gold": 4000,
+      "materials": {
+        "material-nucleo-de-artefato": 10
+      }
+    },
+    {
+      "gold": 8000,
+      "materials": {
+        "material-nucleo-de-artefato": 15
+      }
+    },
+    {
+      "gold": 16000,
+      "materials": {
+        "material-nucleo-de-artefato": 25
+      }
+    }
+  ],
+  "artifactImprint": [
+    {
+      "fragments": 1
+    },
+    {
+      "fragments": 1
+    },
+    {
+      "fragments": 2
+    },
+    {
+      "fragments": 2
+    },
+    {
+      "fragments": 3
+    }
+  ],
   "summon": {
     "premiumCost": 180,
-    "pityThreshold": 10
+    "pityThresholds": {
+      "adventurer": 10,
+      "hero": 90
+    }
   },
   "energyPurchase": {
     "premiumCost": 100,

@@ -31,7 +31,7 @@ Quando A engaja B:
 Regras duras:
 - O **ataque básico custa 0 AP** e está sempre disponível. Um duelo sempre resolve, mesmo com pools zerados.
 - **Contra-atacar custa 1 PP.** Não é grátis. Um defensor sem PP apanha de graça — e sofre "Emboscada" (5.5).
-- Uma unidade **não pode gastar mais de 2 AP em um mesmo duelo**, mesmo tendo pool. Isso impede que um duelo consuma o mapa inteiro e mantém a leitura do preview simples.
+- Uma unidade **não pode gastar mais de 2 AP em um mesmo duelo**, mesmo tendo pool. Isso impede que um duelo consuma o mapa inteiro e mantém o log do duelo curto o bastante para ser lido (era "a leitura do preview", até o preview sair em M36 — ver D47).
 
 Consequência de design pretendida: agressão constante drena recursos. Escolher **quando** duelar é a decisão do jogo.
 
@@ -99,6 +99,10 @@ Reações padrão que toda unidade tem: `Contra-atacar` (1 PP), `Defender` (1 PP
 
 Uma unidade gasta **no máximo 1 PP por troca**.
 
+**A ordem do script padrão (M38, D57):** as reações **concedidas** vêm antes das padrão — primeiro as do artefato, depois as de talento, e por último `Contra-atacar`/`Defender`. A primeira linha cujo gatilho bate e cujo PP cabe vence; com as padrão na frente, uma reação concedida de mesmo gatilho nunca dispararia.
+
+**A reserva da troca (M38, D57):** o `onAttacked` é decidido antes do dano e o `onDamaged` depois, e só há uma reação por troca. Se a unidade tem uma reação **concedida** `onDamaged` habilitada, com condições satisfeitas e que **custa PP** (e o PP cabe), só as linhas concedidas concorrem ao `onAttacked` daquela troca — a padrão não dispara, e a troca fica livre para a concedida depois do dano. Reação de **0 PP não reserva**: ela reservaria toda troca e tiraria o contra-ataque de quem a tem.
+
 ### 6.5 Assistências — a substituição do esquadrão
 
 Depois que o duelo é declarado e antes da primeira troca:
@@ -129,7 +133,12 @@ Todos os valores em ponto fixo, escala 1000.
 10. final       = max(1, trunc(resultado))
 ```
 
-**Acurácia:** `hit = clamp(acc_atacante - eva_defensor + terrenoEva + alturaMod, 50, 1000)`. Rolagem única — não use o "2RN" de Fire Emblem, ele quebra a legibilidade do preview em combate automático.
+**Acurácia:** `hit = clamp(acc_atacante - eva_defensor + terrenoEva + alturaMod, 50, 1000)`. Rolagem única — não use o "2RN" de Fire Emblem.
+
+> **A justificativa mudou em M36 (D47), o número não.** A rolagem única foi escolhida para o
+> PREVIEW de duelo ser legível; o preview saiu do jogo com o inimigo desconhecido. Ela fica por
+> simplicidade: uma rolagem tem uma explicação, o "2RN" tem duas, e o log do duelo — que é o que
+> o jogador lê agora, depois do engajamento — é mais fácil de acreditar com uma.
 
 ### 6.7 O papel de `spd` — benefícios enumerados e fechados
 

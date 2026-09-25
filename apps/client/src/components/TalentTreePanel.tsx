@@ -12,6 +12,7 @@ import {
 } from '../logic/talentLayout.js';
 import { previewTalents } from '../logic/talentPreview.js';
 import { characterTreeForUnit, useBattleStore } from '../store/battleStore.js';
+import { ehVisivelPorInteiro } from '../data/api.js';
 
 const ROW_HEIGHT = 88;
 const COL_WIDTH = 168;
@@ -142,7 +143,10 @@ export function TalentTreePanel() {
   const selectedNode = selectedPositioned?.node;
   const selectedAvailability = selectedNode ? availability.get(selectedNode.id) : undefined;
 
-  const preview = previewTalents(unit.stats, tree.nodes, allocation);
+  // A árvore de talentos abre sobre um HERÓI do jogador: é a alocação DELE que se edita. Do
+  // outro lado não há árvore para abrir — e desde M36 4/N (D47) não há nem os stats sobre os
+  // quais prever.
+  const preview = ehVisivelPorInteiro(unit) ? previewTalents(unit.stats, tree.nodes, allocation) : null;
 
   const svgWidth = MARGIN * 2 + COLS * COL_WIDTH;
   const svgHeight = MARGIN * 2 + tree.depth * ROW_HEIGHT;
@@ -292,15 +296,17 @@ export function TalentTreePanel() {
 
         {lastTalentReason ? <p className="error">{lastTalentReason}</p> : null}
 
-        <div className="talent-preview">
-          <h3>{t('talento.efeitoTotal')}</h3>
-          <ul>{STAT_KEYS.map((stat) => statDeltaRow(stat, preview.statsBefore[stat], preview.statsAfter[stat]))}</ul>
-          <p>
-            Poder de combate: {preview.cpBefore} → {preview.cpAfter} (
-            {preview.cpAfter - preview.cpBefore >= 0 ? '+' : ''}
-            {preview.cpAfter - preview.cpBefore})
-          </p>
-        </div>
+        {preview ? (
+          <div className="talent-preview">
+            <h3>{t('talento.efeitoTotal')}</h3>
+            <ul>{STAT_KEYS.map((stat) => statDeltaRow(stat, preview.statsBefore[stat], preview.statsAfter[stat]))}</ul>
+            <p>
+              Poder de combate: {preview.cpBefore} → {preview.cpAfter} (
+              {preview.cpAfter - preview.cpBefore >= 0 ? '+' : ''}
+              {preview.cpAfter - preview.cpBefore})
+            </p>
+          </div>
+        ) : null}
 
         <div className="talent-build-code">
           <h3>{t('talento.buildCode')}</h3>

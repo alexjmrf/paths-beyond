@@ -142,9 +142,13 @@ export function DuelScene() {
         });
       }
 
+      // M36 4/N (D47) — a arma de cada duelista, quando ela é conhecida. Do lado do jogador
+      // sempre é; do lado do inimigo, nunca — `weaponType` é equipamento, e equipamento está na
+      // lista do que D47 esconde. A cena degrada para o efeito genérico, que é o mesmo caminho
+      // que ela já usava para uma arma sem efeito autorado.
       const armaDe = new Map<string, string | undefined>([
-        [duelScene.atacante.unitId, duelScene.atacante.weaponType],
-        [duelScene.defensor.unitId, duelScene.defensor.weaponType],
+        [duelScene.atacante.unitId, 'weaponType' in duelScene.atacante ? duelScene.atacante.weaponType : undefined],
+        [duelScene.defensor.unitId, 'weaponType' in duelScene.defensor ? duelScene.defensor.weaponType : undefined],
       ]);
 
       const beats = duelSceneBeats(duelScene.duelResult as never);

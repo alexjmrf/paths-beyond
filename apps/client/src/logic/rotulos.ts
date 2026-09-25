@@ -1,5 +1,5 @@
 import type { BattleOutcome, Hero } from '@paths-beyond/core';
-import type { ContentCatalog } from '@paths-beyond/content/src/types.js';
+import type { CatalogoDoCliente } from '@paths-beyond/content/src/catalogoDoCliente.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
 import type { Tradutor } from '../i18n/idioma.js';
 
@@ -32,7 +32,7 @@ export interface RotuloDeHeroi {
   readonly classe: string;
 }
 
-type CatalogoDeRotulos = Pick<ContentCatalog, 'characters' | 'classes' | 'enemies'>;
+type CatalogoDeRotulos = Pick<CatalogoDoCliente, 'characters' | 'classes'>;
 
 // O personagem vem do catálogo do CLIENTE (`data/catalog.ts`, o mesmo `packages/data` lido
 // por `import.meta.glob`), e não do servidor: o roster carrega `characterId`, e quem sabe o
@@ -66,6 +66,12 @@ export function nomeDeUnidade(
   const hero = heroesByUnitId[unitId];
   if (hero) return rotuloDeHeroi(t, hero, catalogo).nome;
   const artId = artIdByUnitId[unitId];
-  const inimigo = artId ? catalogo.enemies[artId] : undefined;
-  return inimigo && artId ? nomeDeConteudo(t, 'inimigo', artId, inimigo.name) : unitId;
+  // M36 3/N (D48) — o nome sai da camada de IDIOMA, pelo id de arte, e não mais do catálogo de
+  // inimigos: ele saiu do bundle junto com os stats que vinham no mesmo arquivo. O nome autorado
+  // era só o fundo do poço da tradução, e `conteudoTraduzido.test.ts` garante que todo inimigo do
+  // catálogo tem entrada nas duas línguas — então o fundo do poço nunca é alcançado por conteúdo
+  // de verdade. Um id desconhecido (replay antigo) continua caindo no `unitId`, como antes.
+  if (!artId) return unitId;
+  const traduzido = nomeDeConteudo(t, 'inimigo', artId, artId);
+  return traduzido === artId ? unitId : traduzido;
 }

@@ -1,4 +1,4 @@
-import { api, type BattleOutcomeResponse, type CampaignRunResponse, type DungeonRunResponse } from '../data/api.js';
+import { api, type DungeonRunResponse } from '../data/api.js';
 
 // §9.4 (M22, sub-sessão 2/N) — o PEDIDO EM VOO.
 //
@@ -18,30 +18,24 @@ import { api, type BattleOutcomeResponse, type CampaignRunResponse, type Dungeon
 // **A arena entrou na auditoria do M22**, e pelo mesmo argumento das outras duas: ela também
 // resolve no servidor, também grava replay e também mexe no ELO — cair no meio da submissão
 // deixava o jogador sem saber se a partida valeu, com o ELO já mudado do outro lado.
+//
+// **M36 4/N (D47) — sobrou UMA rota, e o motivo de as outras três saírem é bom.** Elas eram as
+// submissões de arena, masmorra e capítulo: uma requisição que cobrava recurso, resolvia a
+// batalha inteira e devolvia o desfecho. Com a batalha viva não existe mais esse instante — o
+// estado mora no servidor, cada comando é pequeno, e cair no meio deixou de ser um problema de
+// idempotência para virar uma LEITURA (`GET /matches/current`, a reconexão de verdade).
+//
+// A VARREDURA ficou, e é a exceção que prova a regra: ela continua sendo um disparo só que cobra
+// energia e devolve loot, porque nela não há cliente jogando. É exatamente o caso que este
+// arquivo foi escrito para proteger.
 
 const CHAVE = 'paths-beyond/pedido-em-voo';
 
-export type PedidoEmVoo =
-  | {
-      readonly rota: 'arena-battle';
-      readonly corpo: {
-        readonly nonce: string;
-        readonly attackerHeroIds: readonly string[];
-        readonly defenderPlayerId: string;
-        readonly commands: readonly unknown[];
-        readonly rulesVersion: string;
-      };
-    }
-  | {
-      readonly rota: 'dungeon-run';
-      readonly dungeonId: string;
-      readonly corpo: { readonly nonce: string; readonly heroIds: readonly string[]; readonly commands?: readonly unknown[] };
-    }
-  | {
-      readonly rota: 'campaign-run';
-      readonly chapterId: string;
-      readonly corpo: { readonly nonce: string; readonly heroIds: readonly string[]; readonly commands: readonly unknown[] };
-    };
+export type PedidoEmVoo = {
+  readonly rota: 'dungeon-sweep';
+  readonly dungeonId: string;
+  readonly corpo: { readonly nonce: string; readonly heroIds: readonly string[] };
+};
 
 export function guardarPedido(pedido: PedidoEmVoo): void {
   try {
@@ -68,16 +62,14 @@ export function lerPedido(): PedidoEmVoo | null {
     // Conferido antes de virar requisição: o que está no armazenamento pode ter sido escrito
     // por uma versão anterior do jogo, e reenviar lixo com um nonce de verdade seria pior
     // que não reenviar nada.
-    if (pedido?.rota === 'dungeon-run' && typeof pedido.dungeonId === 'string' && typeof pedido.corpo?.nonce === 'string') {
-      return pedido;
-    }
-    if (pedido?.rota === 'campaign-run' && typeof pedido.chapterId === 'string' && typeof pedido.corpo?.nonce === 'string') {
-      return pedido;
-    }
+    // M36 4/N — as três rotas antigas (`arena-battle`, `dungeon-run`, `campaign-run`) não
+    // existem mais. Um pedido gravado por uma versão anterior do jogo cai aqui e é DESCARTADO,
+    // que é o comportamento certo: reenviá-lo bateria num 404, e o que ele protegia virou a
+    // reconexão de `GET /matches/current`.
     if (
-      pedido?.rota === 'arena-battle' &&
-      typeof pedido.corpo?.nonce === 'string' &&
-      typeof pedido.corpo?.defenderPlayerId === 'string'
+      pedido?.rota === 'dungeon-sweep' &&
+      typeof pedido.dungeonId === 'string' &&
+      typeof pedido.corpo?.nonce === 'string'
     ) {
       return pedido;
     }
@@ -99,40 +91,11 @@ export function lerPedido(): PedidoEmVoo | null {
  */
 export async function reenviarPedidoPendente(
   ticket: string,
-): Promise<{
-  readonly pedido: PedidoEmVoo;
-  readonly resposta: DungeonRunResponse | CampaignRunResponse | BattleOutcomeResponse;
-} | null> {
+): Promise<{ readonly pedido: PedidoEmVoo; readonly resposta: DungeonRunResponse } | null> {
   const pedido = lerPedido();
   if (!pedido) return null;
 
-  if (pedido.rota === 'arena-battle') {
-    const resposta = await api.submitBattle(ticket, {
-      nonce: pedido.corpo.nonce,
-      attackerHeroIds: pedido.corpo.attackerHeroIds,
-      defenderPlayerId: pedido.corpo.defenderPlayerId,
-      commands: pedido.corpo.commands as never,
-      rulesVersion: pedido.corpo.rulesVersion,
-    });
-    limparPedido();
-    return { pedido, resposta };
-  }
-
-  if (pedido.rota === 'dungeon-run') {
-    const resposta = await api.submitDungeonRun(ticket, pedido.dungeonId, {
-      nonce: pedido.corpo.nonce,
-      heroIds: pedido.corpo.heroIds,
-      ...(pedido.corpo.commands ? { commands: pedido.corpo.commands as never } : {}),
-    });
-    limparPedido();
-    return { pedido, resposta };
-  }
-
-  const resposta = await api.submitCampaignRun(ticket, pedido.chapterId, {
-    nonce: pedido.corpo.nonce,
-    heroIds: pedido.corpo.heroIds,
-    commands: pedido.corpo.commands as never,
-  });
+  const resposta = await api.reenviarVarredura(ticket, pedido.dungeonId, pedido.corpo);
   limparPedido();
   return { pedido, resposta };
 }

@@ -1,0 +1,73 @@
+{
+  "id": "artifact-relicario-de-miron",
+  "signatureOf": "ally-clerigo",
+  "name": "Relicário de Miron",
+  "classId": "class-clerigo",
+  "rank": "hero",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "hp",
+    "byAwakening": [
+      40,
+      50,
+      60,
+      70,
+      85,
+      100,
+      120
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "reaction",
+    "skillId": "skill-bencao-do-relicario",
+    "multiplierByImprint": [
+      150,
+      170,
+      190,
+      210,
+      230,
+      250
+    ]
+  }
+}

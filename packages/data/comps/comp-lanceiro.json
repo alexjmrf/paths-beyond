@@ -9,7 +9,7 @@
         "classId": "class-lanceiro",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-nyra-pe-firme": 1,
@@ -48,7 +48,8 @@
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lanca-muralha"
     },
     {
       "hero": {
@@ -57,7 +58,7 @@
         "classId": "class-druida",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-wren-raizes-profundas": 3,
@@ -93,7 +94,8 @@
         "y": 1
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-semente-de-wren"
     },
     {
       "hero": {
@@ -102,7 +104,7 @@
         "classId": "class-couracado",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-bardan-aco-pesado": 1,
@@ -143,7 +145,8 @@
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-egide-de-bardan"
     }
   ]
 }

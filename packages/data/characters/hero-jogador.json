@@ -3,6 +3,7 @@
   "name": "Aren",
   "classId": "class-espadachim",
   "acquisition": "story",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-hero-jogador",
   "startingHero": {
     "level": 10,

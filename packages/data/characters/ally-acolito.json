@@ -1,0 +1,33 @@
+{
+  "id": "ally-acolito",
+  "name": "Dorn",
+  "classId": "class-clerigo",
+  "acquisition": "summon",
+  "rank": "adventurer",
+  "fragmentMaterialId": "material-fragmento-ally-acolito",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "holy",
+    "equipment": {
+      "weapon": "item-arma-clerigo",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-guardiao",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-clerigo",
+      "skill-especial-clerigo",
+      "skill-cura-clerigo"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-clerigo",
+        "conditions": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "artifact-arco-da-alvorada",
+  "signatureOf": "ally-arqueiro",
+  "name": "Arco da Alvorada",
+  "classId": "class-arqueiro",
+  "rank": "hero",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "chc",
+    "byAwakening": [
+      32,
+      40,
+      48,
+      56,
+      68,
+      80,
+      96
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "startingPool",
+    "pool": "ap",
+    "amountByImprint": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      2
+    ]
+  }
+}

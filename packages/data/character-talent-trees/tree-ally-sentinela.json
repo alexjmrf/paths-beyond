@@ -1,0 +1,197 @@
+{
+  "characterId": "ally-sentinela",
+  "depth": 5,
+  "nodes": [
+    {
+      "id": "talent-torv-muro",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": -5
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-machado-erguido",
+      "column": "b",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-golpe-de-peso",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-couracado",
+          "patch": {
+            "multiplier": 1200
+          }
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-leitura-do-campo",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-sede",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 3
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-couro-grosso",
+      "column": "a",
+      "row": 3,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 15
+        },
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-avanco",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-segundo-folego",
+      "column": "middle",
+      "row": 4,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-linha-de-escudos",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "pen",
+          "flat": 60
+        },
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-maestria-da-guarda",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-couracado-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-torv-ultimo-muro",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-couracado",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    }
+  ]
+}

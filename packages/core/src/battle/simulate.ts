@@ -69,30 +69,31 @@ export function buildInitialStateLogged(setup: BattleSetup, seed: number): Build
   });
 }
 
-export interface ApplyCommandAndAdvanceResult {
+export interface AdvanceWithoutAiResult {
   readonly state: BattleState;
   readonly applied: boolean;
   readonly reason?: string;
   readonly duelResult?: DuelResult;
-  // M16 4/N — o que a IA fez DEPOIS deste comando, na ordem em que fez. Sempre uma lista (vazia
-  // quando nenhuma unidade de IA agiu), nunca `undefined`: "a IA não jogou" e "ninguém me contou
-  // o que ela jogou" são coisas diferentes, e quem anima precisa distinguir as duas. Relato puro
-  // — o estado devolvido é o mesmo com ou sem ele.
-  readonly aiSteps: readonly AiTurnStep[];
 }
 
-// Aplica UM comando e faz o mesmo bookkeeping que `simulate` faz por iteração (fecha o
-// round quando todas as unidades vivas agiram, marca outcome quando a condição de
-// vitória é atingida). Existe pra servir dois consumidores com a mesma lógica: `simulate`
-// (lote, replay) e o cliente interativo de M6 (um comando por clique do jogador).
-export function applyCommandAndAdvance(state: BattleState, command: BattleCommand): ApplyCommandAndAdvanceResult {
+// M36 1/N (D47) — AVANÇAR, e só isso: aplica UM comando e faz o mesmo bookkeeping que
+// `simulate` faz por iteração (fecha o round quando todas as unidades vivas agiram, marca
+// outcome quando a condição de vitória é atingida). Para antes da IA.
+//
+// **Por que virou função própria.** Até aqui isto era o corpo de `applyCommandAndAdvance`, e
+// "avançar" e "a IA joga" eram inseparáveis. A batalha viva no servidor precisa das duas
+// metades em momentos diferentes: o comando do jogador chega por uma rota e é respondido, e o
+// turno da IA é um passo com log próprio — que o servidor redige antes de mandar, porque os
+// scripts dela são ocultos (D47). Extrair, não reescrever: `applyCommandAndAdvance` abaixo é
+// esta função seguida de `resolveAiTurnsLogged`, exatamente como antes, e nenhuma regra muda.
+export function advanceWithoutAi(state: BattleState, command: BattleCommand): AdvanceWithoutAiResult {
   if (state.outcome !== 'ongoing') {
-    return { state, applied: false, reason: 'a batalha já terminou', aiSteps: [] };
+    return { state, applied: false, reason: 'a batalha já terminou' };
   }
 
   const outcome = applyCommand(state, command);
   if (!outcome.applied) {
-    return { state, applied: false, reason: outcome.reason, duelResult: outcome.duelResult, aiSteps: [] };
+    return { state, applied: false, reason: outcome.reason, duelResult: outcome.duelResult };
   }
 
   let nextState = outcome.state;
@@ -105,8 +106,25 @@ export function applyCommandAndAdvance(state: BattleState, command: BattleComman
     nextState = { ...nextState, outcome: winStatus };
   }
 
-  const ia = resolveAiTurnsLogged(nextState);
-  return { state: ia.state, applied: true, duelResult: outcome.duelResult, aiSteps: ia.steps };
+  return { state: nextState, applied: true, duelResult: outcome.duelResult };
+}
+
+export interface ApplyCommandAndAdvanceResult extends AdvanceWithoutAiResult {
+  // M16 4/N — o que a IA fez DEPOIS deste comando, na ordem em que fez. Sempre uma lista (vazia
+  // quando nenhuma unidade de IA agiu), nunca `undefined`: "a IA não jogou" e "ninguém me contou
+  // o que ela jogou" são coisas diferentes, e quem anima precisa distinguir as duas. Relato puro
+  // — o estado devolvido é o mesmo com ou sem ele.
+  readonly aiSteps: readonly AiTurnStep[];
+}
+
+// Avançar e deixar a IA jogar, numa chamada só. Serve `simulate` (lote, replay) e o torneio de
+// `tools/balance`, que jogam os dois lados com dados completos e não têm o que redigir.
+export function applyCommandAndAdvance(state: BattleState, command: BattleCommand): ApplyCommandAndAdvanceResult {
+  const avancado = advanceWithoutAi(state, command);
+  if (!avancado.applied) return { ...avancado, aiSteps: [] };
+
+  const ia = resolveAiTurnsLogged(avancado.state);
+  return { state: ia.state, applied: true, duelResult: avancado.duelResult, aiSteps: ia.steps };
 }
 
 // §01-fundacoes-tecnicas.md §3.3 — "O estado da batalha é derivado exclusivamente de

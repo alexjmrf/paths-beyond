@@ -1,0 +1,16 @@
+{
+  "id": "skill-furia-do-tirano",
+  "name": "Fúria do Tirano",
+  "kind": "reaction",
+  "apCost": 0,
+  "ppCost": 1,
+  "cooldown": 0,
+  "multiplier": 500,
+  "flat": 0,
+  "scalesWith": "atk",
+  "effects": [],
+  "trigger": "onDebuffed",
+  "tags": [
+    "physical"
+  ]
+}

@@ -4,10 +4,12 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { authPlugin } from './auth.js';
 import { registerRateLimit, type RateLimiter } from './battle/rateLimit.js';
 import { battleRoutes } from './battle/routes.js';
+import { matchRoutes } from './battle/matchRoutes.js';
 import { campaignRoutes } from './campaign/routes.js';
 import { rewardsRoutes } from './rewards/routes.js';
 import { preparationRoutes } from './economy/preparationRoutes.js';
 import { progressionRoutes } from './economy/progressionRoutes.js';
+import { artifactRoutes } from './economy/artifactRoutes.js';
 import { economyRoutes } from './economy/routes.js';
 import { matchmakingRoutes } from './matchmaking/routes.js';
 import type {
@@ -18,6 +20,7 @@ import type {
   EconomyRepository,
   HeroRepository,
   PlayerRepository,
+  MatchRepository,
   ReplayRepository,
   IdempotencyRepository,
   RewardsRepository,
@@ -54,6 +57,9 @@ export interface BuildAppDeps {
   // repositório, o comportamento é o de antes.
   idempotencyRepository?: IdempotencyRepository;
   replayRepository: ReplayRepository;
+  // M36 2/N (D47) — a BATALHA VIVA. Obrigatório, e não opcional como a telemetria: sem ele
+  // não há batalha nenhuma, porque `ticket → joga tudo → run` foi aposentado nesta milestone.
+  matchRepository: MatchRepository;
   seasonRepository: SeasonRepository;
   catalog: ContentCatalog;
   shopCatalog: ShopCatalog;
@@ -61,6 +67,10 @@ export interface BuildAppDeps {
   // §9.4 (M22, 3/N + auditoria) — o balde ESTREITO, só para as rotas que movem a moeda
   // comprável com dinheiro real. Ausente = um balde só para tudo, que é o que a suíte monta.
   expensiveRateLimiter?: RateLimiter;
+  // M36 4/N (D47) — o balde LARGO do comando de batalha. Com a batalha viva, cada comando é uma
+  // requisição, e uma partida passa facilmente das 60 do balde padrão: sem este, um jogador
+  // levaria 429 no meio da própria missão. Ausente = cai no padrão, que é o que a suíte monta.
+  commandRateLimiter?: RateLimiter;
   // §9.4 (M13, sub-sessão 2/N) — segredo do HMAC que deriva a seed de batalha do nonce
   // (ver battle/ticket.ts). Injetado, não lido de env aqui, pelo mesmo motivo de `now`:
   // teste precisa fixar.
@@ -169,6 +179,8 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
     registerRateLimit(protectedRoutes, {
       padrao: deps.rateLimiter,
       ...(deps.expensiveRateLimiter ? { caro: deps.expensiveRateLimiter } : {}),
+      // M36 4/N — o balde do comando de batalha. Ver `ROTAS_DE_COMANDO`.
+      ...(deps.commandRateLimiter ? { comando: deps.commandRateLimiter } : {}),
     });
 
     protectedRoutes.get('/me', async (request, reply) => {
@@ -213,6 +225,18 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       now: deps.now ?? (() => Date.now()),
     });
 
+    // M38 4/N (D53/D56) — o artefato jogável: equipar, desequipar, despertar e imprint.
+    // Mesmas opções de `progressionRoutes`, e pelo mesmo motivo de estar ao lado dele.
+    await protectedRoutes.register(artifactRoutes, {
+      repository: deps.repository,
+      heroRepository: deps.heroRepository,
+      economyRepository: deps.economyRepository,
+      ownershipRepository: deps.ownershipRepository,
+      catalog: deps.catalog,
+      ticketSecret: deps.ticketSecret,
+      now: deps.now ?? (() => Date.now()),
+    });
+
     // §6.3/§8.2 (M18, 7/N) — script tático e talentos. Mesmas opções de
     // `progressionRoutes` (o tipo é um só desde M14 4/N), e ao lado dele de propósito: as
     // duas famílias são "o que o jogador faz com um herói fora da batalha".
@@ -243,6 +267,25 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       ownershipRepository: deps.ownershipRepository,
       rewardsRepository: deps.rewardsRepository,
       partyPresetRepository: deps.partyPresetRepository,
+      telemetria,
+      catalog: deps.catalog,
+      ticketSecret: deps.ticketSecret,
+      now,
+      ...(deps.newNonce ? { newNonce: deps.newNonce } : {}),
+    });
+
+    // M36 2/N (D47) — a batalha viva, para as TRÊS superfícies. Registrada depois da campanha e
+    // da economia porque reusa as montagens delas; o Fastify não se importa com a ordem.
+    await protectedRoutes.register(matchRoutes, {
+      repository: deps.repository,
+      heroRepository: deps.heroRepository,
+      arenaDefenseRepository: deps.arenaDefenseRepository,
+      ownershipRepository: deps.ownershipRepository,
+      economyRepository: deps.economyRepository,
+      rewardsRepository: deps.rewardsRepository,
+      partyPresetRepository: deps.partyPresetRepository,
+      replayRepository: deps.replayRepository,
+      matchRepository: deps.matchRepository,
       telemetria,
       catalog: deps.catalog,
       ticketSecret: deps.ticketSecret,

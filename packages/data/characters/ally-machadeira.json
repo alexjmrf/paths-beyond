@@ -1,0 +1,32 @@
+{
+  "id": "ally-machadeira",
+  "name": "Halla",
+  "classId": "class-guerreiro",
+  "acquisition": "summon",
+  "rank": "adventurer",
+  "fragmentMaterialId": "material-fragmento-ally-machadeira",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "axe",
+    "equipment": {
+      "weapon": "item-arma-guerreiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-guerreiro",
+      "skill-especial-guerreiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-guerreiro",
+        "conditions": []
+      }
+    ]
+  }
+}

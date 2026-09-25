@@ -1,4 +1,7 @@
+import type { BannerEntry, GenericBanner, RotatingArtifactBanner, RotatingCharacterBanner } from '@paths-beyond/gacha';
 import type {
+  ArtifactDef,
+  BaseRank,
   ClassDef,
   ColumnTalentTree,
   EnemyDef,
@@ -44,6 +47,8 @@ export interface CompUnitContent {
   readonly pos: Coord;
   readonly height: 0 | 1 | 2 | 3;
   readonly aiArchetype: MapAiArchetype;
+  // M38 5/N — o artefato que a unidade leva na medição com artefato. Ver `comps.schema.ts`.
+  readonly artifactId?: Id;
 }
 
 export interface Composition {
@@ -152,6 +157,9 @@ export interface CharacterContent {
   // D14 (M18) — `story` é o núcleo garantido a todo jogador (é contra ele que a campanha é
   // afinada); `summon` é adquirível por banner.
   readonly acquisition: 'story' | 'summon';
+  // M37 (§10) — o rank de BASE. `legend` não entra: o topo não é invocável, e o rank CORRENTE
+  // é função do awakening (`rankCorrente`, em `packages/core`), não um campo de catálogo.
+  readonly rank: BaseRank;
   readonly fragmentMaterialId: Id;
   // §10/D14 (M18, 6/N) — com o que o jogador RECEBE este personagem, no núcleo de uma conta
   // nova ou saindo do banner. É um subconjunto de `Hero` de propósito: o que ela não
@@ -169,21 +177,31 @@ export interface StartingHeroContent {
 }
 
 // §10 (M18, 2/N) — o BANNER. Espelho de `packages/data/schemas/banners.schema.ts`.
-// Estruturalmente compatível com o `BannerDef` de `packages/gacha`, e é assim de propósito:
-// o catálogo entrega o banner direto à rolagem, sem uma camada de conversão que pudesse
-// divergir. O teste de conformidade em `tests/banner.test.ts` é quem trava isso.
-export interface BannerEntryContent {
-  readonly characterId: Id;
-  readonly weight: number;
-  readonly fragmentMaterialId: Id;
+//
+// M38 3/N (D54/D55) — desde os três tipos, o banner do catálogo É o `BannerDef` de
+// `packages/gacha` mais o que só a tela e o servidor leem (nome e janela). Definido A PARTIR do
+// tipo do motor, e não espelhado à mão: o catálogo entrega o banner direto à rolagem, e uma
+// segunda declaração seria uma segunda chance de divergir.
+//
+// O `rank` das entradas e o `token` do rotativo de personagem são DERIVADOS em `buildCatalog`
+// (do elenco e do catálogo de artefatos); o JSON não os declara.
+export type BannerEntryContent = BannerEntry;
+
+interface BannerTela {
+  readonly name: string;
 }
 
-export interface BannerContent {
-  readonly id: Id;
-  readonly name: string;
-  readonly pityThreshold: number;
-  readonly pool: readonly BannerEntryContent[];
+// D54 — o rotativo "fica ativo por um tempo e depois sai". ISO 8601; quem compara com o
+// relógio é o servidor.
+interface JanelaDoRotativo {
+  readonly activeFrom: string;
+  readonly activeUntil: string;
 }
+
+export type RotatingCharacterBannerContent = RotatingCharacterBanner & BannerTela & JanelaDoRotativo;
+export type RotatingArtifactBannerContent = RotatingArtifactBanner & BannerTela & JanelaDoRotativo;
+export type GenericBannerContent = GenericBanner & BannerTela;
+export type BannerContent = RotatingCharacterBannerContent | RotatingArtifactBannerContent | GenericBannerContent;
 
 // §10/D17 (M18) — os números da moeda PREMIUM. Moram aqui, e NÃO em `EconomyRules` do
 // core, e isso é a §15 sendo levada a sério no tipo e não só no diretório: pôr o custo de
@@ -196,7 +214,8 @@ export interface BannerContent {
 export interface PremiumRules {
   readonly summon: {
     readonly premiumCost: number;
-    readonly pityThreshold: number;
+    // D50 (M37) — dois andares, um por rank.
+    readonly pityThresholds: Readonly<Record<BaseRank, number>>;
   };
   readonly energyPurchase: {
     readonly premiumCost: number;
@@ -297,6 +316,9 @@ export interface ContentCatalog {
   readonly dungeons: Readonly<Record<Id, DungeonDef>>;
   readonly dungeonEncounters: Readonly<Record<Id, DungeonEncounter>>;
   readonly materials: Readonly<Record<Id, MaterialDef>>;
+  // M38 2/N (D53/D54) — os artefatos, um por personagem, indexados por id. Chegam aqui já
+  // conferidos contra o elenco e as skills (`buildCatalog`).
+  readonly artifacts: Readonly<Record<Id, ArtifactDef>>;
   // §10 (M18, 2/N) — os banners de invocação. Obrigatórios pela mesma razão que o elenco:
   // catálogo sem banner não é "este jogo não tem aquisição", é uma rota de summon que não
   // resolve.

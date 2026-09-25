@@ -1,0 +1,149 @@
+{
+  "id": "comp-piqueiro",
+  "name": "Piqueiro",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-piqueiro-1",
+        "characterId": "ally-piqueiro",
+        "classId": "class-lanceiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-pell-haste-travada": 3,
+          "talent-pell-folego": 2,
+          "talent-pell-mao-estendida": 1,
+          "talent-pell-muralha-de-hastes": 2,
+          "talent-pell-formacao": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-lanceiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-lanceiro",
+          "skill-especial-lanceiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-lanceiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lanca-muralha"
+    },
+    {
+      "hero": {
+        "id": "heroi-piqueiro-2",
+        "characterId": "ally-mensageira",
+        "classId": "class-druida",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-wren-raizes-profundas": 3,
+          "talent-wren-seiva": 2,
+          "talent-wren-mao-estendida": 1,
+          "talent-wren-abrigo": 2,
+          "talent-wren-maestria-do-bosque": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-druida",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "nature",
+        "duelSkills": [
+          "skill-ataque-druida",
+          "skill-especial-druida"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-druida",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-semente-de-wren"
+    },
+    {
+      "hero": {
+        "id": "heroi-piqueiro-3",
+        "characterId": "ally-couracado",
+        "classId": "class-couracado",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-bardan-aco-pesado": 1,
+          "talent-bardan-respiro-sob-o-elmo": 1,
+          "talent-bardan-mao-estendida": 1,
+          "talent-bardan-guarda-firmada": 1,
+          "talent-bardan-couraca-viva": 1,
+          "talent-bardan-alcance-de-apoio": 1,
+          "talent-bardan-contra-simples": 1,
+          "talent-bardan-resistencia": 1,
+          "talent-bardan-maestria-da-muralha": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-couracado",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-couracado",
+          "skill-especial-couracado",
+          "skill-ultimo-suspiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-couracado",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-egide-de-bardan"
+    }
+  ]
+}

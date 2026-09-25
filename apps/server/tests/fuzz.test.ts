@@ -10,6 +10,7 @@ import {
   createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -128,6 +129,7 @@ const catalog: ContentCatalog = {
   dungeons: {},
   dungeonEncounters: {},
   materials: {},
+  artifacts: {},
   economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
   substatWeights: [],
   mainstatWeights: [],
@@ -136,7 +138,7 @@ const catalog: ContentCatalog = {
   // aqui é o que o tipo obrigatório de `ContentCatalog` cobra (esquecer vira erro de tipo).
   banners: {},
   premiumRules: {
-    summon: { premiumCost: 500, pityThreshold: 10 },
+    summon: { premiumCost: 500, pityThresholds: { adventurer: 10, hero: 90 } },
     energyPurchase: { premiumCost: 100, energy: 60 },
     premiumRewards: { missionFirstClear: 60, chapterFirstClear: 600, dungeonFirstClear: 200 },
   },
@@ -190,6 +192,7 @@ function buildFuzzApp() {
     arenaDefenseRepository,
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     catalog,
     shopCatalog: {},
@@ -237,15 +240,43 @@ describe('fuzz: servidor vs. core local em 1000 partidas (critério de aceite ra
           : { t: 'wait' as const, unitId: heroId };
       });
 
-      const nonce = `fuzz-${i}`;
-      const response = await app.inject({
+      // M36 2/N — a batalha é VIVA: abre, manda comando a comando e fecha. O `nonce` agora é
+      // do servidor (ele é a partida), e vem da abertura.
+      const abertura = await app.inject({
         method: 'POST',
-        url: '/battles',
-        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
-        payload: { attackerHeroIds, defenderPlayerId: defender.playerId, commands, rulesVersion: RULES_VERSION, nonce },
+        url: '/arena/matches',
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}` },
+        payload: { attackerHeroIds, defenderPlayerId: defender.playerId, rulesVersion: RULES_VERSION },
       });
-      expect(response.statusCode).toBe(200);
-      const serverBody = response.json();
+      expect(abertura.statusCode, abertura.body).toBe(201);
+      const nonce = abertura.json().nonce as string;
+      let terminou = abertura.json().outcome !== 'ongoing';
+
+      for (const command of commands) {
+        if (terminou) break;
+        const r = await app.inject({
+          method: 'POST',
+          url: `/matches/${nonce}/commands`,
+          headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}` },
+          payload: { command },
+        });
+        // O fuzz gera comandos que o motor recusa (engajar fora de alcance, por exemplo), e
+        // isso é parte do que ele existe para exercitar: o servidor recusa e NÃO grava o
+        // comando — a receita do replay só tem o que de fato foi aplicado.
+        if (r.statusCode === 200) terminou = r.json().outcome !== 'ongoing';
+        else expect([400, 403]).toContain(r.statusCode);
+      }
+
+      // Quem não terminou, desiste: é o que fecha a linha e grava o registro. Uma batalha
+      // abandonada também é uma batalha que aconteceu.
+      if (!terminou) {
+        const desistencia = await app.inject({
+          method: 'POST',
+          url: `/matches/${nonce}/forfeit`,
+          headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}` },
+        });
+        expect(desistencia.statusCode).toBe(200);
+      }
 
       const replayResponse = await app.inject({
         method: 'GET',
@@ -255,12 +286,15 @@ describe('fuzz: servidor vs. core local em 1000 partidas (critério de aceite ra
       expect(replayResponse.statusCode).toBe(200);
       const replay = replayResponse.json();
 
-      // "o cliente" — em vez de reimplementar a simulação, roda o MESMO simulate() do
-      // core com exatamente o que o servidor persistiu (initialState+seed+commands).
-      // É precisamente essa reprodutibilidade que a arquitetura promete (§9.1): cliente
-      // e servidor sempre concordam porque os dois usam o mesmo pacote sobre a mesma
-      // entrada — a garantia real é que NADA além de initialState+seed+commands afeta o
-      // resultado, o que este loop testa sob 1000 combinações de time/alvo/comando.
+      // Em vez de reimplementar a simulação, roda o MESMO simulate() do core com exatamente o
+      // que o servidor persistiu (initialState+seed+commands). É precisamente essa
+      // reprodutibilidade que a arquitetura promete (§9.1) — a garantia real é que NADA além de
+      // initialState+seed+commands afeta o resultado, o que este laço testa sob 1000
+      // combinações de time/alvo/comando.
+      //
+      // M36 2/N — e isto agora é DIRETAMENTE o critério de aceite "o replay de uma batalha viva
+      // reproduz o mesmo resultado que a batalha produziu", mil vezes: o servidor construiu o
+      // resultado comando a comando, e aqui ele é reconstruído em lote.
       const localReplay: Replay = {
         rulesVersion: replay.rulesVersion,
         seed: replay.seed,
@@ -269,14 +303,14 @@ describe('fuzz: servidor vs. core local em 1000 partidas (critério de aceite ra
       };
       const localResult = simulate(localReplay);
 
-      expect(JSON.stringify(localResult)).toBe(JSON.stringify(serverBody.result));
+      expect(JSON.stringify(localResult)).toBe(JSON.stringify(replay.result));
     }
     // Timeout explícito: isolado este teste roda em ~2s, mas ele simula 1000 batalhas
     // completas e a suíte inteira roda em paralelo — sob contenção já vinha batendo em
     // ~4,6s contra o default de 5s do Vitest, e estourou de vez quando M10 sub-sessão 4/N
     // acrescentou um teste que carrega o catálogo real do disco. O limite generoso abaixo
     // é sobre agendamento, não sobre o que o teste verifica.
-  }, 30_000);
+  }, 120_000);
 });
 
 describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério de aceite raiz de M7)', () => {
@@ -288,7 +322,6 @@ describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério 
       defenderPlayerId: defenderConfigs[0]!.playerId,
       commands: [{ t: 'wait', unitId: attackerRoster[0]!.id }],
       rulesVersion: RULES_VERSION,
-      nonce: 'fuzz-anti-cheat-1',
       // Nenhum destes campos existe no contrato da rota — um cliente malicioso tentando
       // inflar os próprios stats ou forjar o resultado.
       stats: { hp: 999999999, atk: 999999999 },
@@ -296,17 +329,26 @@ describe('anti-cheat: manipulação de stats no cliente é rejeitada (critério 
       attackerHeroes: [{ id: attackerRoster[0]!.id, stats: { hp: 999999999 } }],
     };
 
-    const response = await app.inject({
+    const abertura = await app.inject({
       method: 'POST',
-      url: '/battles',
+      url: '/arena/matches',
       headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
       payload: forgedPayload,
     });
-    expect(response.statusCode).toBe(200);
+    expect(abertura.statusCode, abertura.body).toBe(201);
+    const nonce = abertura.json().nonce as string;
+
+    if (abertura.json().outcome === 'ongoing') {
+      await app.inject({
+        method: 'POST',
+        url: `/matches/${nonce}/forfeit`,
+        headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
+      });
+    }
 
     const replayResponse = await app.inject({
       method: 'GET',
-      url: '/battles/fuzz-anti-cheat-1',
+      url: `/battles/${nonce}`,
       headers: { 'x-platform-ticket': `dev:${ATTACKER_TOKEN}`},
     });
     const replay = replayResponse.json();

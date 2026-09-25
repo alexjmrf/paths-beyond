@@ -10,6 +10,10 @@ export interface ReactionLine {
   readonly enabled: boolean;
   readonly skillId: Id;
   readonly conditions: readonly Condition[];
+  // M38 5/N (D57) — a linha é de uma reação CONCEDIDA (talento ou artefato), e não da
+  // baseline. Quem marca é `resolveHeroCombatProfile`. Uma concedida `onDamaged` com PP
+  // RESERVA a troca: a baseline `onAttacked` não dispara nela (ver `resolveDuel`).
+  readonly granted?: boolean;
 }
 
 // §6.9 — payload de um efeito (o que ele FAZ). ActiveEffect (abaixo) é só o estado da

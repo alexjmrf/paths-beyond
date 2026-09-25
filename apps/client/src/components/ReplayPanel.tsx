@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { catalog } from '../data/catalog.js';
 import { nomeDeUnidade, nomeDoDesfecho } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { hpMaximo } from '../data/api.js';
 
 // §11 — "Replay: reprodução passo a passo com controle de velocidade a partir do
 // `Replay`." Critério de aceite de M13: o replay reproduzido tem que BATER com o
@@ -56,21 +57,23 @@ export function ReplayPanel() {
 
   if (!viewer) return null;
 
-  const total = viewer.replay.commands.length;
-  const current = viewer.replay.commands[step - 1];
-  const next = viewer.replay.commands[step];
+  // M36 4/N (D47) — os passos vêm do LOG do servidor, já redigidos, e não de um `Replay`
+  // reexecutado aqui. Cada passo traz o comando que aconteceu — do jogador ou da IA — e o estado
+  // de antes dele.
+  const total = viewer.log.passos.length;
+  const current = viewer.log.passos[step - 1]?.command;
+  const next = viewer.log.passos[step]?.command;
   const state = viewer.state;
 
   return (
     <div className="replay-overlay">
       <section className="replay-panel">
         <h2>{t('replay.titulo')}</h2>
+        {/* M36 4/N (D47) — a SEED não atravessa mais a rede: ela é do servidor e de mais
+            ninguém. O cabeçalho continua dizendo de QUE batalha é o replay, pelo nonce — que é
+            a identidade da partida —, e a frase de idioma acompanhou. */}
         <p className="replay-meta">
-          {t('replay.cabecalho', {
-            versao: viewer.replay.rulesVersion,
-            seed: viewer.replay.seed,
-            comandos: total,
-          })}
+          {t('replay.cabecalho', { versao: viewer.log.rulesVersion, partida: viewer.log.nonce, comandos: total })}
         </p>
 
         <p className="replay-step">
@@ -99,7 +102,7 @@ export function ReplayPanel() {
               <tr key={unit.unitId} className={unit.hp <= 0 ? 'dead' : unit.side}>
                 <td>{nomeDeUnidade(t, unit.unitId, heroesByUnitId, artIdByUnitId, catalog)}</td>
                 <td>
-                  {unit.hp}/{unit.stats.hp}
+                  {unit.hp}/{hpMaximo(unit)}
                 </td>
                 <td>{unit.ap}</td>
                 <td>{unit.pp}</td>

@@ -1,5 +1,4 @@
 import { CampaignTransitionOverlay } from './components/CampaignTransitionOverlay.js';
-import { DuelPreviewPanel } from './components/DuelPreviewPanel.js';
 import { DungeonPanel } from './components/DungeonPanel.js';
 import { EntradaPanel } from './components/EntradaPanel.js';
 import { InitiativePanel } from './components/InitiativePanel.js';
@@ -143,7 +142,6 @@ export function App() {
           </div>
         </main>
       )}
-      <DuelPreviewPanel />
       <TacticsEditor />
       <InventoryPanel />
       <TalentTreePanel />

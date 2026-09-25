@@ -28,6 +28,8 @@ function baseInput(): ParsedContentFiles {
     classes: readAllJson(fixtureDir('classes', 'valid')),
     characters: readAllJson(fixtureDir('characters', 'valid')),
     banners: readAllJson(fixtureDir('banners', 'valid')),
+    // M38 2/N — sem fixture de artefato: o catálogo de teste não tem nenhum.
+    artifacts: [],
     achievements: readAllJson(fixtureDir('achievements', 'valid')),
     events: readAllJson(fixtureDir('events', 'valid')),
     characterTalentTrees: readAllJson(fixtureDir('character-talent-trees', 'valid')),

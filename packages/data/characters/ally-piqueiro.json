@@ -1,0 +1,32 @@
+{
+  "id": "ally-piqueiro",
+  "name": "Pell",
+  "classId": "class-lanceiro",
+  "acquisition": "summon",
+  "rank": "adventurer",
+  "fragmentMaterialId": "material-fragmento-ally-piqueiro",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "spear",
+    "equipment": {
+      "weapon": "item-arma-lanceiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-lanceiro",
+      "skill-especial-lanceiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-lanceiro",
+        "conditions": []
+      }
+    ]
+  }
+}

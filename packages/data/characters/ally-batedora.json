@@ -1,0 +1,32 @@
+{
+  "id": "ally-batedora",
+  "name": "Ilvi",
+  "classId": "class-arqueiro",
+  "acquisition": "summon",
+  "rank": "adventurer",
+  "fragmentMaterialId": "material-fragmento-ally-batedora",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "bow",
+    "equipment": {
+      "weapon": "item-arma-arqueiro",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-arqueiro",
+      "skill-especial-arqueiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-arqueiro",
+        "conditions": []
+      }
+    ]
+  }
+}

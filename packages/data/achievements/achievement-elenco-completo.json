@@ -1,11 +1,11 @@
 {
   "id": "achievement-elenco-completo",
   "name": "Elenco Completo",
-  "description": "Tenha os nove personagens.",
+  "description": "Tenha os 15 personagens.",
   "premium": 900,
   "platformId": "ACH_ELENCO_COMPLETO",
   "condition": {
     "kind": "charactersOwned",
-    "atLeast": 9
+    "atLeast": 15
   }
 }

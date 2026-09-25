@@ -28,19 +28,25 @@ const MISMATCH = {
 };
 
 describe('o cliente manda a versão de regras', () => {
-  it('a submissão de masmorra leva `rulesVersion`', async () => {
+  // M36 4/N (D47) — a versão vai na ABERTURA da partida, e não numa submissão: a checagem
+  // mudou de lugar junto com a batalha, e para melhor. Um cliente desatualizado é recusado
+  // ANTES de investir a missão inteira, em vez de depois.
+  it('abrir uma partida leva `rulesVersion`, nas três superfícies', async () => {
     const enviados: string[] = [];
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
       enviados.push(String(init.body));
       return { ok: true, status: 200, text: async () => '{}' } as unknown as Response;
     });
 
-    await api.submitDungeonRun('ticket', 'dungeon-1', { nonce: 'n1', heroIds: ['h1'], commands: [] });
+    await api.abrirPartidaDeCampanha('ticket', 'encounter-campanha-1', ['h1']);
+    await api.abrirPartidaDeMasmorra('ticket', 'dungeon-1', ['h1']);
+    await api.abrirPartidaDeArena('ticket', ['h1'], 'player-2');
 
-    expect(JSON.parse(enviados[0]!).rulesVersion).toBe(RULES_VERSION);
+    for (const corpo of enviados) expect(JSON.parse(corpo).rulesVersion).toBe(RULES_VERSION);
+    expect(enviados).toHaveLength(3);
   });
 
-  it('a varredura e o capítulo também levam', async () => {
+  it('a varredura também leva — ela continua sendo uma submissão', async () => {
     const enviados: string[] = [];
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
       enviados.push(String(init.body));
@@ -48,10 +54,8 @@ describe('o cliente manda a versão de regras', () => {
     });
 
     await api.sweepDungeon('ticket', 'dungeon-1', ['h1']);
-    await api.submitCampaignRun('ticket', 'encounter-campanha-1', { nonce: 'n2', heroIds: ['h1'], commands: [] });
 
     expect(JSON.parse(enviados[0]!).rulesVersion).toBe(RULES_VERSION);
-    expect(JSON.parse(enviados[1]!).rulesVersion).toBe(RULES_VERSION);
   });
 });
 
@@ -74,7 +78,7 @@ describe('o cliente reconhece a recusa por versão', () => {
     const cancelar = onRulesVersionMismatch((m) => vistos.push(m));
 
     await api.rewards('ticket').catch(() => undefined);
-    await api.submitCampaignRun('t', 'c', { nonce: 'n', heroIds: [], commands: [] }).catch(() => undefined);
+    await api.abrirPartidaDeCampanha('t', 'c', ['h1']).catch(() => undefined);
 
     expect(vistos).toHaveLength(2);
     expect(vistos[0]).toMatchObject({ expected: '0.19.0', received: '0.18.0', reason: 'different' });

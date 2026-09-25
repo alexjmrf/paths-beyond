@@ -1,0 +1,33 @@
+{
+  "id": "ally-sentinela",
+  "name": "Torv",
+  "classId": "class-couracado",
+  "acquisition": "summon",
+  "rank": "adventurer",
+  "fragmentMaterialId": "material-fragmento-ally-sentinela",
+  "startingHero": {
+    "level": 10,
+    "weaponType": "axe",
+    "equipment": {
+      "weapon": "item-arma-couracado",
+      "helmet": null,
+      "armor": null,
+      "necklace": "item-colar-forca",
+      "ring": null,
+      "boots": null
+    },
+    "duelSkills": [
+      "skill-ataque-couracado",
+      "skill-especial-couracado",
+      "skill-ultimo-suspiro"
+    ],
+    "mapSkills": [],
+    "tacticsScript": [
+      {
+        "enabled": true,
+        "skillId": "skill-especial-couracado",
+        "conditions": []
+      }
+    ]
+  }
+}

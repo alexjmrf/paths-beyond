@@ -1,0 +1,186 @@
+{
+  "characterId": "ally-piqueiro",
+  "depth": 5,
+  "nodes": [
+    {
+      "id": "talent-pell-ponta-baixa",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -25
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-haste-travada",
+      "column": "b",
+      "row": 1,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 10
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-estocada",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-lanceiro",
+          "patch": {
+            "multiplier": 1200
+          }
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-leitura-do-campo",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-folego",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-perfurar",
+      "column": "a",
+      "row": 3,
+      "maxRank": 3,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "pen",
+          "flat": 40
+        },
+        {
+          "t": "apRefund",
+          "on": "kill",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-avanco",
+      "column": "a",
+      "row": 4,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-segundo-folego",
+      "column": "middle",
+      "row": 4,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-muralha-de-hastes",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 5
+        },
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-maestria-da-pica",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-lanceiro-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-pell-formacao",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-lanceiro",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@
   "name": "Kaia",
   "classId": "class-grifeiro",
   "acquisition": "summon",
+  "rank": "adventurer",
   "fragmentMaterialId": "material-fragmento-ally-grifeiro",
   "startingHero": {
     "level": 10,

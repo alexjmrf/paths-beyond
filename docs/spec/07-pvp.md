@@ -7,7 +7,7 @@ Nada pode precisar ser reescrito para ligar o PvP: núcleo determinístico, coma
 
 - O defensor monta um time de até 5 heróis, posiciona-os em um mapa simétrico pequeno (**9×11**), define o `tacticsScript` de cada um e uma **IA de mapa declarativa** por herói: `aggressive | hold-position | guard-tile | flank | support-nearest`.
 - O atacante joga a camada de grid manualmente contra essa defesa. Todos os duelos resolvem automaticamente pelos scripts dos dois lados.
-- Servidor executa `simulate()` com o **mesmo pacote `core`**; o cliente simula só para animar. Divergência = bug crítico.
+- **O servidor resolve; o cliente reproduz o log.** Cada comando é uma rota, o servidor aplica com o pacote `core` e devolve o que aconteceu já redigido — o cliente não simula nada que envolva o inimigo. Divergência não é mais possível por construção: não há um segundo cálculo para divergir.
 - ELO, temporadas de 14 dias.
 
 ### 9.2 Modo 2 — Coliseu (totalmente automático)

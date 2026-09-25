@@ -1,0 +1,149 @@
+{
+  "id": "comp-machadeira",
+  "name": "Machadeira",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-machadeira-1",
+        "characterId": "ally-machadeira",
+        "classId": "class-guerreiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-halla-pe-firme": 2,
+          "talent-halla-folego": 2,
+          "talent-halla-mao-estendida": 1,
+          "talent-halla-resistencia": 2,
+          "talent-halla-cobertura": 1,
+          "talent-halla-investida-dupla": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-machado-do-tirano"
+    },
+    {
+      "hero": {
+        "id": "heroi-machadeira-2",
+        "characterId": "ally-arcanista",
+        "classId": "class-arcanista",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-vesper-manto-arcano": 2,
+          "talent-vesper-reserva-de-mana": 2,
+          "talent-vesper-mao-estendida": 1,
+          "talent-vesper-circulo-de-apoio": 2,
+          "talent-vesper-condutor": 1,
+          "talent-vesper-tecer-o-campo": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arcanista",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "arcane",
+        "duelSkills": [
+          "skill-ataque-arcanista",
+          "skill-especial-arcanista"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arcanista",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-foco-de-vesper"
+    },
+    {
+      "hero": {
+        "id": "heroi-machadeira-3",
+        "characterId": "ally-lanceiro",
+        "classId": "class-lanceiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-nyra-pe-firme": 1,
+          "talent-nyra-folego-da-formacao": 1,
+          "talent-nyra-mao-estendida": 1,
+          "talent-nyra-alcance-de-apoio": 1,
+          "talent-nyra-escudo-companheiro": 2,
+          "talent-nyra-contra-simples": 1,
+          "talent-nyra-ordem-de-linha": 1,
+          "talent-nyra-comando-de-formacao": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-lanceiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-lanceiro",
+          "skill-especial-lanceiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-lanceiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lanca-muralha"
+    }
+  ]
+}

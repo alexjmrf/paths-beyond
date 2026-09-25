@@ -3,6 +3,7 @@
   "name": "Vesper",
   "classId": "class-arcanista",
   "acquisition": "story",
+  "rank": "adventurer",
   "fragmentMaterialId": "material-fragmento-ally-arcanista",
   "startingHero": {
     "level": 10,

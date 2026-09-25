@@ -1,6 +1,7 @@
-import { loadCatalogFromDisk, playFromSetup } from '@paths-beyond/content';
+import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { RULES_VERSION } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
+import { jogarPartidaViva, type EstadoVisivelDeTeste } from './partidaViva.js';
 import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
@@ -11,6 +12,7 @@ import {
   createMemoryHeroRepository,
   createMemoryPartyPresetRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -47,6 +49,7 @@ function harness() {
     partyPresetRepository: createMemoryPartyPresetRepository(),
     telemetryRepository,
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -108,42 +111,55 @@ function timeParaMissao(heroes: readonly { hero: { id: string; characterId: stri
     .map((vaga) => heroes.find((h) => h.hero.characterId === (vaga as { hero: { characterId: string } }).hero.characterId)!.hero.id);
 }
 
-async function pedirTicket(eu: ReturnType<typeof jogador>, heroIds: readonly string[]) {
-  const ticket = await eu.post(`/campaign/${MISSAO}/ticket`, { heroIds });
-  expect(ticket.status, JSON.stringify(ticket.body)).toBe(200);
-  return ticket.body as { nonce: string; seed: number; setup: unknown };
+// M36 2/N — o ticket virou a ABERTURA da partida viva, e a run virou o COMANDO que fecha a
+// batalha. A telemetria do M34 não perdeu nada: os dois instantes que ela mede continuam
+// existindo, com o mesmo nonce casando começo e fim. O que ela ganhou é que "abandonar" deixou
+// de ser um silêncio — agora há uma rota para desistir, e ela de propósito NÃO fecha a
+// tentativa: para o relatório, desistir continua sendo abandono.
+
+async function abrirPartida(eu: ReturnType<typeof jogador>, heroIds: readonly string[]) {
+  const abertura = await eu.post(`/campaign/${MISSAO}/matches`, { heroIds, rulesVersion: RULES_VERSION });
+  expect(abertura.status, JSON.stringify(abertura.body)).toBe(201);
+  return abertura.body as { nonce: string; visivel: EstadoVisivelDeTeste };
 }
 
-async function jogarAteOFim(eu: ReturnType<typeof jogador>, heroIds: readonly string[], ticket: { nonce: string; seed: number; setup: unknown }) {
-  const jogada = playFromSetup(ticket.setup as never, ticket.seed, MISSAO);
-  const run = await eu.post(`/campaign/${MISSAO}/run`, {
-    nonce: ticket.nonce,
-    heroIds,
-    commands: jogada.commandLog,
-    rulesVersion: RULES_VERSION,
-  });
-  expect(run.status, JSON.stringify(run.body)).toBe(200);
-  return run.body as { outcome: 'victory' | 'defeat'; roundsPlayed: number };
+async function desistir(eu: ReturnType<typeof jogador>, nonce: string) {
+  const r = await eu.post(`/matches/${nonce}/forfeit`, {});
+  expect(r.status, JSON.stringify(r.body)).toBe(200);
 }
 
-describe('a tentativa de missão: aberta no ticket, fechada na run', () => {
-  it('o ticket abre uma linha com quem, qual missão e quando; a run fecha com desfecho, rounds e quando', async () => {
+async function jogarAteOFim(
+  eu: ReturnType<typeof jogador>,
+  _heroIds: readonly string[],
+  partida: { nonce: string; visivel: EstadoVisivelDeTeste },
+) {
+  const enviar = async (rota: string, corpo: unknown) => {
+    const r = await eu.post(rota, corpo as Record<string, unknown>);
+    return { status: r.status, body: r.body as Record<string, unknown> };
+  };
+  const jogada = await jogarPartidaViva(enviar, partida.nonce, partida.visivel);
+  expect(jogada.outcome).not.toBe('ongoing');
+  return { outcome: jogada.outcome as 'victory' | 'defeat', roundsPlayed: jogada.roundsPlayed };
+}
+
+describe('a tentativa de missão: aberta ao entrar, fechada ao acabar', () => {
+  it('abrir a partida abre uma linha com quem, qual missão e quando; o fim fecha com desfecho, rounds e quando', async () => {
     const h = harness();
     const { eu, id, heroIds } = await contaNova(h.app, 'ana');
 
-    const ticket = await pedirTicket(eu, heroIds);
+    const partida = await abrirPartida(eu, heroIds);
     expect(await h.telemetryRepository.listAttemptsByPlayer(id)).toEqual([
-      { playerId: id, missionId: MISSAO, nonce: ticket.nonce, issuedAt: T0, finishedAt: null, outcome: null, rounds: null },
+      { playerId: id, missionId: MISSAO, nonce: partida.nonce, issuedAt: T0, finishedAt: null, outcome: null, rounds: null },
     ]);
 
     h.avancar(90_000);
-    const run = await jogarAteOFim(eu, heroIds, ticket);
+    const run = await jogarAteOFim(eu, heroIds, partida);
 
     expect(await h.telemetryRepository.listAttemptsByPlayer(id)).toEqual([
       {
         playerId: id,
         missionId: MISSAO,
-        nonce: ticket.nonce,
+        nonce: partida.nonce,
         issuedAt: T0,
         finishedAt: T0 + 90_000,
         outcome: run.outcome,
@@ -152,13 +168,16 @@ describe('a tentativa de missão: aberta no ticket, fechada na run', () => {
     ]);
   });
 
-  it('um ticket sem run é um abandono: a linha fica aberta, e a tentativa seguinte é outra linha', async () => {
+  it('desistir é um abandono: a linha fica aberta, e a tentativa seguinte é outra linha', async () => {
+    // M36 2/N — abandonar deixou de ser um silêncio e virou uma rota. Ela fecha a PARTIDA e não
+    // fecha a TENTATIVA, de propósito: é assim que "onde o jogador para" continua medível.
     const h = harness();
     const { eu, id, heroIds } = await contaNova(h.app, 'bia');
 
-    await pedirTicket(eu, heroIds);
+    const abandonada = await abrirPartida(eu, heroIds);
+    await desistir(eu, abandonada.nonce);
     h.avancar(10_000);
-    const segundo = await pedirTicket(eu, heroIds);
+    const segundo = await abrirPartida(eu, heroIds);
     await jogarAteOFim(eu, heroIds, segundo);
 
     const linhas = await h.telemetryRepository.listAttemptsByPlayer(id);
@@ -167,15 +186,15 @@ describe('a tentativa de missão: aberta no ticket, fechada na run', () => {
     expect(linhas[1]!.finishedAt).not.toBeNull();
   });
 
-  it('a run de um nonce que a telemetria não conhece NÃO falha a run — medir nunca pode custar a partida', async () => {
+  it('o fim de um nonce que a telemetria não conhece NÃO falha a batalha — medir nunca pode custar a partida', async () => {
     const h = harness();
     const { eu, heroIds } = await contaNova(h.app, 'caio');
 
-    const ticket = await pedirTicket(eu, heroIds);
+    const partida = await abrirPartida(eu, heroIds);
     // Some com a linha por fora (é o que acontece com uma linha gravada antes de o jogador
     // recusar, ou com um banco restaurado de um backup mais velho).
     await h.telemetryRepository.deletePlayerData((await eu.get('/me')).body.id);
-    const run = await jogarAteOFim(eu, heroIds, ticket);
+    const run = await jogarAteOFim(eu, heroIds, partida);
     expect(['victory', 'defeat']).toContain(run.outcome);
   });
 });
@@ -217,7 +236,7 @@ describe('GET/PUT /me/telemetry — a declaração e a recusa', () => {
 
     h.avancar(1_000);
     await eu.post('/accounts/session');
-    const ticket = await pedirTicket(eu, heroIds);
+    const ticket = await abrirPartida(eu, heroIds);
     await jogarAteOFim(eu, heroIds, ticket);
 
     expect(await h.telemetryRepository.listAttemptsByPlayer(id)).toEqual([]);
@@ -228,7 +247,7 @@ describe('GET/PUT /me/telemetry — a declaração e a recusa', () => {
   it('recusar APAGA o que já tinha sido coletado — recusar não é só parar', async () => {
     const h = harness();
     const { eu, id, heroIds } = await contaNova(h.app, 'gil');
-    await jogarAteOFim(eu, heroIds, await pedirTicket(eu, heroIds));
+    await jogarAteOFim(eu, heroIds, await abrirPartida(eu, heroIds));
     expect(await h.telemetryRepository.listAttemptsByPlayer(id)).toHaveLength(1);
 
     await eu.put('/me/telemetry', { optOut: true });
@@ -242,7 +261,7 @@ describe('GET/PUT /me/telemetry — a declaração e a recusa', () => {
     await eu.put('/me/telemetry', { optOut: true });
     await eu.put('/me/telemetry', { optOut: false });
 
-    await pedirTicket(eu, heroIds);
+    await abrirPartida(eu, heroIds);
     expect(await h.telemetryRepository.listAttemptsByPlayer(id)).toHaveLength(1);
   });
 
@@ -258,7 +277,7 @@ describe('a conta leva a telemetria junto (§9.4, M20)', () => {
   it('a exportação inclui as tentativas e a escolha', async () => {
     const h = harness();
     const { eu, id, heroIds } = await contaNova(h.app, 'joana');
-    await jogarAteOFim(eu, heroIds, await pedirTicket(eu, heroIds));
+    await jogarAteOFim(eu, heroIds, await abrirPartida(eu, heroIds));
 
     const exportado = await eu.get('/me/export');
     expect(exportado.status).toBe(200);
@@ -270,7 +289,7 @@ describe('a conta leva a telemetria junto (§9.4, M20)', () => {
   it('apagar a conta apaga a telemetria — senão a exclusão reprovaria por integridade no Postgres', async () => {
     const h = harness();
     const { eu, id, heroIds } = await contaNova(h.app, 'kai');
-    await pedirTicket(eu, heroIds);
+    await abrirPartida(eu, heroIds);
 
     expect((await eu.delete('/me')).body).toEqual({ deleted: true });
     expect(await h.telemetryRepository.listAttemptsByPlayer(id)).toEqual([]);
@@ -279,7 +298,7 @@ describe('a conta leva a telemetria junto (§9.4, M20)', () => {
 });
 
 describe('sem repositório de telemetria, o servidor é o de antes', () => {
-  it('ticket, run e sign-in funcionam sem gravar nada', async () => {
+  it('abrir, jogar e sign-in funcionam sem gravar nada', async () => {
     let nonce = 0;
     const app = buildApp({
       repository: createMemoryPlayerRepository([]),
@@ -287,6 +306,7 @@ describe('sem repositório de telemetria, o servidor é o de antes', () => {
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository: createMemoryEconomyRepository(),
       ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -300,7 +320,7 @@ describe('sem repositório de telemetria, o servidor é o de antes', () => {
       newNonce: () => `nonce-sem-telemetria-${(nonce += 1)}`,
     });
     const { eu, heroIds } = await contaNova(app, 'lia');
-    const run = await jogarAteOFim(eu, heroIds, await pedirTicket(eu, heroIds));
+    const run = await jogarAteOFim(eu, heroIds, await abrirPartida(eu, heroIds));
     expect(['victory', 'defeat']).toContain(run.outcome);
     expect((await eu.get('/me/telemetry')).status).toBe(404);
   });

@@ -1,0 +1,16 @@
+{
+  "id": "skill-bencao-do-relicario",
+  "name": "Bênção do Relicário",
+  "kind": "reaction",
+  "apCost": 0,
+  "ppCost": 1,
+  "cooldown": 0,
+  "multiplier": 150,
+  "flat": 0,
+  "scalesWith": "atk",
+  "effects": [],
+  "trigger": "onDamaged",
+  "tags": [
+    "heal"
+  ]
+}

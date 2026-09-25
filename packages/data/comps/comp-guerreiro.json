@@ -9,7 +9,7 @@
         "classId": "class-guerreiro",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-rurik-estandarte": 2,
@@ -47,7 +47,8 @@
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-machado-do-tirano"
     },
     {
       "hero": {
@@ -56,7 +57,7 @@
         "classId": "class-arcanista",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-vesper-manto-arcano": 2,
@@ -93,7 +94,8 @@
         "y": 1
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-foco-de-vesper"
     },
     {
       "hero": {
@@ -102,7 +104,7 @@
         "classId": "class-lanceiro",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-nyra-pe-firme": 1,
@@ -141,7 +143,8 @@
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lanca-muralha"
     }
   ]
 }

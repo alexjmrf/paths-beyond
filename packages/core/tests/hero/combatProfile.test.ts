@@ -383,7 +383,10 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     expect(profile.knownSkills['skill-inexistente']).toBeUndefined();
   });
 
-  it('reactionScript = baseline (habilitada, sem condições) + reações concedidas por talento, ignorando ids ausentes do catálogo', () => {
+  // M38 5/N (D57) — as reações CONCEDIDAS (talento, artefato) vêm ANTES das baseline. O duelo
+  // escolhe a primeira linha que bate (§6.3 literal); com a baseline na frente, uma reação
+  // concedida com o mesmo gatilho de `contra-atacar` nunca disparava.
+  it('reactionScript = reações concedidas por talento + baseline (habilitada, sem condições), ignorando ids ausentes do catálogo', () => {
     const profile = resolveHeroCombatProfile({
       hero: baseHero,
       classDef: meleeClass,
@@ -395,9 +398,10 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
       baselineReactionSkillIds,
     });
     expect(profile.reactionScript).toEqual([
+      // D57 — a concedida vem marcada: é o que a reserva da troca do duelo lê.
+      { enabled: true, skillId: 'react-escudo-reativo', conditions: [], granted: true },
       { enabled: true, skillId: 'react-counter', conditions: [] },
       { enabled: true, skillId: 'react-defend', conditions: [] },
-      { enabled: true, skillId: 'react-escudo-reativo', conditions: [] },
     ]);
   });
 
@@ -485,5 +489,16 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
     });
     expect(baseHero).toEqual(frozenHero);
     expect(meleeClass).toEqual(frozenClass);
+  });
+});
+
+// M38 5/N (D57) — a ordem das reações é regra: a mesma batalha dá outro resultado quando uma
+// reação concedida passa a disparar na frente da baseline.
+describe('RULES_VERSION — a ordem das reações (D57)', () => {
+  it('sobe para 0.23.0, e o cliente de 0.22.0 é recusado', async () => {
+    const { RULES_VERSION } = await import('../../src/rulesVersion.js');
+    const { checkRulesVersion } = await import('../../src/rulesVersionCompat.js');
+    expect(RULES_VERSION).toBe('0.23.0');
+    expect(checkRulesVersion('0.22.0')).not.toBeNull();
   });
 });

@@ -236,6 +236,12 @@ qualquer lançamento sempre-online.
 
 ## Em aberto (levantadas pelo usuário em 2026-09-10, ao desenhar o gacha final)
 
+> **⚠ FECHADAS em 2026-09-22 por D49 e D50, no começo do M37:** os quatro pontos do item 10 — o
+> pity `P` e os dois andares dele, a fonte do material de `Legend`, a curva do `Adventurer` e a
+> divisão do elenco. Os itens 7 (os números derivados da arma) e 9 (a Soul) continuam abertos, e
+> são do M38 e do M39. O texto abaixo fica como estava, porque é o raciocínio que as decisões
+> responderam.
+
 > **Nada aqui é trabalho das milestones já propostas (M28–M33), e nada aqui deve ser antecipado.**
 > Esta seção existe porque o usuário desenhou o gacha final da demo em diante, e **duas decisões já
 > travadas mudam de lado**. Registrado antes de virar código para que a reversão seja lida como
@@ -8432,3 +8438,692 @@ Brasil ao Railway em São Paulo). Aceitável para turno; sempre-online já é de
 *estimativa a partir do conhecido* (o seu lado + o que você já viu), nunca como cálculo do
 oculto — o teorema não muda.
 
+## M36 — O inimigo desconhecido: a batalha viva no servidor
+
+### D48 — as quatro leituras que D47 não alcançou, e o catálogo partido (2026-09-18)
+
+D47 decidiu o QUÊ; a implementação encontrou quatro perguntas que a decisão não respondia, e
+todas mudavam a forma do que atravessa a rede. As quatro foram levadas ao usuário antes de
+qualquer linha de código.
+
+**1. O catálogo de inimigos de PvE estava dentro do bundle do cliente — e isso torna o esconder
+teatro.** `apps/client/src/data/loadCatalogFromBrowser.ts` empacota `packages/data` inteiro em
+build-time, e `encounters/`, `dungeon-encounters/` e `enemies/` descrevem, com nome e número,
+todo inimigo de PvE. Redigir no fio e distribuir no instalador é exatamente o argumento que o
+teorema de D47 usou para proibir a simulação no cliente: o dado está na máquina de quem joga, e
+dado que está na máquina se lê. No PvP o problema nunca existiu — heróis de outra conta nunca
+estiveram no bundle.
+
+> **Decisão do usuário: PARTIR o catálogo.** Os três diretórios viram só-servidor. O cliente
+> fica com o que precisa para desenhar e para ler o PRÓPRIO lado. Regra 4 continua valendo: os
+> arquivos não foram duplicados nem recortados — o que mudou é quem os lê.
+>
+> O que o cliente perdeu, e de onde passa a vir: a prévia da missão → `GET /campaign/:id/previa`
+> (redigida); a ordem de apresentação do elenco → `GET /campaign`, campo `castOrder`; o nome do
+> inimigo → a camada de idioma, pelo id de arte.
+
+**2. A barra de HP do inimigo.** O máximo é `stats.hp`, um stat, e sem ele não há barra.
+Decisão do usuário: **mostrar barra, número atual e máximo.** `hpMax` é a exceção declarada — o
+único stat que atravessa —, e `visaoDoInimigo.test.ts` existe para que "o único" continue
+verdade.
+
+**3. Efeitos ativos no inimigo.** Não estavam na lista de D47. Decisão do usuário: **visíveis.**
+
+**4. A arte do inimigo (`characterIdByUnitId`).** Decisão do usuário: **continua saindo.**
+Identidade não é build: saber que é um cavaleiro tal não diz o equipamento, os talentos, os
+artefatos nem o script dele — e sem ela toda peça do outro lado vira o mesmo glifo.
+
+#### O que a implementação decidiu dentro dessas quatro
+
+- **`unitType` atravessa; `weaponType` não.** É a régua de (4) aplicada ao `BattleUnit`:
+  `unitType` diz o que a peça É, e a arte já o mostra (um cavaleiro montado parece montado);
+  `weaponType` vem da arma EQUIPADA — que D47 nomeia — e §6.8 faz dela uma vantagem calculável.
+  De quebra, `unitType` é o que dá peso à animação: sem ele toda peça do outro lado cairia e
+  bateria como infantaria leve.
+- **O custo mudou de lugar: energia e entrada de masmorra são cobradas ao ABRIR a partida.** No
+  modelo antigo elas eram cobradas na submissão, e abandonar um ticket era grátis. Na batalha
+  viva não existe submissão — o desfecho acontece no comando que o produz. Sem mover a cobrança,
+  abandonar uma masmorra que está indo mal e abrir outra sairia de graça, e o custo viraria
+  opcional. O par disso é o índice único parcial de `matches` (uma partida em andamento por
+  jogador) e a rota de desistir, que fecha a partida **sem devolver o que foi pago**.
+- **Desistir é ABANDONO, não derrota.** `POST /matches/:nonce/forfeit` fecha a partida e não
+  chama `telemetria.missaoTerminada`: para o relatório do M34, "onde o jogador parou" continua
+  sendo tentativa aberta. Contá-la como derrota apagaria o sinal que o M34 existe para medir.
+- **O replay tem duas formas.** `GET /battles/:nonce` continua devolvendo o registro completo
+  (setup dos dois lados, seed, comandos) — é auditoria, e quem o abre é quem jogou, depois de a
+  batalha ter acabado. O que o CLIENTE usa é `GET /battles/:nonce/log`: os mesmos passos, já
+  redigidos. Se ele reproduzisse o replay localmente, teria de volta em memória todo o dado que
+  D47 tirou da batalha ao vivo, e o esconder valeria só enquanto a partida corre.
+- **Um terceiro balde de rate limit, e ele não é higiene.** O balde padrão é de 60 requisições
+  por minuto, calibrado quando uma batalha inteira era 2. Com a batalha viva cada comando é um
+  POST e uma partida passa de cinquenta: **um jogador jogando normalmente levaria 429 no meio da
+  própria missão**, com a partida aberta no servidor e ele trancado do lado de fora. O comando
+  ganhou o próprio balde (600/min) porque é a única rota que DEVE ser chamada dezenas de vezes
+  por minuto e a que menos pode fazer estrago sozinha — ela move economia uma vez só.
+
+#### O que a 2/N encontrou e ninguém tinha visto
+
+**A batalha pode nascer decidida.** O turno de IA que precede o primeiro comando é uma jogada de
+verdade: com a defesa adjacente, `hold-position` engaja, morre no contra-ataque e `rout` fecha a
+partida antes de o jogador tocar em nada. No modelo antigo isso passava despercebido —
+`simulate` ignorava os comandos e devolvia o desfecho do mesmo jeito, e a asserção "roda a
+batalha" de `battles.test.ts` ficava verde **sem o comando do jogador ter sido aplicado uma vez
+sequer**. Na batalha viva, sem tratar o caso, a partida ficaria para sempre `ongoing` no banco:
+nada a pagar, nada a cobrar, e o jogador travado. A abertura liquida quando o estado já nasce
+decidido, e há teste.
+
+#### O que saiu do jogo, e é bom deixar escrito
+
+- **O preview de duelo.** §11 o chamava de "o recurso mais importante do jogo". Ele rodava
+  `applyCommandAndAdvance` no cliente, com os dados dos dois lados na mão.
+- **A zona de ameaça.** Derivava de `moveType`, `moveRange` e `duelRange` do inimigo.
+- **`ticket → joga tudo → run`**, nas três superfícies, e as seis rotas que a implementavam.
+- **A submissão**, e com ela três das quatro rotas do "pedido em voo" do M22. O que elas
+  protegiam virou uma leitura: `GET /matches/current`. A varredura ficou, porque nela não há
+  cliente jogando.
+
+#### O que NÃO mudou
+
+`packages/core` não mudou de regra: `RULES_VERSION` continua em `0.19.0`. A 1/N partiu
+`applyCommandAndAdvance` em `advanceWithoutAi` + `resolveAiTurnsLogged` — extração pura, com
+teste provando igualdade campo a campo e por hash. `pnpm balance` roda o torneio com dados
+completos, como sempre.
+
+---
+
+## M37 — Os três ranks: Adventurer, Hero e Legend
+
+### D49 — os números de §10, fechados pelo usuário (2026-09-22)
+
+A seção **"Em aberto (levantadas pelo usuário em 2026-09-10, ao desenhar o gacha final)"** fecha
+o item 10 — *"o que precisa de decisão do usuário antes de qualquer código"* — com esta entrada.
+Nada aqui foi proposto pelo agente: os números são do usuário, pela regra 10, e estão registrados
+aqui porque a 1/N já os tinha levado a código sem registro.
+
+**1. Os dois limiares de rank, e o teto que não sobe.** `Adventurer` vira `Hero` em **awakening
+3** — a metade da curva — e qualquer um vira `Legend` em **6**, que é o `MAX_AWAKENING` que já
+existia desde o M14. O teto **não** sobe. Fecha o item 10.3.
+
+Isso responde a pergunta que §4 deixara aberta — *"a curva do Adventurer é a mesma com mais
+degraus, ou a mesma com mais material por degrau?"* — pela primeira alternativa: **a mesma curva,
+mais degraus percorridos.** Na curva autorada hoje, 0→3 custa 3.500 de ouro e 3→6 custa 28.000; o
+`Adventurer` paga os dois trechos e o `Hero` de base só o de cima. A diferença é de DEGRAUS, e os
+caros são os mesmos para os dois — que é precisamente "mais difícil de upgradar" sem nenhum
+número de poder separando os dois ranks.
+
+**2. As faixas de profundidade de árvore.** `Adventurer` = **5–6**, `Hero` = **7–9**, e as faixas
+não se tocam. É a leitura de §2 (*"kit mais simples, não mais fraco"*) levada ao dado: D9 travou o
+orçamento em 9 pontos para todo mundo e declarou que profundidade é troca de FORMA, não de poder.
+Com o elenco de hoje a divisão sai sozinha das árvores que já existem — Mensageira 5, Arcanista 6
+e Grifeiro 6 são `Adventurer`; Clérigo 7, Guerreiro 7, Arqueiro 8, Lanceiro 8, Couraçado 9 e o
+jogador 9 são `Hero`.
+
+**3. A razão do elenco: de 1,5 a 2 `Adventurer` para cada `Hero`, sobre o elenco INTEIRO.** Fecha
+o item 10.4. Note que isto inverte a proporção que §8 tinha esboçado (*"três Heroes e seis
+Adventurers"*): a divisão não é escolhida, ela é **derivada das árvores** pelo item 2 acima, e as
+árvores autoradas dão 6 `Hero` para 3 `Adventurer`. Logo a razão não se alcança reclassificando —
+**alcança-se autorando**, e com 6 `Hero` ela pede **9 `Adventurer`**, ou seja **6 personagens
+novos**. É o item mais caro da milestone, como §8 já dizia, e é o que a dimensiona.
+
+**4. A colisão do item 5 não chega a acontecer, e é de graça.** §5 perguntava de onde vem o
+material do rank `Legend`, porque *"a moeda premium não paga evolução de personagem"* e *"a loja
+de arena nunca vende poder bruto"* — duas frases normativas que "upgradável via materiais da loja"
+atropelaria. **Como `Legend` é apenas o topo do awakening que já existe** (decisão do usuário em
+§4, e o item 1 acima), ele consome o que o awakening sempre consumiu: ouro mais
+`material-nucleo-de-despertar`, que vem da masmorra de Chefe. **Nenhum material novo é comprado em
+loja nenhuma**, e as duas frases continuam de pé sem reversão. Fecha o item 10.2.
+
+### D50 — o pity de dois andares: `Adventurer` em 10, `Hero` em 90 (2026-09-22)
+
+Fecha o item 10.1. O banner deixa de ter **um** contador e passa a ter **dois**, um por rank.
+
+**Os dois números são do usuário:** garantia de `Adventurer` a cada **10** rolagens, garantia de
+`Hero` a cada **90**. É o desenho de §6 levado ao pé da letra — *"o pity passa a garantir um Hero,
+e o Adventurer preenche o intervalo"* — e é o que torna o pity maior possível, que era a
+restrição que `volumeDoGacha.test.ts` guardava desde o M31: **o pity não pode crescer antes do
+pool**, porque excedente vira rolagem morta. Com dois andares o excedente tem onde cair.
+
+**Três perguntas que o desenho não respondia, levadas ao usuário antes de qualquer linha:**
+
+**a) O que a garantia entrega — um personagem NOVO daquele rank, ou qualquer um daquele rank?**
+**Decisão do usuário: qualquer um daquele rank.** Duplicata vira fragmento, como sempre. **Isto
+REVERTE a semântica de D18**, em que a garantia restringia o sorteio ao não-possuído, e a
+reversão é deliberada: §6 já observava que *"o pity deste projeto garante um personagem NOVO, não
+apenas um raro"* e que por isso *"comparar `pityThreshold: 10` com 90 é comparar mecânicas
+diferentes"*. Ao adotar o 90, a mecânica passa a ser a mesma que o 90 descreve no mercado.
+
+**Consequência de forma:** `poolExhausted` — o congelamento do contador do M18 1/N — deixa de
+depender da posse. O contador de um rank congela quando **o banner não tem nenhuma entrada
+daquele rank**, e não quando o jogador já possui todas: com duplicata valendo, sempre há o que
+entregar enquanto o rank existir no pool.
+
+**b) Um `Hero` zera também o contador de `Adventurer`?** **Decisão do usuário: não — os dois
+contadores são independentes.** Só um `Adventurer` zera o de 10, só um `Hero` zera o de 90. Quem
+tirou um `Hero` na rolagem 9 ainda recebe o `Adventurer` garantido na 10. (É o oposto do "4★ ou
+melhor" do Genshin, e é mais generoso.)
+
+**c) E quando os dois armam na MESMA rolagem?** Não é escolha de gosto, e por isso vai registrada
+em vez de perguntada: **o `Hero` tem precedência.** Entregar o `Adventurer` com a garantia de 90
+armada faria o prêmio maior escorregar para a rolagem seguinte, e a garantia de 90 é a cara. Como
+os contadores são independentes (b), o de `Adventurer` continua armado e dispara na rolagem
+seguinte — nada se perde.
+
+**A medição que isto move, dita antes de virar teste.** `packages/content/tests/volumeDoGacha.test.ts`
+afirma desde o M31 que a demo paga **49 rolagens** (`premiumCost` 180, D37). Com `Hero` em 90,
+**quem joga a demo inteira nunca alcança a garantia de `Hero`** — alcança cerca de 4 garantias de
+`Adventurer`. Não é defeito: é o desenho de §6, em que o `Adventurer` é o que preenche o caminho,
+e o `Hero` garantido é horizonte pós-demo. `premiumCost` fica em 180 e a asserção do M31 é
+reescrita para medir os dois andares em vez de um.
+
+### D51 — os seis `Adventurer`: o par de classe como forma de "mais simples, não mais fraco" (2026-09-22)
+
+A 3/N tinha um número dado (a razão de 1,5 de D49) e nenhuma forma. Com 6 `Hero` no elenco, 1,5
+pede **9 `Adventurer`** — seis a mais do que existiam. Estes são eles:
+
+| id | nome | classe | par de classe | profundidade |
+| --- | --- | --- | --- | --- |
+| `ally-batedora` | Ilvi | `class-arqueiro` | Sylla | 5 |
+| `ally-acolito` | Dorn | `class-clerigo` | Miron | 6 |
+| `ally-sentinela` | Torv | `class-couracado` | Bardan | 5 |
+| `ally-machadeira` | Halla | `class-guerreiro` | Rurik | 6 |
+| `ally-piqueiro` | Pell | `class-lanceiro` | Nyra | 5 |
+| `ally-escudeira` | Sena | `class-espadachim` | Aren | 6 |
+
+**A forma: cada `Adventurer` é o PAR DE CLASSE de um `Hero`.** Mesma classe, mesma curva de
+stat, mesmas skills, mesma ficha inicial — nível, arma e táticas clonados do par. **A única
+diferença é a árvore**, 5 a 6 linhas contra 7 a 9, com o mesmo orçamento de 9 pontos.
+
+**Por que assim, e não seis classes novas.** Classe nova é curva de stat nova, e curva de stat é
+número de balanceamento: seis delas seriam seis chances de o rank virar poder pela porta dos
+fundos, que é exatamente a trava do milestone. Com o par de classe, "menos decisões, não menos
+poder" (§2) deixa de ser promessa e vira propriedade verificável — os dois lados compartilham
+tudo menos a forma da árvore. **Nenhum número de balanceamento novo foi inventado nesta fatia:**
+os multiplicadores, as magnitudes de stat e as passivas das seis árvores são os que o par de
+classe já declarava.
+
+**O que isto quebrou de propósito, e está registrado no teste.** `elenco.test.ts` afirmava
+*"toda classe NÃO-promovida tem exatamente UM personagem"* — uma bijeção, herdada da época em
+que havia um personagem por classe. O que D7 queria dizer era o recíproco (nenhuma classe sem
+consumidor), e é ele que continua valendo ao pé da letra. A asserção passou a ser "ao menos um",
+mais uma nova: toda classe compartilhada tem exatamente um `Hero` entre os seus, para que um
+`Adventurer` órfão não passe despercebido.
+
+**Os pesos do banner, e este número é do usuário.** Com o pool em 8 `Adventurer` × 3 `Hero`,
+pesos iguais fariam um `Hero` sair em 27% das rolagens — a garantia de 90 de D50 nunca
+dispararia e "o `Adventurer` preenche o intervalo entre dois `Hero`" (§6) seria falso. Decisão
+do usuário: **`Adventurer` 119, `Hero` 16**, com o total em 1000 para toda chance fechar exata
+em escala 1000 (regra 2). Dá 11,9% por `Adventurer` e 1,6% por `Hero` — 4,8% de `Hero` por
+rolagem, um a cada ~21, e a garantia de 90 disparando para o ~1,2% mais azarado. É o único
+arranjo dos três avaliados em que o pity de 90 é um piso de verdade em vez de enfeite.
+
+**Duas consequências ditas em voz alta, para não virarem descoberta depois:**
+
+**1. `pnpm balance` saiu idêntico, e isso NÃO é prova de nada sobre os seis.** Os comps de
+`packages/data/comps/` continuam sendo os 9 antigos, então nenhum personagem novo entra no
+torneio. A faixa segue 43,6%–57,3% porque o que foi medido é o mesmo de antes. **Medir os seis é
+trabalho da 4/N**, junto com o critério de aceite que proíbe a matriz de misturar ranks
+correntes.
+
+**2. `achievement-elenco-completo` virou um alvo muito mais longo.** Ela pede o elenco inteiro
+(agora 15, e o alvo é móvel por desenho), e desde D50 a garantia paga duplicata — então não há
+mais um número de rolagens que complete o pool com certeza. Com `Hero` a 1,6%, possuir os três
+é grind de horizonte longo. Não foi mexido: é conteúdo de recompensa, e o número é do usuário.
+
+### D52 — a matriz sem ranks misturados, e o defeito que ela encontrou (2026-09-22)
+
+O critério de aceite do M37 pede que `pnpm balance` rode **com todas as comps no mesmo tier
+corrente**, com um teste que reprove uma matriz que misture tiers. Isto é o que a 4/N fez, e o
+que ela descobriu ao fazer.
+
+**1. As comps sobem para awakening 3, e o número não é solto.** É o ponto MÍNIMO em que todo
+comp tem o mesmo rank corrente: `rankCorrente('adventurer', 3)` e `rankCorrente('hero', 3)` são
+os dois `hero`. Abaixo disso a matriz volta a misturar; acima, todo comp paga curva que o
+balanceamento não precisa para ser comparável. `matrizDeBalanceamento.test.ts` trava as duas
+pontas — o rank corrente único E o awakening único, porque rank igual com investimento
+diferente ainda é incomparável — e amarra o valor ao `AWAKENING_PARA_HERO` do core, para que
+mudar o limiar deixe os comps vermelhos em vez de silenciosamente incomparáveis.
+
+**2. Seis comps novas, e a forma delas é o método do M17 5/N.** Cada uma é uma CÓPIA da comp do
+par de classe com a primeira unidade trocada. Não é preguiça: é o que faz a diferença entre
+`comp-arqueiro` e `comp-batedora` isolar Sylla × Ilvi, em vez de medir três mudanças de uma vez.
+O teste também cobra o RECÍPROCO — todo personagem do elenco aparece em alguma comp —, e é ele
+que pega o buraco de verdade: a 3/N autorou seis personagens e `pnpm balance` saiu **idêntico**,
+porque nenhum deles estava em comp nenhuma.
+
+**3. O defeito que a medição encontrou, e ele era meu.** Com os seis na matriz, duas reprovações
+apareceram de uma vez: **`Piqueiro` a 33,0%** (piso de 40%) e **`Espadachim` a 60,3%** (teto de
+60%).
+
+A causa da primeira é erro de autoria da 3/N, não número de balanceamento: eu absorvi o
+orçamento de 9 pontos subindo o `maxRank` dos nós de TROCA. O caminho puro por uma coluna toma
+cada nó no rank cheio, então a **desvantagem multiplicava junto** — o `haste-travada` do Pell
+(`def +10 / atk −10`) em rank 3 virava −30 de atk, e o `machado-erguido` do Torv
+(`atk +45 / def −25`) em rank 3 virava −75% de defesa. A correção move o rank extra para nós de
+vantagem limpa; nenhuma magnitude nova entrou no jogo, e as que se moveram já existiam na árvore
+do par de classe.
+
+**A `Sentinela` custou quatro medições e a lição foi contraintuitiva.** Tirar a troca ofensiva da
+coluna da assistência — o que parecia certo para um couraçado, que vive de defesa — a levou de
+39,6% para **34,0%**: é a ofensiva que sustenta a comp num campo metade armadura. O que faltava
+de verdade era **penetração**: a coluna media `efr` contra um campo que não aplica efeito, e
+trocar isso por `pen +60` (magnitude que a árvore do Bardan já declara) foi o que a pôs acima do
+piso. Uma tentativa intermediária — aprofundar a penetração em vez do retorno de AP — piorou
+para 38,8%, e ficou registrada aqui porque a direção "mais do que funcionou" é o erro fácil.
+
+**4. O `Espadachim` voltou sozinho para dentro do teto, e isso não foi sorte dirigida.** Ele
+passou de 55,5% (awakening 0, 9 comps) para 60,3% com a matriz nova, e nenhuma linha do conteúdo
+dele foi tocada: fortalecer as seis comps fracas puxou o topo para baixo, porque winrate global
+é medida contra o campo inteiro. É o argumento de sempre contra mexer no líder antes de olhar a
+cauda.
+
+**5. O replay anterior passava, e agora não passa.** `GET /battles/:nonce/log` REEXECUTA a
+partida a partir de `setup + seed + commands` contra o motor deste servidor, e não conferia a
+versão em que ela foi gravada. As rotas que abrem e que mandam comando recusam desde o M22;
+esta não, **porque ela não recebe versão nenhuma do cliente** — a versão que importa é a que
+está GRAVADA na partida, e por isso ninguém tinha olhado. Uma partida de `0.19.0` relida sob
+`0.20.0` era reproduzida com as regras novas, e o log entregue deixava de descrever a batalha
+jogada. Com `RULES_VERSION` subindo nesta milestone, o buraco deixou de ser teórico.
+
+**A medição final, `pnpm balance -- --runs 10000` sobre as 15 comps em awakening 3:** a faixa
+fecha em **40,7% (Sentinela) a 59,1% (Espadachim)**, sem nenhum alerta — os dois critérios do M8
+batem. O `spd` fica em 32,5% de concentração nas builds vencedoras (dentro do esperado) e a
+janela de assistência é exercitada em 98,9% das batalhas.
+
+**Um extremo de CONFRONTO que fica declarado, e não é critério:** `Sentinela ataca Piqueiro`
+dá 4,5% para o atacante. Nenhum dos dois critérios do M8 fala de par isolado — os dois são sobre
+winrate GLOBAL —, e um couraçado lento atacando uma parede de lanças é o tipo de par que o jogo
+quer que seja ruim. Fica anotado porque um par de 4,5% é o candidato natural a virar defeito se
+alguém mexer nos dois sem olhar para cá.
+
+**6. E o rank corrente não pode virar coluna.** `migrations.test.ts` passou a varrer as
+declarações de coluna do SQL atrás de qualquer `*rank*` e a conferir que o `Hero` guardado não
+tem o campo. É a metade do critério de aceite 1 que nenhum outro teste alcançava — o catálogo já
+estava travado (o schema recusa `legend`), o banco não.
+
+## M38 — Artefatos assinatura e o banner de armas
+
+### D53 — o artefato é um item próprio, no molde do Epic Seven (2026-09-24)
+
+**A pergunta que travava a fatia, "sidegrade ou upgrade?", recebeu do usuário uma resposta
+que muda o formato do milestone.** A arma assinatura deixou de ser "banner, trava e direito de
+escolha sobre a máquina de item existente" (texto do roadmap) e virou o **artefato**: um item
+com slot próprio, status, uma passiva exclusiva, tier e evolução. As decisões, todas do usuário
+nas duas rodadas de pergunta desta sessão:
+
+1. **Slot novo, separado da arma.** O `weapon` continua decidindo o alcance no duelo e o
+   `weaponType` (§6.1); o artefato é o 7º slot. **Isso adianta para o M38 o "primeiro slot
+   novo desde o M1" que o roadmap atribuía ao M39** — a Soul passa a ser o 8º.
+2. **Trava por CLASSE** (roadmap) e **tier como o dos personagens**: rank de base
+   `adventurer`/`hero` no catálogo, `legend` por evolução.
+3. **Legend pelo awakening PRÓPRIO do artefato** (não pelo imprint nem pelo enhance).
+4. **Status: `atk` fixo + um stat variável por artefato.**
+5. **Uma passiva exclusiva por artefato**, "dos mais variados tipos, desde buff de status até
+   triggers ou AP".
+6. **Duplicatas de personagem E de artefato alimentam imprint**, e o imprint é status, nunca
+   mecânica nova — no artefato, no máximo aumenta o número da própria passiva. Motivo do
+   usuário: o PvP.
+7. **O tier não carrega poder por regra**, mas os poderes "mais diferentes" tendem a vir nos
+   artefatos de tier Hero. Consequência para o `pnpm balance`, a registrar no fechamento: a
+   matriz mede todas as comps com artefato no MESMO tier corrente, como o M37 fez com o rank.
+8. **Todo Hero tem artefato assinatura (tier `hero`)**; Adventurer não tem garantido, mas
+   existem **9 artefatos `adventurer`**, um por personagem Adventurer, na classe dele. No banner
+   eles fazem o papel que o Adventurer faz no banner de personagem.
+9. **Pity do banner de armas: 60** (≈0,67·P, com P = 90), **andar de baixo em 10**. Token de
+   escolha em **1,5·P = 135**. Pool espelhando o banner de personagem.
+10. **Material de awakening do artefato: um material NOVO de masmorra**
+    (`material-nucleo-de-artefato`) mais ouro, numa curva 0–6 que espelha a do personagem —
+    `adventurer` vira `hero` em 3, todos viram `legend` em 6. Opção (b), reusar o núcleo do
+    personagem, foi recusada: os dois sumidouros disputariam o mesmo material.
+11. **O banner com destaque entra neste milestone** (opção b). Hoje o `banner-elenco` é pool
+    fixo, e "o personagem daquele banner", de que o token de 1,5·P depende, não tinha
+    referente. **Como o destaque funciona (rotação, taxa, o que acontece no pity) ainda não foi
+    desenhado e será perguntado antes da 3/N.**
+
+**O que a 1/N decidiu dentro disso (forma, não número):**
+
+- **O artefato não é `ItemInstance`.** Não tem set, enhance, substat rolado nem reforge;
+  forçá-lo naquela forma daria a ele máquinas que ele não tem. `ArtifactDef` (catálogo) e
+  `ArtifactInstance` (estado de conta: `awakening`, `imprint`) são tipos próprios, e
+  `Hero.artifact` guarda o id da instância **fora de `equipment`**. É opcional: herói gravado
+  antes do M38 continua válido.
+- **Na agregação, o artefato é equipamento:** os status entram no passo 3 (flat de
+  equipamento) e o % da passiva `stat` no passo 4. §4.1 não ganha passo novo.
+- **O rank corrente do artefato é `rankCorrente` do M37, a mesma função.** Dois limiares
+  diferentes para a mesma palavra seriam dois ranks com o mesmo nome.
+- **A passiva é um vocabulário FECHADO de três tipos, com os números no dado:** `stat` (% de
+  um stat), `startingPool` (AP ou PP de entrada na batalha — mesma semântica do set Reserva;
+  não é regeneração, regra 7) e `reaction` (concede uma skill de reação do catálogo, e com ela
+  os quatro gatilhos do duelo, `onAttacked`/`onDamaged`/`onDebuffed`/`onLethal`). Cobre os três
+  exemplos do usuário — status, trigger, AP — **sem nenhuma linha nova no motor do duelo**: a
+  reação usa a máquina das reações de talento. Tipo novo de passiva é mudança de regra e passa
+  por aqui.
+- **O imprint só muda número, e a forma garante:** cada passiva carrega a magnitude por nível
+  de imprint (6 entradas) e não existe campo onde declarar efeito por nível. Mais um
+  `imprintFlat` de status, na forma do da classe.
+- **As curvas não descem** (o schema recusa): evoluir nunca tira poder.
+- **Artefato de outra classe faz `resolveHeroStatSheet` falhar alto.** `equipArtifact` já recusa;
+  chegar à resolução com o par errado é dado corrompido, e somar em silêncio daria a um
+  personagem o que o jogo proíbe.
+- `MaterialKind` ganha `artifactFragment`, com `forArtifactId` obrigatório nele e proibido nos
+  outros — pelo mesmo motivo de `forCharacterId`.
+
+`RULES_VERSION` 0.20.0 → **0.21.0**.
+
+### D54 — os três banners e o soft pity (2026-09-24)
+
+O usuário desenhou o banner com destaque que D53 (item 11) deixou em aberto, e com ele um
+terceiro banner. **Isto é o desenho da 3/N; nada disso é código ainda.**
+
+**Os banners rotativos (personagem e artefato):**
+- Cada banner **fica ativo por um tempo** e depois sai.
+- **O pity é guardado ENTRE banners.** O contador deixa de ser por banner e passa a ser por
+  (jogador, TIPO de banner): o rotativo de personagem compartilha um contador, o rotativo de
+  artefato outro. **Isso muda o `(jogador, banner)` do M18/D50**, e a migration da 3/N precisa
+  levar os contadores existentes.
+- **O Hero do rotativo de personagem é sempre o personagem em destaque** (a "prioridade é
+  sempre personagens novos"). Não existe 50/50: os outros Heroes não saem no rotativo.
+- **O rotativo de artefato garante o artefato do Hero em destaque.**
+- **Soft pity com a mediana em torno de 75** no de personagem (a taxa sobe perto do fim, e
+  metade dos jogadores tira o destaque por volta dessa rolagem). O teto duro continua em 90.
+- O andar de `Adventurer` continua em 10, duro.
+- O token de `1,5·P = 135` (critério de aceite do M38) continua: é por banner rotativo.
+
+**O banner genérico, sempre ativo:**
+- Ticket de summon próprio, **pago em cristal na mesma quantidade** dos rotativos.
+- Dois pools, Heroes e artefatos, **com uma seleção** e não o catálogo inteiro: personagens
+  que saem de um banner exclusivo podem entrar depois, **menos os de evento e similares, que
+  ficam limitados**. O pool é declarado no dado, não derivado do elenco.
+- **Soft pity por volta de 90.**
+- **A cada 180 rolagens no genérico, uma escolha**: o jogador escolhe qualquer Hero ou
+  artefato do pool dele. É um contador próprio, repetível e zerado ao conceder, independente do
+  que saiu no caminho.
+- Preenchimento: **Adventurers e artefatos `adventurer`**, com o mesmo andar de 10.
+
+**A renda da demo fica como está, por decisão do usuário, e fica registrada como alerta.**
+Com cerca de 49 rolagens na demo inteira (M31) e o soft pity em 75, **só uns 25% dos
+jogadores tiram um Hero na demo**. O gacha é desenhado para o jogo inteiro; a renda é afinada
+depois.
+
+**A curva proposta (números para o usuário confirmar antes da 3/N; regra 10):** a forma é a de
+Genshin — taxa base constante até o início do soft pity, depois somando uma parcela fixa por
+rolagem até o teto. Calculado exatamente:
+
+| Banner | Taxa base | Soft começa | + por rolagem | Teto | Mediana | Média |
+|---|---|---|---|---|---|---|
+| Rotativo de personagem | 0,6% | 74 | +6% | 90 | 76 | 62,3 |
+| Rotativo de artefato | 0,7% | 50 | +7% | 60 | 52 | 44,7 |
+| Genérico | 0,6% | 89 | +6% | 105 | 90 | 71,3 |
+
+**Correção de D53:** `onLethal` não entra pela passiva `reaction`. No motor ele é skill de
+`kind: 'duel'` resolvida por gatilho de morte, e não linha do script de reação. A passiva
+`reaction` cobre `onAttacked`, `onDamaged` e `onDebuffed`.
+
+**Correções do usuário à proposta (mesmo dia):**
+- **Zerar o pity:** nos rotativos, tirar o Hero ou o artefato em destaque zera o contador (o
+  normal). **No genérico, não:** tirar um Hero ou artefato ali não zera. Leitura registrada:
+  no genérico o contador corre até a escolha das 180 e só zera nela. Consequência que a 3/N
+  tem de resolver na forma: a rampa do soft pity do genérico não pode subir até 100% por
+  rolagem, senão tudo depois da ~105ª seria prêmio garantido até a escolha — **a taxa do
+  genérico sobe até um PATAMAR, não até o teto**. O número do patamar é proposta da 3/N.
+- A curva da tabela acima fica aceita para os rotativos. As proposta B e C (status e evolução
+  do artefato) foram aceitas sem mudança.
+- **Artefatos `adventurer` também têm passiva**, só que mais simples que as dos Hero; não
+  ficam presos a % de stat. **Critério adotado para "mais simples":** a passiva do
+  `adventurer` usa só o que já existe no catálogo (stat %, pool de entrada FIXO, ou uma reação
+  que já existe), e a do `hero` é a que traz skill própria e magnitude que cresce com o
+  imprint.
+
+### Sub-sessão 2/N — o conteúdo dos artefatos (2026-09-24)
+
+Números de D54-B/C aceitos pelo usuário, e a tabela D corrigida por ele (as passivas
+`adventurer` mais simples, mas não presas a % de stat). O que entrou:
+
+- **15 artefatos** em `packages/data/artifacts/`, um por personagem, com **`signatureOf`**
+  (campo novo, obrigatório): de quem o artefato é assinatura. **É associação, não trava** —
+  quem equipa continua decidido por `classId`. Existe porque o rotativo garante "o artefato do
+  Hero em destaque" (D54). `name` também entrou, como em skill e material.
+- **O orçamento de status é idêntico para os 15**, e isso é teste: `atk` `8→24` para todos e o
+  stat variável sendo a MESMA curva convertida pela régua das faixas de substat (1 `atk` ≈ 5
+  `hp` ≈ 0,83 `def` ≈ 4 `chc` ≈ 6,5 `chd` ≈ 5 `eff`/`efr`). O imprint dá o mesmo `hp` a todos.
+- **"Mais simples", como ficou escrito em teste:** a passiva de um `adventurer` não usa skill de
+  artefato Hero e não tem pool que cresce com o imprint. Os seis Hero trazem skill própria
+  (Aren, Miron, Rurik, Nyra) ou pool que chega a 2 no imprint 5 (Sylla em AP, Bardan em PP). Entre
+  os nove `adventurer`: cinco de % de stat, dois de +1 PP fixo (Halla, Wren) e dois reusando a
+  reação `Fôlego de Combate` que já existia (Dorn, Torv).
+- **Uma mudança sobre a tabela D aprovada:** a passiva de Rurik era `atk` +6%→+10%, que é
+  exatamente o formato das `adventurer`. Virou a reação `Fúria do Tirano` (`onDebuffed`, 1 PP,
+  500→700), para os seis Hero terem a passiva mais incomum, como o usuário pediu. **Quatro skills
+  novas**, todas reação com 1 PP: `Juramento do Duelista` (`onAttacked`), `Bênção do Relicário`
+  (`onDamaged`, cura), `Fúria do Tirano` (`onDebuffed`) e `Muralha de Lanças` (`onAttacked`).
+- `material-nucleo-de-artefato` (kind `awakening`), 15 fragmentos `artifactFragment`, e
+  `artifactAwakening`/`artifactImprint` em `economy.json` (ouro igual ao do personagem, núcleo
+  `2, 4, 6, 10, 15, 25`, imprint com a mesma tabela de fragmentos).
+- **O drop, e um desvio a declarar.** O drop de masmorra é sorteio ponderado com reposição; pôr
+  o núcleo de artefato sozinho diluiria o núcleo de despertar e os fragmentos que já dropavam.
+  Regra adotada: **não diluir**. No Covil normal (peso 8, 2 sorteios) isso sai exato com o
+  mesmo peso do núcleo de despertar e 3 sorteios. **No elite (peso 11, 3 sorteios) não há peso
+  inteiro que faça as duas coisas:** os pesos antigos foram multiplicados por 3 (a proporção não
+  muda) e o núcleo de artefato entrou com 11, contra 9 do de despertar — **no elite ele dropa
+  ~22% mais que o núcleo de despertar**. O teste trava o "não diluir", não o "mesmo peso".
+- Carga: `buildCatalog` confere dono no elenco, classe e rank iguais aos do dono, um artefato por
+  dono, e skill de reação existente e de `kind: 'reaction'`. Os dois adaptadores (disco e
+  navegador) leem `artifacts/`. `readContentFilesFromDisk` foi separado de `loadCatalogFromDisk`
+  para os testes poderem alterar um arquivo e ver a carga recusá-lo.
+- i18n: tipo `artefato` na camada de idioma, com 15 nomes, 16 materiais e 4 skills nas duas
+  línguas.
+
+### D55 — os três banners implementados: as respostas do usuário e o que a 3/N decidiu (2026-09-25)
+
+**Quatro perguntas que D54 deixou abertas, respondidas pelo usuário antes da primeira linha:**
+
+1. **O token de 1,5·P = 135 entrega o artefato assinatura do Hero em destaque.** Contado por
+   BANNER (não por tipo), concedido uma única vez por banner. Bateu 135 sem ter o destaque:
+   fica **pendente** e é pago quando o destaque entrar na conta por **qualquer** caminho,
+   inclusive outro banner e inclusive depois de o rotativo sair de rotação. Já tendo o
+   artefato, o token paga o fragmento dele.
+2. **No genérico, "tirar um prêmio não zera" vale só para a ESCOLHA.** São dois contadores: o
+   de soft pity zera ao sair um `hero` (personagem ou artefato), como nos rotativos; o da
+   escolha de 180 anda em toda rolagem, não sabe o que saiu e só zera ao conceder. Isto
+   substitui a leitura de "contador único com patamar" registrada em D54, que daria ~6 prêmios
+   por ciclo de 180 com patamar de 6% (mais que o rotativo).
+3. **O genérico é UM banner misto:** personagens e artefatos no mesmo pool, um contador de
+   soft pity e uma escolha de 180 que pode ser Hero ou artefato.
+4. **A 3/N entrega um par rotativo só**, mais o genérico. A agenda de rotação fica para depois.
+
+**Os números que eu propus e o usuário aprovou:**
+- **Par ativo:** destaque **Rurik** (`ally-guerreiro`), janela 2026-09-25 → 2026-10-09 (UTC).
+  Rotativo de personagem: Rurik + os 8 Adventurers invocáveis, peso igual. Rotativo de
+  artefato: `artifact-machado-do-tirano` + os 9 artefatos `adventurer`, peso igual.
+- **Genérico:** Heroes Bardan e Nyra (Rurik fora enquanto exclusivo); artefatos Hero de
+  Bardan, Nyra, **Sylla, Miron e Aren** (os três de história não saem de nenhum outro lugar);
+  prêmio **50% personagem / 50% artefato** com peso igual dentro de cada lado (5×2 = 2×5);
+  preenchimento também 50/50 (9×8 Adventurers = 8×9 artefatos `adventurer`).
+- **Custo do genérico = `premiumCost`**, o mesmo dos rotativos. O "ticket próprio" de D54 é,
+  nesta fatia, o próprio custo em cristal; um item de ticket no inventário não entrou (não há
+  fonte de ticket além do cristal, então ele seria um passo a mais sem função).
+- O `banner-elenco` saiu, e a migration leva os contadores dele para o pity do rotativo de
+  personagem, com os dois andares como estavam.
+
+**O que a implementação decidiu dentro disso (forma, não número):**
+
+- **O limiar N passou a garantir a N-ésima rolagem, nos DOIS andares.** Até o M37 o motor
+  garantia a N+1-ésima ("depois de N sem prêmio, a próxima"). A tabela de D54, aceita pelo
+  usuário, foi calculada com a curva em 1000 **na** 90ª, e é também a leitura do mercado.
+  Manter a antiga no `Hero` daria médias e medianas diferentes das aprovadas; manter só no
+  `Adventurer` deixaria a mesma palavra com dois significados. **Consequência para o
+  jogador:** o `Adventurer` garantido chega na 10ª em vez da 11ª, e o `Hero` na 90ª em vez da
+  91ª — um a menos nos dois, nunca a mais.
+- **A curva decide o RANK; o peso decide QUEM dentro do rank.** Os pesos antigos (119 × 16,
+  total 1000) deixaram de fazer sentido: a taxa de `Hero` é a curva. `rateOf` passou a devolver
+  a chance dentro do rank. Dois streams de RNG por rolagem: `summon-rank:<banner>` e
+  `summon:<banner>`.
+- **O pool aceita artefato:** a entrada carrega `characterId` OU `artifactId` (a forma do JSON),
+  e a duplicata de artefato é um desfecho próprio (`artifactDuplicate`). O rank da entrada de
+  artefato é derivado do catálogo de artefatos, como o de personagem é do elenco.
+- **O `token` do rotativo é derivado na carga:** o JSON só declara `tokenThreshold`; o artefato
+  é o que tem `signatureOf` igual ao destaque, e o fragmento é o material com `forArtifactId`
+  dele.
+- **Validação por tipo (`validateBanner`):** destaque no pool como `hero`; nenhum outro `hero`
+  no rotativo (não existe 50/50); rotativo de personagem só com personagem e o de artefato só
+  com artefato; `banner-sem-preenchimento` novo (sem `adventurer`, a rolagem que não sai `Hero`
+  não teria o que entregar).
+- **Servidor:** migration `0019_gacha_por_tipo.sql` — `banner_pity.banner_id` renomeada para
+  `pity_scope` com `CHECK` nos três tipos; tabelas `banner_tokens`, `generic_choices` e
+  `player_artifacts` (uma instância por jogador e definição; sem coluna de rank). O estado novo
+  entrou no `CharacterOwnershipRepository` que já existia, para não ligar repositório novo em
+  toda montagem. `GET /summon/banners` só lista o que está ativo no `now()`; `POST /summon`
+  recusa rotativo fora da janela com 409 **antes** de cobrar; `POST /summon/choice` novo, com
+  nonce. A entrada do pool na resposta mantém `characterId`/`artifactId`, que é a forma que a
+  tela do M18 já lê.
+- **O artefato do inimigo (D47):** na unidade de batalha o artefato não é campo — vira status,
+  pool de entrada e reação, e os três já são ocultos. Um teste novo em `visaoDoInimigo.test.ts`
+  trava isso.
+
+**O que NÃO entrou nesta fatia (e não é esquecimento):** equipar, despertar e dar imprint em
+artefato pelo servidor. O motor tem as funções desde a 1/N, mas as rotas não estavam na lista
+da 3/N (D54: banner, token, servidor do gacha). Hoje o jogador GANHA o artefato e ele fica na
+conta; levá-lo à batalha é trabalho a pedir.
+
+`RULES_VERSION` 0.21.0 → **0.22.0**.
+
+### D56 — a 4/N: o artefato jogável e a tela dos três banners (2026-09-25)
+
+**Três decisões do usuário, nesta sessão:**
+
+1. **A semântica de D55 fica:** o limiar N garante a N-ésima rolagem, nos dois andares.
+2. **Equipar, despertar e dar imprint em artefato entram na 4/N**, junto com o cliente. Sem
+   isso a 5/N (o `pnpm balance` com e sem artefato) não teria o que medir além de fixture.
+3. **Equipar num herói um artefato que está em outro herói MOVE o artefato** (como no Epic
+   Seven). Uma instância, um herói: sem isso a mesma cópia iria à batalha duas vezes.
+4. **A tela mostra SEMPRE a taxa base; o soft pity fica escondido.** Consequência de forma:
+   `GET /summon/banners` deixou de mandar `softPity` e manda só `baseRate` (milésimos). O teste
+   trava que `softStart` e `step` não aparecem em nenhum banner da resposta. A curva continua
+   em `packages/data` e em `packages/gacha`, que são do servidor; o JSON do banner é
+   empacotado no cliente pelo catálogo, mas o cliente não o lê para exibir nada da curva.
+
+**O que a implementação decidiu dentro disso:**
+
+- **Rotas novas** (`apps/server/src/economy/artifactRoutes.ts`): `GET /me/artifacts`,
+  `POST /artifacts/:id/equip` (com `movedFrom` na resposta), `POST /heroes/:id/artifact/unequip`,
+  `POST /artifacts/:id/awaken` e `POST /artifacts/:id/imprint`. Todas com nonce. Os `kind` de
+  ação reusam `equip`/`awaken`/`imprint`, então o `CHECK` de `economy_actions` não mudou.
+  Recusa de regra (classe errada, recurso insuficiente) volta 400 **antes** de reservar o
+  nonce, como o saldo no summon.
+- O imprint resolve o fragmento pelo catálogo (`forArtifactId`), nunca pelo corpo da
+  requisição: o mesmo cuidado da rota de imprint de herói.
+- **O artefato chega à batalha pelas três montagens** (`assembleArenaBattle` dos dois lados,
+  `assembleChapterBattle`, `assembleDungeonBattle`), por um helper só (`summon/artefatos.ts`),
+  que **falha alto** se o herói aponta para uma instância que não existe. O replay reexecuta o
+  `BattleSetup` gravado, que já contém o artefato resolvido.
+- Repositório: `updateArtifact` (awakening e imprint), com teste de paridade. Só altera a
+  instância se ela for do jogador que pede.
+- **Cliente:** a invocação em abas (um banner por aba) com destaque, data de saída, taxa base,
+  os dois andares de pity, o token (contando, pendente com o que falta, ou recebido), a escolha
+  do genérico com um seletor e o resultado de artefato, de fragmento e do token entregue. A aba
+  Personagens ganhou o slot de artefato do herói em foco: só oferece os da classe dele, diz com
+  quem está um artefato equipado em outro herói, e o CP da tela inclui o artefato pelo mesmo
+  `resolveHeroStatSheet` da batalha. O rank corrente do artefato é `artifactRank` do core,
+  calculado para exibir e nunca gravado. i18n nas duas línguas, incluindo o tipo de conteúdo
+  `banner` para os três nomes.
+
+`RULES_VERSION` **não muda** (segue 0.22.0): o artefato é regra desde a 0.21.0, e aqui ele só
+passa a chegar à batalha pelo servidor.
+
+### D57 — a medição com e sem artefato: o artefato é UPGRADE, e a matriz com ele reprova (2026-09-25)
+
+**Como se mediu (decisões do usuário nesta sessão):** cada unidade das 15 comps leva um
+artefato **da classe dela** — não necessariamente a assinatura —, **declarado na comp**
+(`artifactId`), com o artefato Hero da classe quando existe e o `adventurer` onde a classe não
+tem Hero. Tier da medição: **awakening 3, imprint 0**, o mínimo em que todo artefato fica no
+rank corrente Hero (D53 item 7). Três rodadas de `pnpm balance`, 10.000 partidas por
+pareamento:
+
+| Medição | Faixa de winrate global | Alertas |
+|---|---|---|
+| Sem artefato (`pnpm balance`) | 40,7% (Sentinela) – 59,1% (Espadachim) | nenhum — idêntica ao M37 |
+| Com artefato (`--artefatos`) | 31,9% (Batedora) – 66,7% (Sentinela) | 2 acima de 65% (Sentinela, Couraçado), 5 abaixo de 40% (Grifeiro, Escudeira, Espadachim, Arqueiro, Batedora) |
+| Delta, a comp com artefato contra ela mesma sem (`--delta-artefato`) | 76,5% (Batedora) – 98,5% (Sentinela) | — |
+
+**Leitura.** O delta responde a pergunta do roadmap sem ambiguidade: **o artefato é upgrade**.
+Com tudo igual menos o artefato, ele vence de 3 em 4 a quase todas as partidas. Isso era
+esperado pelo desenho (D53: status + passiva, no molde do Epic Seven). O que o roadmap exigia
+era a consequência: "se for upgrade, ela é poder saindo do gacha e reprova no critério do M8 — e
+então o critério muda de forma deliberada, ou a arma muda". **A matriz com todo mundo equipado
+reprova nos dois critérios do M8.** O ganho não é uniforme: as comps defensivas e de cura
+(Sentinela 40,7% → 66,7%, Couraçado 52,1% → 65,0%, Clérigo, Acólito) ganham muito mais que as
+ofensivas (Espadachim 59,1% → 37,9%, Batedora 42,2% → 31,9%).
+
+**Um defeito encontrado e corrigido na própria medição:** a primeira rodada do delta saiu 0,0%
+para todas as comps, porque no espelho os dois lados tinham os mesmos ids de unidade. O lado
+espelhado ganhou sufixo, e um teste passou a exigir que o espelho decida partidas.
+
+**DECISÃO PENDENTE, do usuário:** mudar o critério (aceitar o upgrade e medir o M8 só sem
+artefato, ou com todos no mesmo tier com uma faixa própria) ou mudar o artefato (os números, até
+a matriz com artefato voltar a 40–60%). Nenhum número foi tocado nesta fatia (regra 10).
+
+#### D57, continuação — as reações concedidas estavam MORTAS, e a ordem mudou (2026-09-25)
+
+**O que a medição encontrou antes de qualquer ajuste de número.** Uma ablação em memória
+(zerar a magnitude de um artefato e remedir) mostrou que as **quatro passivas de reação** —
+Bênção do Relicário, Juramento do Duelista, Fúria do Tirano, Muralha de Lanças — davam um
+torneio **idêntico dígito a dígito** com a magnitude zerada. A causa: `resolveHeroCombatProfile`
+montava o script de reação como baseline → talento → artefato, e o duelo escolhe a **primeira**
+linha cujo gatilho bate e cujo PP cabe (§6.3 literal). `contra-atacar` e `defender` são
+`onAttacked` e sem condição, então toda reação concedida de mesmo gatilho nunca disparava, e as
+de outro gatilho competiam pelo PP da batalha (que não regenera, regra 7) já gasto por elas.
+**Pela mesma ordem, as reações concedidas por TALENTO tinham o mesmo problema** — um defeito
+anterior ao M38, que o artefato só tornou visível.
+
+**Decisão do usuário:** as reações **concedidas (talento, depois artefato) vêm ANTES das
+baseline**. A baseline vira o que sobra quando a concedida não serve. `RULES_VERSION` 0.22.0 →
+**0.23.0**. O GOLDEN_HASH não mudou (o replay canônico não tem reação concedida). Testes:
+`core/tests/hero/combatProfile.test.ts` (a ordem, e o pin de versão) e
+`core/tests/artifacts/artifact.test.ts` (a reação do artefato na frente de uma baseline de mesmo
+gatilho).
+
+**Consequência:** a matriz SEM artefato também muda (as reações de talento passam a disparar), e
+as três medições foram refeitas.
+
+#### D57, fechamento — as regras corrigidas, e a matriz com artefato passa SEM ajuste de número (2026-09-25)
+
+Mais duas decisões do usuário depois da ordem das reações:
+
+1. **A reação concedida `onDamaged` reserva a troca.** §6.4 permite uma reação por troca, e o
+   `onAttacked` é decidido antes do dano: a baseline gastava sempre a troca, e a Bênção do
+   Relicário (e o Fôlego de Combate como artefato do Dorn e do Torv) nunca disparava. Com uma
+   concedida `onDamaged` habilitada, de condições satisfeitas e com PP, só as linhas concedidas
+   concorrem ao `onAttacked`. `ReactionLine.granted` marca a linha; quem marca é o perfil.
+2. **Reação de 0 PP não reserva.** Medido: o Fôlego de Combate (0 PP, concedido por talento à
+   Sylla) reservava TODA troca, e a Sylla nunca mais contra-atacava — as três comps dela
+   (Arqueiro, Grifeiro, Escudeira) caíram abaixo de 40% inclusive SEM artefato.
+
+**Uma escolha minha dentro da decisão do usuário:** entre as concedidas, **o artefato vem antes
+do talento**. Com o talento na frente, a `assistir` que um talento concede à Sylla tomava sempre
+o lugar da assistência de um artefato. Reação repetida fica só na primeira posição.
+
+Tudo na mesma `RULES_VERSION` **0.23.0**. §6.4 da spec ganhou as duas regras. O GOLDEN_HASH não
+mudou. Testes: `core/tests/duel/reservaDaTroca.test.ts` (7), `core/tests/hero/combatProfile.test.ts`
+e `core/tests/artifacts/artifact.test.ts` (as duas ordens).
+
+**A medição final, 10.000 partidas por pareamento, SEM nenhum número de artefato alterado:**
+
+| Medição | Faixa | Alertas |
+|---|---|---|
+| Sem artefato | 40,7% (Sentinela) – 59,1% (Espadachim) | nenhum — idêntica ao M37 |
+| **Com artefato** (awakening 3, imprint 0) | **42,9% (Espadachim) – 59,0% (Couraçado)** | **nenhum** |
+| Delta (a comp com artefato contra ela mesma sem) | 73,5% (Espadachim) – 90,7% (Sentinela) | — |
+
+**O veredito do roadmap:** o artefato é **UPGRADE** — no espelho ele vence de 3 a 9 em cada 10
+partidas. Como o usuário fixou que no PvP todos terão artefato, o critério do M8 é medido COM
+artefato, e **passa nos dois lados**. A desigualdade de antes (31,9%–66,7%, e 35,3%–73,8% depois
+da primeira correção) não era dos números dos artefatos: era de três defeitos de regra que a
+medição expôs — reações concedidas atrás da baseline, `onDamaged` sem vez na troca, e a reação
+de 0 PP.
+
+**O que NÃO foi aplicado, e por quê.** Com a regra corrigida a matriz passou sozinha, então não
+gravei os ajustes testados em memória (Juramento e Muralha acima do contra-atacar, Fúria como
+`onAttacked`) nem criei a skill da Sylla que o usuário tinha escolhido para o Arco. **Fica
+registrado como observação de desenho:** Juramento (600) e Muralha (500) SUBSTITUEM o
+`contra-atacar` (800) de quem os equipa, com multiplicador menor; a Fúria (`onDebuffed`) e o Arco
+(+1 AP) quase não fazem efeito. A matriz passa assim, mas a passiva desses quatro não entrega o
+que o nome promete.

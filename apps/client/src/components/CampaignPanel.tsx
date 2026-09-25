@@ -1,7 +1,6 @@
 import { catalog } from '../data/catalog.js';
 import { nomeDeUnidade, rotuloDeHeroi } from '../logic/rotulos.js';
 import { descreverObjetivo } from '../logic/objetivo.js';
-import { previaDaMissao } from '../logic/previaDaMissao.js';
 import { PresetsDeParty } from './PresetsDeParty.js';
 import { PreviaDoMapa } from './PreviaDoMapa.js';
 import { missaoPorId, proximaMissao, useBattleStore } from '../store/battleStore.js';
@@ -59,7 +58,13 @@ export function CampaignPanel() {
   // M32 — UMA próxima ação com peso maior que o resto. Com missão escolhida é o botão de
   // entrar; sem escolha, é a primeira missão por limpar (onde o jogador parou). Nunca as duas.
   const proxima = selecionado ? null : proximaMissao(campaign.chapters);
-  const previa = selecionado ? previaDaMissao(catalog, selecionado.id) : null;
+  // M36 3/N (D48) — a prévia vem do servidor e mora na store; ela chega depois da escolha da
+  // missão, e enquanto não chega o cartão simplesmente não aparece.
+  const previa = selecionado && campaign.previa?.missionId === selecionado.id ? campaign.previa : null;
+
+  // M36 3/N — quem é inimigo sai do LADO, que é visível, e não de uma lista à parte que o
+  // cliente montava do catálogo.
+  const inimigosDaPrevia = (previa?.unidades ?? []).filter((unidade) => unidade.side === 'enemy');
 
   return (
     <section className="campaign-panel">
@@ -129,21 +134,23 @@ export function CampaignPanel() {
       {selecionado ? (
         <>
           {/* M35 2/N (D42) — a PRÉVIA antes de escolher quem vai: o tabuleiro de verdade em
-              miniatura, montado do catálogo (sem ticket), com o objetivo, os inimigos pelo nome
-              e as vagas marcadas. §1.1 antes de entrar. */}
+              miniatura, com o objetivo, os inimigos pelo nome e as vagas marcadas.
+              M36 3/N (D47) — ela vem do servidor, já redigida, e sem zona de ameaça. */}
           {previa ? (
             <div className="previa-da-missao">
               <h3>{t('previa.titulo', { missao: nomeDeConteudo(t, 'missao', selecionado.id, selecionado.name) })}</h3>
               <div className="previa-corpo">
                 <PreviaDoMapa previa={previa} />
                 <div className="previa-ficha">
-                  <p className="previa-objetivo">{descreverObjetivo(t, previa.setup.winCondition, { units: previa.setup.units, round: 1 }).titulo}</p>
+                  <p className="previa-objetivo">
+                    {descreverObjetivo(t, previa.winCondition, { units: previa.unidades, round: 1 }).titulo}
+                  </p>
                   <p className="hint">{t('previa.vagas', { vagas: previa.vagas.length })}</p>
-                  <h4>{t('previa.inimigos', { total: previa.inimigos.length })}</h4>
+                  <h4>{t('previa.inimigos', { total: inimigosDaPrevia.length })}</h4>
                   <ul className="previa-inimigos">
-                    {previa.inimigos.map((inimigo) => (
+                    {inimigosDaPrevia.map((inimigo) => (
                       <li key={inimigo.unitId}>
-                        {nomeDeUnidade(t, inimigo.unitId, {}, previa.artIdByUnitId, catalog)}
+                        {nomeDeUnidade(t, inimigo.unitId, {}, previa.characterIdByUnitId, catalog)}
                       </li>
                     ))}
                   </ul>

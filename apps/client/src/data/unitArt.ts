@@ -113,9 +113,13 @@ export function urlsDeArte(): readonly string[] {
  * Uma unidade sem nenhum dos três — reforço invocado, ficha de cenário sem personagem —
  * devolve `undefined` e cai no glifo do M16, que é a resposta certa e não uma falha.
  */
+// M36 (D47) — `heroId` deixou de existir na unidade INIMIGA: ele é a instância de herói, e por
+// ela se chega à build. Quem responde pela arte do outro lado é, agora sempre, o mapa que o
+// servidor manda (`characterIdByUnitId`) — o mesmo de sempre, só que sem o plano B que lia o
+// `heroId` cru. Do lado do jogador nada mudou: o roster responde.
 export function artIdDeUnidade(
   heroesByUnitId: Readonly<Record<string, Hero>>,
-  unit: Pick<BattleUnit, 'unitId' | 'heroId' | 'side'>,
+  unit: { readonly unitId: string; readonly side: 'player' | 'enemy'; readonly heroId?: string },
   artIdByUnitId: Readonly<Record<string, string>> = {},
 ): string | undefined {
   const doServidor = artIdByUnitId[unit.unitId];

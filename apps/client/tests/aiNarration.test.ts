@@ -14,6 +14,7 @@ import {
   type Terrain,
 } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
+import type { EstadoVisivel, PassoDaIa } from '../src/data/api.js';
 import { narrateAiTurns, type AiScene } from '../src/data/aiNarration.js';
 
 // M16, sub-sessão 4/N — a narração do turno da IA.
@@ -131,8 +132,20 @@ function comIaPendente(inimigos: readonly { id: string; pos: Coord; archetype: M
   };
 }
 
-function passoMove(unitId: string, path: readonly Coord[]): AiTurnStep {
-  return { stateBefore: {} as BattleState, command: { t: 'move', unitId, path } };
+// M36 4/N (D47) — os passos que a narração recebe vêm do SERVIDOR (`PassoDaIa`), já redigidos.
+// Aqui eles continuam sendo gerados pelo core, que é a fonte realista de um turno de IA, e
+// convertidos pelo mesmo renomear que `apps/server/src/battle/partida.ts` faz — o servidor
+// ainda passa cada `stateBefore` por `redigirEstado`, e é essa a única diferença.
+function comoPassosDoServidor(steps: readonly AiTurnStep[]): readonly PassoDaIa[] {
+  return steps.map((passo) => ({
+    command: passo.command,
+    ...(passo.duelResult ? { duelResult: passo.duelResult } : {}),
+    estadoAntes: passo.stateBefore as unknown as EstadoVisivel,
+  }));
+}
+
+function passoMove(unitId: string, path: readonly Coord[]): PassoDaIa {
+  return { estadoAntes: {} as EstadoVisivel, command: { t: 'move', unitId, path } };
 }
 
 function cenasDeMovimento(scenes: readonly AiScene[]): readonly Extract<AiScene, { kind: 'move' }>[] {
@@ -141,7 +154,7 @@ function cenasDeMovimento(scenes: readonly AiScene[]): readonly Extract<AiScene,
 
 describe('M16 4/N — `narrateAiTurns`: o relato do core vira cenas', () => {
   it('um `wait` não vira cena: parar o tabuleiro sem nada na tela é o tabuleiro travando, não uma jogada', () => {
-    const steps: readonly AiTurnStep[] = [{ stateBefore: {} as BattleState, command: { t: 'wait', unitId: 'def' } }];
+    const steps: readonly PassoDaIa[] = [{ estadoAntes: {} as EstadoVisivel, command: { t: 'wait', unitId: 'def' } }];
     expect(narrateAiTurns(steps)).toEqual([]);
   });
 
@@ -167,7 +180,7 @@ describe('M16 4/N — `narrateAiTurns`: o relato do core vira cenas', () => {
 
   it('um `engage` vira cena de duelo com o `duelResult` do passo', () => {
     const state = comIaPendente([{ id: 'def', pos: { x: 1, y: 0 }, archetype: 'aggressive' }]);
-    const { steps } = resolveAiTurnsLogged(state);
+    const steps = comoPassosDoServidor(resolveAiTurnsLogged(state).steps);
     const scenes = narrateAiTurns(steps);
 
     const duelo = scenes.find((s) => s.kind === 'duel');
@@ -175,19 +188,19 @@ describe('M16 4/N — `narrateAiTurns`: o relato do core vira cenas', () => {
     const passo = steps.find((s) => s.command.t === 'engage')!;
     if (duelo!.kind !== 'duel') throw new Error('esperava um duelo');
     expect(duelo!.duelResult).toBe(passo.duelResult as DuelResult);
-    expect(duelo!.stateBefore).toBe(passo.stateBefore);
+    expect(duelo!.stateBefore).toBe(passo.estadoAntes);
   });
 
   it('um `engage` sem `duelResult` não vira cena: a narração não inventa duelo', () => {
-    const steps: readonly AiTurnStep[] = [
-      { stateBefore: {} as BattleState, command: { t: 'engage', unitId: 'def', targetId: 'atk' } },
+    const steps: readonly PassoDaIa[] = [
+      { estadoAntes: {} as EstadoVisivel, command: { t: 'engage', unitId: 'def', targetId: 'atk' } },
     ];
     expect(narrateAiTurns(steps)).toEqual([]);
   });
 
   it('uma IA que anda e engaja no mesmo turno vira duas cenas, nessa ordem', () => {
     const state = comIaPendente([{ id: 'def', pos: { x: 3, y: 0 }, archetype: 'aggressive' }]);
-    const scenes = narrateAiTurns(resolveAiTurnsLogged(state).steps);
+    const scenes = narrateAiTurns(comoPassosDoServidor(resolveAiTurnsLogged(state).steps));
     expect(scenes.map((s) => s.kind)).toEqual(['move', 'duel']);
   });
 
@@ -196,7 +209,7 @@ describe('M16 4/N — `narrateAiTurns`: o relato do core vira cenas', () => {
       { id: 'ia1', pos: { x: 6, y: 0 }, archetype: 'aggressive' },
       { id: 'ia2', pos: { x: 6, y: 6 }, archetype: 'aggressive' },
     ]);
-    const { steps } = resolveAiTurnsLogged(state);
+    const steps = comoPassosDoServidor(resolveAiTurnsLogged(state).steps);
     const scenes = narrateAiTurns(steps);
 
     const ordemRelatada = steps

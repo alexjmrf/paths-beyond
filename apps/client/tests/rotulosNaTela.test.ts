@@ -90,16 +90,32 @@ describe('o nome de uma unidade do tabuleiro', () => {
     );
   });
 
-  // M35 1/N (D43) — o inimigo comum pelo NOME AUTORADO, traduzido. `unit-alvo-1` era o que a
-  // lista de iniciativa e a cena de duelo mostravam com sessão de verdade; o nome existe em
-  // `packages/data/enemies/` desde o M27 e o ticket já o transportava — faltava olhar.
-  it('inimigo: o nome autorado de enemies/, pela camada de idioma', () => {
+  // M35 1/N (D43) — o inimigo comum pelo nome, traduzido. `unit-alvo-1` era o que a lista de
+  // iniciativa e a cena de duelo mostravam com sessão de verdade.
+  //
+  // **M36 3/N (D48) — o nome passou a vir SÓ da camada de idioma.** Ele era lido de
+  // `catalog.enemies[artId].name`, e `enemies/` saiu do bundle do cliente: o arquivo que tem o
+  // nome é o mesmo que tem os stats. Quem garante que todo inimigo do catálogo tem entrada nas
+  // duas línguas é `conteudoTraduzido.test.ts`, lendo o catálogo REAL do disco — então a única
+  // fonte que restou é também a única de que se precisa.
+  it('inimigo: o nome pela camada de idioma, nas duas línguas, sem catálogo de inimigos', () => {
     const en = nomeDeUnidade(criarTradutor('en', CATALOGOS), 'unit-alvo-1', heroesByUnitId, artIdByUnitId, catalog);
     const pt = nomeDeUnidade(criarTradutor('pt', CATALOGOS), 'unit-alvo-1', heroesByUnitId, artIdByUnitId, catalog);
-    expect(pt).toBe(catalog.enemies['enemy-treino-alvo-espadachim']!.name);
     expect(en).not.toBe(pt);
+    expect(pt).not.toContain('conteudo.');
     expect(en).not.toContain('conteudo.');
+    expect(pt).not.toBe('unit-alvo-1');
     expect(en).not.toBe('unit-alvo-1');
+    // E o id de arte não vaza para a tela como se fosse nome.
+    expect(pt).not.toBe('enemy-treino-alvo-espadachim');
+  });
+
+  it('id de arte sem tradução cai no `unitId`, e nunca na chave crua nem no id', () => {
+    // O fundo do poço mudou com o catálogo partido: antes era o nome autorado, agora é o
+    // `unitId`. Ele não é alcançado por conteúdo de verdade — mas é o que uma build com um
+    // inimigo novo e ainda sem tradução mostraria, e não pode ser `conteudo.inimigo.foo`.
+    const nome = nomeDeUnidade(t, 'unit-novo', {}, { 'unit-novo': 'enemy-que-ninguem-traduziu' }, catalog);
+    expect(nome).toBe('unit-novo');
   });
 
   it('unidade sem herói E sem id de arte (replay antigo, defesa de outra conta): o id, como antes', () => {

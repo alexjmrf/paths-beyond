@@ -33,17 +33,30 @@ const economyRulesSchema = z.object({
   enhance: z
     .array(z.object({ gold: z.number().int().min(0), stones: z.number().int().min(0) }))
     .length(5),
+  // M38 2/N (D54) — a evolução do ARTEFATO, com a mesma forma das duas tabelas do personagem:
+  // awakening próprio 0–6 (Legend no topo) e imprint 0–5 por fragmento do artefato.
+  artifactAwakening: z
+    .array(z.object({ gold: z.number().int().min(0), materials: materialCostSchema }))
+    .length(6),
+  artifactImprint: z.array(z.object({ fragments: z.number().int().positive() })).length(5),
   // §10 (M18) — os dois sumidouros da QUARTA moeda, a premium (D17). Ela não se ganha
   // farmando e não paga evolução de personagem: awakening, imprint e enhance continuam em
   // ouro, pedras e material, pela mesma razão que a loja de arena nunca vende poder bruto.
   //
-  // O `pityThreshold` aparece aqui E no banner de propósito, e não é duplicação: o do
+  // O `pityThresholds` aparece aqui E no banner de propósito, e não é duplicação: o do
   // banner é o que a rolagem consome (um banner futuro pode ter pity próprio), e este é o
   // padrão do jogo. Um teste de `packages/content` trava os dois iguais enquanto houver um
   // banner só — divergirem em silêncio seria o defeito.
+  //
+  // D50 (M37) — dois andares, um por rank: `adventurer` e `hero`.
   summon: z.object({
     premiumCost: z.number().int().positive(),
-    pityThreshold: z.number().int().positive(),
+    pityThresholds: z
+      .object({
+        adventurer: z.number().int().positive(),
+        hero: z.number().int().positive(),
+      })
+      .strict(),
   }),
   // "Comprar energia extra para farmar mais", nas palavras do usuário ao decidir D17.
   energyPurchase: z.object({

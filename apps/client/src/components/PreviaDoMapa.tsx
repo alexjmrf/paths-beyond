@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { themeFor } from '../data/overlayTheme.js';
 import { activeUnitRenderer } from '../data/unitRenderer.js';
 import { urlsDeArte } from '../data/unitArt.js';
-import type { PreviaDaMissao } from '../logic/previaDaMissao.js';
+import type { MissionPreviewResponse } from '../data/api.js';
 import { entradaDeRender, paintPrimitives, pintarTile } from '../render/tabuleiro.js';
 import { useBattleStore } from '../store/battleStore.js';
 
@@ -16,8 +16,17 @@ import { useBattleStore } from '../store/battleStore.js';
 // prévia tem: as VAGAS marcadas (onde o jogador vai entrar, numeradas na ordem das vagas) e
 // nenhuma peça do lado do jogador (ele ainda não escolheu quem leva).
 //
-// §1.1 antes de entrar: o jogador vê contra o que vai, onde os inimigos estão e o terreno, e
-// só então escolhe quem leva.
+// **M36 3/N (D47/D48) — duas coisas mudaram aqui, e as duas são a milestone.**
+//
+// 1. A prévia não é mais montada do catálogo local: ela vem de `GET /campaign/:id/previa`, já
+//    redigida. O que chega de cada inimigo é posição, HP e a arte — nada da build dele.
+// 2. **A ZONA DE AMEAÇA SAIU.** Ela derivava de `moveType`, `moveRange` e `duelRange` do
+//    inimigo, e os três ficaram no servidor. Não é uma perda de recurso por descuido: D47 tirou
+//    a zona de ameaça de propósito, porque ela é exatamente o cálculo que o oculto não permite.
+//
+// §1.1, na forma reescrita: o jogador vê o terreno, onde os inimigos estão, quantos são e onde
+// ele mesmo vai entrar — e só então escolhe quem leva. O que cada um carrega, ele descobre
+// engajando.
 
 // A prévia cabe num cartão: o tile é o maior que faz o mapa caber em `LARGURA_MAX`, com um piso
 // abaixo do qual a peça vira um borrão e o tabuleiro deixa de informar.
@@ -25,7 +34,7 @@ const LARGURA_MAX = 480;
 const TILE_MIN = 18;
 const TILE_MAX = 36;
 
-export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
+export function PreviaDoMapa({ previa }: { readonly previa: MissionPreviewResponse }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const colorblindMode = useBattleStore((s) => s.colorblindMode);
 
@@ -33,12 +42,10 @@ export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
     let disposed = false;
     let pronto = false;
     const app = new Application();
-    const { map } = previa.setup;
+    const { map } = previa;
     const tileSize = Math.max(TILE_MIN, Math.min(TILE_MAX, Math.floor(LARGURA_MAX / Math.max(map.width, map.height))));
     const theme = themeFor(colorblindMode);
-    const objectiveTile = 'target' in previa.setup.winCondition ? (previa.setup.winCondition.target as Coord) : undefined;
-    // M35 4/N (D44) — a ameaça também na prévia, pelo mesmo cálculo da batalha.
-    const ameacados = new Set(previa.ameaca.map((c) => `${c.x},${c.y}`));
+    const objectiveTile = 'target' in previa.winCondition ? (previa.winCondition.target as Coord) : undefined;
 
     const contexto = {
       theme,
@@ -47,7 +54,7 @@ export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
       // aqui é decidido pelo cartão, e o `MapCanvas` continua sendo quem obedece §11.
       uiScale: tileSize / 64,
       heroesByUnitId: {},
-      artIdByUnitId: previa.artIdByUnitId,
+      artIdByUnitId: previa.characterIdByUnitId,
     };
 
     function desenhar(layer: Container) {
@@ -62,7 +69,8 @@ export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
             tileSize,
             theme,
             overlays: {
-              threatened: ameacados.has(`${x},${y}`),
+              // D47 — sem zona de ameaça. Ver o cabeçalho.
+              threatened: false,
               reachable: false,
               targetable: false,
               gateOpen: false,
@@ -90,7 +98,7 @@ export function PreviaDoMapa({ previa }: { readonly previa: PreviaDaMissao }) {
         numero.position.set(px + tileSize / 2, py + tileSize / 2);
         layer.addChild(numero);
       });
-      for (const unit of previa.setup.units) {
+      for (const unit of previa.unidades) {
         if (unit.hp <= 0) continue;
         paintPrimitives(
           layer,

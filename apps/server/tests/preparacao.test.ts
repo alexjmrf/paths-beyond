@@ -1,4 +1,5 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
+import { RULES_VERSION } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
@@ -10,6 +11,7 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -98,6 +100,7 @@ function buildHarness() {
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository: createMemoryEconomyRepository(),
       ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -290,43 +293,52 @@ describe('PUT /heroes/:heroId/tactics (§6.3)', () => {
 // banco que nada lê, e o motivo de elas existirem (a campanha pelo servidor) não estaria
 // verificado em lugar nenhum.
 describe('o que foi salvo é o que a batalha monta', () => {
-  it('o ticket de campanha traz o script salvo, e não o da ficha', async () => {
+  // M36 2/N — o ticket saiu; quem devolve a batalha montada é `POST /campaign/:id/matches`, e o
+  // que ela devolve é o estado VISÍVEL. A asserção continua possível — e continua sendo a mesma
+  // — porque a unidade do próprio jogador atravessa inteira: é §1.1, "o jogador DEVE ler o
+  // próprio compromisso". Se um dia ela passasse a ser redigida também, estes dois testes seriam
+  // os primeiros a reprovar, e com razão.
+  //
+  // Precisa desistir entre as duas aberturas do segundo teste: é uma partida por jogador
+  // (migration 0017).
+  async function abrirCampanha(h: ReturnType<typeof buildHarness>) {
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/campaign/encounter-campanha-1/matches',
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+      payload: { heroIds: [HERO_ID], rulesVersion: RULES_VERSION },
+    });
+    return res;
+  }
+
+  async function minhaUnidade(h: ReturnType<typeof buildHarness>) {
+    const res = await abrirCampanha(h);
+    expect(res.statusCode, res.body).toBe(201);
+    const corpo = res.json() as any;
+    await h.app.inject({
+      method: 'POST',
+      url: `/matches/${corpo.nonce}/forfeit`,
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+    });
+    return corpo.visivel.units.find((u: any) => u.unitId === `player-${HERO_ID}`);
+  }
+
+  it('a batalha montada traz o script salvo, e não o da ficha', async () => {
     const h = buildHarness();
     const script = [linha(ATAQUE, 1)];
     expect((await put(h, `/heroes/${HERO_ID}/tactics`, { tacticsScript: script })).status).toBe(200);
 
-    const ticket = await h.app.inject({
-      method: 'POST',
-      url: '/campaign/encounter-campanha-1/ticket',
-      headers: { 'x-platform-ticket': `dev:${TOKEN}`},
-      payload: { heroIds: [HERO_ID] },
-    });
-
-    expect(ticket.statusCode).toBe(200);
-    const unidade = (ticket.json() as any).setup.units.find((u: any) => u.unitId === `player-${HERO_ID}`);
-    expect(unidade.tacticsScript).toEqual(script);
+    expect((await minhaUnidade(h)).tacticsScript).toEqual(script);
   });
 
-  it('o ticket reflete os talentos salvos: o stat sheet muda', async () => {
+  it('a batalha montada reflete os talentos salvos: o stat sheet muda', async () => {
     const h = buildHarness();
 
-    const antes = await h.app.inject({
-      method: 'POST',
-      url: '/campaign/encounter-campanha-1/ticket',
-      headers: { 'x-platform-ticket': `dev:${TOKEN}`},
-      payload: { heroIds: [HERO_ID] },
-    });
-    const statsAntes = (antes.json() as any).setup.units.find((u: any) => u.unitId === `player-${HERO_ID}`).stats;
+    const statsAntes = (await minhaUnidade(h)).stats;
 
     expect((await put(h, `/heroes/${HERO_ID}/talents`, { talents: caminhoLegal(4) })).status).toBe(200);
 
-    const depois = await h.app.inject({
-      method: 'POST',
-      url: '/campaign/encounter-campanha-1/ticket',
-      headers: { 'x-platform-ticket': `dev:${TOKEN}`},
-      payload: { heroIds: [HERO_ID] },
-    });
-    const statsDepois = (depois.json() as any).setup.units.find((u: any) => u.unitId === `player-${HERO_ID}`).stats;
+    const statsDepois = (await minhaUnidade(h)).stats;
 
     expect(statsDepois).not.toEqual(statsAntes);
   });

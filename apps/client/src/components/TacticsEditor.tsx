@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { UNIT_TYPES, WEAPON_TYPES, createDefaultCondition } from '../data/conditionSpecs.js';
 import { DEFAULT_DUMMY, runTacticsTest, type DummyConfig } from '../logic/testTactics.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { ehVisivelPorInteiro } from '../data/api.js';
 import { ConditionEditor } from './ConditionEditor.js';
 
 const MAX_LINES = 6; // §6.3 — "lista ordenada de até 6 linhas"
@@ -26,7 +27,11 @@ export function TacticsEditor() {
   // replay não teria como reproduzir a troca (ver DECISIONS.md).
   const locked = useBattleStore((s) => s.commandLog.length > 0);
 
-  const unit = battleState.units.find((u) => u.unitId === tacticsEditorUnitId);
+  // O editor de táticas abre sobre um HERÓI do jogador — é o script DELE que se edita. Do lado
+  // do inimigo não há script para abrir, e desde M36 4/N (D47) não há nem o dado: o `BattleUnit`
+  // completo é o discriminante, e a busca já o exige.
+  const bruta = battleState.units.find((u) => u.unitId === tacticsEditorUnitId);
+  const unit = bruta && ehVisivelPorInteiro(bruta) ? bruta : undefined;
 
   const [script, setScript] = useState<TacticsLine[]>(() => (unit ? unit.tacticsScript.map(cloneLine) : []));
   const [dragIndex, setDragIndex] = useState<number | null>(null);

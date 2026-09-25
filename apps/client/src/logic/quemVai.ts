@@ -1,4 +1,3 @@
-import type { ContentCatalog } from '@paths-beyond/content/src/types.js';
 import type { RosterEntry } from '../data/api.js';
 
 // M35 2/N (D42) — as vagas de uma missão NUNCA começam vazias, e o protagonista vem primeiro.
@@ -13,22 +12,12 @@ import type { RosterEntry } from '../data/api.js';
 // novo numa missão entra na ordem sozinho, e nenhuma lista fica descrevendo o passado. É
 // apresentação (quem vem marcado), não regra: quem valida a party continua sendo o servidor.
 
-/** Ids de personagem na ordem em que a campanha os apresenta como vaga do jogador. */
-export function ordemDeAparicao(catalogo: Pick<ContentCatalog, 'chapters' | 'encounters'>): readonly string[] {
-  const ordemDoCapitulo = new Map(catalogo.chapters.map((c) => [c.id, c.order] as const));
-  const missoes = [...catalogo.encounters].sort(
-    (a, b) => (ordemDoCapitulo.get(a.chapterId) ?? 0) - (ordemDoCapitulo.get(b.chapterId) ?? 0) || a.order - b.order,
-  );
-  const vistos: string[] = [];
-  for (const missao of missoes) {
-    for (const unit of missao.units) {
-      if (unit.side !== 'player') continue;
-      const id = unit.hero.characterId;
-      if (id && !vistos.includes(id)) vistos.push(id);
-    }
-  }
-  return vistos;
-}
+// M36 3/N (D48) — `ordemDeAparicao` MUDOU DE LADO. Ela derivava de `catalogo.encounters`, que
+// saiu do bundle do cliente junto com a ficha dos inimigos que mora nos mesmos arquivos. A regra
+// não mudou uma vírgula — continua derivada do conteúdo autorado, agora em
+// `apps/server/src/campaign/routes.ts`, e chega pronta em `GET /campaign` como `castOrder`.
+//
+// O que ficou aqui é o que sempre foi do cliente: dado o `castOrder`, quem vem marcado.
 
 /** Os heróis que vêm marcados ao escolher uma missão de `vagas` vagas. */
 export function preenchimentoPadrao(

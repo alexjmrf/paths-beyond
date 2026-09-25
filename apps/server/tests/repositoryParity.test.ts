@@ -10,6 +10,7 @@ import {
   createMemoryPlayerRepository,
   createMemoryPartyPresetRepository,
   createMemoryTelemetryRepository,
+  createMemoryMatchRepository,
   createMemoryRewardsRepository,
 } from '../src/repository/memoryRepository.js';
 import {
@@ -19,6 +20,7 @@ import {
   createPostgresPlayerRepository,
   createPostgresPartyPresetRepository,
   createPostgresTelemetryRepository,
+  createPostgresMatchRepository,
   createPostgresRewardsRepository,
 } from '../src/repository/postgresRepository.js';
 import type {
@@ -28,8 +30,10 @@ import type {
   EconomyActionRecord,
   EconomyRepository,
   HeroRepository,
+  MatchRepository,
   PlayerRepository,
   RewardsRepository,
+  StoredMatch,
 } from '../src/repository/types.js';
 
 // §9.4 (M19) — a MESMA bateria contra os dois backends de repositório.
@@ -64,6 +68,8 @@ interface Backend {
   readonly presets: PartyPresetRepository;
   // M34 1/N — a telemetria (D45).
   readonly telemetry: TelemetryRepository;
+  // M36 2/N — a batalha viva (D47).
+  readonly matches: MatchRepository;
 }
 
 const catalog = loadCatalogFromDisk();
@@ -266,14 +272,80 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         expect(adquiridos.filter((id) => id === 'ally-grifeiro')).toHaveLength(1);
       });
 
-      it('pity ausente é null; gravado, volta igual', async () => {
-        expect(await backend.ownership.getPity(PLAYER, 'banner-sem-rolagem')).toBeNull();
+      it('pity ausente é null; gravados, os DOIS andares voltam iguais (D50), por TIPO de banner (D54)', async () => {
+        expect(await backend.ownership.getPity(PLAYER, 'rotatingArtifact')).toBeNull();
 
-        await backend.ownership.setPity(PLAYER, 'banner-elenco', 7);
-        expect(await backend.ownership.getPity(PLAYER, 'banner-elenco')).toBe(7);
+        // Os dois valores DIFERENTES de propósito: com eles iguais, uma implementação que
+        // gravasse o mesmo número nas duas colunas passaria.
+        await backend.ownership.setPity(PLAYER, 'rotatingCharacter', { adventurer: 7, hero: 41 });
+        expect(await backend.ownership.getPity(PLAYER, 'rotatingCharacter')).toEqual({ adventurer: 7, hero: 41 });
 
-        await backend.ownership.setPity(PLAYER, 'banner-elenco', 0);
-        expect(await backend.ownership.getPity(PLAYER, 'banner-elenco')).toBe(0);
+        await backend.ownership.setPity(PLAYER, 'rotatingCharacter', { adventurer: 0, hero: 42 });
+        expect(await backend.ownership.getPity(PLAYER, 'rotatingCharacter')).toEqual({ adventurer: 0, hero: 42 });
+        // Os escopos não se misturam.
+        expect(await backend.ownership.getPity(PLAYER, 'generic')).toBeNull();
+      });
+
+      it('M38 — o token por (jogador, banner): ausente é null, e os pendentes são listáveis', async () => {
+        expect(await backend.ownership.getToken(PLAYER, 'banner-x')).toBeNull();
+
+        await backend.ownership.setToken(PLAYER, 'banner-x', { rolls: 135, status: 'pending' });
+        await backend.ownership.setToken(PLAYER, 'banner-y', { rolls: 12, status: 'counting' });
+        expect(await backend.ownership.getToken(PLAYER, 'banner-x')).toEqual({ rolls: 135, status: 'pending' });
+        expect(await backend.ownership.listPendingTokens(PLAYER)).toEqual([
+          { bannerId: 'banner-x', state: { rolls: 135, status: 'pending' } },
+        ]);
+
+        await backend.ownership.setToken(PLAYER, 'banner-x', { rolls: 136, status: 'granted' });
+        expect(await backend.ownership.listPendingTokens(PLAYER)).toEqual([]);
+      });
+
+      it('M38 — a escolha do genérico: ausente é null, e grava contador e pendentes', async () => {
+        expect(await backend.ownership.getChoice(PLAYER, 'banner-generico')).toBeNull();
+        await backend.ownership.setChoice(PLAYER, 'banner-generico', { rolls: 17, pending: 2 });
+        expect(await backend.ownership.getChoice(PLAYER, 'banner-generico')).toEqual({ rolls: 17, pending: 2 });
+      });
+
+      it('M38 — o artefato: conceder aparece na lista, e conceder o mesmo de novo não duplica', async () => {
+        const instancia = { id: `artefato-${PLAYER}-tirano`, artifactId: 'artifact-machado-do-tirano', awakening: 0, imprint: 0 } as const;
+        await backend.ownership.grantArtifact(PLAYER, instancia);
+        await backend.ownership.grantArtifact(PLAYER, { ...instancia, id: `outro-${PLAYER}` });
+
+        expect(await backend.ownership.listArtifacts(PLAYER)).toEqual([instancia]);
+      });
+
+      it('M38 4/N — atualizar o artefato grava awakening e imprint, e só daquele jogador', async () => {
+        const instancia = { id: `artefato-${PLAYER}-lanca`, artifactId: 'artifact-lanca-muralha', awakening: 0, imprint: 0 } as const;
+        await backend.ownership.grantArtifact(PLAYER, instancia);
+        await backend.ownership.updateArtifact(PLAYER, { ...instancia, awakening: 3, imprint: 2 });
+
+        const lida = (await backend.ownership.listArtifacts(PLAYER)).find((a) => a.id === instancia.id);
+        expect(lida).toEqual({ ...instancia, awakening: 3, imprint: 2 });
+
+        // Outro jogador não altera a instância de ninguém.
+        await backend.ownership.updateArtifact(`${PLAYER}-outro`, { ...instancia, awakening: 6 });
+        expect((await backend.ownership.listArtifacts(PLAYER)).find((a) => a.id === instancia.id)?.awakening).toBe(3);
+      });
+
+      it('M38 — apagar a conta apaga pity, token, escolha e artefatos', async () => {
+        const outro = `${PLAYER}-apagado`;
+        await backend.players.createPlayer({
+          id: outro,
+          platformProvider: 'dev' as const,
+          platformId: `parity-token-apagado-${sufixo}`,
+          displayName: 'Paridade (apagado)',
+        });
+        await backend.ownership.setPity(outro, 'generic', { adventurer: 1, hero: 1 });
+        await backend.ownership.setToken(outro, 'banner-x', { rolls: 1, status: 'counting' });
+        await backend.ownership.setChoice(outro, 'banner-generico', { rolls: 1, pending: 0 });
+        await backend.ownership.grantArtifact(outro, { id: `a-${outro}`, artifactId: 'artifact-pena-de-grifo', awakening: 0, imprint: 0 });
+
+        await backend.ownership.deletePlayerData(outro);
+
+        expect(await backend.ownership.getPity(outro, 'generic')).toBeNull();
+        expect(await backend.ownership.getToken(outro, 'banner-x')).toBeNull();
+        expect(await backend.ownership.getChoice(outro, 'banner-generico')).toBeNull();
+        expect(await backend.ownership.listArtifacts(outro)).toEqual([]);
       });
     });
 
@@ -421,6 +493,90 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         expect(await backend.telemetry.getAccount(PLAYER)).toEqual({ playerId: PLAYER, optOut: false, lastSeenAt: null });
       });
     });
+
+    // M36 2/N (D47) — a BATALHA VIVA. É a tabela mais nova e a mais perigosa de divergir: ela
+    // guarda o `BattleSetup` inteiro como jsonb e uma `seed` que o Postgres devolve como STRING
+    // (é `bigint`), e um repositório que esquecesse a conversão entregaria ao motor uma seed de
+    // texto. Em memória isso nunca apareceria.
+    describe('partidas', () => {
+      const OUTRO = `${PLAYER}-outro`;
+
+      // Um setup mínimo, mas de verdade: o que importa aqui é a ida e a volta pelo jsonb.
+      function partida(nonce: string, playerId = PLAYER): StoredMatch {
+        return {
+          nonce,
+          playerId,
+          kind: 'campaign',
+          refId: 'encounter-de-paridade',
+          rulesVersion: '9.9.9',
+          // Perto do teto de uint32, que é a largura que `rngFor` consome: um `Number()` que
+          // faltasse ou um `parseInt` truncado apareceria aqui e não num valor pequeno.
+          seed: 4_294_967_291,
+          setup: {
+            map: { width: 1, height: 1, tiles: [[{ terrain: 'plain', height: 0 }]], terrains: {}, zocEnabled: false },
+            units: [],
+            permadeath: 'classic',
+            winCondition: { t: 'rout' },
+            effectDefs: {},
+            initialValor: 5,
+          } as StoredMatch['setup'],
+          commands: [],
+          outcome: 'ongoing',
+          createdAt: new Date(1_767_225_600_000).toISOString(),
+          finishedAt: null,
+          forfeited: false,
+        };
+      }
+
+      it('a partida volta idêntica do banco, com a seed ainda sendo NÚMERO', async () => {
+        const criada = await backend.matches.create(partida(`${PLAYER}-m1`));
+        const lida = await backend.matches.get(`${PLAYER}-m1`);
+
+        expect(lida).toEqual(criada);
+        expect(typeof lida!.seed).toBe('number');
+        expect(lida!.seed).toBe(4_294_967_291);
+      });
+
+      it('a partida em andamento é encontrada pelo jogador, e não pelos outros', async () => {
+        expect((await backend.matches.getOngoingByPlayer(PLAYER))?.nonce).toBe(`${PLAYER}-m1`);
+        expect(await backend.matches.getOngoingByPlayer(OUTRO)).toBeNull();
+      });
+
+      it('só UMA em andamento por jogador — a trava é do banco, não da rota', async () => {
+        // É o que faz o custo cobrado na abertura valer (D48). Os dois backends precisam
+        // recusar: um índice único parcial no Postgres, a mesma checagem em memória.
+        await expect(backend.matches.create(partida(`${PLAYER}-m2`))).rejects.toThrow();
+      });
+
+      it('atualizar grava comandos e desfecho; nonce inexistente devolve null em vez de inventar linha', async () => {
+        const atualizada = await backend.matches.update(`${PLAYER}-m1`, {
+          commands: [{ t: 'wait', unitId: 'u1' }],
+          outcome: 'victory',
+          finishedAt: new Date(1_767_225_700_000).toISOString(),
+          forfeited: false,
+        });
+
+        expect(atualizada!.commands).toEqual([{ t: 'wait', unitId: 'u1' }]);
+        expect(atualizada!.outcome).toBe('victory');
+        expect(atualizada!.finishedAt).toBe(new Date(1_767_225_700_000).toISOString());
+        expect(await backend.matches.update(`${PLAYER}-nao-existe`, {
+          commands: [],
+          outcome: 'defeat',
+          finishedAt: null,
+          forfeited: true,
+        })).toBeNull();
+      });
+
+      it('fechada a primeira, a próxima abre — e apagar a conta leva as partidas junto', async () => {
+        const segunda = await backend.matches.create(partida(`${PLAYER}-m3`));
+        expect(segunda.nonce).toBe(`${PLAYER}-m3`);
+
+        await backend.matches.deletePlayerData(PLAYER);
+        expect(await backend.matches.get(`${PLAYER}-m1`)).toBeNull();
+        expect(await backend.matches.get(`${PLAYER}-m3`)).toBeNull();
+        expect(await backend.matches.getOngoingByPlayer(PLAYER)).toBeNull();
+      });
+    });
   });
 }
 
@@ -432,6 +588,7 @@ contrato('memória', () => ({
   heroes: createMemoryHeroRepository(),
   presets: createMemoryPartyPresetRepository(),
   telemetry: createMemoryTelemetryRepository(),
+  matches: createMemoryMatchRepository(),
 }));
 
 // Sem `DATABASE_URL` o bloco inteiro é pulado. O CI define a variável e sobe o serviço, e é
@@ -467,6 +624,8 @@ descrevePostgres('postgres', () => {
       ['party_presets', 'owner_player_id'],
       ['mission_attempts', 'player_id'],
       ['telemetry_accounts', 'player_id'],
+      // M36 2/N — as partidas vivas.
+      ['matches', 'player_id'],
     ] as const) {
       await pool.query(`DELETE FROM ${tabela} WHERE ${coluna} LIKE $1`, [`${PLAYER}%`]).catch(() => undefined);
     }
@@ -482,5 +641,6 @@ descrevePostgres('postgres', () => {
     heroes: createPostgresHeroRepository(pool),
     presets: createPostgresPartyPresetRepository(pool),
     telemetry: createPostgresTelemetryRepository(pool),
+    matches: createPostgresMatchRepository(pool),
   }));
 });

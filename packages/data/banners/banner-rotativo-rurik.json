@@ -1,0 +1,65 @@
+{
+  "id": "banner-rotativo-rurik",
+  "kind": "rotatingCharacter",
+  "name": "Destaque: Rurik",
+  "activeFrom": "2026-09-25T00:00:00Z",
+  "activeUntil": "2026-10-09T00:00:00Z",
+  "featuredCharacterId": "ally-guerreiro",
+  "tokenThreshold": 135,
+  "pityThresholds": {
+    "adventurer": 10,
+    "hero": 90
+  },
+  "softPity": {
+    "baseRate": 6,
+    "softStart": 74,
+    "step": 60
+  },
+  "pool": [
+    {
+      "characterId": "ally-guerreiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-guerreiro"
+    },
+    {
+      "characterId": "ally-acolito",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-acolito"
+    },
+    {
+      "characterId": "ally-batedora",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-batedora"
+    },
+    {
+      "characterId": "ally-escudeira",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-escudeira"
+    },
+    {
+      "characterId": "ally-grifeiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-grifeiro"
+    },
+    {
+      "characterId": "ally-machadeira",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-machadeira"
+    },
+    {
+      "characterId": "ally-mensageira",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-mensageira"
+    },
+    {
+      "characterId": "ally-piqueiro",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-piqueiro"
+    },
+    {
+      "characterId": "ally-sentinela",
+      "weight": 1,
+      "fragmentMaterialId": "material-fragmento-ally-sentinela"
+    }
+  ]
+}

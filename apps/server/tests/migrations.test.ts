@@ -2,7 +2,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CAMPOS_COLETADOS, ECONOMY_ACTION_KINDS } from '../src/repository/types.js';
+import { RANKS_DE_BASE } from '@paths-beyond/core';
+import { BANNER_KINDS } from '@paths-beyond/gacha';
+import { loadCatalogFromDisk, toStartingHero } from '@paths-beyond/content';
+import { CAMPOS_COLETADOS, ECONOMY_ACTION_KINDS, MATCH_KINDS } from '../src/repository/types.js';
 
 // M19 — o SQL e o TypeScript conferidos um contra o outro, SEM banco.
 //
@@ -17,6 +20,12 @@ import { CAMPOS_COLETADOS, ECONOMY_ACTION_KINDS } from '../src/repository/types.
 // rodar sem `DATABASE_URL` para sempre, esta asserção continua de pé.
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
+
+// Um `Hero` de verdade, montado do catálogo pelo mesmo caminho que o servidor usa ao conceder
+// um personagem. Lido do conteúdo e não escrito à mão: um campo novo em `Hero` aparece aqui
+// sozinho, que é o ponto.
+const catalogoParaHeroi = loadCatalogFromDisk();
+const HERO_DE_REFERENCIA = toStartingHero(Object.values(catalogoParaHeroi.characters)[0]!, 'heroi-de-referencia');
 
 function sqlDasMigrations(): string {
   return readdirSync(MIGRATIONS_DIR)
@@ -99,5 +108,174 @@ describe('a declaração da telemetria bate com as tabelas', () => {
     );
     expect(colunas.length).toBeGreaterThan(0);
     expect([...colunas].sort()).toEqual([...CAMPOS_COLETADOS].map(snake).sort());
+  });
+});
+
+// M36 2/N (D47) — a tabela `matches` conferida contra o TypeScript, pelo mesmo motivo que fez
+// este arquivo existir: uma cláusula `CHECK` que não acompanha o código é uma constraint que
+// recusa em produção o que a suíte aceita em memória. A `kind` é o caso exato do defeito de
+// `economy_actions.kind` (migration 0008 × M18 3/N), um milestone depois.
+describe('a tabela de partidas bate com o TypeScript', () => {
+  const sql = sqlDasMigrations();
+
+  // O corpo do `CREATE TABLE matches`, isolado uma vez: as duas cláusulas `CHECK` que
+  // interessam vivem dentro dele, e ler o arquivo inteiro pegaria o `CHECK` de outra tabela.
+  const criacaoDaTabela = sql.split(/;\s*/).find((trecho) => /CREATE TABLE matches/i.test(trecho)) ?? '';
+
+  function valoresDoCheck(coluna: string): readonly string[] {
+    const linha = criacaoDaTabela.split('\n').find((l) => l.trim().startsWith(coluna) && /CHECK/i.test(l)) ?? '';
+    const dentro = /IN\s*\(([^)]*)\)/i.exec(linha)?.[1] ?? '';
+    return dentro
+      .split(',')
+      .map((v) => v.trim().replace(/^'|'$/g, ''))
+      .filter((v) => v.length > 0);
+  }
+
+  it('o CHECK de `matches.kind` cobre exatamente as superfícies que o código abre', () => {
+    // Não é "contém": é igualdade. Um kind a mais no SQL é uma constraint que deixou de
+    // significar o que promete; um a menos é a batalha que não abre em produção.
+    expect([...valoresDoCheck('kind')].sort()).toEqual([...MATCH_KINDS].sort());
+  });
+
+  it('o CHECK de `matches.outcome` cobre os três estados, e `ongoing` é um deles', () => {
+    // `ongoing` não é um detalhe: é o estado em que a partida VIVE. Uma constraint que só
+    // aceitasse desfecho impediria a tabela de guardar a única coisa que ela existe para
+    // guardar.
+    expect([...valoresDoCheck('outcome')].sort()).toEqual(['defeat', 'ongoing', 'victory']);
+  });
+
+  it('há um índice único PARCIAL que garante uma partida em andamento por jogador', () => {
+    // A trava não pode viver só na rota: ela é o que faz o custo cobrado na abertura (D48)
+    // valer alguma coisa. Sem o índice, duas requisições simultâneas abririam duas partidas.
+    const indice = /CREATE UNIQUE INDEX[^;]*ON matches[^;]*WHERE outcome = 'ongoing'/i.test(sql);
+    expect(indice, 'falta o índice único parcial de partida em andamento').toBe(true);
+  });
+});
+
+// M37 2/N (D50) — o pity de DOIS ANDARES conferido contra os ranks de `packages/core`.
+//
+// Mesmo motivo de sempre: os contadores viraram uma coluna por rank, e `RANKS_DE_BASE` é a
+// lista fechada que os nomeia. O dia em que um rank de base novo entrar no core, o repositório
+// para de compilar (o tipo é `PityState`) — mas o SQL não pararia, e uma coluna a menos é um
+// rank sem garantia nenhuma, em silêncio. É esta asserção que o impede.
+describe('os contadores de pity batem com os ranks de base', () => {
+  // `colunasDaTabela` lê só o `CREATE TABLE`, e `banner_pity` foi ALTERADA depois de criada.
+  // O que interessa é o estado FINAL do banco, então as alterações entram na conta — pelo
+  // mesmo princípio que faz `kindsDoCheck` usar a ÚLTIMA cláusula e não a primeira.
+  function colunasDepoisDosAlters(sql: string, tabela: string): readonly string[] {
+    const colunas = new Set(colunasDaTabela(sql, tabela));
+
+    for (const trecho of sql.split(/;\s*/)) {
+      if (!new RegExp(`ALTER\\s+TABLE\\s+${tabela}\\b`, 'i').test(trecho)) continue;
+
+      for (const [, coluna] of trecho.matchAll(/ADD\s+COLUMN\s+([a-z_]+)/gi)) colunas.add(coluna!);
+      for (const [, coluna] of trecho.matchAll(/DROP\s+COLUMN\s+([a-z_]+)/gi)) colunas.delete(coluna!);
+    }
+
+    return [...colunas];
+  }
+
+  const sql = sqlDasMigrations();
+
+  it('`banner_pity` tem exatamente uma coluna `rolls_since_<rank>` por rank de base', () => {
+    const colunas = colunasDepoisDosAlters(sql, 'banner_pity').filter((c) => c.startsWith('rolls_since_'));
+
+    expect([...colunas].sort()).toEqual([...RANKS_DE_BASE].map((rank) => `rolls_since_${rank}`).sort());
+  });
+
+  it('a coluna de um andar só não sobreviveu à migração', () => {
+    // `rolls_since_new` contava "rolagens desde um personagem NOVO", semântica que D50
+    // reverteu. Deixá-la para trás seria um número que ninguém escreve e alguém lê.
+    expect(sql).toContain('ALTER TABLE banner_pity DROP COLUMN rolls_since_new');
+    expect(colunasDepoisDosAlters(sql, 'banner_pity')).not.toContain('rolls_since_new');
+  });
+});
+
+// M37 4/N (D49) — **O RANK CORRENTE NÃO É GRAVADO, E NENHUMA COLUNA PODE NASCER PARA ELE.**
+//
+// É a metade do critério de aceite 1 que nenhum outro teste alcança: o rank de BASE é catálogo
+// e o CORRENTE é `rankCorrente(base, awakening)`, uma função. `rankDoElenco.test.ts` guarda o
+// lado do catálogo (o JSON recusa `legend`); este guarda o lado do banco.
+//
+// **O erro que ele impede tem precedente exato:** o M18 2/N gravou o fragmento de imprint como
+// dado quando ele era estado de conta, e o projeto pagou por isso. Uma coluna
+// `current_rank` aqui seria o mesmo erro ao contrário — estado derivado virando estado
+// gravado, com dois donos para o mesmo número e nenhuma garantia de que concordam.
+describe('o rank corrente é derivado, e o banco não o guarda', () => {
+  const sql = sqlDasMigrations();
+
+  it('nenhuma coluna de nenhuma tabela guarda rank de personagem', () => {
+    // As linhas de COMENTÁRIO falam de rank à vontade (a 0018 explica o pity por rank); o que
+    // não pode existir é DECLARAÇÃO de coluna. Por isso a varredura é sobre as colunas, e não
+    // sobre o texto do arquivo.
+    const declaracoes = sql
+      .split('\n')
+      .filter((linha) => !linha.trim().startsWith('--'))
+      .join('\n');
+
+    const colunasComRank = [...declaracoes.matchAll(/^\s*([a-z_]*rank[a-z_]*)\s+[a-z]/gim)].map((m) => m[1]!);
+
+    // `rolls_since_adventurer` e `rolls_since_hero` são contadores de PITY, não rank — e não
+    // casam com o padrão. Se alguém criar `current_rank`, `hero_rank` ou `rank`, casa.
+    expect(colunasComRank, `colunas de rank no SQL: ${colunasComRank.join(', ')}`).toEqual([]);
+  });
+
+  it('o `Hero` que o servidor guarda não tem campo de rank', () => {
+    // O outro lado da mesma moeda: mesmo sem coluna, um `rank` dentro de um jsonb de herói
+    // seria estado derivado gravado. `StoredHero` carrega o `Hero` do core, e o core não tem
+    // o campo — esta asserção é o que impede alguém de acrescentá-lo sem reabrir a decisão.
+    const campos = Object.keys(HERO_DE_REFERENCIA);
+
+    expect(campos).not.toContain('rank');
+    expect(campos).toContain('awakening'); // o eixo de que o rank corrente é FUNÇÃO
+  });
+});
+
+// M38 3/N (D54/D55) — o pity por TIPO de banner, o token por banner, a escolha do genérico e
+// a posse de artefato, conferidos contra o TypeScript sem banco.
+describe('o gacha do M38 no SQL', () => {
+  const sql = sqlDasMigrations();
+
+  function valoresDoCheck(coluna: string): readonly string[] {
+    const trechos = sql.split(/;\s*/).filter((t) => new RegExp(`${coluna}\\s+IN\\s*\\(`, 'i').test(t));
+    const ultimo = trechos[trechos.length - 1] ?? '';
+    const dentro = new RegExp(`${coluna}\\s+IN\\s*\\(([^)]*)\\)`, 'i').exec(ultimo)?.[1] ?? '';
+    return dentro
+      .split(',')
+      .map((v) => v.trim().replace(/^'|'$/g, ''))
+      .filter((v) => v.length > 0);
+  }
+
+  it('o pity passou a ser por TIPO: `banner_pity.banner_id` virou `pity_scope`', () => {
+    expect(sql).toContain('ALTER TABLE banner_pity RENAME COLUMN banner_id TO pity_scope');
+  });
+
+  it('o escopo do pity aceita exatamente os tipos de banner de `packages/gacha`', () => {
+    expect([...valoresDoCheck('pity_scope')].sort()).toEqual([...BANNER_KINDS].sort());
+  });
+
+  it('os contadores do `banner-elenco` vão para o rotativo de personagem — ninguém perde pity', () => {
+    expect(sql).toMatch(/UPDATE banner_pity SET pity_scope = 'rotatingCharacter' WHERE pity_scope = 'banner-elenco'/);
+  });
+
+  it('o status do token aceita exatamente os estados do motor', () => {
+    expect([...valoresDoCheck('status')].sort()).toEqual(['counting', 'granted', 'pending']);
+  });
+
+  it('as tabelas novas têm as colunas que o repositório lê', () => {
+    expect([...colunasDaTabela(sql, 'banner_tokens')].sort()).toEqual(['banner_id', 'player_id', 'rolls', 'status']);
+    expect([...colunasDaTabela(sql, 'generic_choices')].sort()).toEqual(['banner_id', 'pending', 'player_id', 'rolls']);
+    expect([...colunasDaTabela(sql, 'player_artifacts')].sort()).toEqual([
+      'acquired_at',
+      'artifact_id',
+      'awakening',
+      'id',
+      'imprint',
+      'player_id',
+    ]);
+  });
+
+  it('um artefato por (jogador, definição): a segunda cópia é fragmento, não instância', () => {
+    expect(sql).toMatch(/UNIQUE \(player_id, artifact_id\)/);
   });
 });

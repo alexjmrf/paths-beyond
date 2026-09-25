@@ -1,0 +1,150 @@
+{
+  "id": "comp-escudeira",
+  "name": "Escudeira",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-escudeira-1",
+        "characterId": "ally-escudeira",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-sena-guarda-alta": 2,
+          "talent-sena-respiracao": 2,
+          "talent-sena-mao-estendida": 1,
+          "talent-sena-vigor": 2,
+          "talent-sena-cobertura": 1,
+          "talent-sena-treino-longo": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lamina-do-juramento"
+    },
+    {
+      "hero": {
+        "id": "heroi-escudeira-2",
+        "characterId": "ally-arqueiro",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-sylla-pes-leves": 1,
+          "talent-sylla-folego-de-combate": 1,
+          "talent-sylla-alcance-de-apoio": 1,
+          "talent-sylla-mao-estendida": 1,
+          "talent-sylla-respiro": 2,
+          "talent-sylla-retirada-calculada": 1,
+          "talent-sylla-apoio-constante": 1,
+          "talent-sylla-comando-de-batedores": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-arco-da-alvorada"
+    },
+    {
+      "hero": {
+        "id": "heroi-escudeira-3",
+        "characterId": "ally-guerreiro",
+        "classId": "class-guerreiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-rurik-estandarte": 2,
+          "talent-rurik-brado": 1,
+          "talent-rurik-mao-estendida": 1,
+          "talent-rurik-folego-de-comando": 2,
+          "talent-rurik-alcance-de-apoio": 1,
+          "talent-rurik-ordem-clara": 1,
+          "talent-rurik-comando-de-vanguarda": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-machado-do-tirano"
+    }
+  ]
+}

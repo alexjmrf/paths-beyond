@@ -61,3 +61,30 @@ export function characterIdsForReplayUnits(
   }
   return porUnidade;
 }
+
+/**
+ * O mesmo mapa para uma PARTIDA VIVA (M36 2/N), onde reconectar precisa reproduzir a arte que o
+ * começo da batalha entregou — e os placements não existem mais, só o `setup` gravado.
+ *
+ * Reproduz `characterIdsForPlacements` a partir do `BattleUnit`: o herói do jogador resolve pelo
+ * roster; o inimigo autorado tem o id do manifesto NO PRÓPRIO `heroId` (é o que `assemble.ts`
+ * copia), e por isso ele é aceito quando existe no catálogo de inimigos. Derivado e não gravado,
+ * pela mesma razão do replay: uma coluna a mais que só guarda o que já dá para calcular.
+ */
+export function characterIdsForMatchUnits(
+  units: readonly Pick<BattleUnit, 'unitId' | 'heroId'>[],
+  heroes: readonly Hero[],
+  enemies: Readonly<Record<string, unknown>>,
+): Record<string, string> {
+  const porHeroId = new Map(heroes.map((hero) => [hero.id, hero.characterId] as const));
+  const porUnidade: Record<string, string> = {};
+  for (const unit of units) {
+    const characterId = porHeroId.get(unit.heroId);
+    if (characterId) {
+      porUnidade[unit.unitId] = characterId;
+      continue;
+    }
+    if (unit.heroId in enemies) porUnidade[unit.unitId] = unit.heroId;
+  }
+  return porUnidade;
+}

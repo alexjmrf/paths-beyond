@@ -89,9 +89,12 @@ describe('loadCatalogFromDisk() — itens/sets reais (regressão de M8 sub-sess�
 // só na parte de carregamento — o resto daquele arquivo testa `runTournament`, que continua
 // em `tools/balance` consumindo este pacote).
 describe('loadCatalogFromDisk() — conteúdo real e fixtures (regressão de M8 sub-sessão 1-2)', () => {
-  it('encontra as 9 composições reais de M8, com classes e skills resolvíveis', () => {
+  it('encontra as 15 composições reais, com classes e skills resolvíveis', () => {
+    // Eram 9 até o M37 4/N, uma por classe jogável. Agora são 15: cada `Adventurer` novo tem
+    // a sua, montada como CÓPIA da do par de classe com a primeira unidade trocada — sem ela,
+    // metade do elenco nunca entraria na matriz de `pnpm balance`.
     const catalog = loadCatalogFromDisk();
-    expect(catalog.comps.length).toBe(9);
+    expect(catalog.comps.length).toBe(15);
     for (const comp of catalog.comps) {
       for (const unit of comp.units) {
         expect(catalog.classes[unit.hero.classId]).toBeDefined();

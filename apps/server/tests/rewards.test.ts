@@ -1,6 +1,7 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { RULES_VERSION, resolveAutoBattle, type Hero } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
+import { jogarPartidaViva, type EstadoVisivelDeTeste } from './partidaViva.js';
 import { buildApp } from '../src/app.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
@@ -11,6 +12,7 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -82,6 +84,7 @@ function buildHarness(options: { now?: number; elo?: number } = {}): Harness {
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository: createMemoryEconomyRepository(),
       ownershipRepository,
@@ -106,24 +109,35 @@ async function get(h: Harness, url: string) {
   return { status: response.statusCode, body: response.json() as any };
 }
 
-// Uma vitória honesta no capítulo: o servidor exige que os comandos submetidos levem à
-// vitória, então o teste joga do mesmo jeito que um cliente jogaria e submete exatamente
-// esses comandos. Mesmo idioma de `economy.test.ts`.
-async function jogarCapitulo(h: Harness, chapterId = CAPITULO) {
-  const heroIds = [heroiDoCapitulo().id];
-  const ticket = await post(h, `/campaign/${chapterId}/ticket`, { heroIds });
-  expect(ticket.status).toBe(200);
+// M36 2/N — uma vitória honesta no capítulo, agora pela BATALHA VIVA: abre a partida e joga
+// comando a comando com o piloto CEGO, que decide vendo só o que o jogador vê. A resposta é
+// achatada no formato que a antiga `run` devolvia, para as asserções continuarem falando da
+// mesma coisa.
+//
+// A versão de regras é mandada na ABERTURA (e não numa submissão): é onde a checagem passou a
+// morar, e é melhor lá — um cliente velho é recusado antes de investir a batalha inteira.
+async function abrirCapitulo(h: Harness, chapterId = CAPITULO, heroIds = [heroiDoCapitulo().id]) {
+  return post(h, `/campaign/${chapterId}/matches`, { heroIds, rulesVersion: RULES_VERSION });
+}
 
-  const jogada = resolveAutoBattle({ setup: ticket.body.setup, seed: ticket.body.seed });
-  return post(h, `/campaign/${chapterId}/run`, {
-    nonce: ticket.body.nonce,
-    heroIds,
-    commands: jogada.commands,
-    // M22 1/N — a submissão manda a versão de regras com que o cliente jogou, como
-    // `/battles` sempre fez. Sem ela o servidor recusa: um cliente que não a manda é um
-    // cliente anterior à checagem.
-    rulesVersion: RULES_VERSION,
-  });
+function enviarComando(h: Harness) {
+  return async (rota: string, corpo: unknown) => {
+    const r = await post(h, rota, corpo as Record<string, unknown>);
+    return { status: r.status, body: r.body as Record<string, unknown> };
+  };
+}
+
+async function jogarCapitulo(h: Harness, chapterId = CAPITULO) {
+  const abertura = await abrirCapitulo(h, chapterId);
+  if (abertura.status !== 201) return { status: abertura.status, body: abertura.body };
+
+  const jogada = await jogarPartidaViva(
+    enviarComando(h),
+    abertura.body.nonce as string,
+    abertura.body.visivel as EstadoVisivelDeTeste,
+  );
+  const liquidacao = (jogada.ultima?.liquidacao ?? abertura.body.liquidacao ?? {}) as Record<string, unknown>;
+  return { status: 200, body: { outcome: jogada.outcome, roundsPlayed: jogada.roundsPlayed, ...liquidacao } };
 }
 
 describe('GET /campaign', () => {
@@ -153,10 +167,10 @@ describe('GET /campaign', () => {
   });
 });
 
-describe('POST /campaign/:id/run — a fonte "avanço de história"', () => {
+describe('a campanha viva — a fonte "avanço de história"', () => {
   it('capítulo desconhecido é 404', async () => {
     const h = buildHarness();
-    const { status } = await post(h, '/campaign/encounter-inexistente/ticket', { heroIds: ['x'] });
+    const { status } = await abrirCapitulo(h, 'encounter-inexistente', ['x']);
     expect(status).toBe(404);
   });
 
@@ -231,23 +245,19 @@ describe('POST /campaign/:id/run — a fonte "avanço de história"', () => {
     expect(capitulo.cleared).toBe(false);
   });
 
-  it('§9.4 — o servidor REEXECUTA: comandos que não vencem não pagam nada', async () => {
+  it('§9.4 — quem não joga não recebe: desistir não paga nada', async () => {
     // É o ponto inteiro de a campanha ter vindo para o servidor. Um cliente que afirmasse
-    // "limpei" sem jogar não recebe: o desfecho sai da reexecução, não do corpo do POST.
+    // "limpei" não recebe — e com a batalha viva ele nem tem onde afirmar: o desfecho é
+    // produzido pelo servidor no comando que o produz, e desistir fecha a partida sem liquidar.
     const h = buildHarness();
-    const heroIds = [heroiDoCapitulo().id];
-    const ticket = await post(h, `/campaign/${CAPITULO}/ticket`, { heroIds });
+    const abertura = await abrirCapitulo(h);
+    expect(abertura.status).toBe(201);
 
-    const semJogar = await post(h, `/campaign/${CAPITULO}/run`, {
-      nonce: ticket.body.nonce,
-      heroIds,
-      commands: [],
-      rulesVersion: RULES_VERSION,
-    });
+    const desistencia = await post(h, `/matches/${abertura.body.nonce}/forfeit`, {});
 
-    expect(semJogar.status).toBe(200);
-    expect(semJogar.body.outcome).toBe('defeat');
-    expect(semJogar.body.premiumAwarded).toBe(0);
+    expect(desistencia.status).toBe(200);
+    expect(desistencia.body.outcome).toBe('defeat');
+    expect(desistencia.body.premiumAwarded).toBeUndefined();
 
     const player = await h.playerRepository.getPlayerById('player-1');
     expect(player?.premium).toBe(0);
@@ -260,7 +270,7 @@ describe('POST /campaign/:id/run — a fonte "avanço de história"', () => {
     const naoPossuido: Hero = { ...heroiDoCapitulo(), id: 'heroi-intruso', characterId: 'ally-grifeiro' };
     await h.heroRepository.createHero({ ownerPlayerId: 'player-1', hero: naoPossuido, equippedItems: [] });
 
-    const { status, body } = await post(h, `/campaign/${CAPITULO}/ticket`, { heroIds: ['heroi-intruso'] });
+    const { status, body } = await abrirCapitulo(h, CAPITULO, ['heroi-intruso']);
 
     expect(status).toBe(400);
     expect(body.error).toContain('ally-grifeiro');
@@ -272,26 +282,26 @@ describe('o aliado de cenário chega ao tabuleiro (D16)', () => {
   // vaga, e PERDIA o aliado. O capítulo 1 não tem nenhum, então nada aqui teria reclamado —
   // e o capítulo 5 jogado pelo servidor nasceria sem a unidade que `escort` nomeia.
   it('o capítulo 5 montado pelo servidor tem a escoltada, e a condição a nomeia', async () => {
+    // A condição de vitória e a unidade escoltada são VISÍVEIS: a escoltada é aliada, e a
+    // condição é o objetivo da missão, que o jogador precisa ler para jogar (§1.1).
     const h = buildHarness();
-    const heroIds = [heroiDoCapitulo().id];
-    const ticket = await post(h, '/campaign/encounter-campanha-5/ticket', { heroIds });
+    const abertura = await abrirCapitulo(h, 'encounter-campanha-5');
 
-    expect(ticket.status).toBe(200);
-    const setup = ticket.body.setup;
-    expect(setup.winCondition.t).toBe('escort');
+    expect(abertura.status, JSON.stringify(abertura.body)).toBe(201);
+    const visivel = abertura.body.visivel;
+    expect(visivel.winCondition.t).toBe('escort');
 
-    const escoltada = setup.units.find((u: any) => u.unitId === setup.winCondition.unitId);
+    const escoltada = visivel.units.find((u: any) => u.unitId === visivel.winCondition.unitId);
     expect(escoltada, 'a unidade escoltada não chegou ao tabuleiro').toBeDefined();
     expect(escoltada.side).toBe('player');
   });
 
   it('o capítulo 6 montado pelo servidor tem o couraçado de cenário', async () => {
     const h = buildHarness();
-    const heroIds = [heroiDoCapitulo().id];
-    const ticket = await post(h, '/campaign/encounter-campanha-6/ticket', { heroIds });
+    const abertura = await abrirCapitulo(h, 'encounter-campanha-6');
 
-    expect(ticket.status).toBe(200);
-    expect(ticket.body.setup.units.some((u: any) => u.unitId === 'ally-couracado')).toBe(true);
+    expect(abertura.status).toBe(201);
+    expect(abertura.body.visivel.units.some((u: any) => u.unitId === 'ally-couracado')).toBe(true);
   });
 
   it('o capítulo 5 declara 4 vagas, e levar 5 heróis é recusado', async () => {

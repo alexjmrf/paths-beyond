@@ -1,0 +1,212 @@
+{
+  "characterId": "ally-escudeira",
+  "depth": 6,
+  "nodes": [
+    {
+      "id": "talent-sena-lamina-solta",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-guarda-alta",
+      "column": "b",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 50
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": -30
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-golpe-ensaiado",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-espadachim",
+          "patch": {
+            "multiplier": 1300
+          }
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-leitura-do-campo",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 4
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-respiracao",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 12
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-disciplina",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-braco-firme",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 20
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-vigor",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "hp",
+          "pct": 12
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-avanco",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-segundo-folego",
+      "column": "middle",
+      "row": 5,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-cobertura",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-maestria-da-lamina",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-espadachim-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-sena-treino-longo",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-espadachim",
+          "patch": {
+            "multiplier": 1150
+          }
+        }
+      ]
+    }
+  ]
+}

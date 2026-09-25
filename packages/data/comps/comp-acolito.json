@@ -1,0 +1,161 @@
+{
+  "id": "comp-acolito",
+  "name": "Acólito",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-acolito-1",
+        "characterId": "ally-acolito",
+        "classId": "class-clerigo",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-dorn-bencao-simples": 2,
+          "talent-dorn-litania": 2,
+          "talent-dorn-mao-estendida": 1,
+          "talent-dorn-paciencia": 2,
+          "talent-dorn-cobertura": 1,
+          "talent-dorn-procissao": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-clerigo",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "holy",
+        "duelSkills": [
+          "skill-ataque-clerigo",
+          "skill-especial-clerigo",
+          "skill-cura-clerigo"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-cura-clerigo",
+            "conditions": [
+              {
+                "t": "selfHpBelow",
+                "pct": 250
+              }
+            ]
+          },
+          {
+            "enabled": true,
+            "skillId": "skill-especial-clerigo",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-relicario-de-miron"
+    },
+    {
+      "hero": {
+        "id": "heroi-acolito-2",
+        "characterId": "ally-grifeiro",
+        "classId": "class-grifeiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-kaia-voo-baixo": 2,
+          "talent-kaia-folego-das-asas": 2,
+          "talent-kaia-mao-estendida": 1,
+          "talent-kaia-sombra-protetora": 2,
+          "talent-kaia-rota-de-fuga": 1,
+          "talent-kaia-comando-aereo": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-grifeiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "spear",
+        "duelSkills": [
+          "skill-ataque-grifeiro",
+          "skill-especial-grifeiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-grifeiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-pena-de-grifo"
+    },
+    {
+      "hero": {
+        "id": "heroi-acolito-3",
+        "characterId": "hero-jogador",
+        "classId": "class-espadachim",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-aren-postura-firme": 1,
+          "talent-aren-folego-do-escudo": 1,
+          "talent-aren-mao-estendida": 1,
+          "talent-aren-couro-batido": 1,
+          "talent-aren-contra-simples": 1,
+          "talent-aren-alcance-de-apoio": 1,
+          "talent-aren-vigilia": 1,
+          "talent-aren-troca-limpa": 1,
+          "talent-aren-comando-de-flanco": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-espadachim",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "sword",
+        "duelSkills": [
+          "skill-ataque-espadachim",
+          "skill-especial-espadachim"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-espadachim",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lamina-do-juramento"
+    }
+  ]
+}

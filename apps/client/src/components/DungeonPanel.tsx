@@ -25,7 +25,7 @@ export function DungeonPanel() {
 
   const togglePveHero = useBattleStore((s) => s.togglePveHero);
   const enterDungeon = useBattleStore((s) => s.enterDungeon);
-  const submitDungeonRun = useBattleStore((s) => s.submitDungeonRun);
+  const desistirDaPartida = useBattleStore((s) => s.desistirDaPartida);
   const sweepDungeon = useBattleStore((s) => s.sweepDungeon);
   const exitDungeon = useBattleStore((s) => s.exitDungeon);
 
@@ -58,12 +58,12 @@ export function DungeonPanel() {
               {t('masmorra.resultadoLocal', { desfecho: nomeDoDesfecho(t, battleState.outcome) })}
             </p>
           ) : null}
+          {/* M36 4/N (D47) — sem submissão: o desfecho e a recompensa chegaram no comando que
+              fechou a batalha. Sair é sair — e sair no meio DESISTE, sem devolver a energia
+              cobrada ao entrar (D48). */}
           <div className="pve-actions">
-            <button type="button" onClick={() => void submitDungeonRun()} disabled={pve.busy || !battleOver}>
-              {t('masmorra.enviar')}
-            </button>
             <button type="button" onClick={exitDungeon} disabled={pve.busy}>
-              {t('masmorra.abandonar')}
+              {battleOver ? t('masmorra.voltar') : t('masmorra.abandonar')}
             </button>
           </div>
         </>

@@ -1,0 +1,147 @@
+{
+  "id": "comp-batedora",
+  "name": "Batedora",
+  "units": [
+    {
+      "hero": {
+        "id": "heroi-batedora-1",
+        "characterId": "ally-batedora",
+        "classId": "class-arqueiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-ilvi-passo-leve": 3,
+          "talent-ilvi-folego": 2,
+          "talent-ilvi-mao-estendida": 1,
+          "talent-ilvi-cobertura": 2,
+          "talent-ilvi-caca-longa": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arqueiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "bow",
+        "duelSkills": [
+          "skill-ataque-arqueiro",
+          "skill-especial-arqueiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arqueiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-arco-da-alvorada"
+    },
+    {
+      "hero": {
+        "id": "heroi-batedora-2",
+        "characterId": "ally-guerreiro",
+        "classId": "class-guerreiro",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-rurik-estandarte": 2,
+          "talent-rurik-brado": 1,
+          "talent-rurik-mao-estendida": 1,
+          "talent-rurik-folego-de-comando": 2,
+          "talent-rurik-alcance-de-apoio": 1,
+          "talent-rurik-ordem-clara": 1,
+          "talent-rurik-comando-de-vanguarda": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-guerreiro",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-forca",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "axe",
+        "duelSkills": [
+          "skill-ataque-guerreiro",
+          "skill-especial-guerreiro"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-guerreiro",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 0,
+        "y": 1
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-machado-do-tirano"
+    },
+    {
+      "hero": {
+        "id": "heroi-batedora-3",
+        "characterId": "ally-arcanista",
+        "classId": "class-arcanista",
+        "level": 10,
+        "exp": 0,
+        "awakening": 3,
+        "imprint": 0,
+        "talents": {
+          "talent-vesper-manto-arcano": 2,
+          "talent-vesper-reserva-de-mana": 2,
+          "talent-vesper-mao-estendida": 1,
+          "talent-vesper-circulo-de-apoio": 2,
+          "talent-vesper-condutor": 1,
+          "talent-vesper-tecer-o-campo": 1
+        },
+        "equipment": {
+          "weapon": "item-arma-arcanista",
+          "helmet": null,
+          "armor": null,
+          "necklace": "item-colar-guardiao",
+          "ring": null,
+          "boots": null
+        },
+        "weaponType": "arcane",
+        "duelSkills": [
+          "skill-ataque-arcanista",
+          "skill-especial-arcanista"
+        ],
+        "mapSkills": [],
+        "tacticsScript": [
+          {
+            "enabled": true,
+            "skillId": "skill-especial-arcanista",
+            "conditions": []
+          }
+        ]
+      },
+      "pos": {
+        "x": 1,
+        "y": 0
+      },
+      "height": 0,
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-foco-de-vesper"
+    }
+  ]
+}

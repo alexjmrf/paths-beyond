@@ -37,7 +37,8 @@ Fora da batalha, o jogador constrói heróis com **equipamento com substats alea
 | **Recurso escasso > stat alto** | Vencer é saber quando *não* gastar. Nenhum sistema pode permitir spam da melhor skill. |
 | **Determinismo total** | Mesmo estado inicial + mesma seed + mesmos comandos = mesmo resultado em qualquer máquina. É o que viabiliza PvP assíncrono e replays. |
 | **Tudo é data-driven** | Nenhuma classe, skill, item, mapa ou inimigo é hardcoded. |
-| **Legibilidade tática** | O jogador DEVE conseguir prever o resultado antes de confirmar: preview do duelo, zona de ameaça, lista de iniciativa e pools de recurso sempre visíveis. |
+| **Legibilidade tática** | O jogador DEVE conseguir ler o seu próprio compromisso antes de confirmar: suas skills, seus recursos, quem age em que ordem, e o estado visível do inimigo (posição, HP, AP, PP). O que o inimigo carrega — stats, skills, equipamento, scripts, alcance — é desconhecido até se manifestar. **Engajar é uma aposta informada, não um cálculo.** |
+| **O inimigo é desconhecido** | Em todo combate, PvE e PvP, o jogador vê do inimigo apenas posição, HP, AP, PP, o tipo de unidade e o lugar na iniciativa. Stats, skills, equipamento, artefatos, scripts, `moveType` e alcance ficam no servidor — e uma skill só se revela no instante em que dispara. |
 | **Nenhum stat pode ser obrigatório** | Se um stat vira pré-requisito de toda build, ele é um bug de design. Vale especialmente para `spd` (seção 6.7). |
 
 ---
@@ -321,7 +322,7 @@ Quando A engaja B:
 Regras duras:
 - O **ataque básico custa 0 AP** e está sempre disponível. Um duelo sempre resolve, mesmo com pools zerados.
 - **Contra-atacar custa 1 PP.** Não é grátis. Um defensor sem PP apanha de graça — e sofre "Emboscada" (5.5).
-- Uma unidade **não pode gastar mais de 2 AP em um mesmo duelo**, mesmo tendo pool. Isso impede que um duelo consuma o mapa inteiro e mantém a leitura do preview simples.
+- Uma unidade **não pode gastar mais de 2 AP em um mesmo duelo**, mesmo tendo pool. Isso impede que um duelo consuma o mapa inteiro e mantém o log do duelo curto o bastante para ser lido (era "a leitura do preview", até o preview sair em M36 — ver D47).
 
 Consequência de design pretendida: agressão constante drena recursos. Escolher **quando** duelar é a decisão do jogo.
 
@@ -419,7 +420,12 @@ Todos os valores em ponto fixo, escala 1000.
 10. final       = max(1, trunc(resultado))
 ```
 
-**Acurácia:** `hit = clamp(acc_atacante - eva_defensor + terrenoEva + alturaMod, 50, 1000)`. Rolagem única — não use o "2RN" de Fire Emblem, ele quebra a legibilidade do preview em combate automático.
+**Acurácia:** `hit = clamp(acc_atacante - eva_defensor + terrenoEva + alturaMod, 50, 1000)`. Rolagem única — não use o "2RN" de Fire Emblem.
+
+> **A justificativa mudou em M36 (D47), o número não.** A rolagem única foi escolhida para o
+> PREVIEW de duelo ser legível; o preview saiu do jogo com o inimigo desconhecido. Ela fica por
+> simplicidade: uma rolagem tem uma explicação, o "2RN" tem duas, e o log do duelo — que é o que
+> o jogador lê agora, depois do engajamento — é mais fácil de acreditar com uma.
 
 ### 6.7 O papel de `spd` — benefícios enumerados e fechados
 
@@ -610,7 +616,7 @@ Nada pode precisar ser reescrito para ligar o PvP: núcleo determinístico, coma
 
 - O defensor monta um time de até 5 heróis, posiciona-os em um mapa simétrico pequeno (**9×11**), define o `tacticsScript` de cada um e uma **IA de mapa declarativa** por herói: `aggressive | hold-position | guard-tile | flank | support-nearest`.
 - O atacante joga a camada de grid manualmente contra essa defesa. Todos os duelos resolvem automaticamente pelos scripts dos dois lados.
-- Servidor executa `simulate()` com o **mesmo pacote `core`**; o cliente simula só para animar. Divergência = bug crítico.
+- **O servidor resolve; o cliente reproduz o log.** Cada comando é uma rota, o servidor aplica com o pacote `core` e devolve o que aconteceu já redigido — o cliente não simula nada que envolva o inimigo. Divergência não é mais possível por construção: não há um segundo cálculo para divergir.
 - ELO, temporadas de 14 dias.
 
 ### 9.2 Modo 2 — Coliseu (totalmente automático)
@@ -653,8 +659,8 @@ Se um dia existir: mesma simulação, lockstep com input delay. A arquitetura de
 
 | Tela | Requisitos duros |
 |---|---|
-| Mapa | Overlay de movimento e de ameaça; **lista de iniciativa sempre visível** com a ordem completa do round; AP/PP de cada unidade legíveis no próprio tile (sem hover). |
-| Preview de duelo | Antes de confirmar, rodar `simulateDuel` com a **seed real** e exibir troca a troca: quem age, qual linha do script disparou, dano previsto, HP final, assistências que vão entrar e recursos que serão gastos. **Este é o recurso mais importante do jogo.** |
+| Mapa | Overlay de movimento (o alcance das SUAS unidades); **lista de iniciativa sempre visível** com a ordem completa do round; AP/PP de cada unidade legíveis no próprio tile (sem hover); do inimigo, a barra de HP e os efeitos ativos. |
+| Log do duelo | DEPOIS do engajamento, exibir troca a troca o que aconteceu: quem agiu, **qual skill disparou** (é assim que o jogador aprende o que enfrentou), dano, HP final, assistências que entraram e recursos gastos. |
 | Editor de táticas | Drag & drop das linhas, condições em dropdown, e botão **"Testar"** contra um manequim configurável (HP, tipo, arma, PP). |
 | Painel de recursos | Visão do exército inteiro: AP/PP de todos, quem pode `rest`, quem está sem PP (vulnerável a Emboscada). |
 | Inventário | Filtro por set/slot/substat, comparação lado a lado, **ganho de dano real** (não só CP) ao equipar. |

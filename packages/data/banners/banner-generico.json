@@ -1,0 +1,137 @@
+{
+  "id": "banner-generico",
+  "kind": "generic",
+  "name": "Invocação Permanente",
+  "choiceEvery": 180,
+  "pityThresholds": {
+    "adventurer": 10,
+    "hero": 105
+  },
+  "softPity": {
+    "baseRate": 6,
+    "softStart": 89,
+    "step": 60
+  },
+  "pool": [
+    {
+      "characterId": "ally-couracado",
+      "weight": 5,
+      "fragmentMaterialId": "material-fragmento-ally-couracado"
+    },
+    {
+      "characterId": "ally-lanceiro",
+      "weight": 5,
+      "fragmentMaterialId": "material-fragmento-ally-lanceiro"
+    },
+    {
+      "artifactId": "artifact-egide-de-bardan",
+      "weight": 2,
+      "fragmentMaterialId": "material-fragmento-artifact-egide-de-bardan"
+    },
+    {
+      "artifactId": "artifact-lanca-muralha",
+      "weight": 2,
+      "fragmentMaterialId": "material-fragmento-artifact-lanca-muralha"
+    },
+    {
+      "artifactId": "artifact-arco-da-alvorada",
+      "weight": 2,
+      "fragmentMaterialId": "material-fragmento-artifact-arco-da-alvorada"
+    },
+    {
+      "artifactId": "artifact-relicario-de-miron",
+      "weight": 2,
+      "fragmentMaterialId": "material-fragmento-artifact-relicario-de-miron"
+    },
+    {
+      "artifactId": "artifact-lamina-do-juramento",
+      "weight": 2,
+      "fragmentMaterialId": "material-fragmento-artifact-lamina-do-juramento"
+    },
+    {
+      "characterId": "ally-acolito",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-acolito"
+    },
+    {
+      "characterId": "ally-batedora",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-batedora"
+    },
+    {
+      "characterId": "ally-escudeira",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-escudeira"
+    },
+    {
+      "characterId": "ally-grifeiro",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-grifeiro"
+    },
+    {
+      "characterId": "ally-machadeira",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-machadeira"
+    },
+    {
+      "characterId": "ally-mensageira",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-mensageira"
+    },
+    {
+      "characterId": "ally-piqueiro",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-piqueiro"
+    },
+    {
+      "characterId": "ally-sentinela",
+      "weight": 9,
+      "fragmentMaterialId": "material-fragmento-ally-sentinela"
+    },
+    {
+      "artifactId": "artifact-aljava-da-batedora",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-aljava-da-batedora"
+    },
+    {
+      "artifactId": "artifact-broquel-de-sena",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-broquel-de-sena"
+    },
+    {
+      "artifactId": "artifact-elmo-da-sentinela",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-elmo-da-sentinela"
+    },
+    {
+      "artifactId": "artifact-foco-de-vesper",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-foco-de-vesper"
+    },
+    {
+      "artifactId": "artifact-machadinha-de-halla",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-machadinha-de-halla"
+    },
+    {
+      "artifactId": "artifact-pena-de-grifo",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-pena-de-grifo"
+    },
+    {
+      "artifactId": "artifact-ponta-do-piqueiro",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-ponta-do-piqueiro"
+    },
+    {
+      "artifactId": "artifact-rosario-do-acolito",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-rosario-do-acolito"
+    },
+    {
+      "artifactId": "artifact-semente-de-wren",
+      "weight": 8,
+      "fragmentMaterialId": "material-fragmento-artifact-semente-de-wren"
+    }
+  ]
+}

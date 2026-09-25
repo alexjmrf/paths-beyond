@@ -12,11 +12,16 @@ import { loadCatalogFromDisk } from '../src/loadCatalogFromDisk.js';
 // este arquivo fica vermelho dizendo o número novo. Quem mexeu decide se o volume ainda serve;
 // o que não acontece é passar em silêncio.
 //
-// **A restrição que ordena a milestone, e que contraria a intuição:** o pity NÃO pode crescer
-// antes do pool crescer. Com pool `N` e pity `P`, completar o pool custa `N × P` rolagens no
-// pior caso, e `pool esgotado congela o contador de pity` (M18 1/N) — então excedente vira
-// rolagem morta. É por isso que o pity maior fica para o M34, junto do elenco novo, e o que
-// esta fatia mexe é o CUSTO.
+// **A restrição que ordenava o M31 foi RESOLVIDA por D50, e é por isso que este arquivo mudou
+// de forma no M37.** Ela dizia: o pity não pode crescer antes do pool, porque com pool `N` e
+// pity `P` completar o pool custava `N × P` rolagens no pior caso e o excedente virava rolagem
+// morta. Os DOIS ANDARES são a saída — o `Adventurer` em 10 é o que preenche o intervalo entre
+// dois `Hero` em 90, exatamente como `DECISIONS.md` §6 previu.
+//
+// **E a conta `N × P` não existe mais**, porque a garantia mudou de promessa: desde D50 ela
+// entrega QUALQUER UM daquele rank, não um personagem novo. Não há mais um número de rolagens
+// que complete o pool com certeza — o que há é quantas garantias de cada andar a demo alcança,
+// que é o que se mede aqui.
 
 const catalogo = loadCatalogFromDisk();
 
@@ -61,43 +66,67 @@ describe('o volume do gacha na demo', () => {
     expect(p.total).toBe(8_950);
   });
 
-  it('o pool e o pity são os que a restrição assume', () => {
-    // `N` e `P`. Se qualquer um dos dois mudar, o pior caso muda junto e a conta da fatia
-    // deixa de valer — que é exatamente o momento em que alguém precisa ser avisado.
+  it('o pool e os DOIS limiares são os que a medição assume (D50)', () => {
+    // Se qualquer um dos três mudar, as contas abaixo deixam de valer — que é exatamente o
+    // momento em que alguém precisa ser avisado.
     expect(poolInvocavel()).toEqual([
+      'ally-acolito',
+      'ally-batedora',
       'ally-couracado',
+      'ally-escudeira',
       'ally-grifeiro',
       'ally-guerreiro',
       'ally-lanceiro',
+      'ally-machadeira',
       'ally-mensageira',
+      'ally-piqueiro',
+      'ally-sentinela',
     ]);
-    expect(catalogo.premiumRules.summon.pityThreshold).toBe(10);
+    expect(catalogo.premiumRules.summon.pityThresholds).toEqual({ adventurer: 10, hero: 90 });
   });
 
-  it('quantas rolagens a demo paga, e quantas o pool exige', () => {
+  it('o pool por RANK — o `Adventurer` é a MAIORIA, que é o desenho de §6', () => {
+    // O `Adventurer` é o que preenche o intervalo entre dois `Hero` (DECISIONS.md §6), então
+    // um pool com mais `Hero` que `Adventurer` seria o contrário do desenho. Até a 3/N ele
+    // estava 3 `Hero` para 2 `Adventurer`; com os seis que D49 autorou, ele inverteu.
+    const porRank = new Map<string, number>();
+    for (const id of poolInvocavel()) {
+      const rank = catalogo.characters[id]!.rank;
+      porRank.set(rank, (porRank.get(rank) ?? 0) + 1);
+    }
+
+    expect(porRank.get('adventurer')).toBe(8);
+    expect(porRank.get('hero')).toBe(3);
+    expect(porRank.get('adventurer')!).toBeGreaterThan(porRank.get('hero')!);
+  });
+
+  it('quantas rolagens a demo paga, e quantas garantias de cada andar ela alcança', () => {
     const total = premiumDaDemo().total;
     const custo = catalogo.premiumRules.summon.premiumCost;
+    const { adventurer, hero } = catalogo.premiumRules.summon.pityThresholds;
 
     const rolagens = Math.floor(total / custo);
-    const exigidas = poolInvocavel().length * catalogo.premiumRules.summon.pityThreshold;
 
-    // M31, com `premiumCost` em 180 (decisão do usuário): a demo paga 49 rolagens contra as
-    // 50 do PIOR caso de completar o pool. 50 é o teto do azar — o pity só entra quando a
-    // sorte não veio —, então na prática o pool completa perto do fim e o gacha continua
-    // sendo uma decisão até lá. Antes eram 17, e o jogador que zerasse a demo inteira sem
-    // pagar nada podia terminar com dois dos cinco.
+    // M31, com `premiumCost` em 180 (decisão do usuário): a demo paga 49 rolagens.
     expect(rolagens).toBe(49);
-    expect(exigidas).toBe(50);
-    expect(rolagens).toBeLessThanOrEqual(exigidas);
+
+    // D50 — **o jogador que zera a demo inteira sem pagar nada alcança 4 garantias de
+    // `Adventurer` e NENHUMA de `Hero`**, e isso é o desenho e não um defeito: o `Adventurer`
+    // é o que preenche o caminho, e o `Hero` garantido é horizonte pós-demo (§6/§7).
+    expect(Math.floor(rolagens / adventurer)).toBe(4);
+    expect(Math.floor(rolagens / hero)).toBe(0);
+    expect(rolagens).toBeLessThan(hero);
   });
 
-  it('o custo que faria a demo pagar o pool inteiro', () => {
+  it('o custo que faria a demo alcançar a PRIMEIRA garantia de `Hero`', () => {
     // O número que a decisão do usuário precisa considerar, derivado e não chutado. Ele NÃO é
     // aplicado aqui: `premiumCost` é número de balanceamento, e a regra 10 exige `pnpm
     // balance` e o relatório, e D18 exige que o número venha do usuário.
+    //
+    // Substitui a conta antiga (179), que pressupunha a garantia entregando personagem NOVO —
+    // premissa que D50 reverteu.
     const total = premiumDaDemo().total;
-    const exigidas = poolInvocavel().length * catalogo.premiumRules.summon.pityThreshold;
 
-    expect(Math.floor(total / exigidas)).toBe(179);
+    expect(Math.floor(total / catalogo.premiumRules.summon.pityThresholds.hero)).toBe(99);
   });
 });

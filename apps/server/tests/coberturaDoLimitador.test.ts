@@ -11,6 +11,7 @@ import {
   createMemoryHeroRepository,
   createMemoryIdempotencyRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -35,9 +36,10 @@ const TOKEN = 'token-cobertura';
 const AGORA = Date.UTC(2026, 5, 1);
 const catalog = loadCatalogFromDisk();
 
-function buildAppCom(rateLimiter: RateLimiter, expensiveRateLimiter?: RateLimiter) {
+function buildAppCom(rateLimiter: RateLimiter, expensiveRateLimiter?: RateLimiter, commandRateLimiter?: RateLimiter) {
   return buildApp({
     ...(expensiveRateLimiter ? { expensiveRateLimiter } : {}),
+    ...(commandRateLimiter ? { commandRateLimiter } : {}),
     repository: createMemoryPlayerRepository([
       {
         id: 'player-1',
@@ -55,6 +57,7 @@ function buildAppCom(rateLimiter: RateLimiter, expensiveRateLimiter?: RateLimite
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -315,5 +318,83 @@ describe('os dois baldes', () => {
     });
 
     expect(consumidos).toEqual(['padrao:player-1']);
+  });
+});
+
+// M36 4/N (D47) — o TERCEIRO balde, e por que ele deixou de ser opcional.
+//
+// Até a batalha ficar viva, uma partida inteira era UMA requisição. Agora cada comando é um
+// POST, e uma batalha de dez rounds com cinco heróis passa de cinquenta — contra um balde de 60
+// por minuto calibrado quando o número era 2. Sem separar, o jogador levaria 429 no meio da
+// própria missão, com a partida aberta no servidor e ele trancado do lado de fora.
+describe('o balde do comando de batalha', () => {
+  function espiao(nome: string, consumidos: string[]) {
+    return {
+      tryConsume: (key: string) => {
+        consumidos.push(`${nome}:${key}`);
+        return true;
+      },
+    };
+  }
+
+  it('o comando cai no balde do COMANDO, e não no padrão nem no caro', async () => {
+    const consumidos: string[] = [];
+    const app = buildAppCom(
+      espiao('padrao', consumidos),
+      espiao('caro', consumidos),
+      espiao('comando', consumidos),
+    );
+    await app.ready();
+
+    await app.inject({
+      method: 'POST',
+      url: '/matches/seja-qual-for/commands',
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+      payload: { command: { t: 'wait', unitId: 'x' } },
+    });
+
+    expect(consumidos).toEqual(['comando:comando:player-1']);
+  });
+
+  it('esgotar o balde do comando NÃO impede de comprar nem de preparar — e vice-versa', async () => {
+    // Os baldes são separados de verdade: a contagem de um não é a do outro. É o que garante
+    // que uma batalha longa não gaste a cota que protege a carteira.
+    const app = buildAppCom(
+      { tryConsume: () => true },
+      { tryConsume: () => true },
+      { tryConsume: () => false },
+    );
+    await app.ready();
+
+    const comando = await app.inject({
+      method: 'POST',
+      url: '/matches/seja-qual-for/commands',
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+      payload: { command: { t: 'wait', unitId: 'x' } },
+    });
+    expect(comando.statusCode).toBe(429);
+
+    const preparacao = await app.inject({
+      method: 'PUT',
+      url: '/heroes/h1/tactics',
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+      payload: {},
+    });
+    expect(preparacao.statusCode).not.toBe(429);
+  });
+
+  it('sem balde de comando declarado, o comando cai no padrão — o servidor de antes', async () => {
+    const consumidos: string[] = [];
+    const app = buildAppCom(espiao('padrao', consumidos), espiao('caro', consumidos));
+    await app.ready();
+
+    await app.inject({
+      method: 'POST',
+      url: '/matches/seja-qual-for/commands',
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+      payload: { command: { t: 'wait', unitId: 'x' } },
+    });
+
+    expect(consumidos).toEqual(['padrao:padrao:player-1']);
   });
 });

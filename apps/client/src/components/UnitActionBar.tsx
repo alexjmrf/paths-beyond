@@ -2,6 +2,7 @@ import { catalog } from "../data/catalog.js";
 import { acoesDaUnidade } from "../logic/acoesDaUnidade.js";
 import { nomeDeUnidade } from "../logic/rotulos.js";
 import { useBattleStore } from "../store/battleStore.js";
+import { ehVisivelPorInteiro } from "../data/api.js";
 
 // §5.4 — "No seu turno, uma unidade faz: mover? + uma das opções." `move`/`engage` já
 // são feitos clicando no mapa (overlays de alcance/ameaça); aqui ficam `wait`/`rest` e o
@@ -35,15 +36,20 @@ export function UnitActionBar() {
     );
   }
 
+  // M36 4/N (D47) — do INIMIGO o cliente tem posição, HP, AP, PP e o tipo de unidade, e é
+  // exatamente isso que a ficha mostra. O que ele não tem — `moveRange`, `knownSkills` — é o
+  // que a barra usava para desenhar AÇÃO, e ação sobre a peça do inimigo nunca existiu (D44).
+  //
+  // A distinção importa: "não há o que fazer com esta peça" é diferente de "não há peça
+  // selecionada", e confundir as duas foi uma regressão que a tela pegou na hora.
+  const completa = ehVisivelPorInteiro(unit);
   const distanceMoved = battleState.distanceMovedThisTurn[unit.unitId] ?? 0;
 
   // §5.4 — "No seu turno, uma unidade faz: mover? + uma das opções", e `mapSkill` é uma
   // delas. O comando existe no core desde M3 e resolve área desde M11, mas o cliente não
   // tinha como emiti-lo: o mapa só sabia mover e engajar, então toda skill de mapa
   // autorada era inalcançável por um humano.
-  const mapSkills = Object.values(unit.knownSkills).filter(
-    (skill) => skill.kind === "map",
-  );
+  const mapSkills = completa ? Object.values(unit.knownSkills).filter((skill) => skill.kind === "map") : [];
 
   // M35 1/N (D44) — o inimigo selecionado mostra a FICHA, e nenhuma ação. A decisão é de
   // `acoesDaUnidade`; aqui só se desenha o que ela devolve. As skills de mapa são ação e
@@ -56,9 +62,10 @@ export function UnitActionBar() {
         {nomeDeUnidade(t, unit.unitId, heroesByUnitId, artIdByUnitId, catalog)}
       </h3>
       <p>{t("unidade.stats", { hp: unit.hp, ap: unit.ap, pp: unit.pp })}</p>
-      <p>
-        {t("unidade.moveu", { andou: distanceMoved, alcance: unit.moveRange })}
-      </p>
+      {/* Quanto a unidade já andou só faz sentido contra o alcance DELA, e o alcance do
+          inimigo é oculto (D47). Para ele a linha some; a ficha continua dizendo o que importa
+          no tabuleiro — quem é, quanto de vida tem e quanto de recurso lhe resta. */}
+      {completa ? <p>{t("unidade.moveu", { andou: distanceMoved, alcance: unit.moveRange })}</p> : null}
       {acoes.length === 0 ? null : (
         <div className="actions">
           <button
@@ -79,7 +86,8 @@ export function UnitActionBar() {
             const targeting =
               targetingMode?.kind === "mapSkill" &&
               targetingMode.skillId === skill.id;
-            const cooldown = unit.cooldowns[skill.id] ?? 0;
+            // `mapSkills` só é preenchida para a unidade completa, então o cooldown existe aqui.
+            const cooldown = ehVisivelPorInteiro(unit) ? (unit.cooldowns[skill.id] ?? 0) : 0;
             return (
               <button
                 key={skill.id}

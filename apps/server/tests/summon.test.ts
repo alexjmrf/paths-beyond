@@ -1,4 +1,5 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
+import { RULES_VERSION } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
@@ -10,6 +11,7 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -24,15 +26,28 @@ import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
 
 const TICKET_SECRET = 'segredo-de-teste';
 const TOKEN = 'token-summon';
-const AGORA = Date.UTC(2024, 0, 5, 12);
+// M38 3/N — dentro da janela do rotativo do Rurik (2026-09-25 a 2026-10-09).
+const AGORA = Date.UTC(2026, 8, 30, 12);
 
 const catalog = loadCatalogFromDisk();
 const CUSTO = catalog.premiumRules.summon.premiumCost;
-const BANNER = 'banner-elenco';
+const BANNER = 'banner-rotativo-rurik';
+const GENERICO = 'banner-generico';
+const ROT_ARTEFATO = 'banner-rotativo-artefato-rurik';
+const DESTAQUE = 'ally-guerreiro';
+const ARTEFATO_DO_DESTAQUE = 'artifact-machado-do-tirano';
 
-// D14 — os quatro garantidos, e os cinco que só o banner entrega.
-const NUCLEO = ['ally-arcanista', 'ally-arqueiro', 'ally-clerigo', 'hero-jogador'];
-const ADQUIRIVEIS = ['ally-couracado', 'ally-grifeiro', 'ally-guerreiro', 'ally-lanceiro', 'ally-mensageira'];
+// D14 — os garantidos, e os que só o banner entrega.
+//
+// DERIVADOS do catálogo desde o M37 3/N, e não mais escritos à mão: D49 levou o elenco de 9
+// para 15, e uma lista literal aqui só dizia que ela estava desatualizada. O que estes testes
+// afirmam é sobre a PARTIÇÃO (`acquisition`), não sobre quais nomes existem hoje.
+const NUCLEO = Object.values(catalog.characters)
+  .filter((c) => c.acquisition === 'story')
+  .map((c) => c.id);
+const ADQUIRIVEIS = Object.values(catalog.characters)
+  .filter((c) => c.acquisition === 'summon')
+  .map((c) => c.id);
 
 interface Harness {
   readonly app: ReturnType<typeof buildApp>;
@@ -42,7 +57,7 @@ interface Harness {
   readonly economyRepository: ReturnType<typeof createMemoryEconomyRepository>;
 }
 
-function buildHarness(options: { premium?: number } = {}): Harness {
+function buildHarness(options: { premium?: number; agora?: number } = {}): Harness {
   const playerRepository = createMemoryPlayerRepository([
     {
       id: 'player-1',
@@ -71,6 +86,7 @@ function buildHarness(options: { premium?: number } = {}): Harness {
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
       ownershipRepository,
@@ -80,7 +96,7 @@ function buildHarness(options: { premium?: number } = {}): Harness {
       rateLimiter: createInMemoryRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
       ticketSecret: TICKET_SECRET,
       identityValidator: createDevIdentityValidator(),
-      now: () => AGORA,
+      now: () => options.agora ?? AGORA,
     }),
   };
 }
@@ -205,31 +221,84 @@ describe('POST /summon', () => {
     expect(body.outcome.fragmentMaterialId).toBe(character.fragmentMaterialId);
   });
 
-  it('o pity é contado por jogador e sobrevive entre rolagens', async () => {
+  it('o pity é contado por jogador, por RANK, e sobrevive entre rolagens (D50)', async () => {
     const h = buildHarness({ premium: CUSTO * 20 });
     for (const id of ADQUIRIVEIS) await h.ownershipRepository.grant('player-1', id);
 
-    // Pool esgotado: o contador CONGELA (a leitura registrada na 1/N). É o que se afirma
-    // aqui — que ele não avança inventando garantia sem destino.
+    // **Com o pool inteiro possuído, os contadores CONTINUAM correndo** — e é justamente o
+    // que D50 mudou. Antes a garantia prometia personagem NOVO, então com tudo possuído ela
+    // não tinha destino e o contador congelava. Agora ela promete o RANK: sai duplicata,
+    // paga fragmento, e o contador daquele rank zera como em qualquer rolagem.
     const primeira = await post(h, '/summon', { nonce: 'p-1', bannerId: BANNER });
     const segunda = await post(h, '/summon', { nonce: 'p-2', bannerId: BANNER });
 
-    expect(primeira.body.rollsSinceNew).toBe(0);
-    expect(segunda.body.rollsSinceNew).toBe(0);
+    for (const r of [primeira, segunda]) {
+      expect(r.body.outcome.kind).toBe('duplicate');
+      // O rank que saiu está zerado; o outro avançou. Nenhum dos dois está congelado.
+      expect(r.body.rollsSince[r.body.outcome.rank]).toBe(0);
+    }
+
+    const outroRank = primeira.body.outcome.rank === 'hero' ? 'adventurer' : 'hero';
+    if (segunda.body.outcome.rank === primeira.body.outcome.rank) {
+      expect(segunda.body.rollsSince[outroRank]).toBe(2);
+    }
   });
 
-  it('invocando até esgotar o pool, o jogador obtém os CINCO — o pity garante a cauda', async () => {
-    // O critério 1 ponta a ponta pela rota, e não pelo motor: 60 invocações são de sobra
-    // com pity 10 sobre um pool de 5, e o que se afirma é que nenhum fica para trás.
+  it('nenhum rank passa do limiar sem sair — 60 rolagens pela ROTA (D50)', async () => {
+    // O que a garantia promete depois de D50, medido ponta a ponta e não no motor: ela
+    // promete o RANK. Antes esta asserção era "o jogador obtém os CINCO", que dependia da
+    // garantia entregar personagem NOVO — premissa revertida. Trocá-la por uma contagem de
+    // posse seria deixar o teste depender de sorte de seed.
     const h = buildHarness({ premium: CUSTO * 60 });
+    const { adventurer, hero } = catalog.premiumRules.summon.pityThresholds;
+
+    const desde: Record<string, number> = { adventurer: 0, hero: 0 };
+    const pior: Record<string, number> = { adventurer: 0, hero: 0 };
 
     for (let i = 0; i < 60; i++) {
       const r = await post(h, '/summon', { nonce: `bulk-${i}`, bannerId: BANNER });
       expect(r.status).toBe(200);
+
+      for (const rank of ['adventurer', 'hero'] as const) {
+        desde[rank] = r.body.outcome.rank === rank ? 0 : desde[rank]! + 1;
+        pior[rank] = Math.max(pior[rank]!, desde[rank]!);
+      }
     }
 
-    const adquiridos = await h.ownershipRepository.listAcquired('player-1');
-    expect([...adquiridos].sort()).toEqual([...ADQUIRIVEIS].sort());
+    // D55 — o limiar N garante a N-ésima: nunca há N rolagens seguidas sem o rank.
+    expect(pior.adventurer).toBeLessThanOrEqual(adventurer - 1);
+    // 60 rolagens não alcançam o limiar de 90 do `Hero`: o que se afirma aqui é que o
+    // contador não estourou nada, e não que a garantia disparou. Ela é horizonte pós-demo.
+    expect(pior.hero).toBeLessThanOrEqual(hero);
+  });
+
+  it('a garantia dispara pela rota, e a resposta DIZ qual das duas disparou (D50)', async () => {
+    // O contador é ARMADO no repositório em vez de esperado por sorte: com 2 `Adventurer`
+    // em 5 entradas, o rank sai sozinho muito antes das 10 rolagens, e um teste que
+    // esperasse o limiar chegar estaria medindo a seed. O que se afirma aqui é que a rota
+    // honra um contador armado e devolve QUAL garantia disparou.
+    const { adventurer, hero } = catalog.premiumRules.summon.pityThresholds;
+
+    const a = buildHarness({ premium: CUSTO });
+    await a.ownershipRepository.setPity('player-1', 'rotatingCharacter', { adventurer, hero: 0 });
+    const rA = await post(a, '/summon', { nonce: 'g-adv', bannerId: BANNER });
+    expect(rA.body.guaranteed).toBe('adventurer');
+    expect(rA.body.outcome.rank).toBe('adventurer');
+    expect(rA.body.rollsSince).toEqual({ adventurer: 0, hero: 1 });
+
+    const b = buildHarness({ premium: CUSTO });
+    await b.ownershipRepository.setPity('player-1', 'rotatingCharacter', { adventurer: 0, hero });
+    const rB = await post(b, '/summon', { nonce: 'g-hero', bannerId: BANNER });
+    expect(rB.body.guaranteed).toBe('hero');
+    expect(rB.body.outcome.rank).toBe('hero');
+    expect(rB.body.rollsSince).toEqual({ adventurer: 1, hero: 0 });
+
+    // Os dois armados: o `Hero` tem precedência, e o de `Adventurer` continua armado.
+    const c = buildHarness({ premium: CUSTO });
+    await c.ownershipRepository.setPity('player-1', 'rotatingCharacter', { adventurer, hero });
+    const rC = await post(c, '/summon', { nonce: 'g-ambos', bannerId: BANNER });
+    expect(rC.body.guaranteed).toBe('hero');
+    expect(rC.body.rollsSince).toEqual({ adventurer: adventurer + 1, hero: 0 });
   });
 
   it('a mesma seed dá a mesma rolagem: dois jogadores com o mesmo nonce NÃO recebem o mesmo', async () => {
@@ -245,6 +314,229 @@ describe('POST /summon', () => {
     const r2 = await post(b, '/summon', { nonce: 'mesmo', bannerId: BANNER });
 
     expect(r1.body.outcome).toEqual(r2.body.outcome);
+  });
+});
+
+// M38 3/N (D54/D55) — os TRÊS banners pela rota: janela, pity por tipo, artefato, o token de
+// 1,5·P e a escolha do genérico.
+describe('M38 3/N — os banners rotativos e o genérico', () => {
+  it('GET /summon/banners dentro da janela lista os três, cada um com o seu tipo', async () => {
+    const h = buildHarness();
+    const { body } = await get(h, '/summon/banners');
+
+    expect(body.banners.map((b: any) => `${b.kind}:${b.id}`).sort()).toEqual([
+      `generic:${GENERICO}`,
+      `rotatingArtifact:${ROT_ARTEFATO}`,
+      `rotatingCharacter:${BANNER}`,
+    ]);
+    const rotativo = body.banners.find((b: any) => b.id === BANNER);
+    expect(rotativo.featuredId).toBe(DESTAQUE);
+    expect(rotativo.token).toEqual({ threshold: 135, artifactId: ARTEFATO_DO_DESTAQUE, rolls: 0, status: 'counting' });
+    const generico = body.banners.find((b: any) => b.id === GENERICO);
+    expect(generico.choice).toEqual({ every: 180, rolls: 0, pending: 0 });
+  });
+
+  it('a tela recebe só a TAXA BASE; a curva de soft pity não sai do servidor (D56)', async () => {
+    const h = buildHarness();
+    const { body } = await get(h, '/summon/banners');
+    const taxa = Object.fromEntries(body.banners.map((b: any) => [b.id, b.baseRate]));
+
+    expect(taxa).toEqual({ [BANNER]: 6, [ROT_ARTEFATO]: 7, [GENERICO]: 6 });
+    for (const banner of body.banners) {
+      expect('softPity' in banner, banner.id).toBe(false);
+      expect(JSON.stringify(banner)).not.toMatch(/softStart|step/);
+    }
+  });
+
+  it('fora da janela, só o genérico aparece — e rolar no rotativo é recusado sem cobrar', async () => {
+    const h = buildHarness({ premium: CUSTO, agora: Date.UTC(2026, 9, 9, 0) });
+    const { body } = await get(h, '/summon/banners');
+    expect(body.banners.map((b: any) => b.id)).toEqual([GENERICO]);
+
+    const r = await post(h, '/summon', { nonce: 'fora', bannerId: BANNER });
+    expect(r.status).toBe(409);
+    expect((await h.playerRepository.getPlayerById('player-1'))?.premium).toBe(CUSTO);
+  });
+
+  it('o pity é por TIPO: o contador do rotativo de personagem vale em qualquer banner desse tipo', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    // O teto do rotativo é 90: com 89 sem `Hero`, a 90ª é o destaque, venha o contador de
+    // que banner vier.
+    await h.ownershipRepository.setPity('player-1', 'rotatingCharacter', { adventurer: 0, hero: 89 });
+
+    const r = await post(h, '/summon', { nonce: 'teto', bannerId: BANNER });
+    expect(r.body.outcome).toEqual({ kind: 'character', characterId: DESTAQUE, rank: 'hero' });
+    expect(r.body.guaranteed).toBe('hero');
+    expect(await h.ownershipRepository.getPity('player-1', 'rotatingCharacter')).toEqual({ adventurer: 1, hero: 0 });
+    // E os outros tipos não andaram.
+    expect(await h.ownershipRepository.getPity('player-1', 'generic')).toBeNull();
+  });
+
+  it('o rotativo de artefato entrega o ARTEFATO; a segunda cópia vira fragmento dele', async () => {
+    const h = buildHarness({ premium: CUSTO * 2 });
+    await h.ownershipRepository.setPity('player-1', 'rotatingArtifact', { adventurer: 0, hero: 59 });
+
+    const primeira = await post(h, '/summon', { nonce: 'art-1', bannerId: ROT_ARTEFATO });
+    expect(primeira.body.outcome).toEqual({ kind: 'artifact', artifactId: ARTEFATO_DO_DESTAQUE, rank: 'hero' });
+    expect((await h.ownershipRepository.listArtifacts('player-1')).map((a) => a.artifactId)).toEqual([
+      ARTEFATO_DO_DESTAQUE,
+    ]);
+
+    await h.ownershipRepository.setPity('player-1', 'rotatingArtifact', { adventurer: 0, hero: 59 });
+    const segunda = await post(h, '/summon', { nonce: 'art-2', bannerId: ROT_ARTEFATO });
+    expect(segunda.body.outcome.kind).toBe('artifactDuplicate');
+    const materiais = await h.economyRepository.getMaterials('player-1');
+    expect(materiais[`material-fragmento-${ARTEFATO_DO_DESTAQUE}`]).toBe(1);
+    expect(await h.ownershipRepository.listArtifacts('player-1')).toHaveLength(1);
+  });
+});
+
+describe('M38 3/N — o token de 1,5·P, pela rota', () => {
+  it('com o destaque na conta, a 135ª rolagem NAQUELE banner entrega o artefato dele', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await h.ownershipRepository.grant('player-1', DESTAQUE);
+    await h.ownershipRepository.setToken('player-1', BANNER, { rolls: 134, status: 'counting' });
+
+    const r = await post(h, '/summon', { nonce: 'tok-1', bannerId: BANNER });
+    expect(r.body.tokenGrants).toEqual([{ kind: 'artifact', artifactId: ARTEFATO_DO_DESTAQUE, rank: 'hero' }]);
+    expect(r.body.token).toEqual({ rolls: 135, status: 'granted' });
+    expect((await h.ownershipRepository.listArtifacts('player-1')).map((a) => a.artifactId)).toContain(
+      ARTEFATO_DO_DESTAQUE,
+    );
+  });
+
+  it('é concedido uma única vez por banner', async () => {
+    const h = buildHarness({ premium: CUSTO * 2 });
+    await h.ownershipRepository.grant('player-1', DESTAQUE);
+    await h.ownershipRepository.setToken('player-1', BANNER, { rolls: 134, status: 'counting' });
+
+    await post(h, '/summon', { nonce: 'tok-a', bannerId: BANNER });
+    const depois = await post(h, '/summon', { nonce: 'tok-b', bannerId: BANNER });
+    expect(depois.body.tokenGrants).toEqual([]);
+    expect(depois.body.token.status).toBe('granted');
+  });
+
+  it('SEM o destaque, bater 135 deixa o token PENDENTE; o destaque saindo depois, ele é pago na mesma resposta', async () => {
+    const h = buildHarness({ premium: CUSTO * 2 });
+    await h.ownershipRepository.setToken('player-1', BANNER, { rolls: 134, status: 'counting' });
+    // Contador de pity zerado: com 0,6% a rolagem não traz o destaque (seed fixa).
+    const sem = await post(h, '/summon', { nonce: 'pend-1', bannerId: BANNER });
+    expect(sem.body.outcome.characterId).not.toBe(DESTAQUE);
+    expect(sem.body.tokenGrants).toEqual([]);
+    expect(sem.body.token).toEqual({ rolls: 135, status: 'pending' });
+
+    // Agora o teto traz o destaque, e o token pendente sai junto.
+    await h.ownershipRepository.setPity('player-1', 'rotatingCharacter', { adventurer: 0, hero: 89 });
+    const com = await post(h, '/summon', { nonce: 'pend-2', bannerId: BANNER });
+    expect(com.body.outcome.characterId).toBe(DESTAQUE);
+    expect(com.body.tokenGrants).toEqual([{ kind: 'artifact', artifactId: ARTEFATO_DO_DESTAQUE, rank: 'hero' }]);
+    expect(com.body.token.status).toBe('granted');
+  });
+
+  it('pendente é pago quando o destaque entra por OUTRO caminho — numa rolagem de outro banner', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await h.ownershipRepository.setToken('player-1', BANNER, { rolls: 140, status: 'pending' });
+    await h.ownershipRepository.grant('player-1', DESTAQUE);
+
+    const r = await post(h, '/summon', { nonce: 'outro-caminho', bannerId: GENERICO });
+    expect(r.body.tokenGrants).toEqual([{ kind: 'artifact', artifactId: ARTEFATO_DO_DESTAQUE, rank: 'hero' }]);
+    expect(await h.ownershipRepository.getToken('player-1', BANNER)).toEqual({ rolls: 140, status: 'granted' });
+  });
+
+  it('o recíproco: pendente SEM o destaque continua pendente, rolando em qualquer banner', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await h.ownershipRepository.setToken('player-1', BANNER, { rolls: 140, status: 'pending' });
+
+    const r = await post(h, '/summon', { nonce: 'sem-destaque', bannerId: GENERICO });
+    expect(r.body.tokenGrants).toEqual([]);
+    expect(await h.ownershipRepository.getToken('player-1', BANNER)).toEqual({ rolls: 140, status: 'pending' });
+  });
+
+  it('já tendo o artefato, o token paga o fragmento dele', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await h.ownershipRepository.grant('player-1', DESTAQUE);
+    await h.ownershipRepository.grantArtifact('player-1', {
+      id: 'ja-tinha',
+      artifactId: ARTEFATO_DO_DESTAQUE,
+      awakening: 0,
+      imprint: 0,
+    });
+    await h.ownershipRepository.setToken('player-1', BANNER, { rolls: 134, status: 'counting' });
+
+    const r = await post(h, '/summon', { nonce: 'tok-frag', bannerId: BANNER });
+    expect(r.body.tokenGrants[0].kind).toBe('artifactDuplicate');
+    const materiais = await h.economyRepository.getMaterials('player-1');
+    expect(materiais[`material-fragmento-${ARTEFATO_DO_DESTAQUE}`]).toBe(1);
+  });
+
+  it('rolar no rotativo de ARTEFATO ou no genérico não conta para o token', async () => {
+    const h = buildHarness({ premium: CUSTO * 2 });
+    await post(h, '/summon', { nonce: 'nao-conta-1', bannerId: ROT_ARTEFATO });
+    await post(h, '/summon', { nonce: 'nao-conta-2', bannerId: GENERICO });
+    expect(await h.ownershipRepository.getToken('player-1', BANNER)).toBeNull();
+  });
+});
+
+describe('M38 3/N — a escolha do genérico, pela rota', () => {
+  it('a 180ª rolagem no genérico concede uma escolha, e o resgate entrega o escolhido', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await h.ownershipRepository.setChoice('player-1', GENERICO, { rolls: 179, pending: 0 });
+
+    const r = await post(h, '/summon', { nonce: 'ch-1', bannerId: GENERICO });
+    expect(r.body.choice).toEqual({ rolls: 0, pending: 1 });
+
+    const escolha = await post(h, '/summon/choice', { nonce: 'ch-resgate', bannerId: GENERICO, choiceId: 'ally-couracado' });
+    expect(escolha.status).toBe(200);
+    expect(escolha.body.outcome).toEqual({ kind: 'character', characterId: 'ally-couracado', rank: 'hero' });
+    expect(escolha.body.choice).toEqual({ rolls: 0, pending: 0 });
+    expect(await h.ownershipRepository.listAcquired('player-1')).toContain('ally-couracado');
+  });
+
+  it('o resgate de artefato entrega o artefato', async () => {
+    const h = buildHarness();
+    await h.ownershipRepository.setChoice('player-1', GENERICO, { rolls: 3, pending: 1 });
+    const r = await post(h, '/summon/choice', { nonce: 'ch-art', bannerId: GENERICO, choiceId: 'artifact-arco-da-alvorada' });
+    expect(r.body.outcome).toEqual({ kind: 'artifact', artifactId: 'artifact-arco-da-alvorada', rank: 'hero' });
+  });
+
+  it('sem escolha pendente recusa; `Adventurer` e id fora do pool recusam', async () => {
+    const h = buildHarness();
+    const sem = await post(h, '/summon/choice', { nonce: 'ch-sem', bannerId: GENERICO, choiceId: 'ally-couracado' });
+    expect(sem.status).toBe(409);
+
+    await h.ownershipRepository.setChoice('player-1', GENERICO, { rolls: 0, pending: 1 });
+    const adv = await post(h, '/summon/choice', { nonce: 'ch-adv', bannerId: GENERICO, choiceId: 'ally-mensageira' });
+    expect(adv.status).toBe(400);
+    const fora = await post(h, '/summon/choice', { nonce: 'ch-fora', bannerId: GENERICO, choiceId: DESTAQUE });
+    expect(fora.status).toBe(400);
+    // Recusar não consumiu a escolha.
+    expect(await h.ownershipRepository.getChoice('player-1', GENERICO)).toEqual({ rolls: 0, pending: 1 });
+  });
+
+  it('a escolha só existe no genérico', async () => {
+    const h = buildHarness();
+    const r = await post(h, '/summon/choice', { nonce: 'ch-rot', bannerId: BANNER, choiceId: DESTAQUE });
+    expect(r.status).toBe(400);
+  });
+
+  it('reenvio do mesmo nonce não resgata duas vezes', async () => {
+    const h = buildHarness();
+    await h.ownershipRepository.setChoice('player-1', GENERICO, { rolls: 0, pending: 2 });
+    await post(h, '/summon/choice', { nonce: 'ch-dup', bannerId: GENERICO, choiceId: 'ally-couracado' });
+    const segunda = await post(h, '/summon/choice', { nonce: 'ch-dup', bannerId: GENERICO, choiceId: 'ally-lanceiro' });
+    expect(segunda.status).toBe(409);
+    expect(await h.ownershipRepository.getChoice('player-1', GENERICO)).toEqual({ rolls: 0, pending: 1 });
+  });
+
+  it('tirar um prêmio no genérico zera o soft pity, mas NÃO o contador da escolha (D55)', async () => {
+    const h = buildHarness({ premium: CUSTO });
+    await h.ownershipRepository.setPity('player-1', 'generic', { adventurer: 0, hero: 104 });
+    await h.ownershipRepository.setChoice('player-1', GENERICO, { rolls: 50, pending: 0 });
+
+    const r = await post(h, '/summon', { nonce: 'gen-premio', bannerId: GENERICO });
+    expect(r.body.outcome.rank).toBe('hero');
+    expect(r.body.rollsSince.hero).toBe(0);
+    expect(r.body.choice).toEqual({ rolls: 51, pending: 0 });
   });
 });
 
@@ -383,9 +675,14 @@ describe('M18 6/N — o personagem possuído vira herói jogável', () => {
     const heroes = await get(h, '/me/heroes');
     const puxado = heroes.body.find((e: any) => e.hero.characterId === body.outcome.characterId);
 
-    const ticket = await post(h, '/campaign/encounter-campanha-1/ticket', { heroIds: [puxado.hero.id] });
+    // M36 2/N — a campanha abre uma PARTIDA VIVA; o que volta é o estado visível, e a unidade
+    // do próprio jogador continua nele por inteiro (§1.1).
+    const partida = await post(h, '/campaign/encounter-campanha-1/matches', {
+      heroIds: [puxado.hero.id],
+      rulesVersion: RULES_VERSION,
+    });
 
-    expect(ticket.status).toBe(200);
-    expect(ticket.body.setup.units.some((u: any) => u.unitId === `player-${puxado.hero.id}`)).toBe(true);
+    expect(partida.status, JSON.stringify(partida.body)).toBe(201);
+    expect(partida.body.visivel.units.some((u: any) => u.unitId === `player-${puxado.hero.id}`)).toBe(true);
   });
 });

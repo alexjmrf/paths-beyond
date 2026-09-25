@@ -21,7 +21,7 @@ export function PvpPanel() {
   const togglePvpHero = useBattleStore((s) => s.togglePvpHero);
   const findPvpOpponent = useBattleStore((s) => s.findPvpOpponent);
   const startPvpBattle = useBattleStore((s) => s.startPvpBattle);
-  const submitPvpBattle = useBattleStore((s) => s.submitPvpBattle);
+  const desistirDaPartida = useBattleStore((s) => s.desistirDaPartida);
   const reviewPvpBattle = useBattleStore((s) => s.reviewPvpBattle);
   const exitPvp = useBattleStore((s) => s.exitPvp);
 
@@ -98,15 +98,16 @@ export function PvpPanel() {
           ) : null}
 
           <div className="pvp-actions">
-            {/* M32 — com a batalha terminada, enviar é a próxima ação; antes disso não há
-                o que enviar, e o peso vai para o mapa. Depois de enviado, o peso sai. */}
+            {/* M36 4/N (D47) — **não há mais o que enviar.** O ELO e as marcas foram pagos no
+                comando que fechou a batalha; o botão que estava aqui submetia a partida inteira,
+                e a partida inteira deixou de existir como um ato só. Sair no meio DESISTE. */}
             <button
               type="button"
-              className={battleOver && !pvp.outcome ? 'acao-principal' : ''}
-              onClick={() => void submitPvpBattle()}
-              disabled={pvp.busy || !battleOver}
+              className={battleOver ? 'acao-principal' : ''}
+              onClick={() => void desistirDaPartida()}
+              disabled={pvp.busy}
             >
-              {t('pvp.enviar')}
+              {battleOver ? t('pvp.voltar') : t('pvp.abandonar')}
             </button>
             <button type="button" onClick={() => void reviewPvpBattle()} disabled={pvp.busy || !pvp.outcome}>
               {t('pvp.reverReplay')}

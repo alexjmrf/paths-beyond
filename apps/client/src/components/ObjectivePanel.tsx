@@ -1,6 +1,7 @@
 import { nomeDeConteudo } from '../i18n/conteudo.js';
 import { descreverObjetivo } from '../logic/objetivo.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { catalog } from '../data/catalog.js';
 
 // M12, sub-sessão 4/N — o objetivo do mapa na tela.
 //
@@ -21,7 +22,10 @@ function ValorSection() {
   const beginValorTargeting = useBattleStore((s) => s.beginValorTargeting);
   const cancelTargeting = useBattleStore((s) => s.cancelTargeting);
 
-  const skills = Object.values(battleState.valorSkills ?? {});
+  // M36 4/N — as valor-skills vêm do CATÁLOGO do cliente e não do estado. Elas são definição
+  // autorada (`packages/data/valor-skills/`), continuam no bundle e não descrevem inimigo nenhum;
+  // o estado visível carrega só tabuleiro.
+  const skills = Object.values(catalog.valorSkills);
 
   return (
     <div className="valor-section">

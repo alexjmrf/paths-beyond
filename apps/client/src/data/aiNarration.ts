@@ -1,4 +1,5 @@
-import type { AiTurnStep, BattleState, Coord, DuelResult } from '@paths-beyond/core';
+import type { Coord, DuelResult } from '@paths-beyond/core';
+import type { EstadoVisivel, PassoDaIa } from './api.js';
 
 // M16, sub-sessão 4/N — a narração do turno da IA.
 //
@@ -22,17 +23,22 @@ export type AiScene =
       readonly kind: 'move';
       // O estado imediatamente antes do passo: é de onde sai a geometria da cena (onde cada
       // peça estava, quem ainda estava viva) sem o cliente reaplicar um comando sequer.
-      readonly stateBefore: BattleState;
+      readonly stateBefore: EstadoVisivel;
       readonly unitId: string;
       readonly path: readonly Coord[];
     }
   | {
       readonly kind: 'duel';
-      readonly stateBefore: BattleState;
+      readonly stateBefore: EstadoVisivel;
       readonly duelResult: DuelResult;
     };
 
-export function narrateAiTurns(steps: readonly AiTurnStep[]): readonly AiScene[] {
+// M36 4/N (D47) — os passos chegam do SERVIDOR (`PassoDaIa`), já redigidos, em vez de saírem de
+// `resolveAiTurnsLogged` rodando aqui. A narração não mudou uma linha: ela sempre leu só o
+// comando e o estado de antes, que é exatamente o que continua chegando. O que mudou é que o
+// `stateBefore` agora é um `EstadoVisivel` — o inimigo aparece nele com posição e HP, e sem
+// ficha, que é tudo de que uma animação precisa.
+export function narrateAiTurns(steps: readonly PassoDaIa[]): readonly AiScene[] {
   const scenes: AiScene[] = [];
 
   for (const step of steps) {
@@ -42,7 +48,7 @@ export function narrateAiTurns(steps: readonly AiTurnStep[]): readonly AiScene[]
       // Caminho de um tile só não tem imagem: a peça sairia e chegaria no mesmo lugar, e a
       // pausa apareceria como o tabuleiro travando sem motivo.
       if (command.path.length < 2) continue;
-      scenes.push({ kind: 'move', stateBefore: step.stateBefore, unitId: command.unitId, path: command.path });
+      scenes.push({ kind: 'move', stateBefore: step.estadoAntes, unitId: command.unitId, path: command.path });
       continue;
     }
 
@@ -51,7 +57,7 @@ export function narrateAiTurns(steps: readonly AiTurnStep[]): readonly AiScene[]
       // que o core não decidiu. Não acontece em jogo (`applyCommand` sempre devolve o resultado
       // de um `engage` aceito); a guarda existe porque o tipo permite e o silêncio seria pior.
       if (!step.duelResult) continue;
-      scenes.push({ kind: 'duel', stateBefore: step.stateBefore, duelResult: step.duelResult });
+      scenes.push({ kind: 'duel', stateBefore: step.estadoAntes, duelResult: step.duelResult });
       continue;
     }
 

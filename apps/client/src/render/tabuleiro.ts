@@ -7,6 +7,7 @@ import { structureMarkFor } from '../data/structureMarks.js';
 import { terrainMarkFor } from '../data/terrainMarks.js';
 import { patternPrimitives } from '../data/tilePatterns.js';
 import { artIdDeUnidade } from '../data/unitArt.js';
+import { ehVisivelPorInteiro, hpMaximo, type UnidadeVisivel } from '../data/api.js';
 import type { UnitRenderInput, UnitRenderState } from '../data/unitRenderer.js';
 import { primitivasPintaveis } from '../logic/spriteSemTextura.js';
 
@@ -257,13 +258,21 @@ export interface ContextoDeRender {
   readonly artIdByUnitId: Readonly<Record<string, string>>;
 }
 
+// M36 (D47) — a peça desenhada a partir do VISÍVEL.
+//
+// Antes o renderer recebia um `BattleUnit` e lia dele o que precisava; agora ele recebe uma
+// `UnidadeVisivel`, que é o `BattleUnit` do próprio lado OU o retrato redigido do outro. As duas
+// metades do glifo do M16 sobrevivem: HP, AP, PP, efeitos e a arte continuam chegando dos dois
+// lados. O que só existe para o próprio lado é o nível 2 do glifo (tipo de arma e de unidade) —
+// e ele sair do inimigo é a decisão de D47 aparecendo na tela, não uma regressão de desenho.
 export function entradaDeRender(
-  unit: BattleUnit,
+  unit: UnidadeVisivel,
   px: number,
   py: number,
   state: UnitRenderState,
   { theme, tileSize, uiScale, heroesByUnitId, artIdByUnitId }: ContextoDeRender,
 ): UnitRenderInput {
+  const completa = ehVisivelPorInteiro(unit);
   // §6.9 — quantos efeitos ativos de cada polaridade. Quem resolve `ActiveEffect.id` →
   // `EffectDef.kind` é aqui, contra o catálogo: o renderer é puro e não conhece catálogo.
   let buffs = 0;
@@ -293,15 +302,16 @@ export function entradaDeRender(
       ap: unit.ap,
       pp: unit.pp,
       hp: unit.hp,
-      // `stats.hp` é o HP MÁXIMO resolvido (§4.1); `unit.hp` é o atual.
-      maxHp: unit.stats.hp,
+      // `stats.hp` é o HP MÁXIMO resolvido (§4.1) do lado do jogador; do lado do inimigo é o
+      // `hpMax` redigido, que D48 deixou atravessar justamente para a barra continuar existindo.
+      maxHp: hpMaximo(unit),
       hasActedThisRound: unit.hasActedThisRound,
       buffs,
       debuffs,
       ...(classId ? { classId } : {}),
-      // Nível 2 — o perfil, que todo `BattleUnit` carrega.
-      weaponType: unit.weaponType,
-      unitType: unit.unitType,
+      // Nível 2 — o perfil. Só do próprio lado: tipo de arma e de unidade são build (§6.8 faz do
+      // tipo de arma uma vantagem calculável), e D47 os manteve ocultos.
+      ...(completa ? { weaponType: unit.weaponType, unitType: unit.unitType } : {}),
       ...(artId ? { artId } : {}),
     },
     tile: { px, py, size: tileSize },

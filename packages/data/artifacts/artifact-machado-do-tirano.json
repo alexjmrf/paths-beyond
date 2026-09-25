@@ -1,0 +1,73 @@
+{
+  "id": "artifact-machado-do-tirano",
+  "signatureOf": "ally-guerreiro",
+  "name": "Machado do Tirano",
+  "classId": "class-guerreiro",
+  "rank": "hero",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "chd",
+    "byAwakening": [
+      52,
+      65,
+      78,
+      91,
+      110,
+      130,
+      156
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "reaction",
+    "skillId": "skill-furia-do-tirano",
+    "multiplierByImprint": [
+      500,
+      540,
+      580,
+      620,
+      660,
+      700
+    ]
+  }
+}

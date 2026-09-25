@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findJsonFiles } from '@paths-beyond/data/validate.js';
-import { buildCatalog } from './buildCatalog.js';
+import { buildCatalog, type ParsedContentFiles } from './buildCatalog.js';
 import type { ContentCatalog } from './types.js';
 
 // Diretório-fonte por padrão: packages/data/ (conteúdo real). `import.meta.resolve`
@@ -42,10 +42,16 @@ function readFirstJsonFile(dir: string): unknown {
 // função pura fazer a validação/indexação/fusão. Usado por `apps/server`, `sim-cli` e
 // `tools/balance` — nenhum deles roda em browser.
 export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): ContentCatalog {
+  return buildCatalog(readContentFilesFromDisk(options));
+}
+
+// M38 2/N — a LEITURA separada da montagem, exportada para que um teste possa alterar um
+// arquivo e ver `buildCatalog` recusá-lo, sem copiar a lista de diretórios.
+export function readContentFilesFromDisk(options: LoadCatalogFromDiskOptions = {}): ParsedContentFiles {
   const root = options.rootDir ?? realContentDir();
   const layout = options.layout ?? 'flat';
 
-  return buildCatalog({
+  return {
     classes: readJsonFiles(typeDir(root, 'classes', layout)),
     characters: readJsonFiles(typeDir(root, 'characters', layout)),
     characterTalentTrees: readJsonFiles(typeDir(root, 'character-talent-trees', layout)),
@@ -66,6 +72,8 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     dungeons: readJsonFiles(typeDir(root, 'dungeons', layout)),
     dungeonEncounters: readJsonFiles(typeDir(root, 'dungeon-encounters', layout)),
     materials: readJsonFiles(typeDir(root, 'materials', layout)),
+    // M38 2/N — os artefatos.
+    artifacts: readJsonFiles(typeDir(root, 'artifacts', layout)),
     // §10 (M18, 2/N) — os banners de invocação.
     banners: readJsonFiles(typeDir(root, 'banners', layout)),
     // §10 (M18, 4/N) — as fontes autoradas da moeda premium.
@@ -75,5 +83,5 @@ export function loadCatalogFromDisk(options: LoadCatalogFromDiskOptions = {}): C
     substatWeights: readFirstJsonFile(typeDir(root, 'substat-weights', layout)),
     mainstatWeights: readFirstJsonFile(typeDir(root, 'mainstat-weights', layout)),
     enhanceRates: readFirstJsonFile(typeDir(root, 'enhance-rates', layout)),
-  });
+  };
 }

@@ -1,12 +1,6 @@
-import {
-  RULES_VERSION,
-  applyCommandAndAdvance,
-  buildBattleSetupFromHeroes,
-  buildInitialState,
-  type BattleCommand,
-  type BattleSetup,
-  type Placement,
-} from '@paths-beyond/core';
+import { artefatoEquipado } from '../summon/artefatos.js';
+import { buildBattleSetupFromHeroes, type BattleSetup, type Coord, type Placement } from '@paths-beyond/core';
+import { redigirUnidade, type UnidadeVisivel } from '../battle/visao.js';
 import {
   toEncounterPlacements,
   toSummonBlueprintPlacements,
@@ -14,8 +8,6 @@ import {
   type Encounter,
 } from '@paths-beyond/content';
 import type { FastifyPluginAsync } from 'fastify';
-import { rejectOnRulesVersion } from '../version.js';
-import { deriveSeed, generateNonce } from '../battle/ticket.js';
 import type { Telemetria } from '../telemetry/telemetria.js';
 import { characterIdsForPlacements } from '../battle/artIds.js';
 import {
@@ -64,24 +56,14 @@ export interface CampaignRoutesOptions {
   readonly newNonce?: () => string;
 }
 
-interface RunBody {
-  readonly nonce?: string;
-  readonly heroIds?: readonly string[];
-  readonly commands?: readonly BattleCommand[];
-  // M22 1/N — mesmo campo, mesmo motivo de `/dungeons/:id/run`: esta rota também reexecuta
-  // comandos do cliente. Ela nasceu no M18 4/N, depois de o roadmap do M22 ser escrito, e
-  // por isso o buraco não estava listado lá — é o mesmo buraco.
-  readonly rulesVersion?: string;
-}
-
 // `catalog.encounters` é uma LISTA e não um índice por id (é assim desde M12): a busca é
 // linear de propósito, com seis capítulos, e centralizada aqui para as duas rotas não
 // divergirem no que consideram "capítulo desconhecido".
-function findChapter(catalog: ContentCatalog, chapterId: string): Encounter | undefined {
+export function findChapter(catalog: ContentCatalog, chapterId: string): Encounter | undefined {
   return catalog.encounters.find((encounter) => encounter.id === chapterId);
 }
 
-async function assembleChapterBattle(
+export async function assembleChapterBattle(
   opts: CampaignRoutesOptions,
   encounter: Encounter,
   playerHeroIds: readonly string[],
@@ -109,16 +91,20 @@ async function assembleChapterBattle(
   const faltando = unownedAmong(stored, owned);
   if (faltando.length > 0) return { error: `você não possui: ${faltando.join(', ')}` };
 
+  // M38 4/N — o artefato equipado de cada herói, buscado antes (a busca é assíncrona).
+  const artefatos = await Promise.all(stored.map((hero) => artefatoEquipado(opts.ownershipRepository, opts.catalog, hero)));
   const placements: Placement[] = [];
   stored.forEach((hero, index) => {
     const slot = slots[index]!;
     const classDef = opts.catalog.classes[hero.hero.classId];
     if (!classDef) return;
+    const artifact = artefatos[index];
     placements.push({
       unitId: `player-${hero.hero.id}`,
       hero: hero.hero,
       classDef,
       equippedItems: hero.equippedItems,
+      ...(artifact ? { artifact } : {}),
       side: 'player',
       pos: slot.pos,
       height: slot.height,
@@ -184,6 +170,26 @@ function slotDaRota(params: unknown): number | null {
   return slot >= 1 && slot <= MAX_PARTY_PRESETS ? slot : null;
 }
 
+/**
+ * Os ids de personagem na ordem em que a campanha os apresenta como VAGA do jogador. Movida de
+ * `apps/client/src/logic/quemVai.ts` (M35 2/N) nesta fatia, sem mudar de regra.
+ */
+export function ordemDeAparicao(catalog: ContentCatalog): readonly string[] {
+  const ordemDoCapitulo = new Map(catalog.chapters.map((c) => [c.id, c.order] as const));
+  const missoes = [...catalog.encounters].sort(
+    (a, b) => (ordemDoCapitulo.get(a.chapterId) ?? 0) - (ordemDoCapitulo.get(b.chapterId) ?? 0) || a.order - b.order,
+  );
+  const vistos: string[] = [];
+  for (const missao of missoes) {
+    for (const unit of missao.units) {
+      if (unit.side !== 'player') continue;
+      const id = unit.hero.characterId;
+      if (id && !vistos.includes(id)) vistos.push(id);
+    }
+  }
+  return vistos;
+}
+
 export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (fastify, opts) => {
   // M35 3/N (D42) — os PRESETS de party. Estado de conta, pelo mesmo desenho de `/me/defense`:
   // o cliente escolhe um preset ao entrar numa missão e ainda troca antes de entrar. O servidor
@@ -228,6 +234,65 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
     return { deleted: true };
   });
 
+  // M36 3/N (D48) — a PRÉVIA da missão, agora do servidor.
+  //
+  // Ela existia desde o M35 2/N e era montada no CLIENTE, a partir de `packages/data/encounters`
+  // empacotado junto com o jogo. Com o catálogo partido esse arquivo não viaja mais no bundle —
+  // e mesmo que viajasse, mostrar a ficha do inimigo antes de entrar seria o oposto de D47.
+  //
+  // O que ela devolve é o mesmo que a batalha devolve: o tabuleiro e o VISÍVEL. §1.1 continua
+  // valendo na forma reescrita — o jogador vê o terreno, onde os inimigos estão, quantos são e
+  // onde ele mesmo vai entrar. O que ele não vê é o que cada um carrega.
+  //
+  // Sem `buildInitialState` de propósito: construir o estado resolveria o turno de IA que abre a
+  // batalha, e a prévia mostraria as peças JÁ MOVIDAS — um defeito que a versão do cliente tinha
+  // e que ninguém tinha notado, porque lá a prévia nascia de uma seed fixa.
+  fastify.get('/campaign/:id/previa', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+
+    const missionId = (request.params as { id: string }).id;
+    const encounter = findChapter(opts.catalog, missionId);
+    if (!encounter) return reply.code(404).send({ error: 'capítulo desconhecido' });
+
+    const mapa = opts.catalog.maps[encounter.mapId];
+    if (!mapa) return reply.code(500).send({ error: 'capítulo referencia mapa desconhecido' });
+
+    // O que NÃO é vaga: inimigos e aliados de cenário (D16). As vagas ficam de fora — elas são
+    // marcas no tabuleiro, e quem as preenche o jogador ainda vai escolher.
+    const doCenario = toEncounterPlacements(
+      encounter.units.filter((unit) => unit.side !== 'player'),
+      opts.catalog,
+    );
+
+    const setup = buildBattleSetupFromHeroes({
+      placements: doCenario,
+      map: mapa.grid,
+      permadeath: encounter.permadeath,
+      winCondition: encounter.winCondition ?? mapa.winCondition,
+      effectDefs: opts.catalog.effects,
+      initialValor: mapa.initialValor,
+      valorSkills: opts.catalog.valorSkills,
+      summonBlueprints: toSummonBlueprintPlacements(opts.catalog),
+      itemSets: opts.catalog.itemSets,
+      skillsCatalog: opts.catalog.skills,
+      weaponDuelRanges: opts.catalog.weaponDuelRanges,
+      baselineReactionSkillIds: opts.catalog.baselineReactionSkillIds,
+      characterTalentTrees: opts.catalog.characterTalentTrees,
+    });
+
+    const vagas: readonly Coord[] = encounter.units.filter((unit) => unit.side === 'player').map((unit) => unit.pos);
+    const unidades: readonly UnidadeVisivel[] = setup.units.map((unidade) => redigirUnidade(unidade, 'player'));
+
+    return {
+      missionId: encounter.id,
+      map: setup.map,
+      winCondition: setup.winCondition,
+      vagas,
+      unidades,
+      characterIdByUnitId: characterIdsForPlacements(doCenario),
+    };
+  });
+
   fastify.get('/campaign', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const cleared = new Set(await opts.rewardsRepository.listClearedChapters(request.player.id));
@@ -258,96 +323,26 @@ export const campaignRoutes: FastifyPluginAsync<CampaignRoutesOptions> = async (
       }),
       premiumOnFirstClear: opts.catalog.premiumRules.premiumRewards.missionFirstClear,
       premiumOnChapterClear: opts.catalog.premiumRules.premiumRewards.chapterFirstClear,
+      // M36 3/N — a ordem em que a campanha APRESENTA os personagens. Era derivada no cliente
+      // (`quemVai.ts`, M35 2/N) a partir de `encounters`, que não viaja mais no bundle. Continua
+      // derivada do conteúdo autorado, só que aqui: um personagem novo numa missão entra na
+      // ordem sozinho, e nenhuma lista fica descrevendo o passado.
+      //
+      // É APRESENTAÇÃO, não regra — ela decide quem vem pré-marcado ao escolher uma missão.
+      // Quem valida a party continua sendo a montagem da batalha.
+      castOrder: ordemDeAparicao(opts.catalog),
     };
   });
 
-  fastify.post('/campaign/:id/ticket', async (request, reply) => {
-    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
-    const player = request.player;
-
-
-    const chapterId = (request.params as { id: string }).id;
-    const encounter = findChapter(opts.catalog, chapterId);
-    if (!encounter) return reply.code(404).send({ error: 'capítulo desconhecido' });
-
-    const body = request.body as RunBody;
-    const assembled = await assembleChapterBattle(opts, encounter, body.heroIds ?? [], player.id);
-    if ('error' in assembled) return reply.code(400).send({ error: assembled.error });
-
-    const nonce = (opts.newNonce ?? generateNonce)();
-    await opts.telemetria.missaoIniciada({ playerId: player.id, missionId: encounter.id, nonce });
-    return {
-      nonce,
-      seed: deriveSeed(opts.ticketSecret, nonce),
-      rulesVersion: RULES_VERSION,
-      setup: assembled.setup,
-      characterIdByUnitId: assembled.characterIdByUnitId,
-      chapterId: encounter.id,
-    };
-  });
-
-  fastify.post('/campaign/:id/run', async (request, reply) => {
-    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
-    const player = request.player;
-
-    const chapterId = (request.params as { id: string }).id;
-    const encounter = findChapter(opts.catalog, chapterId);
-    if (!encounter) return reply.code(404).send({ error: 'capítulo desconhecido' });
-
-    const body = request.body as RunBody;
-    if (!body.nonce) return reply.code(400).send({ error: 'nonce é obrigatório' });
-
-    // Antes do limitador, pelo mesmo motivo da masmorra: quem não consegue jogar precisa da
-    // resposta que explica por quê.
-    if (rejectOnRulesVersion(reply, body.rulesVersion)) return reply;
-
-
-    const assembled = await assembleChapterBattle(opts, encounter, body.heroIds ?? [], player.id);
-    if ('error' in assembled) return reply.code(400).send({ error: assembled.error });
-
-    // §9.4 — o resultado NUNCA vem do cliente: o servidor reaplica os comandos sobre o
-    // mesmo setup e a mesma seed que o ticket entregou.
-    const seed = deriveSeed(opts.ticketSecret, body.nonce);
-    let state = buildInitialState(assembled.setup, seed);
-    for (const command of body.commands ?? []) {
-      if (state.outcome !== 'ongoing') break;
-      const applied = applyCommandAndAdvance(state, command);
-      if (!applied.applied) {
-        return reply.code(400).send({ error: `comando rejeitado: ${applied.reason}` });
-      }
-      state = applied.state;
-    }
-
-    const outcome = state.outcome === 'victory' ? 'victory' : 'defeat';
-    await opts.telemetria.missaoTerminada({ nonce: body.nonce, outcome, rounds: state.round });
-    if (outcome !== 'victory') {
-      return reply.code(200).send({ outcome, roundsPlayed: state.round, premiumAwarded: 0, premium: player.premium });
-    }
-
-    // A primeira completude paga; a segunda não. `markChapterCleared` devolve se foi a
-    // primeira — a checagem e a escrita numa operação só, porque perguntar e depois
-    // escrever abriria a fresta em que duas submissões simultâneas pagam duas vezes.
-    //
-    // M27 (D23) — o pagamento tem DUAS granularidades, e a segunda só existe no instante em
-    // que a última missão do capítulo cai. A ordem importa: a marca é escrita ANTES de
-    // recontar, senão a missão que acabou de ser limpa não entraria na conta e o capítulo
-    // nunca pagaria.
-    const first = await opts.rewardsRepository.markChapterCleared(player.id, encounter.id);
-    let premiumAwarded = first ? opts.catalog.premiumRules.premiumRewards.missionFirstClear : 0;
-
-    if (first) {
-      const cleared = new Set(await opts.rewardsRepository.listClearedChapters(player.id));
-      const irmas = opts.catalog.encounters.filter((e) => e.chapterId === encounter.chapterId);
-      // Fecha o capítulo? Só paga o bônus quem virou a chave — e como este caminho só roda
-      // quando `first` é verdadeiro, ele roda uma vez por missão e portanto uma vez por
-      // capítulo.
-      if (irmas.length > 0 && irmas.every((e) => cleared.has(e.id))) {
-        premiumAwarded += opts.catalog.premiumRules.premiumRewards.chapterFirstClear;
-      }
-    }
-    const updated =
-      premiumAwarded > 0 ? await opts.repository.updatePremium(player.id, player.premium + premiumAwarded) : player;
-
-    return { outcome, roundsPlayed: state.round, premiumAwarded, premium: updated.premium };
-  });
+  // M36 2/N (D47) — `POST /campaign/:id/ticket` e `POST /campaign/:id/run` FORAM APOSENTADAS.
+  //
+  // Elas eram o modelo `ticket → joga tudo → run`, e ele não sobrevive ao inimigo desconhecido: o
+  // ticket entregava o `BattleSetup` COMPLETO do capítulo — stats, skills e scripts de todo
+  // inimigo — para o cliente jogar sozinho. O que as substitui é `POST /campaign/:id/matches` +
+  // `POST /matches/:nonce/commands`, em `battle/matchRoutes.ts`, com `assembleChapterBattle`
+  // acima continuando a ser a MESMA montagem.
+  //
+  // A telemetria do M34 não perdeu nada: `missaoIniciada` passou para a abertura da partida e
+  // `missaoTerminada` para o comando que fecha a batalha — os mesmos dois instantes, com o mesmo
+  // nonce casando começo e fim.
 };

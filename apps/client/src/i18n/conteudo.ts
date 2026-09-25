@@ -43,6 +43,10 @@ export const TIPOS_DE_CONTEUDO = [
   // M35 1/N (D43) — os inimigos comuns de `enemies/`: nome autorado `<função> [de <facção>]`,
   // que o ticket já transportava e a tela não olhava.
   'inimigo',
+  // M38 2/N (D53) — os artefatos: o nome é o do OBJETO, não o de uma pessoa, e se traduz.
+  'artefato',
+  // M38 3/N — os banners: o nome autorado é da tela, e se traduz.
+  'banner',
 ] as const;
 
 export type TipoDeConteudo = (typeof TIPOS_DE_CONTEUDO)[number];

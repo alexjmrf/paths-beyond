@@ -1,0 +1,224 @@
+{
+  "characterId": "ally-acolito",
+  "depth": 6,
+  "nodes": [
+    {
+      "id": "talent-dorn-fe-severa",
+      "column": "a",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 40
+        },
+        {
+          "t": "stat",
+          "stat": "heal",
+          "pct": -20
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-bencao-simples",
+      "column": "b",
+      "row": 1,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-cura-clerigo",
+          "patch": {
+            "multiplier": 1200
+          }
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 45
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-verbo-de-luz",
+      "column": "a",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "modifySkill",
+          "skillId": "skill-especial-clerigo",
+          "patch": {
+            "multiplier": 1250
+          }
+        },
+        {
+          "t": "maxPp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-leitura-do-campo",
+      "column": "middle",
+      "row": 2,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "spd",
+          "flat": 3
+        },
+        {
+          "t": "extraTacticsCondition"
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-litania",
+      "column": "b",
+      "row": 2,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "maxPp",
+          "n": 1
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "flat": 3
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-vigilia",
+      "column": "a",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "apRefund",
+          "on": "duelWon",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-mao-estendida",
+      "column": "b",
+      "row": 3,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "grantReaction",
+          "reactionId": "skill-assistir"
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-unguento",
+      "column": "a",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "heal",
+          "pct": 30
+        },
+        {
+          "t": "stat",
+          "stat": "atk",
+          "pct": 30
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-paciencia",
+      "column": "b",
+      "row": 4,
+      "maxRank": 2,
+      "effects": [
+        {
+          "t": "stat",
+          "stat": "def",
+          "pct": 20
+        },
+        {
+          "t": "stat",
+          "stat": "efr",
+          "flat": 30
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-avanco",
+      "column": "a",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "duelApCap",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-segundo-folego",
+      "column": "middle",
+      "row": 5,
+      "maxRank": 1,
+      "minAwakening": 5,
+      "effects": [
+        {
+          "t": "maxAp",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-cobertura",
+      "column": "b",
+      "row": 5,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "assistRangeBonus",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-maestria-do-rito",
+      "column": "a",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "passive",
+          "passiveId": "passive-clerigo-maestria"
+        }
+      ]
+    },
+    {
+      "id": "talent-dorn-procissao",
+      "column": "b",
+      "row": 6,
+      "maxRank": 1,
+      "effects": [
+        {
+          "t": "extraTacticsSlot"
+        },
+        {
+          "t": "modifySkill",
+          "skillId": "skill-ataque-clerigo",
+          "patch": {
+            "multiplier": 1200
+          }
+        }
+      ]
+    }
+  ]
+}

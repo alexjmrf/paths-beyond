@@ -1,0 +1,73 @@
+{
+  "id": "artifact-aljava-da-batedora",
+  "signatureOf": "ally-batedora",
+  "name": "Aljava da Batedora",
+  "classId": "class-arqueiro",
+  "rank": "adventurer",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "chc",
+    "byAwakening": [
+      32,
+      40,
+      48,
+      56,
+      68,
+      80,
+      96
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "stat",
+    "stat": "atk",
+    "pctByImprint": [
+      50,
+      58,
+      66,
+      74,
+      82,
+      90
+    ]
+  }
+}

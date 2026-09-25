@@ -1,17 +1,23 @@
+// M36 4/N (D47) — **o que saiu daqui é a milestone inteira.**
+//
+// `applyCommandAndAdvance`, `buildInitialState` e `buildBattleSetupFromHeroes` não estão mais na
+// lista, e não podem voltar: informação oculta e simulação no cliente não coexistem. Se o
+// cliente resolvesse o comando, ele teria os dados do inimigo para resolvê-lo — e um editor de
+// memória os leria. Quem resolve é o servidor; o cliente **reproduz o log** que ele devolve.
+//
+// O que ficou do core é o que só depende do PRÓPRIO lado e do tabuleiro visível:
+// `computeReachableTiles` (para onde a minha unidade anda), `openGateCoords`,
+// `manhattanDistance`, `tileAt` e as funções de talento. `ambiente.test.ts` do cliente trava
+// esta lista — ver `semSimulacaoNoCliente.test.ts`.
 import {
   RULES_VERSION,
-  buildBattleSetupFromHeroes,
-  applyCommandAndAdvance,
-  buildInitialState,
   computeReachableTiles,
   openGateCoords,
   manhattanDistance,
   tileAt,
   resetFromRow,
   validateColumnAllocation,
-  type AiTurnStep,
   type BattleCommand,
-  type BattleState,
   type BattleUnit,
   type ClassDef,
   type Coord,
@@ -21,12 +27,10 @@ import {
   type ItemInstance,
   type MapAiArchetype,
   type ReachableTile,
-  type BattleSetup,
   type Hero,
   type TacticsScript,
   type TalentAllocation,
   type ColumnTalentTree,
-  type Replay,
   type ValorSkillDef,
 } from '@paths-beyond/core';
 import { create } from 'zustand';
@@ -50,9 +54,18 @@ import {
   type CampaignMission,
   type CampaignRunResponse,
   type CampaignTicket,
+  type MissionPreviewResponse,
+  ehVisivelPorInteiro,
+  type EstadoVisivel,
+  type LiquidacaoDaPartida,
+  type LogDeReplay,
+  type PassoDaIa,
+  type UnidadeVisivel,
+  type VistaDaPartida,
   type CharacterRosterEntry,
   type RewardView,
   type SummonResponse,
+  type ArtifactInstanceView,
 } from '../data/api.js';
 import { narrateAiTurns } from '../data/aiNarration.js';
 import { catalog } from '../data/catalog.js';
@@ -62,7 +75,7 @@ import { VOLUMES_PADRAO } from '../audio/sons.js';
 import { CATALOGOS } from '../i18n/catalogos.js';
 import { criarTradutor, idiomaDoNavegador, idiomaValido, type Idioma, type Tradutor } from '../i18n/idioma.js';
 import type { AbaDoHub, TelaDoHub } from '../logic/tela.js';
-import { ordemDeAparicao, preenchimentoPadrao } from '../logic/quemVai.js';
+import { preenchimentoPadrao } from '../logic/quemVai.js';
 import { nomeDoDesfecho } from '../logic/rotulos.js';
 import { guardarPedido, limparPedido, reenviarPedidoPendente } from '../logic/pedidoEmVoo.js';
 import {
@@ -103,33 +116,33 @@ const BATTLE_SEED = 42;
 // com zero unidades e zero iniciativa, ou seja, nada acontece, nada é jogável e nenhum
 // overlay de vitória dispara. É o que a tela deve mostrar enquanto o jogador escolhe o
 // capítulo.
-let setupVazioMemo: BattleSetup | null = null;
+let tabuleiroVazioMemo: EstadoVisivel | null = null;
 
-function setupVazio(): BattleSetup {
-  if (setupVazioMemo) return setupVazioMemo;
-  const primeiro = catalog.encounters[0];
-  const arenaMap = primeiro ? catalog.maps[primeiro.mapId] : undefined;
+function tabuleiroVazio(): EstadoVisivel {
+  if (tabuleiroVazioMemo) return tabuleiroVazioMemo;
+  // M36 3/N — QUALQUER mapa serve, e agora tem de servir: a linha antiga escolhia o mapa da
+  // primeira missão (`catalog.encounters[0]`), e `encounters` não viaja mais no bundle. O
+  // tabuleiro vazio nunca dependeu de qual mapa era — ele existe para a tela abrir em algo real
+  // e sem unidade nenhuma enquanto o jogador escolhe.
+  const arenaMap = Object.values(catalog.maps)[0];
   if (!arenaMap) throw new Error('catálogo sem mapa para o tabuleiro vazio');
 
-  setupVazioMemo = buildBattleSetupFromHeroes({
-    placements: [],
+  // M36 4/N — um `EstadoVisivel` LITERAL, e não mais um `BattleSetup` passado por
+  // `buildInitialState`. O tabuleiro vazio nunca precisou do motor: ele é um grid com zero
+  // unidades, e montá-lo pelo core seria a última simulação do cliente sobrevivendo por
+  // inércia num caso em que não há nada a simular.
+  tabuleiroVazioMemo = {
     map: arenaMap.grid,
-    permadeath: 'casual',
+    units: [],
+    initiativeOrder: [],
+    round: 1,
+    valor: arenaMap.initialValor,
+    outcome: 'ongoing',
     winCondition: arenaMap.winCondition,
-    effectDefs: catalog.effects,
-    initialValor: arenaMap.initialValor,
-    valorSkills: catalog.valorSkills,
-    itemSets: catalog.itemSets,
-    skillsCatalog: catalog.skills,
-    weaponDuelRanges: catalog.weaponDuelRanges,
-    baselineReactionSkillIds: catalog.baselineReactionSkillIds,
-    characterTalentTrees: catalog.characterTalentTrees,
-  });
-  return setupVazioMemo;
-}
-
-function tabuleiroVazio(): BattleState {
-  return buildInitialState(setupVazio(), BATTLE_SEED);
+    permadeath: 'casual',
+    distanceMovedThisTurn: {},
+  };
+  return tabuleiroVazioMemo;
 }
 
 // Quem é cada unidade do tabuleiro, para as telas que abrem sobre uma PESSOA (talentos,
@@ -138,13 +151,18 @@ function tabuleiroVazio(): BattleState {
 //
 // Antes isto vinha de `data/campaign.ts`, montado do conteúdo local. Com a batalha vindo do
 // servidor, o conteúdo local não sabe quem está no tabuleiro: só a conta sabe.
+// M36 4/N — recebe o ESTADO VISÍVEL, e não mais o `BattleSetup`. A ponte continua sendo o
+// `heroId`, que só a unidade do próprio jogador carrega — e é exatamente por isso que o mapa
+// sempre foi só do lado dele: as telas que ele abre (talentos, equipamento, táticas) abrem sobre
+// uma PESSOA, e inimigo nunca teve ficha para abrir.
 export function heroesPorUnidade(
-  setup: BattleSetup,
+  units: readonly UnidadeVisivel[],
   roster: readonly RosterEntry[],
 ): Readonly<Record<string, Hero>> {
   const porHeroId = new Map(roster.map((entry) => [entry.hero.id, entry.hero] as const));
   const porUnidade: Record<string, Hero> = {};
-  for (const unit of setup.units) {
+  for (const unit of units) {
+    if (!ehVisivelPorInteiro(unit)) continue;
     const hero = porHeroId.get(unit.heroId);
     if (hero) porUnidade[unit.unitId] = hero;
   }
@@ -284,24 +302,41 @@ export function saveProjection(state: {
 // commita `nextState` no mesmo instante, e nele o perdedor já está morto. A cena conta o que
 // aconteceu — ela precisa dos dois de pé no primeiro quadro, exatamente como a animação de
 // tabuleiro de M16 3/N precisa de `stateBefore`.
+// M36 4/N (D47) — o relato de UM quadro de jogo: o duelo que o JOGADOR abriu (quando abriu) e
+// o turno que a IA jogou em seguida, na ordem em que aconteceram.
+//
+// **`meuDuelo` é novo, e substitui uma dedução que não sobreviveu.** Até aqui o `MapCanvas`
+// descobria o duelo do jogador pela transição do preview ("havia preview, não há mais, e o
+// estado mudou"). Sem preview, a informação tem de ser dita: o servidor manda o `duelResult` do
+// comando, e o estado de ANTES é o que o cliente tinha antes de aplicar a resposta.
+export interface RelatoDoTurno {
+  readonly state: EstadoVisivel;
+  readonly steps: readonly PassoDaIa[];
+  readonly meuDuelo?: { readonly estadoAntes: EstadoVisivel; readonly duelResult: DuelResult };
+}
+
 export interface CenaDeDuelo {
-  readonly atacante: BattleUnit;
-  readonly defensor: BattleUnit;
+  // M36 4/N (D47) — `UnidadeVisivel`, e não mais `BattleUnit`: um dos dois duelistas é do
+  // inimigo, e do inimigo o cliente tem posição, HP, AP, PP e a arte. É o bastante para a cena,
+  // porque ela conta o que ACONTECEU — o `duelResult` traz cada golpe, cada dano e o nome da
+  // skill no instante em que ela disparou. A ficha nunca foi o que a cena desenhava.
+  readonly atacante: UnidadeVisivel;
+  readonly defensor: UnidadeVisivel;
   readonly duelResult: DuelResult;
 }
 
-export interface DuelPreview {
-  readonly nextState: BattleState;
-  readonly duelResult: DuelResult;
-  // O comando que gerou este preview. Só entra na gravação quando o jogador CONFIRMA:
-  // cancelar um preview não aconteceu na batalha e não pode aparecer no replay.
-  readonly command: BattleCommand;
-  // M16 4/N — o turno da IA que veio DEPOIS deste engate. Vive no preview pelo mesmo motivo
-  // que `nextState`: confirmar aplica o objeto já computado e nunca recalcula, então o relato
-  // tem de viajar junto — recomputá-lo no confirm seria uma segunda rodada que só deveria dar
-  // o mesmo resultado. Cancelar descarta os dois.
-  readonly aiSteps: readonly AiTurnStep[];
-}
+// M36 4/N (D47) — **`DuelPreview` FOI REMOVIDO, e é a maior coisa que esta milestone tira.**
+//
+// §11 chamava o preview de duelo de "o recurso mais importante do jogo": o jogador via o
+// resultado do engajamento ANTES de confirmar. Ele funcionava rodando `applyCommandAndAdvance`
+// no cliente, com os dados dos dois lados na mão — que é exatamente o que deixou de existir.
+//
+// Não é uma perda por limitação técnica: D47 decidiu que engajar é uma APOSTA INFORMADA. O
+// jogador lê o próprio compromisso (suas skills, seus recursos, a ordem de quem age) e o estado
+// visível do inimigo (posição, HP, AP, PP); o que o inimigo carrega, ele descobre no duelo.
+//
+// Se um dia o preview voltar, ele volta como ESTIMATIVA a partir do conhecido — o seu lado mais
+// o que você já viu —, nunca como cálculo do oculto. O teorema não muda.
 
 // §5.4/§5.6 (M12, sub-sessão 4/N) — mira no mapa. `mapSkill` e `useValor` são os dois
 // únicos comandos cujo alvo é uma COORDENADA e não uma unidade, e nenhum dos dois tinha
@@ -318,15 +353,21 @@ export interface TargetingMode {
   readonly tiles: readonly Coord[]; // tiles legais de lançamento
 }
 
-// §11 — "Replay: reprodução passo a passo com controle de velocidade a partir do
-// `Replay`." O estado do passo corrente é RECOMPUTADO do início a cada busca, em vez de
-// guardado em snapshots: só é legítimo porque o core é determinístico (mesma seed + mesmos
-// comandos = mesmo estado), e é o que garante que rebobinar mostre exatamente o que a ida
-// mostrou. Um cache de snapshots poderia divergir em silêncio.
+// §11 — "Replay: reprodução passo a passo com controle de velocidade."
+//
+// **M36 4/N (D47) — o estado de cada passo deixou de ser RECOMPUTADO e passa a ser LIDO.** Antes
+// o cliente reexecutava o replay do começo a cada busca, o que era legítimo porque o core é
+// determinístico; agora ele não pode reexecutar coisa nenhuma — reproduzir o replay localmente
+// devolveria em memória exatamente o dado que D47 tirou da batalha ao vivo, e o esconder valeria
+// só enquanto a partida corre.
+//
+// O servidor reproduz e redige (`GET /battles/:nonce/log`), e cada passo chega com o estado de
+// ANTES dele. Rebobinar mostra o que a ida mostrou porque é literalmente a mesma lista.
 export interface ReplayViewer {
-  readonly replay: Replay;
-  readonly step: number; // 0 = antes do primeiro comando
-  readonly state: BattleState;
+  /** O log REDIGIDO, do servidor: `GET /battles/:nonce/log`. */
+  readonly log: LogDeReplay;
+  readonly step: number; // 0 = antes do primeiro passo
+  readonly state: EstadoVisivel;
   readonly playing: boolean;
   readonly speed: number; // multiplicador de velocidade da reprodução automática
 }
@@ -355,6 +396,9 @@ export interface PvpSession {
   // como persistido um rascunho que nunca subiu.
   readonly savedDefense: ArenaDefense | null;
   readonly defenseDraft: DefenseDraft;
+  // M38 4/N — os artefatos da conta (instâncias). Moram ao lado do roster de heróis porque
+  // são lidos juntos: a aba Personagens mostra quem leva qual.
+  readonly artifacts: readonly ArtifactInstanceView[];
 }
 
 // O rascunho: mapa escolhido e as unidades posicionadas. Mora no store e não no componente
@@ -390,6 +434,7 @@ const EMPTY_PVP: PvpSession = {
   busy: false,
   savedDefense: null,
   defenseDraft: { mapId: '', units: [], placingHeroId: null },
+  artifacts: [],
 };
 
 // §10 (M14, sub-sessão 5/N) — a sessão de farm. Mora ao lado da de PvP e pelo mesmo
@@ -439,6 +484,12 @@ export interface CampaignSession {
   // do componente poria a regra de "onde o jogador parou" onde nenhum teste a alcança.
   readonly openChapterIds: readonly string[];
   readonly selectedHeroIds: readonly string[];
+  // M36 3/N (D48) — a ordem em que a campanha apresenta o elenco, vinda de `GET /campaign`.
+  // Era derivada localmente de `catalog.encounters` (M35 2/N), que saiu do bundle.
+  readonly castOrder: readonly string[];
+  // M36 3/N (D48) — a prévia da missão escolhida, do servidor e já redigida. `null` enquanto
+  // não há missão escolhida ou enquanto ela não chegou.
+  readonly previa: MissionPreviewResponse | null;
   readonly ticket: CampaignTicket | null;
   readonly lastRun: CampaignRunResponse | null;
   readonly premiumOnFirstClear: number;
@@ -453,6 +504,8 @@ const EMPTY_CAMPAIGN: CampaignSession = {
   selectedMissionId: null,
   openChapterIds: [],
   selectedHeroIds: [],
+  castOrder: [],
+  previa: null,
   ticket: null,
   lastRun: null,
   premiumOnFirstClear: 0,
@@ -477,7 +530,12 @@ export interface SummonSession {
   // A última rolagem, para a tela poder mostrar o que saiu. Não é histórico: o servidor é
   // quem guarda o que aconteceu, e um histórico de cliente divergiria dele no primeiro
   // reenvio de rede.
-  readonly lastResult: SummonResponse | null;
+  // M38 3/N — o resgate da escolha do genérico entra aqui também: a tela mostra o que saiu
+  // pelo mesmo caminho, e `tokenGrants` vem nos dois.
+  readonly lastResult: (Pick<SummonResponse, 'outcome' | 'tokenGrants'> & Partial<SummonResponse>) | null;
+  // De qual banner o último resultado saiu: a tela só o mostra na aba dele (visto no
+  // navegador — o "ganhou o Machado" aparecia na aba do Rurik).
+  readonly lastResultBannerId: string | null;
   readonly status: string | null;
   readonly error: string | null;
   readonly busy: boolean;
@@ -489,13 +547,14 @@ const EMPTY_SUMMON: SummonSession = {
   characters: [],
   rewards: [],
   lastResult: null,
+  lastResultBannerId: null,
   status: null,
   error: null,
   busy: false,
 };
 
 interface BattleStore {
-  readonly battleState: BattleState;
+  readonly battleState: EstadoVisivel;
   readonly selectedUnitId: string | null;
   readonly reachableTiles: readonly ReachableTile[];
   // §1.1 (M23, 1/N) — a introdução contextual.
@@ -510,7 +569,13 @@ interface BattleStore {
   readonly idioma: Idioma;
   readonly idiomaEscolhido: string | null;
   readonly t: Tradutor;
-  readonly duelPreview: DuelPreview | null;
+  // M36 4/N (D47) — a PARTIDA VIVA no servidor. `null` fora de batalha. Ela substitui os três
+  // `ticket` que viviam em `pvp`, `pve` e `campaign`: um caminho, e não três.
+  readonly partida: VistaDaPartida | null;
+  /** Um comando por vez: dois cliques rápidos não podem virar dois comandos contra o mesmo estado. */
+  readonly comandoEmVoo: boolean;
+  /** O que o servidor pagou (ou cobrou) quando a batalha fechou. `null` enquanto ela corre. */
+  readonly liquidacao: LiquidacaoDaPartida | null;
   readonly lastCommandReason: string | null;
   readonly tacticsEditorUnitId: string | null;
   readonly inventory: readonly ItemInstance[];
@@ -540,7 +605,7 @@ interface BattleStore {
   // `battleState`, e o relato pendente deixa de casar sozinho — sem precisar de um `reset` em
   // cada um dos nove pontos que começam batalha, que é o tipo de lista que se esquece de
   // atualizar. Não é regra e não vai para o save.
-  readonly aiTurnReport: { readonly state: BattleState; readonly steps: readonly AiTurnStep[] } | null;
+  readonly aiTurnReport: RelatoDoTurno | null;
   // §11 (acessibilidade) — "modo daltônico nos overlays" e "fonte escalável". Só
   // apresentação: nenhum dos dois muda uma decisão do core (regra 3). A paleta e os
   // padrões moram em `data/overlayTheme.ts`; a escala vale para o HTML (todo o CSS já é
@@ -614,15 +679,25 @@ interface BattleStore {
   moveSelectedUnitTo: (destination: Coord) => void;
   waitSelectedUnit: () => void;
   restSelectedUnit: () => void;
-  previewEngage: (targetId: string) => void;
-  confirmEngage: () => void;
-  cancelEngage: () => void;
+  // M36 4/N (D47) — engajar virou um comando só. `previewEngage`/`confirmEngage`/`cancelEngage`
+  // saíram com o preview de duelo; ver o comentário onde `DuelPreview` era declarado.
+  engageTarget: (targetId: string) => void;
+  /** O único caminho pelo qual um comando sai do cliente. */
+  enviarComando: (command: BattleCommand, opcoes?: { readonly manterSelecao?: boolean }) => Promise<void>;
+  /** Põe uma partida viva na tela, vinda da abertura ou da reconexão. */
+  assumirPartida: (vista: VistaDaPartida) => void;
+  /** Pergunta ao servidor se há batalha aberta (M22, na forma da batalha viva). */
+  reconectarPartida: () => Promise<void>;
+  /** A batalha fechou: relê o hub, porque o servidor já pagou o que tinha de pagar. */
+  liquidarPartida: (liquidacao: LiquidacaoDaPartida) => void;
+  /** Sair da batalha; desiste se ela ainda corre. */
+  desistirDaPartida: () => Promise<void>;
+  limparTabuleiro: () => void;
   refreshCampaign: () => Promise<void>;
   selectChapter: (chapterId: string) => void;
   toggleChapterOpen: (chapterId: string) => void;
   toggleCampaignHero: (heroId: string) => void;
   enterChapter: (chapterId: string) => Promise<void>;
-  submitCampaignRun: () => Promise<void>;
   exitCampaign: () => void;
   saveHeroTactics: (heroId: string, script: TacticsScript) => Promise<void>;
   saveHeroTalents: (heroId: string, allocation: TalentAllocation) => Promise<void>;
@@ -647,7 +722,7 @@ interface BattleStore {
   definirIdioma: (idioma: Idioma) => void;
   toggleInstantResultMode: () => void;
   setBoardAnimating: (value: boolean) => void;
-  abrirCenaDeDuelo: (stateBefore: BattleState, duelResult: DuelResult) => boolean;
+  abrirCenaDeDuelo: (stateBefore: EstadoVisivel, duelResult: DuelResult) => boolean;
   fecharCenaDeDuelo: () => void;
   setDuelSceneEnabled: (value: boolean) => void;
   toggleColorblindMode: () => void;
@@ -672,7 +747,7 @@ interface BattleStore {
   cancelarApagarProgresso: () => void;
   confirmarApagarProgresso: () => void;
   clearProgress: () => void;
-  buildReplay: () => Replay;
+  // M36 4/N — `buildReplay` saiu: quem constrói o replay é o servidor, do log que ele acumulou.
   setPvpToken: (token: string) => void;
   connectPvp: () => Promise<void>;
   togglePvpHero: (heroId: string) => void;
@@ -686,13 +761,11 @@ interface BattleStore {
   saveDefense: () => Promise<void>;
   findPvpOpponent: () => Promise<void>;
   startPvpBattle: () => Promise<void>;
-  submitPvpBattle: () => Promise<void>;
   reviewPvpBattle: () => Promise<void>;
   exitPvp: () => void;
   refreshPve: () => Promise<void>;
   togglePveHero: (heroId: string) => void;
   enterDungeon: (dungeonId: string) => Promise<void>;
-  submitDungeonRun: () => Promise<void>;
   sweepDungeon: (dungeonId: string) => Promise<void>;
   exitDungeon: () => void;
   enhanceInventoryItem: (itemId: string) => Promise<void>;
@@ -702,10 +775,18 @@ interface BattleStore {
   lerInvocacao: () => Promise<void>;
   // M32 — o que o hub mostra, lido no sign-in: campanha, invocação e masmorras.
   carregarHub: () => Promise<void>;
+  /** Depois do sign-in: volta para a batalha que ficou aberta, se houver (M22 + M36 4/N). */
+  retomarBatalhaAberta: () => Promise<void>;
   rollSummon: (bannerId: string) => Promise<void>;
+  // M38 3/N–4/N — a escolha do genérico e o artefato jogável.
+  resgatarEscolha: (bannerId: string, choiceId: string) => Promise<void>;
+  equiparArtefato: (instanceId: string, heroId: string) => Promise<void>;
+  desequiparArtefato: (heroId: string) => Promise<void>;
+  despertarArtefato: (instanceId: string) => Promise<void>;
+  imprintArtefato: (instanceId: string) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
   purchaseEnergy: () => Promise<void>;
-  openReplayViewer: () => void;
+  openReplayViewer: () => Promise<void>;
   closeReplayViewer: () => void;
   seekReplay: (step: number) => void;
   setReplaySpeed: (speed: number) => void;
@@ -716,7 +797,13 @@ interface BattleStore {
   confirmTargetAt: (target: Coord) => void;
 }
 
-function computeReachableForUnit(battleState: BattleState, unit: BattleUnit): readonly ReachableTile[] {
+// M36 4/N — o alcance continua sendo calculado AQUI, e é a única conta de tabuleiro que
+// sobreviveu no cliente. Ela é legítima porque só usa dado do próprio lado (`moveType`,
+// `moveRange`, o quanto já andou) e o que o tabuleiro mostra de todo mundo (posição). D47 diz
+// isso com todas as letras: "ficam as de dados próprios (`computeReachableTiles` das suas
+// unidades)". O `BattleUnit` do parâmetro é sempre uma unidade do jogador — o inimigo redigido
+// não tem `moveType` nem `moveRange`, e o tipo o recusa.
+function computeReachableForUnit(battleState: EstadoVisivel, unit: BattleUnit): readonly ReachableTile[] {
   if (unit.hasActedThisRound || unit.hp <= 0) return [];
 
   const allies = battleState.units
@@ -734,7 +821,11 @@ function computeReachableForUnit(battleState: BattleState, unit: BattleUnit): re
       // §5.1 (M15) — muro e portão fechado bloqueiam. Sem repassar os portões já abertos,
       // o cliente desenharia um alcance que o core recusa no `move`: quem decide continua
       // sendo o motor (regra 3), e o desenho tem de ser a MESMA conta.
-      openGates: openGateCoords(battleState),
+      //
+      // `openGateCoords` lê só `map` e `gateState`, e os dois atravessam a redação — o estado do
+      // portão é tabuleiro, não build. O cast estreita um parâmetro que pede mais do que a
+      // função usa.
+      openGates: openGateCoords(battleState as never),
     },
     unit.pos,
     remainingRange,
@@ -743,7 +834,7 @@ function computeReachableForUnit(battleState: BattleState, unit: BattleUnit): re
 
 // Tiles dentro de `radius` em distância Manhattan (§5.1) que existem no grid. O core faz
 // a mesma conta; aqui é só pra desenhar o overlay.
-function tilesWithin(battleState: BattleState, center: Coord, radius: number): readonly Coord[] {
+function tilesWithin(battleState: EstadoVisivel, center: Coord, radius: number): readonly Coord[] {
   const tiles: Coord[] = [];
   for (let y = 0; y < battleState.map.height; y++) {
     for (let x = 0; x < battleState.map.width; x++) {
@@ -753,7 +844,7 @@ function tilesWithin(battleState: BattleState, center: Coord, radius: number): r
   return tiles;
 }
 
-function allTiles(battleState: BattleState): readonly Coord[] {
+function allTiles(battleState: EstadoVisivel): readonly Coord[] {
   const tiles: Coord[] = [];
   for (let y = 0; y < battleState.map.height; y++) {
     for (let x = 0; x < battleState.map.width; x++) tiles.push({ x, y });
@@ -770,25 +861,29 @@ function allTiles(battleState: BattleState): readonly Coord[] {
 // duelo do jogador, reaparecendo pela porta da IA. Quem BAIXA a trava é sempre o canvas: no fim
 // da cadeia, ou na hora, quando não há cena para contar.
 function relatoDaIa(
-  state: BattleState,
-  steps: readonly AiTurnStep[],
+  state: EstadoVisivel,
+  steps: readonly PassoDaIa[],
   instantResultMode: boolean,
-): { aiTurnReport: { state: BattleState; steps: readonly AiTurnStep[] }; boardAnimating?: true } {
+  meuDuelo?: { readonly estadoAntes: EstadoVisivel; readonly duelResult: DuelResult },
+): { aiTurnReport: RelatoDoTurno; boardAnimating?: true } {
   // O MESMO predicado que o canvas usa para decidir se roda a cadeia. Se os dois discordassem,
   // a trava poderia subir sem que ninguém a baixasse e o desfecho nunca apareceria.
-  const anima = !instantResultMode && narrateAiTurns(steps).length > 0;
-  return { aiTurnReport: { state, steps }, ...(anima ? { boardAnimating: true as const } : {}) };
+  const anima = !instantResultMode && (!!meuDuelo || narrateAiTurns(steps).length > 0);
+  return {
+    aiTurnReport: { state, steps, ...(meuDuelo ? { meuDuelo } : {}) },
+    ...(anima ? { boardAnimating: true as const } : {}),
+  };
 }
 
-// Recomputa o estado do passo N do zero. Determinismo do core é o que torna isso correto
-// e barato o bastante: mesma seed + mesmo prefixo de comandos = mesmo estado, sempre.
-function replayStateAt(replay: Replay, step: number): BattleState {
-  let state = buildInitialState(replay.initialState, replay.seed);
-  for (const command of replay.commands.slice(0, step)) {
-    if (state.outcome !== 'ongoing') break;
-    state = applyCommandAndAdvance(state, command).state;
-  }
-  return state;
+// O estado do passo N: uma LEITURA da lista que o servidor mandou, não uma reexecução. O passo
+// `step` mostra o estado de ANTES dele; passar do último mostra o fim da batalha, que é o estado
+// de antes que não existe — daí o `?? estadoFinal`.
+function replayStateAt(log: LogDeReplay, step: number): EstadoVisivel {
+  if (step <= 0) return log.estadoInicial;
+  const passo = log.passos[step];
+  if (passo) return passo.estadoAntes;
+  const ultimo = log.passos[log.passos.length - 1];
+  return ultimo ? ultimo.estadoAntes : log.estadoInicial;
 }
 
 function describeApiError(error: unknown): string {
@@ -817,6 +912,31 @@ function persistirAlocacao(
   void get().saveHeroTalents(hero.id, allocation);
 }
 
+// M38 4/N — o molde das quatro ações de artefato: chamar a rota, e reler heróis, artefatos e a
+// economia (ouro e material mudam no despertar e no imprint). Erro do servidor — a trava por
+// classe, recurso insuficiente — vai para a tela, como nas ações de herói.
+async function acaoDeArtefato(
+  get: () => BattleStore,
+  set: (parcial: (s: BattleStore) => Partial<BattleStore>) => void,
+  chamada: () => Promise<unknown>,
+  status: string,
+): Promise<void> {
+  const { pvp } = get();
+  if (!pvp.token) {
+    set((s) => ({ pve: { ...s.pve, error: get().t('estado.conecteAntes') } }));
+    return;
+  }
+  set((s) => ({ pve: { ...s.pve, busy: true, error: null } }));
+  try {
+    await chamada();
+    const [roster, artefatos] = await Promise.all([api.roster(pvp.token), api.artifacts(pvp.token)]);
+    set((s) => ({ pvp: { ...s.pvp, roster, artifacts: artefatos.artifacts }, pve: { ...s.pve, busy: false, status } }));
+    await get().refreshPve();
+  } catch (error) {
+    set((s) => ({ pve: { ...s.pve, busy: false, error: describeApiError(error) } }));
+  }
+}
+
 export const useBattleStore = create<BattleStore>((set, get) => ({
   // O capítulo salvo é remontado do setup — a batalha em si não é persistida (decisão do
   // usuário): recarregar no meio de um capítulo recomeça o capítulo, com as táticas
@@ -824,7 +944,6 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   battleState: tabuleiroVazio(),
   selectedUnitId: null,
   reachableTiles: [],
-  duelPreview: null,
   lastCommandReason: null,
   tacticsEditorUnitId: null,
   inventory: Object.values(catalog.items),
@@ -858,6 +977,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   telemetria: { optOut: null, collected: [], busy: false, error: null },
   apagarProgressoPendente: false,
   targetingMode: null,
+  partida: null,
+  comandoEmVoo: false,
+  liquidacao: null,
   commandLog: [],
   replayViewer: null,
   tacticsOverrides: {},
@@ -877,108 +999,104 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const { battleState } = get();
     const unit = battleState.units.find((u) => u.unitId === unitId);
     if (!unit) return;
-    set({ selectedUnitId: unitId, reachableTiles: computeReachableForUnit(battleState, unit), lastCommandReason: null });
+    // Só a unidade do PRÓPRIO jogador tem alcance a desenhar: a do inimigo não traz `moveType`
+    // nem `moveRange` (D47), e é por isso que selecioná-la mostra a ficha e nenhuma ação.
+    const alcance = ehVisivelPorInteiro(unit) ? computeReachableForUnit(battleState, unit) : [];
+    set({ selectedUnitId: unitId, reachableTiles: alcance, lastCommandReason: null });
   },
 
   moveSelectedUnitTo: (destination) => {
-    const { battleState, selectedUnitId, reachableTiles } = get();
+    const { selectedUnitId, reachableTiles } = get();
     if (!selectedUnitId) return;
 
     const target = reachableTiles.find((tile) => tile.coord.x === destination.x && tile.coord.y === destination.y);
     if (!target) return; // clicou fora do overlay de alcance — ignora, não monta comando inválido de propósito
 
-    const result = applyCommandAndAdvance(battleState, { t: 'move', unitId: selectedUnitId, path: target.path });
-    if (!result.applied) {
-      set({ lastCommandReason: result.reason ?? 'movimento inválido' });
-      return;
-    }
-
-    const movedUnit = result.state.units.find((u) => u.unitId === selectedUnitId);
-    set({
-      commandLog: [...get().commandLog, { t: 'move', unitId: selectedUnitId, path: target.path }],
-      battleState: result.state,
-      reachableTiles: movedUnit ? computeReachableForUnit(result.state, movedUnit) : [],
-      lastCommandReason: null,
-      ...relatoDaIa(result.state, result.aiSteps, get().instantResultMode),
-    });
+    void get().enviarComando({ t: 'move', unitId: selectedUnitId, path: target.path }, { manterSelecao: true });
   },
 
   waitSelectedUnit: () => {
-    const { battleState, selectedUnitId } = get();
+    const { selectedUnitId } = get();
     if (!selectedUnitId) return;
-    const command: BattleCommand = { t: 'wait', unitId: selectedUnitId };
-    const result = applyCommandAndAdvance(battleState, command);
-    if (!result.applied) {
-      set({ lastCommandReason: result.reason ?? 'comando inválido' });
-      return;
-    }
-    set({
-      commandLog: [...get().commandLog, command],
-      battleState: result.state,
-      selectedUnitId: null,
-      reachableTiles: [],
-      lastCommandReason: null,
-      ...relatoDaIa(result.state, result.aiSteps, get().instantResultMode),
-    });
+    void get().enviarComando({ t: 'wait', unitId: selectedUnitId });
   },
 
   restSelectedUnit: () => {
-    const { battleState, selectedUnitId } = get();
+    const { selectedUnitId } = get();
     if (!selectedUnitId) return;
-    const command: BattleCommand = { t: 'rest', unitId: selectedUnitId };
-    const result = applyCommandAndAdvance(battleState, command);
-    if (!result.applied) {
-      set({ lastCommandReason: result.reason ?? 'comando inválido' });
-      return;
-    }
-    set({
-      commandLog: [...get().commandLog, command],
-      battleState: result.state,
-      selectedUnitId: null,
-      reachableTiles: [],
-      lastCommandReason: null,
-      ...relatoDaIa(result.state, result.aiSteps, get().instantResultMode),
-    });
+    void get().enviarComando({ t: 'rest', unitId: selectedUnitId });
   },
 
-  previewEngage: (targetId) => {
-    const { battleState, selectedUnitId } = get();
+  // M36 4/N (D47) — ENGAJAR é um comando, e não mais um preview seguido de confirmação.
+  //
+  // O gesto tinha dois tempos porque havia o que mostrar entre eles: o resultado do duelo,
+  // calculado no cliente antes de confirmar. Sem esse cálculo, um segundo tempo seria um "tem
+  // certeza?" — uma fricção que não informa nada. Engajar é uma aposta informada (D47): o
+  // jogador decide com o que vê, e o duelo acontece.
+  engageTarget: (targetId) => {
+    const { selectedUnitId } = get();
     if (!selectedUnitId) return;
+    void get().enviarComando({ t: 'engage', unitId: selectedUnitId, targetId });
+  },
 
-    const command: BattleCommand = { t: 'engage', unitId: selectedUnitId, targetId };
-    const result = applyCommandAndAdvance(battleState, command);
-    if (!result.applied || !result.duelResult) {
-      set({ lastCommandReason: result.reason ?? 'não foi possível engajar' });
-      return;
+  /**
+   * O ÚNICO caminho pelo qual um comando sai do cliente. Todas as ações de tabuleiro passam por
+   * aqui, e o que volta é o estado visível depois do comando, o duelo que ele abriu (se abriu) e
+   * o turno da IA que veio em seguida — tudo já redigido pelo servidor.
+   *
+   * Nada aqui decide (regra 3). O cliente nem sequer sabe se o comando é legal: ele o manda, e o
+   * servidor responde `400` com o motivo, que aparece na barra de ações como sempre apareceu.
+   */
+  enviarComando: async (command, opcoes = {}) => {
+    const { pvp, partida, comandoEmVoo, battleState: estadoAntes } = get();
+    if (!partida || !pvp.token) return;
+    // Um comando por vez. Sem isto, dois cliques rápidos mandariam dois comandos contra o mesmo
+    // estado, e o segundo seria recusado por um motivo que confundiria o jogador — ou pior,
+    // aceito numa ordem que ele não escolheu.
+    if (comandoEmVoo) return;
+
+    set({ comandoEmVoo: true, lastCommandReason: null });
+    try {
+      const resposta = await api.enviarComando(pvp.token, partida.nonce, command);
+
+      const minhaUnidade =
+        opcoes.manterSelecao && 'unitId' in command
+          ? resposta.visivel.units.find((u) => u.unitId === command.unitId)
+          : undefined;
+
+      set((s) => ({
+        comandoEmVoo: false,
+        commandLog: [...s.commandLog, command],
+        battleState: resposta.visivel,
+        // Mover não encerra o turno da unidade: ela continua selecionada, com o alcance
+        // restante redesenhado. Os outros comandos encerram, e a seleção sai.
+        selectedUnitId: minhaUnidade ? s.selectedUnitId : null,
+        reachableTiles:
+          minhaUnidade && ehVisivelPorInteiro(minhaUnidade)
+            ? computeReachableForUnit(resposta.visivel, minhaUnidade)
+            : [],
+        targetingMode: null,
+        lastCommandReason: null,
+        partida: s.partida ? { ...s.partida, outcome: resposta.outcome } : null,
+        ...(resposta.liquidacao ? { liquidacao: resposta.liquidacao } : {}),
+        // A cena de duelo do JOGADOR entra aqui, com o estado de antes do comando: `duelResult`
+        // é o relato do que ACONTECEU, e revelá-lo é o que faz o jogador aprender o que
+        // enfrentou (D47). Quem o transforma em cena é o `MapCanvas`, num lugar só, junto com
+        // os passos da IA — como desde o M16 4/N.
+        ...relatoDaIa(
+          resposta.visivel,
+          resposta.passosDaIa,
+          s.instantResultMode,
+          resposta.duelResult ? { estadoAntes, duelResult: resposta.duelResult } : undefined,
+        ),
+      }));
+
+      if (resposta.liquidacao) get().liquidarPartida(resposta.liquidacao);
+    } catch (error) {
+      set({ comandoEmVoo: false, lastCommandReason: describeApiError(error) });
     }
-
-    set({
-      duelPreview: { nextState: result.state, duelResult: result.duelResult, command, aiSteps: result.aiSteps },
-      lastCommandReason: null,
-    });
-    // §1.1 (M23, 1/N) — o preview é o momento em que "duelo automático" deixa de ser
-    // abstrato: o jogador vê o resultado ANTES de confirmar, que é o pilar de §1.1 em ação.
-    // A explicação cabe aqui e não antes, quando ela seria texto sobre nada.
-    get().dispararIntroducao('preview-de-duelo');
   },
 
-  confirmEngage: () => {
-    const { duelPreview } = get();
-    if (!duelPreview) return;
-    set({
-      commandLog: [...get().commandLog, duelPreview.command],
-      battleState: duelPreview.nextState,
-      duelPreview: null,
-      selectedUnitId: null,
-      reachableTiles: [],
-      lastCommandReason: null,
-      ...relatoDaIa(duelPreview.nextState, duelPreview.aiSteps, get().instantResultMode),
-    });
-  },
-
-  cancelEngage: () => {
-    set({ duelPreview: null });
-  },
 
   // §10/§9.4 (M18, 7/N) — a campanha pelo servidor. Os capítulos e o que já foi limpo vêm
   // dele; o roster vem junto porque escolher quem preenche a vaga exige saber quem o
@@ -1006,6 +1124,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
               : [capituloInicialAberto(lista.chapters)].filter((id): id is string => id !== null),
           premiumOnFirstClear: lista.premiumOnFirstClear,
           premiumOnChapterClear: lista.premiumOnChapterClear,
+          // M36 3/N (D48) — a ordem de apresentação do elenco, derivada do conteúdo no servidor.
+          // `?? []` porque um servidor anterior a esta milestone não manda o campo: sem ele o
+          // preenchimento cai na ordem do roster, que é o comportamento de antes do M35 2/N.
+          castOrder: lista.castOrder ?? [],
           busy: false,
         },
         pvp: { ...s.pvp, roster },
@@ -1032,10 +1154,28 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         ...campaign,
         selectedMissionId: chapterId,
         selectedHeroIds:
-          aparada.length > 0 ? aparada : preenchimentoPadrao(get().pvp.roster, missao.slots, ordemDeAparicao(catalog)),
+          aparada.length > 0 ? aparada : preenchimentoPadrao(get().pvp.roster, missao.slots, campaign.castOrder),
+        // A prévia da missão ANTERIOR sai da tela na hora: deixá-la enquanto a nova não chega
+        // mostraria o tabuleiro errado para a missão certa, que é pior do que não mostrar nada.
+        previa: null,
         error: null,
       },
     });
+
+    // M36 3/N (D48) — a prévia vem do servidor, então ela é assíncrona. Falha de rede aqui não
+    // vira erro na tela: a prévia é um luxo informativo, e quem não a recebe ainda consegue
+    // escolher o time e entrar. O que não pode é a tela travar por causa dela.
+    const { pvp } = get();
+    if (!pvp.token) return;
+    void api
+      .missionPreview(pvp.token, chapterId)
+      .then((previa) => {
+        // Só aplica se o jogador ainda está olhando ESTA missão: uma resposta lenta de uma
+        // missão que ele já trocou desenharia o tabuleiro de outra.
+        if (get().campaign.selectedMissionId !== chapterId) return;
+        set((s) => ({ campaign: { ...s.campaign, previa } }));
+      })
+      .catch(() => undefined);
   },
 
   // M27 3/N — abrir e fechar um capítulo. Sem exclusividade: o jogador que quer comparar a
@@ -1084,10 +1224,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ campaign: { ...campaign, selectedHeroIds: [...campaign.selectedHeroIds, heroId], error: null } });
   },
 
-  // O ticket traz o `BattleSetup` MONTADO PELO SERVIDOR, e é ele que vira o tabuleiro. O
-  // cliente não monta mais a batalha de campanha: §9.1 chama de bug crítico a divergência
-  // entre o que o cliente jogou e o que o servidor reexecuta, e duas montagens são duas
-  // chances de divergir.
+  // M36 4/N (D47) — entrar numa missão ABRE UMA PARTIDA VIVA. O `ticket` morreu com ela: o
+  // servidor não manda mais o `BattleSetup` montado, manda o tabuleiro REDIGIDO e guarda o
+  // resto. O cliente desenha o que recebeu e joga um comando por vez.
   enterChapter: async (chapterId) => {
     const { pvp, campaign } = get();
     if (!pvp.token) {
@@ -1101,60 +1240,111 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
 
     set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: get().t('estado.pedindoCapitulo') } }));
     try {
-      const ticket = await api.requestCampaignTicket(pvp.token, chapterId, campaign.selectedHeroIds);
+      const vista = await api.abrirPartidaDeCampanha(pvp.token, chapterId, campaign.selectedHeroIds);
+      get().assumirPartida(vista);
       set((s) => ({
-        mode: 'campaign',
-        battleState: buildInitialState(ticket.setup, ticket.seed),
-        heroesByUnitId: heroesPorUnidade(ticket.setup, s.pvp.roster),
-        artIdByUnitId: ticket.characterIdByUnitId,
-        commandLog: [],
-        replayViewer: null,
-        selectedUnitId: null,
-        reachableTiles: [],
-        duelPreview: null,
-        duelScene: null,
-        targetingMode: null,
-        lastCommandReason: null,
-        aiTurnReport: null,
-        campaign: { ...s.campaign, ticket, selectedMissionId: chapterId, lastRun: null, busy: false, status: null },
+        campaign: { ...s.campaign, selectedMissionId: chapterId, lastRun: null, busy: false, status: null },
       }));
     } catch (error) {
       set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
     }
   },
 
-  // §9.4 — o desfecho NUNCA vem do cliente: ele manda os comandos e o servidor reexecuta.
-  // Quem marca "capítulo limpo" e paga a moeda premium é ele.
-  submitCampaignRun: async () => {
-    const { pvp, campaign, commandLog } = get();
-    if (!campaign.ticket) return;
-
-    set((s) => ({ campaign: { ...s.campaign, busy: true, error: null, status: get().t('estado.enviandoComandos') } }));
-    const corpoDoCapitulo = {
-      nonce: campaign.ticket.nonce,
-      heroIds: campaign.selectedHeroIds,
-      commands: commandLog,
-    };
-    guardarPedido({ rota: 'campaign-run', chapterId: campaign.ticket.chapterId, corpo: corpoDoCapitulo });
-    try {
-      const run = await api.submitCampaignRun(pvp.token, campaign.ticket.chapterId, corpoDoCapitulo);
-      limparPedido();
-      set((s) => ({
-        campaign: { ...s.campaign, lastRun: run, busy: false, status: get().t('estado.servidorResolveu', { desfecho: nomeDoDesfecho(get().t, run.outcome) }) },
-      }));
-      // O capítulo pode ter virado "limpo" e a moeda pode ter sido paga: a lista é relida
-      // para a tela não mostrar um estado que o servidor já mudou. M32 — o hub INTEIRO, e não
-      // só a campanha: a moeda premium da primeira vitória aparece no painel de invocação, que
-      // seguia dizendo "0" ao lado de "+60 de moeda premium" na tela de vitória.
-      await get().carregarHub();
-    } catch (error) {
-      if (error instanceof ApiError) limparPedido();
-      set((s) => ({ campaign: { ...s.campaign, busy: false, status: null, error: describeApiError(error) } }));
-    }
-  },
-
-  exitCampaign: () => {
+  /**
+   * Põe uma partida viva na tela — vinda da abertura ou da RECONEXÃO. Um lugar só para as três
+   * superfícies: o tabuleiro, quem é cada peça, o log zerado e a abertura da IA para animar.
+   */
+  assumirPartida: (vista) => {
     set((s) => ({
+      mode: vista.kind === 'arena' ? 'pvp' : vista.kind === 'dungeon' ? 'dungeon' : 'campaign',
+      partida: vista,
+      battleState: vista.visivel,
+      heroesByUnitId: heroesPorUnidade(vista.visivel.units, s.pvp.roster),
+      artIdByUnitId: vista.characterIdByUnitId,
+      commandLog: [],
+      replayViewer: null,
+      selectedUnitId: null,
+      reachableTiles: [],
+      duelScene: null,
+      targetingMode: null,
+      lastCommandReason: null,
+      comandoEmVoo: false,
+      liquidacao: vista.liquidacao ?? null,
+      // O turno de IA que acontece ANTES do primeiro comando: sem ele o jogador abriria a
+      // missão com os inimigos já noutro lugar, sem ter visto ninguém andar.
+      ...relatoDaIa(vista.visivel, vista.aberturaDaIa, s.instantResultMode),
+    }));
+    if (vista.liquidacao) get().liquidarPartida(vista.liquidacao);
+  },
+
+  /**
+   * A RECONEXÃO (M22, que sobrevive à batalha viva): o cliente pergunta ao servidor se há
+   * batalha aberta. Nada é guardado em disco — quem sabe é quem tem o estado.
+   *
+   * Silenciosa de propósito: quem não tem partida recebe 404, e isso não é erro nenhum.
+   */
+  reconectarPartida: async () => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    try {
+      get().assumirPartida(await api.partidaAtual(pvp.token));
+    } catch {
+      // Sem batalha aberta. É o caso normal.
+    }
+  },
+
+  /**
+   * A batalha fechou: o servidor já pagou (ou cobrou) o que tinha de pagar, e o cliente relê o
+   * hub para a tela não mostrar um estado que ele mudou.
+   *
+   * Não há submissão: o desfecho é do comando que o produziu. Esta função é o que sobrou de
+   * `submitCampaignRun`/`submitDungeonRun`/`submitPvpBattle`, e é só leitura.
+   */
+  liquidarPartida: (liquidacao) => {
+    set((s) => ({
+      liquidacao,
+      campaign:
+        s.partida?.kind === 'campaign'
+          ? {
+              ...s.campaign,
+              lastRun: {
+                outcome: s.battleState.outcome === 'victory' ? 'victory' : 'defeat',
+                roundsPlayed: s.battleState.round,
+                premiumAwarded: liquidacao.premiumAwarded ?? 0,
+                premium: liquidacao.premium ?? s.summon.premium,
+              },
+              status: get().t('estado.servidorResolveu', {
+                desfecho: nomeDoDesfecho(get().t, s.battleState.outcome),
+              }),
+            }
+          : s.campaign,
+    }));
+    void get().carregarHub();
+  },
+
+  /**
+   * Sair da batalha. Se ela ainda corre, DESISTIR — e desistir não devolve o que foi pago ao
+   * entrar (D48). É a saída honesta: sem ela, quem abriu uma masmorra e não quer mais jogá-la
+   * ficaria preso, porque é uma partida em andamento por jogador.
+   */
+  desistirDaPartida: async () => {
+    const { pvp, partida } = get();
+    if (partida && partida.outcome === 'ongoing' && pvp.token) {
+      try {
+        await api.desistirDaPartida(pvp.token, partida.nonce);
+      } catch {
+        // Uma desistência que não chegou deixa a partida aberta no servidor, e a reconexão a
+        // encontra de novo. Travar a tela por causa disso seria pior.
+      }
+    }
+    get().limparTabuleiro();
+    void get().carregarHub();
+  },
+
+  /** O tabuleiro volta a ser o vazio, e nada mais fica pendurado dele. */
+  limparTabuleiro: () => {
+    set({
+      partida: null,
       battleState: tabuleiroVazio(),
       heroesByUnitId: {},
       artIdByUnitId: {},
@@ -1162,19 +1352,27 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       replayViewer: null,
       selectedUnitId: null,
       reachableTiles: [],
-      duelPreview: null,
+      duelScene: null,
       targetingMode: null,
       lastCommandReason: null,
+      aiTurnReport: null,
+      comandoEmVoo: false,
+    });
+  },
+
+  exitCampaign: () => {
+    const missaoJogada = get().partida?.refId ?? null;
+    void get().desistirDaPartida();
+    set((s) => ({
       campaign: {
         ...s.campaign,
-        ticket: null,
         status: null,
         error: null,
         // M32 — missão que ficou LIMPA solta a seleção: com ela selecionada, o botão azul
         // do hub apontaria para jogá-la de novo, e a missão seguinte (a próxima ação de
         // verdade, D40) ficaria sem destaque. A que não ficou limpa continua selecionada —
         // quem abandonou ou perdeu provavelmente quer tentar de novo.
-        selectedMissionId: missaoPorId(s.campaign.chapters, s.campaign.ticket?.chapterId ?? null)?.cleared
+        selectedMissionId: missaoPorId(s.campaign.chapters, missaoJogada)?.cleared
           ? null
           : s.campaign.selectedMissionId,
       },
@@ -1411,39 +1609,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // desenhar o overlay, mas quem valida continua sendo o core: clicar fora do overlay não
   // monta comando, e um comando inválido que escape é rejeitado por
   // `applyCommandAndAdvance` com o motivo aparecendo na barra de ações.
-  // §3.4 — `Replay {rulesVersion, seed, initialState, commands}`. O `initialState` é o
-  // `BattleSetup` do capítulo, não um snapshot do meio da batalha: reproduzir é sempre
-  // partir do começo e reaplicar.
-  buildReplay: () => {
-    const { commandLog, mode, pvp, campaign } = get();
-    // Em PvP o setup e a seed são os do ticket — do servidor, não do catálogo local.
-    if (mode === 'pvp' && pvp.ticket) {
-      return {
-        rulesVersion: pvp.ticket.rulesVersion,
-        seed: pvp.ticket.seed,
-        initialState: pvp.ticket.setup,
-        commands: commandLog,
-      };
-    }
-    // M18 7/N — a campanha também vem de ticket agora: o setup e a seed são os do
-    // servidor, e não os de um catálogo local que ele não consultaria.
-    if (campaign.ticket) {
-      return {
-        rulesVersion: campaign.ticket.rulesVersion,
-        seed: campaign.ticket.seed,
-        initialState: campaign.ticket.setup,
-        commands: commandLog,
-      };
-    }
-    // Sem ticket não há batalha: o tabuleiro vazio é o que a tela mostra entre capítulos, e
-    // reproduzir o nada é um replay de zero comandos sobre zero unidades.
-    return {
-      rulesVersion: RULES_VERSION,
-      seed: BATTLE_SEED,
-      initialState: setupVazio(),
-      commands: commandLog,
-    };
-  },
+  // M36 4/N (D47) — `buildReplay` FOI REMOVIDA.
+  //
+  // Ela montava o `Replay {rulesVersion, seed, initialState, commands}` no cliente, a partir do
+  // setup e da seed que o ticket tinha entregue. Os dois saíram: o setup completo não atravessa
+  // mais a rede e a seed nunca sai do servidor. Quem constrói o replay é o servidor, do log que
+  // ele acumulou — e o cliente o LÊ em `GET /battles/:nonce/log`, já redigido passo a passo.
 
   // §10 (M18, 6/N) — a tela de aquisição lê as TRÊS superfícies de uma vez. Separá-las em
   // três botões faria o jogador ver saldo velho ao lado de pity novo: a moeda premium é a
@@ -1459,12 +1630,14 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     }
     set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
     try {
-      const [roster, banners, rewards] = await Promise.all([
+      const [roster, banners, rewards, artefatos] = await Promise.all([
         api.characterRoster(pvp.token),
         api.banners(pvp.token),
         api.rewards(pvp.token),
+        api.artifacts(pvp.token),
       ]);
       set((s) => ({
+        pvp: { ...s.pvp, artifacts: artefatos.artifacts },
         summon: {
           ...s.summon,
           premium: roster.premium,
@@ -1506,7 +1679,14 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     try {
       const resultado = await api.summon(pvp.token, bannerId);
       set((s) => ({
-        summon: { ...s.summon, lastResult: resultado, premium: resultado.premium, busy: false, status: null },
+        summon: {
+          ...s.summon,
+          lastResult: resultado,
+          lastResultBannerId: bannerId,
+          premium: resultado.premium,
+          busy: false,
+          status: null,
+        },
       }));
       // Relê tudo: o personagem que acabou de sair tem de aparecer possuído sem recarregar
       // a página, e o pity mudou. O saldo já veio na resposta e é o que vale até lá.
@@ -1524,6 +1704,48 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     } catch (error) {
       set((s) => ({ summon: { ...s.summon, busy: false, status: null, error: describeApiError(error) } }));
     }
+  },
+
+  // M38 3/N — o resgate da escolha do genérico. A recusa sem escolha pendente é do servidor,
+  // e mesmo assim a tela não a deixa virar requisição (o mesmo contrato do saldo).
+  resgatarEscolha: async (bannerId, choiceId) => {
+    const { pvp, summon } = get();
+    if (!pvp.token) {
+      set((s) => ({ summon: { ...s.summon, error: get().t('estado.conecteAntes') } }));
+      return;
+    }
+    const banner = summon.banners.find((candidate) => candidate.id === bannerId);
+    if (!banner?.choice || banner.choice.pending < 1) {
+      set((s) => ({ summon: { ...s.summon, error: get().t('summon.semEscolha') } }));
+      return;
+    }
+    set((s) => ({ summon: { ...s.summon, busy: true, error: null } }));
+    try {
+      const resultado = await api.summonChoice(pvp.token, bannerId, choiceId);
+      set((s) => ({ summon: { ...s.summon, lastResult: resultado, lastResultBannerId: bannerId, busy: false } }));
+      await get().lerInvocacao();
+      if (resultado.outcome.kind === 'character') {
+        const heroes = await api.roster(pvp.token);
+        set((s) => ({ pvp: { ...s.pvp, roster: heroes } }));
+      }
+    } catch (error) {
+      set((s) => ({ summon: { ...s.summon, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  // M38 4/N (D53/D56) — o artefato jogável. Quem trava por classe, cobra e move entre heróis
+  // é o servidor; a tela chama e relê heróis e artefatos, que é onde o poder na tela muda.
+  equiparArtefato: async (instanceId, heroId) => {
+    await acaoDeArtefato(get, set, () => api.equipArtifact(get().pvp.token, instanceId, heroId), get().t('estado.artefatoEquipado'));
+  },
+  desequiparArtefato: async (heroId) => {
+    await acaoDeArtefato(get, set, () => api.unequipArtifact(get().pvp.token, heroId), get().t('estado.artefatoDesequipado'));
+  },
+  despertarArtefato: async (instanceId) => {
+    await acaoDeArtefato(get, set, () => api.awakenArtifact(get().pvp.token, instanceId), get().t('estado.artefatoDespertado'));
+  },
+  imprintArtefato: async (instanceId) => {
+    await acaoDeArtefato(get, set, () => api.imprintArtifact(get().pvp.token, instanceId), get().t('estado.artefatoImprint'));
   },
 
   claimReward: async (rewardId) => {
@@ -1572,13 +1794,23 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     }
   },
 
-  openReplayViewer: () => {
-    const replay = get().buildReplay();
-    set({
-      replayViewer: { replay, step: 0, state: replayStateAt(replay, 0), playing: false, speed: 1 },
-      duelPreview: null,
-      targetingMode: null,
-    });
+  // M36 4/N (D47) — abrir o replay virou uma LEITURA do servidor, e por isso é assíncrono.
+  //
+  // O cliente não tem mais como montar um `Replay`: o setup completo não atravessa a rede e a
+  // seed nunca sai do servidor. O que ele pede é o log já redigido, passo a passo, e o que ele
+  // faz com ele é o de sempre — desenhar.
+  openReplayViewer: async () => {
+    const { pvp, partida } = get();
+    if (!pvp.token || !partida) return;
+    try {
+      const log = await api.logDoReplay(pvp.token, partida.nonce);
+      set({
+        replayViewer: { log, step: 0, state: replayStateAt(log, 0), playing: false, speed: 1 },
+        targetingMode: null,
+      });
+    } catch (error) {
+      set({ lastCommandReason: describeApiError(error) });
+    }
   },
 
   closeReplayViewer: () => set({ replayViewer: null }),
@@ -1586,14 +1818,15 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   seekReplay: (step) => {
     const { replayViewer } = get();
     if (!replayViewer) return;
-    const clamped = Math.max(0, Math.min(replayViewer.replay.commands.length, step));
+    const total = replayViewer.log.passos.length;
+    const clamped = Math.max(0, Math.min(total, step));
     set({
       replayViewer: {
         ...replayViewer,
         step: clamped,
-        state: replayStateAt(replayViewer.replay, clamped),
+        state: replayStateAt(replayViewer.log, clamped),
         // Chegou ao fim: para sozinho, senão o timer segue disparando à toa.
-        playing: clamped < replayViewer.replay.commands.length ? replayViewer.playing : false,
+        playing: clamped < total ? replayViewer.playing : false,
       },
     });
   },
@@ -1607,12 +1840,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const { replayViewer } = get();
     if (!replayViewer) return;
     // Dar play no fim rebobina: é o gesto esperado de quem quer rever.
-    const atEnd = replayViewer.step >= replayViewer.replay.commands.length;
+    const atEnd = replayViewer.step >= replayViewer.log.passos.length;
     set({
       replayViewer: {
         ...replayViewer,
         playing: !replayViewer.playing,
-        ...(atEnd && !replayViewer.playing ? { step: 0, state: replayStateAt(replayViewer.replay, 0) } : {}),
+        ...(atEnd && !replayViewer.playing ? { step: 0, state: replayStateAt(replayViewer.log, 0) } : {}),
       },
     });
   },
@@ -1620,7 +1853,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   beginMapSkillTargeting: (skillId) => {
     const { battleState, selectedUnitId } = get();
     const unit = battleState.units.find((u) => u.unitId === selectedUnitId);
-    if (!unit) return;
+    // Só a unidade do PRÓPRIO jogador tem skills a mirar — a do inimigo não traz `knownSkills`
+    // (D47), e mirar com a peça dele nunca fez sentido de qualquer forma.
+    if (!unit || !ehVisivelPorInteiro(unit)) return;
 
     const skill = unit.knownSkills[skillId];
     if (!skill || skill.kind !== 'map') return;
@@ -1634,7 +1869,6 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         areaRadius: skill.areaRadius ?? 0,
         tiles: tilesWithin(battleState, unit.pos, castRange),
       },
-      duelPreview: null,
       lastCommandReason: null,
     });
   },
@@ -1643,7 +1877,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // de alcance, então todo tile do grid é alvo legal (decisão registrada em M11 3/N).
   beginValorTargeting: (skillId) => {
     const { battleState } = get();
-    const skill = battleState.valorSkills?.[skillId];
+    // M36 4/N — as valor-skills saem do CATÁLOGO do cliente e não mais do estado: o estado
+    // visível não as carrega (elas são definição autorada, não tabuleiro), e o catálogo as tem
+    // porque `valor-skills/` continua no bundle — nada nelas descreve o inimigo.
+    const skill = catalog.valorSkills[skillId];
     if (!skill) return;
 
     set({
@@ -1654,7 +1891,6 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         areaRadius: skill.kind === 'artillery' ? skill.payload.radius : 0,
         tiles: allTiles(battleState),
       },
-      duelPreview: null,
       lastCommandReason: null,
     });
   },
@@ -1671,26 +1907,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         ? { t: 'mapSkill', unitId: targetingMode.casterUnitId ?? '', skillId: targetingMode.skillId, target }
         : { t: 'useValor', skillId: targetingMode.skillId, target };
 
-    const result = applyCommandAndAdvance(battleState, command);
-    if (!result.applied) {
-      set({ lastCommandReason: result.reason ?? 'alvo inválido', targetingMode: null });
-      return;
-    }
-
     // Valor não consome o turno de ninguém (§5.6), então a unidade selecionada continua
-    // selecionada e com o alcance de movimento recomputado; uma skill de mapa encerra o
-    // turno de quem lançou.
-    const caster = result.state.units.find((u) => u.unitId === get().selectedUnitId);
-    set({
-      commandLog: [...get().commandLog, command],
-      battleState: result.state,
-      targetingMode: null,
-      lastCommandReason: null,
-      ...relatoDaIa(result.state, result.aiSteps, get().instantResultMode),
-      ...(targetingMode.kind === 'valor'
-        ? { reachableTiles: caster ? computeReachableForUnit(result.state, caster) : [] }
-        : { selectedUnitId: null, reachableTiles: [] }),
-    });
+    // selecionada e com o alcance recomputado; uma skill de mapa encerra o turno de quem lançou.
+    // `manterSelecao` diz isso ao caminho comum, que é o mesmo de todo outro comando.
+    void get().enviarComando(command, { manterSelecao: targetingMode.kind === 'valor' });
   },
 
   setPvpToken: (token) => set((s) => ({ pvp: { ...s.pvp, token, error: null } })),
@@ -1717,12 +1937,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       await api.session(ticket);
       set((s) => ({ pvp: { ...s.pvp, token: ticket } }));
 
-      const [me, roster] = await Promise.all([api.me(ticket), api.roster(ticket)]);
+      const [me, roster, artefatos] = await Promise.all([api.me(ticket), api.roster(ticket), api.artifacts(ticket)]);
       set((s) => ({
         pvp: {
           ...s.pvp,
           me,
           roster,
+          artifacts: artefatos.artifacts,
           // Time inteiro pré-selecionado: o servidor aceita de 1 a 5 heróis, e escolher é
           // decisão do jogador, não pré-requisito pra começar.
           selectedHeroIds: roster.map((entry) => entry.hero.id),
@@ -1736,32 +1957,14 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       // fazer requisição nenhuma, e falhar nunca derruba a conexão.
       void sincronizarConquistasDaConta(ticket);
 
-      // M22 2/N — a RECONEXÃO. Se o jogo caiu no meio de uma submissão, o pedido ficou
-      // guardado com o nonce; reenviá-lo agora devolve a run original (o servidor guarda a
-      // resposta por nonce) em vez de cobrar de novo. Falhar aqui não pode impedir o
-      // sign-in: o pedido continua guardado para a próxima tentativa.
+      // M22 2/N, na forma que sobrou depois de M36 4/N — o pedido em voo cobre uma rota só: a
+      // VARREDURA, que continua sendo um disparo que cobra energia e devolve loot. As outras
+      // três (arena, masmorra à mão, capítulo) deixaram de existir com a batalha viva, e o que
+      // elas protegiam virou a reconexão de verdade, logo abaixo.
       try {
         const recuperado = await reenviarPedidoPendente(ticket);
         if (recuperado) {
-          set((s) =>
-            recuperado.pedido.rota === 'arena-battle'
-              ? {
-                  pvp: {
-                    ...s.pvp,
-                    outcome: recuperado.resposta as BattleOutcomeResponse,
-                    status: get().t('estado.arenaRecuperada'),
-                  },
-                }
-              : recuperado.pedido.rota === 'dungeon-run'
-              ? { pve: { ...s.pve, lastRun: recuperado.resposta as DungeonRunResponse, status: get().t('estado.runRecuperada') } }
-              : {
-                  campaign: {
-                    ...s.campaign,
-                    lastRun: recuperado.resposta as CampaignRunResponse,
-                    status: get().t('estado.capituloRecuperado'),
-                  },
-                },
-          );
+          set((s) => ({ pve: { ...s.pve, lastRun: recuperado.resposta, status: get().t('estado.runRecuperada') } }));
         }
       } catch {
         // Servidor fora do ar ou recusa: a próxima conexão tenta de novo.
@@ -1777,6 +1980,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       // quem chega (D40), só existia depois de um clique num botão de harness. Visto na tela
       // com sessão de verdade, depois de D38 tirar o tabuleiro do hub.
       await get().carregarHub();
+
+      // M36 4/N — e a batalha que ficou aberta volta, se houver. Depois do hub: quem reconecta
+      // no meio de uma missão precisa do roster carregado para o tabuleiro saber quem é quem.
+      await get().retomarBatalhaAberta();
     } catch (error) {
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
     }
@@ -1787,6 +1994,20 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // jogador entra e vê no painel o que não carregou, com o botão de tentar de novo.
   carregarHub: async () => {
     await Promise.all([get().refreshCampaign(), get().lerInvocacao(), get().refreshPve(), get().lerPresets(), get().lerTelemetria()]);
+  },
+
+  // M36 4/N (D47/M22) — a RECONEXÃO, no lugar onde a sessão começa.
+  //
+  // Quem cai no meio de uma batalha e volta encontra a partida no ponto em que a deixou: o
+  // estado é do servidor, e perguntar por ele é uma requisição. Antes desta milestone o M22
+  // guardava o PEDIDO em disco e o reenviava; agora não há pedido que valha a pena guardar,
+  // porque não existe mais um instante em que a batalha inteira é submetida.
+  //
+  // Roda depois do sign-in e não dentro de `carregarHub`: `carregarHub` também roda ao FECHAR
+  // uma batalha, e reabrir o tabuleiro nesse instante jogaria o jogador de volta para dentro
+  // dela.
+  retomarBatalhaAberta: async () => {
+    await get().reconectarPartida();
   },
 
   // M35 3/N (D42) — os presets de party. Estado de conta no servidor; aqui só leitura,
@@ -2049,77 +2270,37 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     }
     set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.pedindoTicket') } });
     try {
-      const ticket = await api.requestTicket(pvp.token, pvp.selectedHeroIds, pvp.opponent.playerId);
-      // A batalha é montada com o setup e a SEED do servidor: o que o jogador vê aqui é
-      // exatamente o que o servidor vai resolver quando os comandos chegarem.
-      set({
-        mode: 'pvp',
-        battleState: buildInitialState(ticket.setup, ticket.seed),
-        // M26 3/N — é aqui que o mapa do servidor deixa de ser conveniência e vira a única
-        // resposta possível: o time do defensor são instâncias de herói de OUTRA conta, e o
-        // roster do atacante não as contém nem em princípio.
-        artIdByUnitId: ticket.characterIdByUnitId,
-        commandLog: [],
-        replayViewer: null,
-        selectedUnitId: null,
-        reachableTiles: [],
-        duelPreview: null,
-        duelScene: null,
-        targetingMode: null,
-        lastCommandReason: null,
-        pvp: { ...pvp, ticket, outcome: null, busy: false, status: get().t('estado.batalhaEmAndamento') },
-      });
-    } catch (error) {
-      set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
-    }
-  },
-
-  submitPvpBattle: async () => {
-    const { pvp, commandLog } = get();
-    if (!pvp.ticket || !pvp.opponent) return;
-    set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.enviandoComandos') } });
-    // M22 (auditoria) — a arena guarda o pedido como a masmorra e o capítulo: ela resolve no
-    // servidor, grava replay e mexe no ELO, então cair aqui deixava o jogador sem saber se a
-    // partida valeu, com o ELO já mudado do outro lado.
-    const corpoDaArena = {
-      attackerHeroIds: pvp.selectedHeroIds,
-      defenderPlayerId: pvp.opponent.playerId,
-      commands: commandLog,
-      rulesVersion: pvp.ticket.rulesVersion,
-      nonce: pvp.ticket.nonce,
-    };
-    guardarPedido({ rota: 'arena-battle', corpo: corpoDaArena });
-    try {
-      const outcome = await api.submitBattle(pvp.token, corpoDaArena);
-      limparPedido();
+      // M36 4/N (D47) — abrir a PARTIDA VIVA contra a defesa do oponente. É aqui que o
+      // esconder deixa de ser escolha e vira a única possibilidade: o time do defensor são
+      // instâncias de herói de OUTRA conta, e nenhum catálogo do cliente as teria.
+      const vista = await api.abrirPartidaDeArena(pvp.token, pvp.selectedHeroIds, pvp.opponent.playerId);
+      get().assumirPartida(vista);
       set((s) => ({
-        pvp: { ...s.pvp, outcome, busy: false, status: get().t('estado.servidorResolveu', { desfecho: nomeDoDesfecho(get().t, outcome.result.outcome) }) },
+        pvp: { ...s.pvp, outcome: null, busy: false, status: get().t('estado.batalhaEmAndamento') },
       }));
     } catch (error) {
-      if (error instanceof ApiError) limparPedido();
       set((s) => ({ pvp: { ...s.pvp, busy: false, status: null, error: describeApiError(error) } }));
     }
   },
 
-  // §11 — "Replay: reprodução passo a passo." Aqui o replay não é o gravado localmente: é
-  // o que o SERVIDOR persistiu, buscado de volta. É o que fecha "revista pelo cliente".
+  // M36 4/N — `submitPvpBattle` FOI REMOVIDA. Não há submissão: o ELO e as marcas são pagos no
+  // comando que fecha a batalha, e chegam em `liquidacao`. O pedido guardado do M22 sai junto —
+  // o que ele protegia (cair depois de o servidor ter resolvido) deixou de poder acontecer,
+  // porque não existe mais um instante em que tudo é resolvido de uma vez.
+
+  // §11 — "Replay: reprodução passo a passo." O replay não é o gravado localmente (não há
+  // gravação local desde M36 4/N): é o log que o SERVIDOR construiu, já redigido.
   reviewPvpBattle: async () => {
-    const { pvp } = get();
-    if (!pvp.ticket) return;
+    const { pvp, partida } = get();
+    if (!partida) return;
     set({ pvp: { ...pvp, busy: true, error: null, status: get().t('estado.buscandoReplay') } });
     try {
-      const stored = await api.fetchReplay(pvp.token, pvp.ticket.nonce);
-      const replay: Replay = {
-        rulesVersion: stored.rulesVersion,
-        seed: stored.seed,
-        initialState: stored.initialState,
-        commands: stored.commands,
-      };
+      const log = await api.logDoReplay(pvp.token, partida.nonce);
       set((s) => ({
-        replayViewer: { replay, step: 0, state: replayStateAt(replay, 0), playing: false, speed: 1 },
+        replayViewer: { log, step: 0, state: replayStateAt(log, 0), playing: false, speed: 1 },
         // M26 3/N — o replay também desenha peça. O mapa vem DERIVADO na leitura (o servidor
         // não o grava), então replays antigos ganham arte junto com os novos.
-        artIdByUnitId: stored.characterIdByUnitId,
+        artIdByUnitId: log.characterIdByUnitId,
         pvp: { ...s.pvp, busy: false, status: get().t('estado.replayCarregado') },
       }));
     } catch (error) {
@@ -2137,7 +2318,6 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       replayViewer: null,
       selectedUnitId: null,
       reachableTiles: [],
-      duelPreview: null,
       targetingMode: null,
       lastCommandReason: null,
       pvp: { ...get().pvp, ticket: null, outcome: null, status: null, error: null },
@@ -2182,81 +2362,35 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       },
     })),
 
-  // Entrar = pedir o ticket e montar a batalha com a SEED do servidor, exatamente como o
-  // PvP de M13 2/N. O jogador joga por cliques no mapa; nada aqui simula por conta própria.
+  // M36 4/N (D47) — entrar numa masmorra ABRE UMA PARTIDA VIVA. E entrar é o que CUSTA agora
+  // (D48): a energia e a entrada são cobradas na abertura, não numa submissão que não existe
+  // mais. Abandonar depois de entrar não devolve nada — é o que dá peso à decisão.
   enterDungeon: async (dungeonId) => {
     const { pvp, pve } = get();
     set({ pve: { ...pve, busy: true, error: null, status: get().t('estado.pedindoTicketMasmorra') } });
     try {
-      const ticket = await api.requestDungeonTicket(pvp.token, dungeonId, pve.selectedHeroIds);
-      set({
-        mode: 'dungeon',
-        battleState: buildInitialState(ticket.setup, ticket.seed),
-        artIdByUnitId: ticket.characterIdByUnitId,
-        commandLog: [],
-        replayViewer: null,
-        selectedUnitId: null,
-        reachableTiles: [],
-        duelPreview: null,
-        duelScene: null,
-        targetingMode: null,
-        lastCommandReason: null,
-        pve: { ...pve, ticket, activeDungeonId: dungeonId, lastRun: null, busy: false, status: get().t('estado.masmorraEmAndamento') },
-      });
-    } catch (error) {
-      set((s) => ({ pve: { ...s.pve, busy: false, status: null, error: describeApiError(error) } }));
-    }
-  },
-
-  submitDungeonRun: async () => {
-    const { pvp, pve, commandLog } = get();
-    if (!pve.ticket || !pve.activeDungeonId) return;
-    set({ pve: { ...pve, busy: true, error: null, status: get().t('estado.enviandoComandos') } });
-    // M22 2/N — o pedido é guardado ANTES de sair. A energia é debitada no servidor, e uma
-    // queda de conexão depois disso deixaria o jogador sem a run e sem a energia; com o
-    // nonce em disco, reconectar reenvia o mesmo pedido e recebe a run original de volta.
-    const corpoDaRun = {
-      nonce: pve.ticket.nonce,
-      heroIds: pve.selectedHeroIds,
-      commands: commandLog,
-    };
-    guardarPedido({ rota: 'dungeon-run', dungeonId: pve.activeDungeonId, corpo: corpoDaRun });
-    try {
-      const run = await api.submitDungeonRun(pvp.token, pve.activeDungeonId, corpoDaRun);
-      limparPedido();
-      // A run acabou: o `battleState` da masmorra não vale mais nada, e ficar nele deixaria
-      // o painel preso na visão de batalha — sem lista de masmorras e sem inventário, que é
-      // justamente o próximo passo do ciclo (achado da verificação em navegador).
-
+      const vista = await api.abrirPartidaDeMasmorra(pvp.token, dungeonId, pve.selectedHeroIds);
+      get().assumirPartida(vista);
       set((s) => ({
-        mode: 'campaign',
-        battleState: tabuleiroVazio(),
-        heroesByUnitId: {},
-        artIdByUnitId: {},
-        commandLog: [],
-        selectedUnitId: null,
-        reachableTiles: [],
-        duelPreview: null,
-        duelScene: null,
-        targetingMode: null,
         pve: {
           ...s.pve,
-          lastRun: run,
-          ticket: null,
-          activeDungeonId: null,
+          activeDungeonId: dungeonId,
+          lastRun: null,
           busy: false,
-          status: get().t('estado.servidorResolveu', { desfecho: nomeDoDesfecho(get().t, run.outcome) }),
+          status: get().t('estado.masmorraEmAndamento'),
         },
       }));
+      // A energia acabou de ser debitada: a tela tem de mostrar o saldo de verdade.
       await get().refreshPve();
     } catch (error) {
-      // O servidor RESPONDEU (mesmo que recusando): o desfecho é conhecido e não há o que
-      // reenviar. Falha de rede não cai aqui com `ApiError`, e o pedido fica guardado — que
-      // é justamente o caso de quem perdeu a conexão.
-      if (error instanceof ApiError) limparPedido();
       set((s) => ({ pve: { ...s.pve, busy: false, status: null, error: describeApiError(error) } }));
     }
   },
+
+  // M36 4/N — `submitDungeonRun` FOI REMOVIDA, e com ela o pedido guardado do M22 para esta
+  // rota. O que ele protegia — cair depois de o servidor ter debitado a energia e resolvido a
+  // batalha — deixou de poder acontecer: não há um instante em que tudo é resolvido de uma vez,
+  // e reconectar devolve a partida no ponto em que ela ficou.
 
   // Varredura: o servidor joga a batalha com a IA de mapa dos dois lados. Pode perder — e
   // quando perde, gasta a energia igual.
@@ -2273,19 +2407,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   exitDungeon: () => {
+    void get().desistirDaPartida();
     set((s) => ({
       mode: 'campaign',
-      battleState: tabuleiroVazio(),
-      heroesByUnitId: {},
-      artIdByUnitId: {},
-      commandLog: [],
-      replayViewer: null,
-      selectedUnitId: null,
-      reachableTiles: [],
-      duelPreview: null,
-      targetingMode: null,
-      lastCommandReason: null,
-      pve: { ...s.pve, ticket: null, activeDungeonId: null, status: null, error: null },
+      pve: { ...s.pve, activeDungeonId: null, status: null, error: null },
     }));
   },
 
@@ -2399,10 +2524,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // M26 2/N — abrir a cena para UM duelo, a partir do estado de ANTES dele.
   //
   // **Quem chama é o `MapCanvas`, e num lugar só.** O duelo que o jogador confirmou e o que a
-  // IA jogou chegam por caminhos diferentes (`duelPreview` e `aiTurnReport`), mas viram a mesma
-  // lista de cenas no tabuleiro desde M16 4/N — e é ali que a decisão cabe. Ligar a cena no
-  // `confirmEngage` teria deixado a FASE INIMIGA sem tela, que é meia funcionalidade: Fire
-  // Emblem e Unicorn Overlord mostram as duas.
+  // IA jogou chegam pelo MESMO relato desde M36 4/N (`aiTurnReport.meuDuelo` e
+  // `aiTurnReport.steps`), e viram a mesma lista de cenas no tabuleiro — é ali que a decisão
+  // cabe. Ligar a cena no envio do comando teria deixado a FASE INIMIGA sem tela, que é meia
+  // funcionalidade: Fire Emblem e Unicorn Overlord mostram as duas.
   //
   // Devolve `false` quando não dá para montar a cena (uma das duas peças não está no estado de
   // antes). O chamador então anima no tabuleiro, como sempre fez — degradar é sempre um duelo
@@ -2476,7 +2601,6 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       replayViewer: null,
       selectedUnitId: null,
       reachableTiles: [],
-      duelPreview: null,
       targetingMode: null,
       lastCommandReason: null,
       lastTalentReason: null,

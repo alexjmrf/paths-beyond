@@ -25,10 +25,10 @@
     "min": 10,
     "max": 16
   },
-  "materialDropCount": 3,
+  "materialDropCount": 4,
   "materialDrops": [
     {
-      "weight": 3,
+      "weight": 9,
       "materialId": "material-nucleo-de-despertar",
       "amount": {
         "min": 3,
@@ -36,7 +36,15 @@
       }
     },
     {
-      "weight": 2,
+      "weight": 11,
+      "materialId": "material-nucleo-de-artefato",
+      "amount": {
+        "min": 3,
+        "max": 6
+      }
+    },
+    {
+      "weight": 6,
       "materialId": "material-fragmento-hero-jogador",
       "amount": {
         "min": 1,
@@ -44,7 +52,7 @@
       }
     },
     {
-      "weight": 2,
+      "weight": 6,
       "materialId": "material-fragmento-ally-clerigo",
       "amount": {
         "min": 1,
@@ -52,7 +60,7 @@
       }
     },
     {
-      "weight": 2,
+      "weight": 6,
       "materialId": "material-fragmento-ally-arqueiro",
       "amount": {
         "min": 1,
@@ -60,7 +68,7 @@
       }
     },
     {
-      "weight": 2,
+      "weight": 6,
       "materialId": "material-fragmento-ally-arcanista",
       "amount": {
         "min": 1,

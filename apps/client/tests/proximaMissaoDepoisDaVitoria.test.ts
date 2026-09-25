@@ -25,11 +25,14 @@ const CAPITULOS = (limpa1: boolean) => [
   },
 ];
 
-const TICKET = { chapterId: 'encounter-campanha-1' } as never;
+// M36 4/N (D47) — quem diz qual missão foi jogada é a PARTIDA (`refId`), e não mais um ticket:
+// o ticket saiu com a batalha viva. A regra medida aqui não mudou uma vírgula.
+const PARTIDA = { nonce: 'n-1', kind: 'campaign', refId: 'encounter-campanha-1', outcome: 'victory' } as never;
 
 beforeEach(() => {
   useBattleStore.setState((s) => ({
-    campaign: { ...s.campaign, ticket: TICKET, selectedMissionId: 'encounter-campanha-1', error: null, status: null },
+    partida: PARTIDA,
+    campaign: { ...s.campaign, selectedMissionId: 'encounter-campanha-1', error: null, status: null },
   }));
 });
 
@@ -40,7 +43,7 @@ describe('a seleção da missão ao sair da batalha (M32)', () => {
     useBattleStore.getState().exitCampaign();
     const { campaign } = useBattleStore.getState();
 
-    expect(campaign.ticket).toBeNull();
+    expect(useBattleStore.getState().partida).toBeNull();
     expect(campaign.selectedMissionId).toBeNull();
     expect(proximaMissao(campaign.chapters)).toBe('encounter-campanha-2');
   });
@@ -51,7 +54,7 @@ describe('a seleção da missão ao sair da batalha (M32)', () => {
     useBattleStore.getState().exitCampaign();
     const { campaign } = useBattleStore.getState();
 
-    expect(campaign.ticket).toBeNull();
+    expect(useBattleStore.getState().partida).toBeNull();
     expect(campaign.selectedMissionId).toBe('encounter-campanha-1');
   });
 });

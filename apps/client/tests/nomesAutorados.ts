@@ -49,4 +49,6 @@ export const NOMES_AUTORADOS: Readonly<Record<TipoDeConteudo, Readonly<Record<st
   valor: porId(catalogo.valorSkills),
   // M35 1/N (D43) — os 41 inimigos comuns. O nome existia desde o M27 e nunca chegou à tela.
   inimigo: porId(catalogo.enemies),
+  artefato: porId(catalogo.artifacts),
+  banner: porId(catalogo.banners),
 };

@@ -43,6 +43,9 @@ describe('checkRulesVersion()', () => {
     expect(checkRulesVersion('0.18.0', '0.19.0')).not.toBeNull();
     expect(checkRulesVersion('0.19.1', '0.19.0')).not.toBeNull();
     expect(checkRulesVersion('0.20.0', '0.19.0')).not.toBeNull();
+    expect(checkRulesVersion('0.21.0', '0.20.0')).not.toBeNull();
+    expect(checkRulesVersion('0.22.0', '0.21.0')).not.toBeNull();
+    expect(checkRulesVersion('0.23.0', '0.22.0')).not.toBeNull();
   });
 
   it('versão AUSENTE é recusada como ausente, e não como diferente', () => {

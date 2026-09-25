@@ -1,0 +1,20 @@
+{
+  "unitId": "ally-acolito",
+  "kind": "sprite",
+  "arquivo": "apps/client/src/art/units/ally-acolito.png",
+  "duelo": {
+    "sudeste": "apps/client/src/art/units/ally-acolito-sudeste.png",
+    "sudoeste": "apps/client/src/art/units/ally-acolito-sudoeste.png"
+  },
+  "frameSize": 64,
+  "procedencia": {
+    "ferramenta": "pixellab",
+    "endpoint": "/create-character-v3",
+    "modelo": "character-v3",
+    "prompt": "a robed spellcaster with a hooded mantle, holding a holy mace and a hanging censer, steel blue and warm bronze colour scheme, pixel art game sprite, low top-down 3/4 view, single character centered and fully inside the frame, full body, facing the viewer, transparent background, crisp dark outline, limited palette, flat shading with one light source from the upper left, readable silhouette at small size, no text, no shadow on the ground",
+    "seed": 3530176905,
+    "characterId": "da9a6b70-f6fc-4b80-90d4-1ad714191660",
+    "licenca": "PixelLab — assinatura Tier 1, uso comercial permitido pelos termos em pixellab.ai/termsofservice",
+    "geradoEm": "2026-09-22"
+  }
+}

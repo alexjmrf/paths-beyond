@@ -1,6 +1,7 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { RULES_VERSION, resolveAutoBattle, resolveHeroStatSheet, type Hero, type ItemInstance } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
+import { jogarPartidaViva, type EstadoVisivelDeTeste } from './partidaViva.js';
 import { buildApp } from '../src/app.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
@@ -11,6 +12,7 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -142,6 +144,7 @@ function buildHarness(options: { gold?: number; stones?: number } = {}): Harness
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
       ownershipRepository,
@@ -168,18 +171,31 @@ async function economia(h: Harness) {
 }
 
 // Joga uma masmorra de verdade e devolve o que caiu — o começo do ciclo.
+//
+// M36 2/N — pela BATALHA VIVA: abre a partida e joga comando a comando com o piloto cego. O que
+// o ciclo de progressão precisa daqui não mudou (o que caiu), e é bom que ele passe pelo caminho
+// de verdade: um drop que só existisse na rota antiga seria um drop que o jogador não vê.
 async function farmar(h: Harness, dungeonId: string, heroIds = [HERO_COM_FRAGMENTO, 'heroi-2']) {
-  const ticket = await post(h, `/dungeons/${dungeonId}/ticket`, { heroIds });
-  expect(ticket.status).toBe(200);
-  const jogada = resolveAutoBattle({ setup: ticket.body.setup, seed: ticket.body.seed });
-  const run = await post(h, `/dungeons/${dungeonId}/run`, {
-    nonce: ticket.body.nonce,
-    heroIds,
-    commands: jogada.commands,
-    rulesVersion: RULES_VERSION,
-  });
-  expect(run.body.outcome).toBe('victory');
-  return run.body.rewards as { items: ItemInstance[]; materials: Record<string, number>; gold: number; stones: number };
+  const abertura = await post(h, `/dungeons/${dungeonId}/matches`, { heroIds, rulesVersion: RULES_VERSION });
+  expect(abertura.status, JSON.stringify(abertura.body)).toBe(201);
+
+  const enviar = async (rota: string, corpo: unknown) => {
+    const r = await post(h, rota, corpo as Record<string, unknown>);
+    return { status: r.status, body: r.body as Record<string, unknown> };
+  };
+  const jogada = await jogarPartidaViva(
+    enviar,
+    abertura.body.nonce as string,
+    abertura.body.visivel as EstadoVisivelDeTeste,
+  );
+
+  expect(jogada.outcome).toBe('victory');
+  return (jogada.ultima!.liquidacao as { rewards: unknown }).rewards as {
+    items: ItemInstance[];
+    materials: Record<string, number>;
+    gold: number;
+    stones: number;
+  };
 }
 
 describe('POST /heroes/:heroId/awaken', () => {

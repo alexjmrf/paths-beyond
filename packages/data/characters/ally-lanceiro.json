@@ -3,6 +3,7 @@
   "name": "Nyra",
   "classId": "class-lanceiro",
   "acquisition": "summon",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-ally-lanceiro",
   "startingHero": {
     "level": 10,

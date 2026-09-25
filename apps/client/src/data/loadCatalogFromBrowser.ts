@@ -5,8 +5,8 @@
 // propósito — o cliente roda em browser). Mesmo padrão já usado por
 // `tools/balance/src/loadContent.ts` (M8) pra importar schemas de `@paths-beyond/data`
 // por subpath em vez de um barrel.
-import { buildCatalog } from '@paths-beyond/content/src/buildCatalog.js';
-import type { ContentCatalog } from '@paths-beyond/content/src/types.js';
+import { buildClientCatalog } from '@paths-beyond/content/src/catalogoDoCliente.js';
+import type { CatalogoDoCliente } from '@paths-beyond/content/src/catalogoDoCliente.js';
 
 // Adapter de browser de `buildCatalog` (D2, docs/milestones/M9-integracao-de-conteudo.md,
 // sub-sessão 3) — o par de `loadCatalogFromDisk` (packages/content, adapter Node) que
@@ -35,9 +35,21 @@ const characterTalentTreeModules = import.meta.glob('../../../../packages/data/c
   eager: true,
   import: 'default',
 });
-// §8.1 (M17, 3/N) — os inimigos de fase autorados. Mesma paridade com o adapter de disco:
-// sem eles o cliente montaria a campanha com `enemyId` que não resolve.
-const enemyModules = import.meta.glob('../../../../packages/data/enemies/*.json', { eager: true, import: 'default' });
+// M36 3/N (D48) — `enemies/`, `encounters/` e `dungeon-encounters/` NÃO são mais empacotados.
+//
+// Eram a ficha completa de todo inimigo de PvE — stats, skills, equipamento — dentro do binário
+// que o jogador instala. Enquanto o inimigo era conhecido isso era só conteúdo; depois de D47 é
+// o buraco que faz o esconder virar teatro: o servidor pode redigir tudo no fio, que o dado
+// continua na máquina de quem joga. Ver `packages/content/src/catalogoDoCliente.ts`.
+//
+// O que o cliente perdeu com eles, e de onde passa a vir:
+//   - a prévia da missão → `GET /campaign/:id/previa`, já redigida;
+//   - a ordem de apresentação do elenco → `GET /campaign`, campo `castOrder`;
+//   - o nome do inimigo no tabuleiro → a camada de idioma, pelo id de arte que o servidor manda.
+//
+// A paridade com `loadCatalogFromDisk` deixou de ser o objetivo AQUI, e é a primeira vez que
+// isso acontece neste arquivo: os dois adaptadores passaram a ser diferentes de propósito, e a
+// diferença é a milestone. Quem a trava é `catalogoPartido.test.ts`.
 const skillModules = import.meta.glob('../../../../packages/data/skills/*.json', { eager: true, import: 'default' });
 const itemModules = import.meta.glob('../../../../packages/data/items/*.json', { eager: true, import: 'default' });
 const itemSetModules = import.meta.glob('../../../../packages/data/item-sets/*.json', { eager: true, import: 'default' });
@@ -49,7 +61,6 @@ const valorSkillModules = import.meta.glob('../../../../packages/data/valor-skil
 const summonBlueprintModules = import.meta.glob('../../../../packages/data/summon-blueprints/*.json', { eager: true, import: 'default' });
 const compModules = import.meta.glob('../../../../packages/data/comps/*.json', { eager: true, import: 'default' });
 const chapterModules = import.meta.glob('../../../../packages/data/chapters/*.json', { eager: true, import: 'default' });
-const encounterModules = import.meta.glob('../../../../packages/data/encounters/*.json', { eager: true, import: 'default' });
 const mapModules = import.meta.glob('../../../../packages/data/maps/*.json', { eager: true, import: 'default' });
 const terrainModules = import.meta.glob('../../../../packages/data/terrains/*.json', { eager: true, import: 'default' });
 const weaponDuelRangesModules = import.meta.glob('../../../../packages/data/weapon-duel-ranges/*.json', { eager: true, import: 'default' });
@@ -57,8 +68,8 @@ const weaponDuelRangesModules = import.meta.glob('../../../../packages/data/weap
 // o catálogo é um só: carregar aqui mantém os dois adaptadores em paridade, que é o que
 // impede o cliente de descobrir a diferença tarde, em runtime.
 const dungeonModules = import.meta.glob('../../../../packages/data/dungeons/*.json', { eager: true, import: 'default' });
-const dungeonEncounterModules = import.meta.glob('../../../../packages/data/dungeon-encounters/*.json', { eager: true, import: 'default' });
 const materialModules = import.meta.glob('../../../../packages/data/materials/*.json', { eager: true, import: 'default' });
+const artifactModules = import.meta.glob('../../../../packages/data/artifacts/*.json', { eager: true, import: 'default' });
 // §10 (M18, 2/N) — os banners de invocação. O cliente ainda não tem tela de summon (é a
 // 6/N), e carregar aqui é a mesma paridade que os outros: um adapter que conhece menos
 // tipos de conteúdo que o outro é um descompasso descoberto em runtime.
@@ -71,19 +82,18 @@ const substatWeightsModules = import.meta.glob('../../../../packages/data/substa
 const mainstatWeightsModules = import.meta.glob('../../../../packages/data/mainstat-weights/*.json', { eager: true, import: 'default' });
 const enhanceRatesModules = import.meta.glob('../../../../packages/data/enhance-rates/*.json', { eager: true, import: 'default' });
 
-export function loadCatalogFromBrowser(): ContentCatalog {
+export function loadCatalogFromBrowser(): CatalogoDoCliente {
   const weaponDuelRangesValues = globJsonValues(weaponDuelRangesModules);
   const weaponDuelRanges = weaponDuelRangesValues[0];
   if (!weaponDuelRanges) throw new Error('nenhuma tabela de weapon-duel-ranges encontrada em packages/data');
 
-  return buildCatalog({
+  return buildClientCatalog({
     classes: globJsonValues(classModules),
     characters: globJsonValues(characterModules),
     banners: globJsonValues(bannerModules),
     achievements: globJsonValues(achievementModules),
     events: globJsonValues(eventModules),
     characterTalentTrees: globJsonValues(characterTalentTreeModules),
-    enemies: globJsonValues(enemyModules),
     skills: globJsonValues(skillModules),
     items: globJsonValues(itemModules),
     itemSets: globJsonValues(itemSetModules),
@@ -92,13 +102,12 @@ export function loadCatalogFromBrowser(): ContentCatalog {
     summonBlueprints: globJsonValues(summonBlueprintModules),
     comps: globJsonValues(compModules),
     chapters: globJsonValues(chapterModules),
-    encounters: globJsonValues(encounterModules),
     maps: globJsonValues(mapModules),
     terrains: globJsonValues(terrainModules),
     weaponDuelRanges,
     dungeons: globJsonValues(dungeonModules),
-    dungeonEncounters: globJsonValues(dungeonEncounterModules),
     materials: globJsonValues(materialModules),
+    artifacts: globJsonValues(artifactModules),
     economyRules: globJsonValues(economyRulesModules),
     substatWeights: globJsonValues(substatWeightsModules)[0],
     mainstatWeights: globJsonValues(mainstatWeightsModules)[0],

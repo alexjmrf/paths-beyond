@@ -14,7 +14,7 @@ export function CampaignTransitionOverlay() {
   const battleState = useBattleStore((s) => s.battleState);
   const t = useBattleStore((s) => s.t);
   const campaign = useBattleStore((s) => s.campaign);
-  const submitCampaignRun = useBattleStore((s) => s.submitCampaignRun);
+  const desistirDaPartida = useBattleStore((s) => s.desistirDaPartida);
   const exitCampaign = useBattleStore((s) => s.exitCampaign);
   const enterChapter = useBattleStore((s) => s.enterChapter);
   // §11 — a tela de replay abre a partir do fim do mapa, que é quando a gravação está
@@ -56,7 +56,7 @@ export function CampaignTransitionOverlay() {
               ? t('capituloFim.primeiraVez', { premium: campaign.lastRun.premiumAwarded })
               : ''}
           </p>
-          <button type="button" onClick={openReplayViewer}>
+          <button type="button" onClick={() => void openReplayViewer()}>
             {t('capituloFim.reverBatalha')}
           </button>
           <button type="button" onClick={exitCampaign}>
@@ -71,18 +71,21 @@ export function CampaignTransitionOverlay() {
     <div className="campaign-overlay">
       <div className="campaign-overlay-panel">
         <h2>{venceu ? t('capituloFim.vitoria') : t('capituloFim.derrota')}</h2>
-        {/* Submeter não é opcional nem no caso da derrota: é a submissão que fecha o
-            capítulo do lado do servidor, e sem ela nada foi jogado do ponto de vista da
-            conta. */}
-        <p>{venceu ? t('capituloFim.envieVitoria') : t('capituloFim.envieDerrota')}</p>
-        <button type="button" onClick={() => void submitCampaignRun()} disabled={campaign.busy}>
-          {t('capituloFim.enviar')}
-        </button>
-        <button type="button" onClick={openReplayViewer}>
+        {/* M36 4/N (D47) — **não há mais o que submeter.** O desfecho é do servidor e chegou no
+            comando que o produziu; a missão já está limpa (ou não) do lado da conta antes de
+            esta tela aparecer. O que sobrou aqui é rever e sair. */}
+        <button type="button" onClick={() => void openReplayViewer()}>
           {t('capituloFim.reverBatalha')}
         </button>
         {!venceu ? (
-          <button type="button" onClick={() => void enterChapter(campaign.ticket!.chapterId)} disabled={campaign.busy}>
+          <button
+            type="button"
+            onClick={() => {
+              const missao = campaign.selectedMissionId;
+              if (missao) void enterChapter(missao);
+            }}
+            disabled={campaign.busy}
+          >
             {t('capituloFim.tentarNovamente')}
           </button>
         ) : null}

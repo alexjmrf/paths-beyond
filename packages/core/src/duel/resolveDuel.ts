@@ -20,6 +20,7 @@ import {
   persistentLethalTriggersUsed,
 } from './lethal.js';
 import { effectivePpCost, selectReaction } from './reactions.js';
+import { evaluateCondition } from '../tactics/evaluateCondition.js';
 import { SET_SPECIAL_DUELISTA, SET_SPECIAL_IMUNIDADE } from '../items/sets.js';
 import { selectTacticsAction } from '../tactics/selectTacticsAction.js';
 import { combinedTypeDamageMultiplier, weaponTriangleResult } from './triangle.js';
@@ -620,10 +621,28 @@ function resolveExchange(
   // vale para a reação `onAttacked` da troca 1 — que, pela lista fechada de §6.4, são
   // exatamente as duas reações universais. Leitura registrada em DECISIONS.md.
   const duelistaFreeCounter = trocaNumber === 1 && hasSetSpecial(opponent, SET_SPECIAL_DUELISTA);
+  // M38 5/N (D57) — A RESERVA DA TROCA. Uma reação CONCEDIDA `onDamaged` só dispara depois
+  // do dano, e §6.4 permite uma reação por troca: sem a reserva, a baseline `onAttacked` (que
+  // é decidida antes) gastava a troca sempre, e a concedida nunca disparava. Com uma
+  // concedida `onDamaged` habilitada, de condições satisfeitas e com PP, só as linhas
+  // CONCEDIDAS concorrem ao `onAttacked` desta troca.
+  const reservaDaTroca = opponent.reactionScript.some((line) => {
+    if (!line.enabled || !line.granted) return false;
+    const skill = opponent.knownSkills[line.skillId];
+    if (!skill || skill.trigger !== 'onDamaged') return false;
+    // Decisão do usuário: só reserva a reação que COMPETE pelo PP. Uma de 0 PP (o Fôlego de
+    // Combate) reservaria toda troca, e quem a tem nunca mais contra-atacaria.
+    const custo = skill.ppCost ?? 0;
+    if (custo <= 0 || !canAffordPp(opponentEconomy, custo)) return false;
+    return line.conditions.every((condition) => evaluateCondition(condition, opponentContext));
+  });
+  const scriptDoOnAttacked = reservaDaTroca
+    ? opponent.reactionScript.filter((line) => line.granted)
+    : opponent.reactionScript;
   const reactionDecision = opponentPpLocked
     ? ({ kind: 'none' } as const)
     : selectReaction({
-        reactionScript: opponent.reactionScript,
+        reactionScript: scriptDoOnAttacked,
         skills: opponent.knownSkills,
         trigger: 'onAttacked',
         economy: opponentEconomy,
@@ -658,7 +677,9 @@ function resolveExchange(
       }
       reactionLog = {
         skillId: reactionSkill.id,
-        lineIndex: reactionDecision.lineIndex,
+        // Com a reserva, a escolha foi feita no script FILTRADO; o log aponta para a linha no
+        // script do herói, que é o que a tela e o replay leem.
+        lineIndex: opponent.reactionScript.indexOf(scriptDoOnAttacked[reactionDecision.lineIndex]!),
         counterDamage: null,
         healDone: reactionHeal,
         trigger: 'onAttacked',

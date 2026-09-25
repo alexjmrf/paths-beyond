@@ -3,6 +3,7 @@
   "name": "Bardan",
   "classId": "class-couracado",
   "acquisition": "summon",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-ally-couracado",
   "startingHero": {
     "level": 10,

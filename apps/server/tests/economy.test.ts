@@ -1,5 +1,5 @@
 import { loadCatalogFromDisk } from '@paths-beyond/content';
-import { RULES_VERSION, resolveAutoBattle, type Hero } from '@paths-beyond/core';
+import { RULES_VERSION, type Hero } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
@@ -11,11 +11,13 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
 } from '../src/repository/memoryRepository.js';
 import { DEFAULT_PVE_ACCOUNT } from '../src/repository/types.js';
+import { jogarPartidaViva, type EstadoVisivelDeTeste } from './partidaViva.js';
 
 // §10 (M14, sub-sessão 3/N) — o farm de ponta a ponta contra o servidor real, com o
 // catálogo real de `packages/data`.
@@ -64,6 +66,8 @@ interface Harness {
   readonly playerRepository: ReturnType<typeof createMemoryPlayerRepository>;
   now: number;
   nonceCounter: number;
+  /** O nonce da última partida aberta por `jogarEVencer`/`abrirPartida`. */
+  ultimoNonce: string;
 }
 
 function buildHarness(options: { energy?: number } = {}): Harness {
@@ -118,6 +122,7 @@ function buildHarness(options: { energy?: number } = {}): Harness {
   const harness: Harness = {
     now: SEXTA,
     nonceCounter: 0,
+    ultimoNonce: '',
     economyRepository,
     ownershipRepository,
     rewardsRepository,
@@ -128,6 +133,7 @@ function buildHarness(options: { energy?: number } = {}): Harness {
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       economyRepository,
       ownershipRepository,
@@ -161,14 +167,54 @@ const ELITE = 'dungeon-campo-de-treino-elite';
 // Um adquirível de verdade do catálogo (D14): Kaia só entra por invocação.
 const PERSONAGEM_ADQUIRIVEL = 'ally-grifeiro';
 
-async function pedirTicket(h: Harness, dungeonId: string, heroIds: readonly string[] = ['heroi-1']) {
+// M36 2/N (D47) — `POST /dungeons/:id/ticket` e a metade MANUAL de `POST /dungeons/:id/run`
+// saíram. A masmorra jogada à mão é uma batalha viva; a varredura, que não tem cliente jogando,
+// continua onde estava.
+//
+// O que cada helper virou:
+//   - `pedirTicket` → `abrirPartida`: as validações de posse, de trava e de energia acontecem
+//     agora ao ABRIR, que é quando o jogador entra (D48).
+//   - `jogarEVencer` → o piloto CEGO de `partidaViva.ts`, um comando por requisição. Ele decide
+//     vendo só o que o jogador vê, e é a prova de que a masmorra é jogável sem a ficha do
+//     inimigo — `resolveAutoBattle` sobre o setup do ticket não seria mais possível nem no
+//     cliente nem aqui.
+//   - `rodar` ficou, e agora só serve varredura.
+
+async function abrirPartida(
+  h: Harness,
+  dungeonId: string,
+  heroIds: readonly string[] = ['heroi-1'],
+  extra: Record<string, unknown> = {},
+): Promise<{ status: number; body: any }> {
   const response = await h.app.inject({
     method: 'POST',
-    url: `/dungeons/${dungeonId}/ticket`,
-    headers: { 'x-platform-ticket': `dev:${TOKEN}`},
-    payload: { heroIds },
+    url: `/dungeons/${dungeonId}/matches`,
+    headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+    payload: { heroIds, rulesVersion: RULES_VERSION, ...extra },
   });
-  return { status: response.statusCode, body: response.json() };
+  const body = response.json();
+  if (response.statusCode === 201) h.ultimoNonce = body.nonce as string;
+  return { status: response.statusCode, body };
+}
+
+function enviarComando(h: Harness) {
+  return async (rota: string, corpo: unknown) => {
+    const response = await h.app.inject({
+      method: 'POST',
+      url: rota,
+      headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+      payload: corpo as never,
+    });
+    return { status: response.statusCode, body: response.json() as Record<string, unknown> };
+  };
+}
+
+async function desistir(h: Harness, nonce: string) {
+  return h.app.inject({
+    method: 'POST',
+    url: `/matches/${nonce}/forfeit`,
+    headers: { 'x-platform-ticket': `dev:${TOKEN}` },
+  });
 }
 
 async function rodar(
@@ -179,7 +225,7 @@ async function rodar(
   const response = await h.app.inject({
     method: 'POST',
     url: `/dungeons/${dungeonId}/run`,
-    headers: { 'x-platform-ticket': `dev:${TOKEN}`},
+    headers: { 'x-platform-ticket': `dev:${TOKEN}` },
     // M22 1/N — a versão de regras entra por padrão, como o cliente passa a mandar; um teste
     // que queira mandar outra (ou nenhuma) sobrescreve, porque o payload vem depois.
     payload: { rulesVersion: RULES_VERSION, ...payload },
@@ -188,20 +234,30 @@ async function rodar(
 }
 
 async function economia(h: Harness) {
-  const response = await h.app.inject({ method: 'GET', url: '/me/economy', headers: { 'x-platform-ticket': `dev:${TOKEN}`} });
+  const response = await h.app.inject({ method: 'GET', url: '/me/economy', headers: { 'x-platform-ticket': `dev:${TOKEN}` } });
   return response.json();
 }
 
-// Uma vitória "manual" honesta: o servidor exige que os comandos submetidos levem à
-// vitória, então o teste joga a batalha do mesmo jeito que a varredura jogaria e submete
-// exatamente esses comandos. É o que um cliente faria — e prova, de quebra, que o resultado
-// do cliente e o do servidor coincidem.
+/**
+ * Uma vitória honesta: o piloto cego joga a batalha inteira contra o servidor, um comando por
+ * vez, e o desfecho é o que o servidor produziu. A resposta é achatada no formato que a antiga
+ * `run` devolvia (`{ outcome, rewards, premiumAwarded, ... }`) para as asserções continuarem
+ * falando da mesma coisa.
+ */
 async function jogarEVencer(h: Harness, dungeonId: string, heroIds: readonly string[] = ['heroi-1', 'heroi-2']) {
-  const ticket = await pedirTicket(h, dungeonId, heroIds);
-  expect(ticket.status).toBe(200);
-  const jogada = resolveAutoBattle({ setup: ticket.body.setup, seed: ticket.body.seed });
-  expect(jogada.outcome).toBe('victory');
-  return rodar(h, dungeonId, { nonce: ticket.body.nonce, heroIds, commands: jogada.commands });
+  const abertura = await abrirPartida(h, dungeonId, heroIds);
+  if (abertura.status !== 201) return { status: abertura.status, body: abertura.body };
+
+  const jogada = await jogarPartidaViva(
+    enviarComando(h),
+    abertura.body.nonce as string,
+    abertura.body.visivel as EstadoVisivelDeTeste,
+  );
+  const liquidacao = (jogada.ultima?.liquidacao ?? abertura.body.liquidacao ?? {}) as Record<string, unknown>;
+  return {
+    status: 200,
+    body: { outcome: jogada.outcome, roundsPlayed: jogada.roundsPlayed, ...liquidacao },
+  };
 }
 
 describe('GET /me/economy', () => {
@@ -246,7 +302,7 @@ describe('GET /dungeons', () => {
   });
 });
 
-describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
+describe('a masmorra é uma batalha VIVA (M36 2/N)', () => {
   // §10 (M18, 4/N) — a fonte "primeira completude". Paga aqui, e não numa rota de
   // reivindicação, porque este é o único ponto do sistema que sabe que a masmorra acabou de
   // ser vencida PELA PRIMEIRA VEZ.
@@ -270,7 +326,7 @@ describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
   // porta.
   it('recusa herói cujo PERSONAGEM o jogador não possui', async () => {
     const h = buildHarness();
-    const { status, body } = await pedirTicket(h, NORMAL, ['heroi-personagem']);
+    const { status, body } = await abrirPartida(h, NORMAL, ['heroi-personagem']);
 
     expect(status).toBe(400);
     expect(body.error).toContain(PERSONAGEM_ADQUIRIVEL);
@@ -280,9 +336,9 @@ describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
     const h = buildHarness();
     await h.ownershipRepository.grant('player-farmer', PERSONAGEM_ADQUIRIVEL);
 
-    const { status } = await pedirTicket(h, NORMAL, ['heroi-personagem']);
+    const { status } = await abrirPartida(h, NORMAL, ['heroi-personagem']);
 
-    expect(status).toBe(200);
+    expect(status).toBe(201);
   });
 
   it('vitória manual paga a recompensa e marca a masmorra como limpa', async () => {
@@ -306,25 +362,29 @@ describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
     expect(antes - depois).toBe(catalog.dungeons[NORMAL]!.energyCost);
   });
 
-  it('sem energia, a run é recusada e nada é cobrado', async () => {
+  it('sem energia, a partida nem abre e nada é cobrado', async () => {
+    // D48 — a energia é cobrada ao ENTRAR, e entrar agora é abrir a partida. A recusa mudou de
+    // lugar junto com a cobrança: o jogador descobre que não tem energia ANTES de jogar, e não
+    // depois de uma batalha inteira.
     const h = buildHarness({ energy: 1 });
-    const ticket = await pedirTicket(h, NORMAL);
-    const resultado = await rodar(h, NORMAL, { nonce: ticket.body.nonce, heroIds: ['heroi-1'], commands: [] });
+    const { status, body } = await abrirPartida(h, NORMAL);
 
-    expect(resultado.status).toBe(403);
-    expect(resultado.body.error).toContain('energia');
+    expect(status).toBe(403);
+    expect(body.error).toContain('energia');
     expect((await economia(h)).energy.stored).toBe(1);
   });
 
   it('derrota gasta energia e NÃO paga nada', async () => {
+    // Desistir é a derrota que o teste consegue provocar de propósito, e é o caso que importa:
+    // o que foi pago ao entrar não volta. É o que dá peso à decisão de entrar com um time
+    // fraco (decisão do usuário, M14 3/N).
     const h = buildHarness();
-    const ticket = await pedirTicket(h, NORMAL);
-    // Nenhum comando: os inimigos agem, o jogador não, e a batalha não é vencida.
-    const resultado = await rodar(h, NORMAL, { nonce: ticket.body.nonce, heroIds: ['heroi-1'], commands: [] });
+    const abertura = await abrirPartida(h, NORMAL);
+    expect(abertura.status).toBe(201);
 
-    expect(resultado.status).toBe(200);
-    expect(resultado.body.outcome).toBe('defeat');
-    expect(resultado.body.rewards).toBeNull();
+    const desistencia = await desistir(h, abertura.body.nonce as string);
+    expect(desistencia.statusCode).toBe(200);
+    expect(desistencia.json().outcome).toBe('defeat');
 
     const depois = await economia(h);
     expect(depois.wallet.gold).toBe(0);
@@ -332,31 +392,31 @@ describe('POST /dungeons/:id/run — a masmorra é uma batalha', () => {
     expect(depois.energy.stored).toBe(catalog.economyRules.energy.max - catalog.dungeons[NORMAL]!.energyCost);
   });
 
-  it('o mesmo nonce não paga duas vezes', async () => {
+  it('a mesma partida não paga duas vezes', async () => {
+    // O que o nonce protegia continua protegido; o que mudou é a forma. Antes era "este nonce
+    // já foi submetido"; agora é "esta partida já terminou", e a partida É o nonce.
     const h = buildHarness();
-    const ticket = await pedirTicket(h, NORMAL, ['heroi-1', 'heroi-2']);
-    const jogada = resolveAutoBattle({ setup: ticket.body.setup, seed: ticket.body.seed });
-    const payload = { nonce: ticket.body.nonce, heroIds: ['heroi-1', 'heroi-2'], commands: jogada.commands };
-
-    const primeira = await rodar(h, NORMAL, payload);
+    const primeira = await jogarEVencer(h, NORMAL);
+    expect(primeira.body.outcome).toBe('victory');
     const ouroDepoisDaPrimeira = (await economia(h)).wallet.gold;
 
-    const segunda = await rodar(h, NORMAL, payload);
-    expect(primeira.status).toBe(200);
-    expect(segunda.status).toBe(409);
+    const denovo = await enviarComando(h)(`/matches/${h.ultimoNonce}/commands`, {
+      command: { t: 'wait', unitId: 'heroi-1' },
+    });
+    expect(denovo.status).toBe(409);
     expect((await economia(h)).wallet.gold).toBe(ouroDepoisDaPrimeira);
   });
 
   it('comando inválido é rejeitado — o servidor não confia na jogada do cliente', async () => {
     const h = buildHarness();
-    const ticket = await pedirTicket(h, NORMAL);
-    const resultado = await rodar(h, NORMAL, {
-      nonce: ticket.body.nonce,
-      heroIds: ['heroi-1'],
-      commands: [{ t: 'move', unitId: 'unidade-que-nao-existe', path: [{ x: 0, y: 0 }] }],
+    const abertura = await abrirPartida(h, NORMAL);
+    expect(abertura.status).toBe(201);
+
+    const resultado = await enviarComando(h)(`/matches/${abertura.body.nonce}/commands`, {
+      command: { t: 'move', unitId: 'unidade-que-nao-existe', path: [{ x: 0, y: 0 }] },
     });
     expect(resultado.status).toBe(400);
-    expect(resultado.body.error).toContain('rejeitado');
+    expect((resultado.body as { error: string }).error).toContain('unidade desconhecida');
   });
 });
 
@@ -415,9 +475,9 @@ describe('varredura (decisão do usuário: limpar à mão antes)', () => {
 describe('trava de tempo da dificuldade alta', () => {
   it('a elite fica trancada até a normal ser limpa', async () => {
     const h = buildHarness();
-    const ticket = await pedirTicket(h, ELITE);
-    expect(ticket.status).toBe(403);
-    expect(ticket.body.error).toContain(NORMAL);
+    const abertura = await abrirPartida(h, ELITE);
+    expect(abertura.status).toBe(403);
+    expect(abertura.body.error).toContain(NORMAL);
   });
 
   it('as entradas acabam e só voltam no dia declarado', async () => {
@@ -430,8 +490,8 @@ describe('trava de tempo da dificuldade alta', () => {
       expect(resultado.status, `entrada ${i + 1}`).toBe(200);
     }
 
-    // Esgotou: a próxima é recusada mesmo com energia sobrando.
-    const estourou = await rodar(h, ELITE, { nonce: 'nonce-estouro', heroIds: ['heroi-1'], commands: [] });
+    // Esgotou: a próxima nem abre, mesmo com energia sobrando.
+    const estourou = await abrirPartida(h, ELITE);
     expect(estourou.status).toBe(403);
     expect(estourou.body.error).toContain('entrada');
 
@@ -454,15 +514,17 @@ describe('trava de tempo da dificuldade alta', () => {
 
 describe('o drop é do servidor, não do cliente', () => {
   it('a recompensa é determinística pelo nonce: dois servidores concordariam', async () => {
+    // Os dois servidores emitem a MESMA sequência de nonce (`newNonce` é um contador
+    // injetado), logo a mesma seed, logo a mesma batalha e o mesmo sorteio de drop. Nada aqui
+    // depende de o cliente mandar a jogada: os dois pilotos cegos tomam as mesmas decisões
+    // porque veem a mesma coisa.
     const h1 = buildHarness();
     const h2 = buildHarness();
 
-    const t1 = await pedirTicket(h1, NORMAL, ['heroi-1', 'heroi-2']);
-    const jogada = resolveAutoBattle({ setup: t1.body.setup, seed: t1.body.seed });
-    const payload = { nonce: t1.body.nonce, heroIds: ['heroi-1', 'heroi-2'], commands: jogada.commands };
+    const r1 = await jogarEVencer(h1, NORMAL);
+    const r2 = await jogarEVencer(h2, NORMAL);
 
-    const r1 = await rodar(h1, NORMAL, payload);
-    const r2 = await rodar(h2, NORMAL, payload);
+    expect(r1.body.outcome).toBe(r2.body.outcome);
     expect(r1.body.rewards).toEqual(r2.body.rewards);
   });
 

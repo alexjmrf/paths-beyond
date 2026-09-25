@@ -1,6 +1,9 @@
 export { buildCatalog, firstArenaMap } from './buildCatalog.js';
+// M36 3/N (D48) — o catálogo PARTIDO: o que o cliente empacota, sem o inimigo de PvE.
+export { CONTEUDO_SO_DO_SERVIDOR, buildClientCatalog } from './catalogoDoCliente.js';
+export type { CatalogoDoCliente, ConteudoSoDoServidor, ParsedClientContentFiles } from './catalogoDoCliente.js';
 export type { ParsedContentFiles } from './buildCatalog.js';
-export { loadCatalogFromDisk } from './loadCatalogFromDisk.js';
+export { loadCatalogFromDisk, readContentFilesFromDisk } from './loadCatalogFromDisk.js';
 export { toSummonBlueprintPlacements } from './summonPlacements.js';
 export { toEncounterPlacements } from './encounterPlacements.js';
 export { toStartingHero } from './startingHero.js';
@@ -14,6 +17,9 @@ export type {
   ArenaMap,
   BannerContent,
   BannerEntryContent,
+  GenericBannerContent,
+  RotatingArtifactBannerContent,
+  RotatingCharacterBannerContent,
   PremiumRules,
   CharacterContent,
   CompUnitContent,

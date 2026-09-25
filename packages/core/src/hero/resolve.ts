@@ -6,6 +6,8 @@ import type { ColumnTalentNode } from '../talents/columnTree.js';
 import { resolveTalentEffects } from '../talents/resolve.js';
 import type { Id } from '../types.js';
 import type { ClassDef, Hero } from './types.js';
+import { assertArtifactFitsClass, resolveArtifact } from '../artifacts/index.js';
+import type { EquippedArtifact } from '../artifacts/types.js';
 
 export interface ResolveHeroStatSheetInput {
   readonly hero: Hero;
@@ -18,6 +20,10 @@ export interface ResolveHeroStatSheetInput {
   // agora quem resolve o herói busca a árvore de `hero.characterId` no catálogo e a passa
   // aqui. Vazio é legítimo e significa "sem árvore" (inimigo de fase, até a 3/N).
   readonly talentTree: readonly ColumnTalentNode[];
+  // M38 (D53) — o artefato equipado, já buscado por quem chama (mesmo padrão de
+  // `equippedItems`). Ausente = slot vazio. Os status entram no passo 3 e o % da passiva no
+  // passo 4: o artefato é equipamento, e §4.1 não ganha passo novo.
+  readonly artifact?: EquippedArtifact;
 }
 
 function itemStatMods(item: ItemInstance): readonly StatModifier[] {
@@ -43,8 +49,11 @@ export function resolveHeroStatSheet(input: ResolveHeroStatSheetInput): StatShee
     ...(classDef.imprintFlat[hero.imprint] ?? []),
   ];
 
-  const equipmentFlat = equippedItems.flatMap(itemStatMods);
-  const equipmentPct: readonly StatModifier[] = [];
+  if (input.artifact) assertArtifactFitsClass(input.artifact, classDef.id);
+  const artifact = input.artifact ? resolveArtifact(input.artifact) : undefined;
+
+  const equipmentFlat = [...equippedItems.flatMap(itemStatMods), ...(artifact?.equipmentFlat ?? [])];
+  const equipmentPct: readonly StatModifier[] = artifact?.equipmentPct ?? [];
 
   const resolvedTalents = resolveTalentEffects(talentTree, hero.talents);
 

@@ -13,6 +13,11 @@ const compUnitSchema = z.object({
   pos: coordSchema,
   height: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
   aiArchetype: mapAiArchetypeSchema,
+  // M38 5/N — o artefato que a unidade leva na medição COM artefato (`pnpm balance --
+  // --artefatos`). Da classe da unidade, e não necessariamente a assinatura (decisão do
+  // usuário); a carga confere que existe e que a classe bate. Opcional para a forma, e o teste
+  // da matriz exige que toda comp real o declare.
+  artifactId: idSchema.optional(),
 });
 
 // §9.1 — "o defensor monta um time de até 5 heróis" — mesmo teto aplicado aqui, já que

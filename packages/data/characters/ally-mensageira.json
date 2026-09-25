@@ -3,6 +3,7 @@
   "name": "Wren",
   "classId": "class-druida",
   "acquisition": "summon",
+  "rank": "adventurer",
   "fragmentMaterialId": "material-fragmento-ally-mensageira",
   "startingHero": {
     "level": 10,

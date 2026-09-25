@@ -13,6 +13,7 @@ import {
   createPostgresRewardsRepository,
   createPostgresHeroRepository,
   createPostgresPlayerRepository,
+  createPostgresMatchRepository,
   createPostgresReplayRepository,
   createPostgresSeasonRepository,
 } from './repository/postgresRepository.js';
@@ -57,6 +58,7 @@ const app = buildApp({
   partyPresetRepository: createPostgresPartyPresetRepository(pool),
   telemetryRepository: createPostgresTelemetryRepository(pool),
   replayRepository: createPostgresReplayRepository(pool),
+  matchRepository: createPostgresMatchRepository(pool),
   seasonRepository: createPostgresSeasonRepository(pool),
   identityValidator: createSteamIdentityValidator({ apiKey: steamApiKey, appId: steamAppId }),
   catalog: loadCatalogFromDisk(),
@@ -73,6 +75,11 @@ const app = buildApp({
   // E as três rotas que gastam a moeda comprável com dinheiro real ficam com o teto
   // estreito, que é onde ele importa: 10 por minuto é mais do que qualquer humano invoca.
   expensiveRateLimiter: createPostgresRateLimiter(pool, { maxRequests: 10, windowMs: 60_000 }),
+  // M36 4/N (D47) — o balde do COMANDO de batalha. 600 por minuto são dez por segundo: nenhum
+  // humano clica nesse ritmo, e um bot em laço ainda bate no teto. O balde padrão (60) foi
+  // calibrado quando uma batalha inteira era duas requisições; com a batalha viva ela passa de
+  // cinquenta, e sem este balde o jogador levaria 429 no meio da partida.
+  commandRateLimiter: createPostgresRateLimiter(pool, { maxRequests: 600, windowMs: 60_000 }),
   ticketSecret,
 });
 

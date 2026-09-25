@@ -1,0 +1,16 @@
+{
+  "id": "skill-juramento-do-duelista",
+  "name": "Juramento do Duelista",
+  "kind": "reaction",
+  "apCost": 0,
+  "ppCost": 1,
+  "cooldown": 0,
+  "multiplier": 600,
+  "flat": 0,
+  "scalesWith": "atk",
+  "effects": [],
+  "trigger": "onAttacked",
+  "tags": [
+    "physical"
+  ]
+}

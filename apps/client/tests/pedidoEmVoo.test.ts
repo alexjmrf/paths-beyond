@@ -24,10 +24,16 @@ function armazenamentoFalso() {
 beforeEach(() => vi.stubGlobal('localStorage', armazenamentoFalso()));
 afterEach(() => vi.unstubAllGlobals());
 
+// M36 4/N (D47) — sobrou UMA rota: a VARREDURA. As outras três (arena, masmorra à mão,
+// capítulo) eram submissões que resolviam a batalha inteira num disparo, e com a batalha viva
+// esse instante não existe mais — o que elas protegiam virou a reconexão de `GET /matches/current`.
+//
+// A varredura ficou porque nela não há cliente jogando: ela continua sendo um pedido só que
+// cobra energia e devolve loot, que é exatamente o caso que este arquivo existe para proteger.
 const PEDIDO = {
-  rota: 'dungeon-run' as const,
+  rota: 'dungeon-sweep' as const,
   dungeonId: 'dungeon-1',
-  corpo: { nonce: 'nonce-1', heroIds: ['h1'], commands: [] },
+  corpo: { nonce: 'nonce-1', heroIds: ['h1'] },
 };
 
 describe('o pedido guardado', () => {
@@ -45,7 +51,7 @@ describe('o pedido guardado', () => {
   it('lixo no armazenamento não vira requisição', () => {
     // O que está guardado pode ter sido escrito por uma versão anterior do jogo. Reenviar
     // lixo com um nonce de verdade seria pior que não reenviar nada.
-    globalThis.localStorage.setItem('paths-beyond/pedido-em-voo', '{"rota":"dungeon-run"}');
+    globalThis.localStorage.setItem('paths-beyond/pedido-em-voo', '{"rota":"dungeon-sweep"}');
     expect(lerPedido()).toBeNull();
 
     globalThis.localStorage.setItem('paths-beyond/pedido-em-voo', 'não é json');
@@ -113,47 +119,23 @@ describe('reenviarPedidoPendente()', () => {
   });
 });
 
-// Auditoria do M22 (2026-09-04) — a ARENA tinha o mesmo buraco, e não estava coberta.
-describe('a arena também é recuperável', () => {
-  const ARENA = {
-    rota: 'arena-battle' as const,
-    corpo: {
-      nonce: 'nonce-arena',
-      attackerHeroIds: ['h1'],
-      defenderPlayerId: 'player-2',
-      commands: [],
-      rulesVersion: RULES_VERSION,
-    },
-  };
-
-  it('o pedido de arena sobrevive e é reenviado com o mesmo nonce', async () => {
-    // Ela resolve no servidor, grava replay e mexe no ELO: cair no meio da submissão
-    // deixava o jogador sem saber se a partida valeu, com o ELO já mudado do outro lado.
-    const enviados: { url: string; body: string }[] = [];
-    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
-      enviados.push({ url: String(url), body: String(init.body) });
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({ result: { outcome: 'victory' } }),
-      } as unknown as Response;
-    });
-
-    guardarPedido(ARENA);
-    const recuperado = await reenviarPedidoPendente('ticket');
-
-    expect(enviados[0]!.url).toContain('/battles');
-    expect(JSON.parse(enviados[0]!.body).nonce).toBe('nonce-arena');
-    expect(recuperado?.pedido.rota).toBe('arena-battle');
-    expect(lerPedido()).toBeNull();
-  });
-
-  it('pedido de arena sem oponente é recusado na leitura', () => {
-    globalThis.localStorage.setItem(
-      'paths-beyond/pedido-em-voo',
-      JSON.stringify({ rota: 'arena-battle', corpo: { nonce: 'n' } }),
-    );
-
-    expect(lerPedido()).toBeNull();
+// M36 4/N (D47) — a ARENA saiu deste arquivo, e não por descuido.
+//
+// A auditoria do M22 a trouxe para cá porque ela resolvia no servidor, gravava replay e mexia no
+// ELO num disparo só: cair no meio da submissão deixava o jogador sem saber se a partida valeu.
+// Com a batalha viva não há submissão — o ELO é pago no comando que fecha a batalha, e quem cai
+// volta para o ponto em que parou por `GET /matches/current`. O buraco não foi reaberto; ele
+// deixou de existir.
+describe('um pedido de uma versão ANTERIOR do jogo é descartado', () => {
+  it('as rotas aposentadas não viram requisição — elas levariam 404', () => {
+    // O jogador que atualizar o jogo no meio de uma submissão antiga tem isto guardado em
+    // disco. Reenviá-lo bateria numa rota que não existe mais.
+    for (const rota of ['arena-battle', 'dungeon-run', 'campaign-run']) {
+      globalThis.localStorage.setItem(
+        'paths-beyond/pedido-em-voo',
+        JSON.stringify({ rota, dungeonId: 'd', chapterId: 'c', corpo: { nonce: 'n', heroIds: ['h1'] } }),
+      );
+      expect(lerPedido(), rota).toBeNull();
+    }
   });
 });

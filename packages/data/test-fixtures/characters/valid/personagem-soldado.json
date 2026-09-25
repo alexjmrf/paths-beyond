@@ -3,6 +3,7 @@
   "name": "Soldado de Teste",
   "classId": "class-soldado",
   "acquisition": "summon",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-personagem-soldado",
   "startingHero": {
     "level": 10,

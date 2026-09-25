@@ -77,12 +77,33 @@ export const ROTAS_CARAS: ReadonlySet<string> = new Set([
   'POST /energy/purchase',
 ]);
 
+// **M36 4/N (D47) — um TERCEIRO balde, e ele é obrigatório desde que a batalha ficou viva.**
+//
+// Até aqui uma batalha inteira era UMA requisição: o cliente jogava sozinho e submetia os
+// comandos em lote. Agora cada comando é um POST, e uma batalha de dez rounds com cinco heróis
+// passa de cinquenta — contra um balde de 60 por minuto, calibrado quando o número de
+// requisições por batalha era 2. **Um jogador jogando normalmente levaria 429 no meio da
+// partida**, e a partida ficaria aberta no servidor com ele trancado do lado de fora.
+//
+// Afrouxar o balde padrão consertaria isso afrouxando junto tudo que ele protege. Então o
+// comando ganha o seu: ele é a única rota do jogo que DEVE ser chamada dezenas de vezes por
+// minuto, e é também a que menos pode fazer estrago sozinha — ela move economia uma vez só, no
+// comando que fecha a batalha, e o resto é tabuleiro.
+//
+// O teto continua existindo, e continua servindo para o que um limitador serve aqui: um bot
+// mandando comandos em laço ainda bate nele; um humano clicando, não.
+export const ROTAS_DE_COMANDO: ReadonlySet<string> = new Set(['POST /matches/:nonce/commands']);
+
 export interface RateLimitPolicy {
   readonly padrao: RateLimiter;
   // Ausente = um balde só, que é o comportamento de quem monta o app sem política (todo o
-  // resto da suíte). O servidor de produção monta os dois.
+  // resto da suíte). O servidor de produção monta os três.
   readonly caro?: RateLimiter;
   readonly rotasCaras?: ReadonlySet<string>;
+  // M36 4/N — o balde do COMANDO de batalha. Ausente = ele cai no padrão, que é o
+  // comportamento de quem monta o app sem política.
+  readonly comando?: RateLimiter;
+  readonly rotasDeComando?: ReadonlySet<string>;
 }
 
 /**
@@ -95,8 +116,12 @@ export interface RateLimitPolicy {
  * e gastar cota de uma conta que ainda não se sabe qual é seria gastar a cota errada.
  */
 export function registerRateLimit(app: FastifyInstance, politica: RateLimiter | RateLimitPolicy): void {
-  const { padrao, caro, rotasCaras } = 'tryConsume' in politica ? { padrao: politica, caro: undefined, rotasCaras: undefined } : politica;
+  const { padrao, caro, rotasCaras, comando, rotasDeComando } =
+    'tryConsume' in politica
+      ? { padrao: politica, caro: undefined, rotasCaras: undefined, comando: undefined, rotasDeComando: undefined }
+      : politica;
   const caras = rotasCaras ?? ROTAS_CARAS;
+  const deComando = rotasDeComando ?? ROTAS_DE_COMANDO;
 
   app.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!METODOS_QUE_MUDAM.has(request.method)) return;
@@ -104,10 +129,11 @@ export function registerRateLimit(app: FastifyInstance, politica: RateLimiter | 
 
     const rota = `${request.method} ${request.routeOptions?.url ?? request.url}`;
     const cara = caro !== undefined && caras.has(rota);
-    const limitador = cara ? caro : padrao;
+    const jogada = !cara && comando !== undefined && deComando.has(rota);
+    const limitador = cara ? caro : jogada ? comando : padrao;
     // O prefixo separa as contagens: sem ele, gastar a cota de preparação derrubaria a de
     // compra na implementação que guarda tudo numa tabela só.
-    const chave = `${cara ? 'caro' : 'padrao'}:${request.player.id}`;
+    const chave = `${cara ? 'caro' : jogada ? 'comando' : 'padrao'}:${request.player.id}`;
 
     if (!(await limitador.tryConsume(chave))) {
       return reply.code(429).send({ error: 'rate limit exceeded' });

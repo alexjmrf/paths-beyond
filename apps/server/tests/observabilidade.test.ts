@@ -11,6 +11,7 @@ import {
   createMemoryEconomyRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -52,6 +53,7 @@ function harness() {
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -156,7 +158,7 @@ describe('log estruturado por requisição (M19)', () => {
       method: 'POST',
       url: '/summon',
       headers: { 'x-platform-ticket': `dev:${TOKEN}`},
-      payload: { nonce: 'obs-2', bannerId: 'banner-elenco' },
+      payload: { nonce: 'obs-2', bannerId: 'banner-generico' },
     });
 
     // Log que vaza credencial é pior que log nenhum (§9.4 — o token É a autenticação).

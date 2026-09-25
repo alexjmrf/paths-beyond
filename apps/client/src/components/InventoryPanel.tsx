@@ -4,6 +4,7 @@ import { catalog } from '../data/catalog.js';
 import { GEAR_SLOTS } from '../data/gearSlots.js';
 import { previewEquip } from '../logic/itemPreview.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { ehVisivelPorInteiro } from '../data/api.js';
 
 const itemSets = Object.values(catalog.itemSets);
 
@@ -61,7 +62,11 @@ export function InventoryPanel() {
   });
 
   const selectedItem = filteredItems.find((i) => i.id === selectedItemId) ?? null;
-  const preview = selectedItem ? previewEquip(unit.stats, equippedItems, selectedItem) : null;
+  // M36 4/N — a tela de inventário só abre sobre uma unidade do JOGADOR (é dela que se troca o
+  // equipamento), e é por isso que `unit.stats` existe aqui. A guarda torna isso uma afirmação do
+  // tipo em vez de um acidente: se um dia ela abrisse sobre um inimigo, não haveria o que prever.
+  const preview =
+    selectedItem && ehVisivelPorInteiro(unit) ? previewEquip(unit.stats, equippedItems, selectedItem) : null;
   const isEquipped = selectedItem ? equippedSlots[selectedItem.slot] === selectedItem.id : false;
 
   return (

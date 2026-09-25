@@ -69,6 +69,19 @@ const characterSchema = z
     // Obrigatório e sem padrão de propósito: um personagem novo tem de declarar de que
     // lado está, senão ele nasce garantido por omissão e ninguém repara.
     acquisition: z.enum(['story', 'summon']),
+    // M37 (§10, DECISIONS.md §1) — o RANK DE BASE. Identidade do personagem, como a classe:
+    // um `Adventurer` é `Adventurer` para sempre, em toda conta.
+    //
+    // **`legend` não está aqui de propósito.** O topo não é invocável — chega-se nele por
+    // evolução, e quem responde por isso é `rankCorrente(base, awakening)` em `packages/core`.
+    // O rank CORRENTE não mora em arquivo nenhum: guardá-lo no catálogo repetiria o erro que o
+    // M18 2/N pagou com o fragmento de imprint, o dado descrevendo estado de conta.
+    //
+    // Obrigatório e sem padrão, pelo mesmo motivo de `acquisition`: um campo com default é um
+    // campo que ninguém preenche, e o rank decide de que banner o personagem sai e quanta curva
+    // ele atravessa. O rank NÃO carrega poder — o que ele descreve é a profundidade da árvore
+    // (`Adventurer` 5–6, `Hero` 7–9, mesmo orçamento de pontos; D9) e o custo de evolução.
+    rank: z.enum(['adventurer', 'hero']),
     // O fragmento que a duplicata deste personagem paga, e que o `imprint` de §10 consome.
     // Obrigatório para os dois tipos: um personagem de história também tem imprint, e o
     // fragmento dele dropa na masmorra de Chefe desde M14.

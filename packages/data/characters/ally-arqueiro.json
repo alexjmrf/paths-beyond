@@ -3,6 +3,7 @@
   "name": "Sylla",
   "classId": "class-arqueiro",
   "acquisition": "story",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-ally-arqueiro",
   "startingHero": {
     "level": 10,

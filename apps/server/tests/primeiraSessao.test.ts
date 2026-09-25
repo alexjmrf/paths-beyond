@@ -1,6 +1,7 @@
-import { loadCatalogFromDisk, playFromSetup } from '@paths-beyond/content';
-import { RULES_VERSION, resolveAutoBattle } from '@paths-beyond/core';
+import { loadCatalogFromDisk } from '@paths-beyond/content';
+import { RULES_VERSION } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
+import { jogarPartidaViva, type EstadoVisivelDeTeste } from './partidaViva.js';
 import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
@@ -12,6 +13,7 @@ import {
   createMemoryHeroRepository,
   createMemoryIdempotencyRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -93,6 +95,7 @@ function servidorVazio() {
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -167,16 +170,32 @@ async function venceCapitulo(
 // O capítulo 1 tem duas missões de `seize` desde a 2/N, então isto não é higiene: sem a troca,
 // as duas seriam perdidas oito vezes seguidas e a corrente seguiria em frente sem reprovar,
 // porque só a ÚLTIMA missão tem asserção de desfecho.
+// M36 2/N — a corrente inteira passa pela BATALHA VIVA. `ticket → joga tudo → run` saiu, e com
+// ele saiu a possibilidade de o teste jogar a batalha localmente: `playFromSetup` precisa do
+// setup completo, e o setup completo é exatamente o que não sai mais do servidor.
+//
+// Quem joga agora é o piloto CEGO de `partidaViva.ts`, um comando por requisição, decidindo com
+// posição, HP, AP, PP e iniciativa. Este arquivo é a prova de que uma conta nova atravessa o
+// jogo; a partir desta milestone ele prova junto que ela atravessa **sem ver a ficha do
+// inimigo**, que é o que D47 passou a exigir do jogador de verdade.
+function enviarComo(eu: ReturnType<typeof jogador>) {
+  return async (rota: string, corpo: unknown) => {
+    const r = await eu.post(rota, corpo as Record<string, unknown>);
+    return { status: r.status, body: r.body as Record<string, unknown> };
+  };
+}
+
 async function jogarCapitulo(eu: ReturnType<typeof jogador>, heroIds: readonly string[], missao = CAPITULO) {
-  const ticket = await eu.post(`/campaign/${missao}/ticket`, { heroIds });
-  expect(ticket.status, JSON.stringify(ticket.body)).toBe(200);
-  const jogada = playFromSetup(ticket.body.setup, ticket.body.seed, missao);
-  return eu.post(`/campaign/${missao}/run`, {
-    nonce: ticket.body.nonce,
-    heroIds,
-    commands: jogada.commandLog,
-    rulesVersion: RULES_VERSION,
-  });
+  const abertura = await eu.post(`/campaign/${missao}/matches`, { heroIds, rulesVersion: RULES_VERSION });
+  expect(abertura.status, JSON.stringify(abertura.body)).toBe(201);
+
+  const jogada = await jogarPartidaViva(
+    enviarComo(eu),
+    abertura.body.nonce as string,
+    abertura.body.visivel as EstadoVisivelDeTeste,
+  );
+  const liquidacao = (jogada.ultima?.liquidacao ?? abertura.body.liquidacao ?? {}) as Record<string, unknown>;
+  return { status: 200, body: { outcome: jogada.outcome, roundsPlayed: jogada.roundsPlayed, ...liquidacao } as any };
 }
 
 // Quem vai para cada VAGA, na ordem em que a missão as declara.
@@ -289,19 +308,21 @@ describe('a primeira sessão, de uma conta que não existia', () => {
     // ---- 3. um item, e equipá-lo -------------------------------------------------------
     // Equipamento não nasce com a conta: ele cai na masmorra, que custa energia — e a
     // energia é o único recurso que a conta nova já tem cheio.
-    const ticketMasmorra = await eu.post(`/dungeons/${MASMORRA.id}/ticket`, { heroIds: timeCompleto });
-    expect(ticketMasmorra.status, JSON.stringify(ticketMasmorra.body)).toBe(200);
-    const jogada = resolveAutoBattle({ setup: ticketMasmorra.body.setup, seed: ticketMasmorra.body.seed });
-    const run = await eu.post(`/dungeons/${MASMORRA.id}/run`, {
-      // O nonce do TICKET, e não um escrito aqui: é dele que sai a seed que o servidor usa
-      // para reexecutar. Ver o cabeçalho — este era o fio solto do M23.
-      nonce: ticketMasmorra.body.nonce,
+    const aberturaMasmorra = await eu.post(`/dungeons/${MASMORRA.id}/matches`, {
       heroIds: timeCompleto,
-      commands: jogada.commands,
       rulesVersion: RULES_VERSION,
     });
-    expect(run.status, JSON.stringify(run.body)).toBe(200);
-    expect(run.body.outcome, 'o núcleo inicial vence a primeira masmorra').toBe('victory');
+    expect(aberturaMasmorra.status, JSON.stringify(aberturaMasmorra.body)).toBe(201);
+
+    // O nonce é do SERVIDOR agora, e a seed sai dele sem nunca atravessar a rede. O fio solto
+    // que o M23 registrou aqui — planejar com a seed do ticket e submeter outro nonce — deixou
+    // de poder existir: não há mais duas metades para divergirem.
+    const runMasmorra = await jogarPartidaViva(
+      enviarComo(eu),
+      aberturaMasmorra.body.nonce as string,
+      aberturaMasmorra.body.visivel as EstadoVisivelDeTeste,
+    );
+    expect(runMasmorra.outcome, 'o núcleo inicial vence a primeira masmorra').toBe('victory');
 
     const economia = await eu.get('/me/economy');
     const item = economia.body.inventory?.[0];
@@ -339,27 +360,25 @@ describe('a primeira sessão, de uma conta que não existia', () => {
     const oponente = await eu.get('/matchmaking/opponent');
     expect(oponente.status, 'o matchmaking achou a defesa do outro jogador').toBe(200);
 
-    const ticketArena = await eu.post('/battles/ticket', {
+    const aberturaArena = await eu.post('/arena/matches', {
       attackerHeroIds: heroIds,
       defenderPlayerId: oponente.body.playerId,
-    });
-    expect(ticketArena.status, JSON.stringify(ticketArena.body)).toBe(200);
-
-    // O jogador joga a batalha; submeter sem comando nenhum devolveria `ongoing`, que é o
-    // servidor dizendo "ninguém fez nada" — e não um desfecho.
-    const jogadaArena = resolveAutoBattle({ setup: ticketArena.body.setup, seed: ticketArena.body.seed });
-    const arena = await eu.post('/battles', {
-      attackerHeroIds: heroIds,
-      defenderPlayerId: oponente.body.playerId,
-      commands: jogadaArena.commands,
       rulesVersion: RULES_VERSION,
-      nonce: ticketArena.body.nonce,
     });
+    expect(aberturaArena.status, JSON.stringify(aberturaArena.body)).toBe(201);
 
-    // Ganhar ou perder é do balanceamento; o que este teste afirma é que a partida
-    // ACONTECEU — a conta do zero chegou até a arena e submeteu uma batalha de verdade.
-    expect(arena.status, JSON.stringify(arena.body)).toBe(200);
-    expect(['victory', 'defeat']).toContain(arena.body.result.outcome);
+    // O jogador joga a batalha contra um time que ele NÃO CONHECE — em PvP isso não é uma
+    // escolha de desenho, é a única coisa possível: os heróis do defensor são instâncias de
+    // outra conta, e nenhum catálogo do cliente os teria.
+    const arena = await jogarPartidaViva(
+      enviarComo(eu),
+      aberturaArena.body.nonce as string,
+      aberturaArena.body.visivel as EstadoVisivelDeTeste,
+    );
+
+    // Ganhar ou perder é do balanceamento; o que este teste afirma é que a partida ACONTECEU —
+    // a conta do zero chegou até a arena e jogou uma batalha de verdade.
+    expect(['victory', 'defeat']).toContain(arena.outcome);
   });
 
   // M26 3/N — a arte da campanha e da masmorra, contra o CATÁLOGO REAL.
@@ -368,17 +387,21 @@ describe('a primeira sessão, de uma conta que não existia', () => {
   // tem (o time do defensor). O que só este arquivo prova é que os ids que o servidor manda
   // são os ids que o manifesto usa: numa fixture, 'enemy-tirano' é uma string qualquer; aqui
   // ele é uma entrada de `packages/data/unit-art/`.
-  it('o ticket de capítulo e o de masmorra dizem quem é cada unidade, com ids do catálogo real', async () => {
+  it('a abertura de capítulo e a de masmorra dizem quem é cada unidade, com ids do catálogo real', async () => {
     const app = servidorVazio();
     const eu = await contaNova(app, 'jogador-novo');
     const heroes = (await eu.get('/me/heroes')).body as { hero: { id: string; characterId: string } }[];
 
-    const capitulo = await eu.post(`/campaign/${CAPITULO}/ticket`, { heroIds: [heroes[0]!.hero.id] });
-    expect(capitulo.status, JSON.stringify(capitulo.body)).toBe(200);
+    const capitulo = await eu.post(`/campaign/${CAPITULO}/matches`, {
+      heroIds: [heroes[0]!.hero.id],
+      rulesVersion: RULES_VERSION,
+    });
+    expect(capitulo.status, JSON.stringify(capitulo.body)).toBe(201);
     const mapa = capitulo.body.characterIdByUnitId as Record<string, string>;
 
-    // Toda unidade do tabuleiro tem quem seja — o capítulo 1 não tem ficha sem personagem.
-    const unidades = (capitulo.body.setup.units as { unitId: string }[]).map((u) => u.unitId);
+    // D48 — a arte do inimigo CONTINUA saindo: identidade não é build, e sem ela toda peça do
+    // outro lado vira o mesmo glifo. Toda unidade do tabuleiro tem quem seja.
+    const unidades = (capitulo.body.visivel.units as { unitId: string }[]).map((u) => u.unitId);
     expect(Object.keys(mapa).sort()).toEqual([...unidades].sort());
 
     // O herói do jogador sai como PERSONAGEM e não como instância. É a linha inteira do bug:
@@ -391,9 +414,15 @@ describe('a primeira sessão, de uma conta que não existia', () => {
       expect(catalog.characters[id] ?? catalog.enemies[id], `${id} não está no catálogo`).toBeDefined();
     }
 
+    // Desiste da partida do capítulo antes de abrir a da masmorra: é uma por jogador.
+    await eu.post(`/matches/${capitulo.body.nonce}/forfeit`, {});
+
     const timeCompleto = heroes.slice(0, VAGAS_DA_MASMORRA).map((h) => h.hero.id);
-    const masmorra = await eu.post(`/dungeons/${MASMORRA.id}/ticket`, { heroIds: timeCompleto });
-    expect(masmorra.status, JSON.stringify(masmorra.body)).toBe(200);
+    const masmorra = await eu.post(`/dungeons/${MASMORRA.id}/matches`, {
+      heroIds: timeCompleto,
+      rulesVersion: RULES_VERSION,
+    });
+    expect(masmorra.status, JSON.stringify(masmorra.body)).toBe(201);
     const mapaMasmorra = masmorra.body.characterIdByUnitId as Record<string, string>;
     expect(Object.keys(mapaMasmorra).length).toBeGreaterThan(0);
     for (const id of Object.values(mapaMasmorra)) {

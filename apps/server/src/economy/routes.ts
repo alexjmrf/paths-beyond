@@ -1,8 +1,6 @@
+import { artefatoEquipado } from '../summon/artefatos.js';
 import {
-  RULES_VERSION,
   buildBattleSetupFromHeroes,
-  buildInitialState,
-  applyCommandAndAdvance,
   consumeEntry,
   entriesRemaining,
   resolveAutoBattle,
@@ -26,7 +24,7 @@ import {
 
 type DungeonEncounterUnit = DungeonEncounter['units'][number];
 import type { FastifyPluginAsync } from 'fastify';
-import { deriveSeed, generateNonce } from '../battle/ticket.js';
+import { deriveSeed } from '../battle/ticket.js';
 import { characterIdsForPlacements } from '../battle/artIds.js';
 import { rejectOnRulesVersion } from '../version.js';
 import type {
@@ -81,7 +79,7 @@ interface RunBody {
 
 // A energia guardada é sempre reapurada contra o agora antes de qualquer decisão: o valor
 // no banco é do instante em que foi escrito, não de agora.
-function currentEnergy(player: Player, nowMs: number, catalog: ContentCatalog): EnergyState {
+export function currentEnergy(player: Player, nowMs: number, catalog: ContentCatalog): EnergyState {
   return resolveEnergy(player.energy, nowMs, catalog.economyRules.energy);
 }
 
@@ -89,7 +87,7 @@ function currentEnergy(player: Player, nowMs: number, catalog: ContentCatalog): 
 // jogador são preenchidas com os heróis que ele escolheu. As vagas de referência do
 // conteúdo existem só para o encounter ser jogável sozinho em teste — em produção elas são
 // substituídas, nesta ordem, pelas posições declaradas.
-async function assembleDungeonBattle(
+export async function assembleDungeonBattle(
   opts: EconomyRoutesOptions,
   encounter: DungeonEncounter,
   playerHeroIds: readonly string[],
@@ -118,17 +116,21 @@ async function assembleDungeonBattle(
   const faltando = unownedAmong(stored, owned);
   if (faltando.length > 0) return { error: `você não possui: ${faltando.join(', ')}` };
 
+  // M38 4/N — o artefato equipado de cada herói, buscado antes (a busca é assíncrona).
+  const artefatos = await Promise.all(stored.map((hero) => artefatoEquipado(opts.ownershipRepository, opts.catalog, hero)));
   const placements: Placement[] = [];
 
   stored.forEach((hero, index) => {
     const slot = slots[index]!;
     const classDef = opts.catalog.classes[hero.hero.classId];
     if (!classDef) throw new Error(`classe desconhecida: ${hero.hero.classId}`);
+    const artifact = artefatos[index];
     placements.push({
       unitId: `player-${hero.hero.id}`,
       hero: hero.hero,
       classDef,
       equippedItems: hero.equippedItems,
+      ...(artifact ? { artifact } : {}),
       side: 'player',
       pos: slot.pos,
       height: slot.height,
@@ -178,11 +180,11 @@ async function assembleDungeonBattle(
 // Por que a recompensa tem stream próprio: a seed da BATALHA e a seed do DROP saem do mesmo
 // nonce, mas por sufixos diferentes. Sem isso, um jogador que descobrisse o resultado do
 // drop conseguiria inferir a batalha (e vice-versa).
-function rewardSeedFor(secret: string, nonce: string): number {
+export function rewardSeedFor(secret: string, nonce: string): number {
   return deriveSeed(secret, `${nonce}:rewards`);
 }
 
-function rollRewards(catalog: ContentCatalog, dungeon: DungeonDef, seed: number, nonce: string): DungeonRunRewards {
+export function rollRewards(catalog: ContentCatalog, dungeon: DungeonDef, seed: number, nonce: string): DungeonRunRewards {
   return rollDungeonRun({
     dungeon,
     seed,
@@ -253,46 +255,22 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
     return { dungeons };
   });
 
-  // O ticket: mesmo contrato de `POST /battles/ticket` (M13, 2/N). Não cobra energia — quem
-  // cobra é a submissão. Abandonar um ticket não pode custar recurso; em compensação, pedir
-  // muitos tickets consome a mesma cota do rate limiter, que é o que contém procurar seed
-  // favorável (risco residual já registrado em M13).
-  fastify.post('/dungeons/:id/ticket', async (request, reply) => {
-    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
-    const player = request.player;
+  // M36 2/N (D47) — `POST /dungeons/:id/ticket` FOI APOSENTADA, e `POST /dungeons/:id/run` ficou
+  // só com a VARREDURA.
+  //
+  // O ticket entregava o `BattleSetup` completo da masmorra ao cliente para ele jogar sozinho, e
+  // é exatamente isso que o inimigo desconhecido proíbe. A masmorra jogada à mão passa por
+  // `POST /dungeons/:id/matches` + `POST /matches/:nonce/commands` (`battle/matchRoutes.ts`), com
+  // `assembleDungeonBattle` acima continuando a ser a MESMA montagem.
+  //
+  // A varredura sobrevive aqui, e sobrevive intacta, porque ela não tem cliente jogando: a IA de
+  // mapa joga os dois lados dentro do servidor e o jogador só recebe o desfecho. Não há informação
+  // oculta a proteger onde não há ninguém olhando o tabuleiro.
 
-
-    const dungeonId = (request.params as { id: string }).id;
-    const dungeon = opts.catalog.dungeons[dungeonId];
-    if (!dungeon) return reply.code(404).send({ error: 'masmorra desconhecida' });
-
-    const clears = new Set(await opts.economyRepository.listClears(player.id));
-    if (dungeon.requiresClearOf && !clears.has(dungeon.requiresClearOf)) {
-      return reply.code(403).send({ error: `precisa limpar ${dungeon.requiresClearOf} antes` });
-    }
-
-    const encounter = opts.catalog.dungeonEncounters[dungeon.encounterId];
-    if (!encounter) return reply.code(500).send({ error: 'masmorra sem confronto declarado' });
-
-    const body = request.body as RunBody;
-    const assembled = await assembleDungeonBattle(opts, encounter, body.heroIds ?? [], player.id);
-    if ('error' in assembled) return reply.code(400).send({ error: assembled.error });
-
-    const nonce = (opts.newNonce ?? generateNonce)();
-    return {
-      nonce,
-      seed: deriveSeed(opts.ticketSecret, nonce),
-      rulesVersion: RULES_VERSION,
-      setup: assembled.setup,
-      characterIdByUnitId: assembled.characterIdByUnitId,
-      dungeonId: dungeon.id,
-    };
-  });
-
-  // A submissão. Manual: o servidor reaplica os comandos do cliente e exige vitória.
-  // Varredura: a IA de mapa joga os dois lados. Nos dois casos a energia é cobrada ANTES do
-  // resultado — perder também gasta, que é o que dá peso à decisão de entrar com um time
-  // fraco (decisão do usuário: "ainda sim teria que ser forte o suficiente para passar").
+  // A VARREDURA (M36 2/N: o manual saiu daqui). A IA de mapa joga os dois lados; a energia é
+  // cobrada ANTES do resultado — varrer também pode perder, que é o que dá peso à decisão de
+  // entrar com um time fraco (decisão do usuário: "ainda sim teria que ser forte o suficiente
+  // para passar").
   fastify.post('/dungeons/:id/run', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });
     const player = request.player;
@@ -320,13 +298,14 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
       return reply.code(403).send({ error: `precisa limpar ${dungeon.requiresClearOf} antes` });
     }
 
-    const auto = body.auto === true;
-    if (auto) {
-      // Duas travas, as duas da decisão do usuário: a dificuldade alta é sempre manual, e
-      // varrer exige ter limpado a masmorra à mão antes.
-      if (dungeon.manualOnly) return reply.code(403).send({ error: 'esta dificuldade é sempre manual' });
-      if (!clears.has(dungeon.id)) return reply.code(403).send({ error: 'limpe a masmorra à mão antes de varrer' });
+    // M36 2/N — esta rota é só varredura. Quem manda comando joga a partida viva.
+    if (body.auto !== true) {
+      return reply.code(400).send({ error: 'esta rota é só varredura; abra uma partida em /dungeons/:id/matches' });
     }
+    // Duas travas, as duas da decisão do usuário: a dificuldade alta é sempre manual, e
+    // varrer exige ter limpado a masmorra à mão antes.
+    if (dungeon.manualOnly) return reply.code(403).send({ error: 'esta dificuldade é sempre manual' });
+    if (!clears.has(dungeon.id)) return reply.code(403).send({ error: 'limpe a masmorra à mão antes de varrer' });
 
     const encounter = opts.catalog.dungeonEncounters[dungeon.encounterId];
     if (!encounter) return reply.code(500).send({ error: 'masmorra sem confronto declarado' });
@@ -359,34 +338,17 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
 
     const seed = deriveSeed(opts.ticketSecret, body.nonce);
 
-    // §9.4 — "servidor autoritativo". O resultado NUNCA vem do cliente: no manual o
-    // servidor reaplica os comandos sobre o mesmo setup e a mesma seed; na varredura ele
-    // joga a batalha inteira.
-    let outcome: 'victory' | 'defeat';
-    let roundsPlayed: number;
-    if (auto) {
-      const result = resolveAutoBattle({ setup: assembled.setup, seed });
-      outcome = result.outcome === 'victory' ? 'victory' : 'defeat';
-      roundsPlayed = result.rounds;
-    } else {
-      let state = buildInitialState(assembled.setup, seed);
-      for (const command of body.commands ?? []) {
-        if (state.outcome !== 'ongoing') break;
-        const applied = applyCommandAndAdvance(state, command);
-        if (!applied.applied) {
-          return reply.code(400).send({ error: `comando rejeitado: ${applied.reason}` });
-        }
-        state = applied.state;
-      }
-      outcome = state.outcome === 'victory' ? 'victory' : 'defeat';
-      roundsPlayed = state.round;
-    }
+    // §9.4 — "servidor autoritativo". O resultado NUNCA vem do cliente: a IA de mapa joga a
+    // batalha inteira aqui dentro.
+    const result = resolveAutoBattle({ setup: assembled.setup, seed });
+    const outcome: 'victory' | 'defeat' = result.outcome === 'victory' ? 'victory' : 'defeat';
+    const roundsPlayed = result.rounds;
 
     await opts.economyRepository.saveRun({
       nonce: body.nonce,
       playerId: player.id,
       dungeonId: dungeon.id,
-      mode: auto ? 'auto' : 'manual',
+      mode: 'auto',
       outcome,
       createdAt: new Date(nowMs).toISOString(),
     });
@@ -424,15 +386,10 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
     // premium. Ela é paga aqui, e não numa rota de reivindicação, porque este é o único
     // ponto do sistema que sabe que a masmorra acabou de ser vencida pela primeira vez —
     // `clears` foi lido no começo desta requisição, antes de `markCleared`.
-    let premiumAwarded = 0;
-    if (!auto) {
-      const primeiraVez = !clears.has(dungeon.id);
-      await opts.economyRepository.markCleared(player.id, dungeon.id);
-      if (primeiraVez) {
-        premiumAwarded = opts.catalog.premiumRules.premiumRewards.dungeonFirstClear;
-        await opts.repository.updatePremium(player.id, player.premium + premiumAwarded);
-      }
-    }
+    // A varredura nunca marca nada de novo: ela só é permitida depois de a masmorra já ter sido
+    // limpa à mão, e a primeira completude (a que paga premium) acontece no fechamento da partida
+    // viva, em `battle/matchRoutes.ts`.
+    const premiumAwarded = 0;
 
     return {
       outcome,

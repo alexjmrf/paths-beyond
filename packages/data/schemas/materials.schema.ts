@@ -16,16 +16,23 @@ import { idSchema } from './shared.js';
 // `forCharacterId` é obrigatório em `heroFragment` e proibido nos outros: um fragmento sem
 // dono viraria imprint de qualquer um, e um núcleo com dono seria promessa que o motor não
 // cumpre (`applyImprint` só aceita `kind: 'heroFragment'`).
+//
+// M38 (D53): `artifactFragment` é a duplicata de ARTEFATO, com `forArtifactId` pela mesma
+// razão — obrigatório nele e proibido nos outros.
 const materialSchema = z
   .object({
     id: idSchema,
     name: z.string().min(1),
-    kind: z.enum(['awakening', 'heroFragment', 'generic']),
+    kind: z.enum(['awakening', 'heroFragment', 'artifactFragment', 'generic']),
     forCharacterId: idSchema.optional(),
+    forArtifactId: idSchema.optional(),
   })
   .strict()
   .refine((m) => (m.kind === 'heroFragment' ? m.forCharacterId !== undefined : m.forCharacterId === undefined), {
     message: 'forCharacterId é obrigatório em heroFragment e proibido nos demais kinds.',
+  })
+  .refine((m) => (m.kind === 'artifactFragment' ? m.forArtifactId !== undefined : m.forArtifactId === undefined), {
+    message: 'forArtifactId é obrigatório em artifactFragment e proibido nos demais kinds.',
   });
 
 export default materialSchema;

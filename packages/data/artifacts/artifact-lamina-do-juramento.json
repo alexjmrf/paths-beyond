@@ -1,0 +1,73 @@
+{
+  "id": "artifact-lamina-do-juramento",
+  "signatureOf": "hero-jogador",
+  "name": "Lâmina do Juramento",
+  "classId": "class-espadachim",
+  "rank": "hero",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "chd",
+    "byAwakening": [
+      52,
+      65,
+      78,
+      91,
+      110,
+      130,
+      156
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "reaction",
+    "skillId": "skill-juramento-do-duelista",
+    "multiplierByImprint": [
+      600,
+      640,
+      680,
+      720,
+      760,
+      800
+    ]
+  }
+}

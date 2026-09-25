@@ -1,0 +1,73 @@
+{
+  "id": "artifact-ponta-do-piqueiro",
+  "signatureOf": "ally-piqueiro",
+  "name": "Ponta do Piqueiro",
+  "classId": "class-lanceiro",
+  "rank": "adventurer",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "def",
+    "byAwakening": [
+      6,
+      8,
+      9,
+      11,
+      14,
+      16,
+      19
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "stat",
+    "stat": "hp",
+    "pctByImprint": [
+      60,
+      68,
+      76,
+      84,
+      92,
+      100
+    ]
+  }
+}

@@ -154,9 +154,9 @@ export { resolveValorSkill } from './battle/valor.js';
 export type { ValorResolution, ValorSkillDef } from './battle/valor.js';
 export { checkWinCondition } from './battle/winCondition.js';
 export type { BattleOutcome } from './battle/winCondition.js';
-export { applyCommandAndAdvance, buildInitialState, buildInitialStateLogged, simulate } from './battle/simulate.js';
+export { advanceWithoutAi, applyCommandAndAdvance, buildInitialState, buildInitialStateLogged, simulate } from './battle/simulate.js';
 export type { BuildInitialStateResult } from './battle/simulate.js';
-export type { ApplyCommandAndAdvanceResult } from './battle/simulate.js';
+export type { AdvanceWithoutAiResult, ApplyCommandAndAdvanceResult } from './battle/simulate.js';
 export type {
   BattleCommand,
   BattleResult,
@@ -254,6 +254,15 @@ export type { AutoBattleResult, ResolveAutoBattleInput } from './economy/autoBat
 export { rollDungeonRun } from './economy/drops.js';
 export type { RollDungeonRunInput } from './economy/drops.js';
 export { MAX_AWAKENING, awaken } from './economy/awakening.js';
+// M37 (§10) — os três ranks. O rank de BASE é catálogo; o CORRENTE é função do awakening.
+export {
+  AWAKENING_PARA_HERO,
+  AWAKENING_PARA_LEGEND,
+  RANKS_CORRENTES,
+  RANKS_DE_BASE,
+  rankCorrente,
+} from './economy/rank.js';
+export type { BaseRank, CharacterRank } from './economy/rank.js';
 export type { AwakenInput } from './economy/awakening.js';
 export { MAX_IMPRINT, applyImprint } from './economy/imprint.js';
 export type { ApplyImprintInput } from './economy/imprint.js';
@@ -284,3 +293,23 @@ export type {
   SpendEnergyResult,
   Wallet,
 } from './economy/types.js';
+
+// M38 (D53) — o artefato: o 7º slot, travado por classe, com awakening e imprint próprios.
+export {
+  MAX_ARTIFACT_AWAKENING,
+  MAX_ARTIFACT_IMPRINT,
+  applyArtifactImprint,
+  artifactRank,
+  assertArtifactFitsClass,
+  awakenArtifact,
+  equipArtifact,
+  resolveArtifact,
+} from './artifacts/index.js';
+export type {
+  ApplyArtifactImprintInput,
+  ArtifactAwakenResult,
+  ArtifactImprintResult,
+  AwakenArtifactInput,
+  EquipArtifactResult,
+} from './artifacts/index.js';
+export type { ArtifactDef, ArtifactInstance, ArtifactPassive, EquippedArtifact, ResolvedArtifact } from './artifacts/types.js';

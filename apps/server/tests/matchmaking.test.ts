@@ -8,6 +8,7 @@ import {
   createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -44,6 +45,7 @@ const emptyCatalog: ContentCatalog = {
   dungeons: {},
   dungeonEncounters: {},
   materials: {},
+  artifacts: {},
   economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
   substatWeights: [],
   mainstatWeights: [],
@@ -52,7 +54,7 @@ const emptyCatalog: ContentCatalog = {
   // aqui é o que o tipo obrigatório de `ContentCatalog` cobra (esquecer vira erro de tipo).
   banners: {},
   premiumRules: {
-    summon: { premiumCost: 500, pityThreshold: 10 },
+    summon: { premiumCost: 500, pityThresholds: { adventurer: 10, hero: 90 } },
     energyPurchase: { premiumCost: 100, energy: 60 },
     premiumRewards: { missionFirstClear: 60, chapterFirstClear: 600, dungeonFirstClear: 200 },
   },
@@ -74,6 +76,7 @@ function buildTestApp(players: readonly Player[], defenses: readonly ArenaDefens
     arenaDefenseRepository: createMemoryArenaDefenseRepository(defenses),
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     catalog: emptyCatalog,
     shopCatalog: {},

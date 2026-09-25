@@ -10,6 +10,8 @@ import type { ColumnTalentNode } from '../talents/columnTree.js';
 import { resolveTalentEffects } from '../talents/resolve.js';
 import type { Id } from '../types.js';
 import { resolveHeroStatSheet } from './resolve.js';
+import { resolveArtifact } from '../artifacts/index.js';
+import type { EquippedArtifact } from '../artifacts/types.js';
 import type { ClassDef, Hero } from './types.js';
 
 // §15 (decisões em aberto) — "alcance de assistência: começar em 2 tiles para melee e
@@ -59,6 +61,8 @@ export interface ResolveHeroCombatProfileInput {
   // registrada em DECISIONS.md: sintetizadas aqui a partir dos ids canônicos que o
   // chamador (servidor) resolve do seu próprio catálogo de skills.
   readonly baselineReactionSkillIds: readonly Id[];
+  // M38 (D53) — o artefato equipado. Ausente = slot vazio. Ver `resolveHeroStatSheet`.
+  readonly artifact?: EquippedArtifact;
 }
 
 function isMeleeWeapon(weaponType: WeaponType): boolean {
@@ -92,8 +96,12 @@ export function toReactionLine(skillId: Id, skillsCatalog: Readonly<Record<Id, S
 export function resolveHeroCombatProfile(input: ResolveHeroCombatProfileInput): HeroCombatProfile {
   const { hero, classDef, equippedItems, itemSets, skillsCatalog, weaponDuelRanges, baselineReactionSkillIds, talentTree } = input;
 
-  const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets, talentTree });
+  const artifactInput = input.artifact ? { artifact: input.artifact } : {};
+  const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets, talentTree, ...artifactInput });
   const resolvedTalents = resolveTalentEffects(talentTree, hero.talents);
+  // A trava de classe já foi conferida por `resolveHeroStatSheet` logo acima.
+  const artifact = input.artifact ? resolveArtifact(input.artifact) : undefined;
+  const artifactReactionIds = artifact?.grantedReactionIds ?? [];
   const setSpecialEffectIds = resolveSetSpecialEffects(equippedItems, itemSets);
   // §7.4 Reserva — "+1 AP máximo". Este motor não tem teto de AP em runtime (`rest`/`wait`
   // somam sem clamp), então "máximo" é o pool com que a unidade entra na batalha: mesma
@@ -109,20 +117,32 @@ export function resolveHeroCombatProfile(input: ResolveHeroCombatProfileInput): 
     ...resolvedTalents.grantedSkillIds,
     ...baselineReactionSkillIds,
     ...resolvedTalents.grantedReactionIds,
+    ...artifactReactionIds,
   ];
 
   const knownSkills: Record<Id, SkillDef> = {};
   for (const skillId of knownSkillIds) {
     const base = skillsCatalog[skillId];
     if (!base) continue;
-    const patch = resolvedTalents.skillPatches[skillId];
-    knownSkills[skillId] = patch ? { ...base, ...patch } : base;
+    const patch = { ...resolvedTalents.skillPatches[skillId], ...artifact?.skillPatches[skillId] };
+    knownSkills[skillId] = Object.keys(patch).length > 0 ? { ...base, ...patch } : base;
   }
 
   const reactionScript: ReactionLine[] = [];
-  for (const skillId of [...baselineReactionSkillIds, ...resolvedTalents.grantedReactionIds]) {
+  // M38 5/N (D57) — as reações CONCEDIDAS (artefato, depois talento) vêm ANTES da baseline. O
+  // duelo escolhe a primeira linha que bate (§6.3 literal): com a baseline na frente, uma
+  // reação concedida de mesmo gatilho que `contra-atacar` (sem condição) nunca disparava, e a
+  // passiva do artefato medida no torneio não mudava resultado nenhum. A baseline vira o que
+  // sobra quando a concedida não serve (gatilho diferente, PP insuficiente).
+  // Entre as concedidas, o ARTEFATO vem antes do talento: é o equipamento específico, e com o
+  // talento na frente uma reação de mesmo gatilho concedida por talento (a `assistir` da Sylla)
+  // tomava sempre o lugar da do artefato. Uma reação repetida (baseline que um talento também
+  // concede) fica só na primeira posição.
+  const concedidas = new Set([...artifactReactionIds, ...resolvedTalents.grantedReactionIds]);
+  const ordem = [...new Set([...artifactReactionIds, ...resolvedTalents.grantedReactionIds, ...baselineReactionSkillIds])];
+  for (const skillId of ordem) {
     const line = toReactionLine(skillId, skillsCatalog);
-    if (line) reactionScript.push(line);
+    if (line) reactionScript.push(concedidas.has(skillId) ? { ...line, granted: true } : line);
   }
 
   return {
@@ -133,8 +153,8 @@ export function resolveHeroCombatProfile(input: ResolveHeroCombatProfileInput): 
     assistRange,
     moveType: classDef.moveType,
     moveRange: classDef.moveRange,
-    startingAp: classDef.basePools.ap + resolvedTalents.maxApBonus + reservaApBonus,
-    startingPp: classDef.basePools.pp + resolvedTalents.maxPpBonus,
+    startingAp: classDef.basePools.ap + resolvedTalents.maxApBonus + reservaApBonus + (artifact?.startingApBonus ?? 0),
+    startingPp: classDef.basePools.pp + resolvedTalents.maxPpBonus + (artifact?.startingPpBonus ?? 0),
     tacticsScript: hero.tacticsScript,
     reactionScript,
     knownSkills,

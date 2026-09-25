@@ -1,8 +1,6 @@
+import { artefatoEquipado } from '../summon/artefatos.js';
 import {
-  RULES_VERSION,
   buildBattleSetupFromHeroes,
-  simulate,
-  type BattleCommand,
   type Coord,
   type BattleSetup,
   type HeroPlacement,
@@ -10,10 +8,7 @@ import {
 } from '@paths-beyond/core';
 import { toSummonBlueprintPlacements, type ContentCatalog } from '@paths-beyond/content';
 import type { FastifyPluginAsync } from 'fastify';
-import { computeEloUpdate } from '../matchmaking/elo.js';
-import { rejectOnRulesVersion } from '../version.js';
 import { ownedCharacterIds, unownedAmong } from '../summon/ownership.js';
-import { deriveSeed, generateNonce } from './ticket.js';
 import { characterIdsForPlacements, characterIdsForReplayUnits } from './artIds.js';
 import type {
   ArenaDefenseRepository,
@@ -24,14 +19,14 @@ import type {
 } from '../repository/types.js';
 
 // §9.1 — "o defensor monta um time de até 5 heróis."
-const MAX_TEAM_SIZE = 5;
+export const MAX_TEAM_SIZE = 5;
 
 // §10 — "marcas de arena" é moeda de economia de servidor, não número de balanceamento
 // de combate (mesmo tratamento já dado a DEFAULT_K_FACTOR/ELO_SEARCH_RANGE em
 // matchmaking/elo.ts — não vem de packages/data). Vencedor ganha mais, perdedor ganha
 // menos por participar (nunca zero — perder não deveria travar o jogador fora da loja).
-const ARENA_MARKS_WIN = 10;
-const ARENA_MARKS_LOSS = 3;
+export const ARENA_MARKS_WIN = 10;
+export const ARENA_MARKS_LOSS = 3;
 
 
 interface SaveDefenseBody {
@@ -42,16 +37,6 @@ interface SaveDefenseBody {
     readonly height?: 0 | 1 | 2 | 3;
     readonly aiArchetype?: MapAiArchetype;
   }[];
-}
-
-interface CreateBattleBody {
-  readonly attackerHeroIds?: readonly string[];
-  readonly defenderPlayerId?: string;
-  readonly commands?: readonly BattleCommand[];
-  readonly rulesVersion?: string;
-  // §9.4 — "nonce por partida": gerado pelo cliente, único por tentativa de batalha.
-  // Dobra como id do replay persistido (ver ReplayRepository).
-  readonly nonce?: string;
 }
 
 export interface BattleRoutesOptions {
@@ -85,7 +70,7 @@ type AssembleResult =
 // (M13, sub-sessão 2/N) precisa montar EXATAMENTE o mesmo setup — se as duas montagens
 // divergissem, o cliente jogaria contra uma batalha e o servidor resolveria outra, que é
 // o tipo de divergência que §9.1 chama de bug crítico.
-async function assembleArenaBattle(
+export async function assembleArenaBattle(
   opts: BattleRoutesOptions,
   attackerPlayerId: string,
   attackerHeroIds: readonly string[],
@@ -133,11 +118,14 @@ async function assembleArenaBattle(
     // Posicionamento do atacante: corte de escopo de M7 (ver DECISIONS.md) — mapas ainda
     // não têm pontos de spawn declarados; time inteiro entra pela borda esquerda, uma
     // unidade por linha.
+    // M38 4/N — o artefato equipado vai junto, dos DOIS lados (o do defensor é da conta dele).
+    const artifact = await artefatoEquipado(opts.ownershipRepository, opts.catalog, stored);
     placements.push({
       unitId: stored.hero.id,
       hero: stored.hero,
       classDef,
       equippedItems: stored.equippedItems,
+      ...(artifact ? { artifact } : {}),
       side: 'player',
       pos: { x: 0, y: index },
       height: 0,
@@ -149,11 +137,13 @@ async function assembleArenaBattle(
     if (!stored) return { ok: false, code: 500, error: `defesa referencia herói inexistente: ${defenseUnit.heroId}` };
     const classDef = opts.catalog.classes[stored.hero.classId];
     if (!classDef) return { ok: false, code: 500, error: `classe desconhecida: ${stored.hero.classId}` };
+    const artifact = await artefatoEquipado(opts.ownershipRepository, opts.catalog, stored);
     placements.push({
       unitId: stored.hero.id,
       hero: stored.hero,
       classDef,
       equippedItems: stored.equippedItems,
+      ...(artifact ? { artifact } : {}),
       side: 'enemy',
       pos: defenseUnit.pos,
       height: defenseUnit.height,
@@ -270,116 +260,16 @@ export const battleRoutes: FastifyPluginAsync<BattleRoutesOptions> = async (fast
     return heroes.map((stored) => ({ hero: stored.hero, equippedItems: stored.equippedItems }));
   });
 
-  fastify.post('/battles/ticket', async (request, reply) => {
-    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
-    const attacker = request.player;
-
-    const body = request.body as CreateBattleBody;
-    const assembled = await assembleArenaBattle(opts, attacker.id, body.attackerHeroIds ?? [], body.defenderPlayerId);
-    if (!assembled.ok) return reply.code(assembled.code).send({ error: assembled.error });
-
-    const nonce = generateNonce();
-    return {
-      nonce,
-      seed: deriveSeed(opts.ticketSecret, nonce),
-      rulesVersion: RULES_VERSION,
-      setup: assembled.setup,
-      defenderPlayerId: assembled.defenderPlayerId,
-      characterIdByUnitId: assembled.characterIdByUnitId,
-    };
-  });
-
-  fastify.post('/battles', async (request, reply) => {
-    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
-    const attacker = request.player;
-
-    const body = request.body as CreateBattleBody;
-
-    // §9.4 — "rate limiting". M22 3/N: deixou de ser chamada de rota e virou hook
-    // (`registerRateLimit`), porque escrito por rota o limite existe só onde alguém lembrou
-    // de escrever — e as rotas que gastam a moeda comprável com dinheiro real eram as que
-    // ninguém lembrou.
-
-    // §9.4 — "nonce por partida": sem nonce, ou nonce já usado, rejeita — previne reenvio
-    // da mesma requisição rodar a batalha (e mexer no ELO) mais de uma vez.
-    if (!body.nonce) {
-      return reply.code(400).send({ error: 'nonce é obrigatório' });
-    }
-    if (await opts.replayRepository.getByNonce(body.nonce)) {
-      return reply.code(409).send({ error: 'nonce já utilizado' });
-    }
-
-    // §9.4 — "versionamento: rulesVersion no replay; recusar replays de versão
-    // diferente." Checado antes de qualquer outra coisa: uma versão de regras errada
-    // invalida a requisição inteira, não só o resultado.
-    //
-    // M22 1/N: a comparação virou `rejectOnRulesVersion` — mesma decisão de antes, agora
-    // compartilhada com as outras duas rotas que reexecutam comandos, e com corpo de erro
-    // que o cliente consegue LER para mostrar a tela de atualização.
-    if (rejectOnRulesVersion(reply, body.rulesVersion)) return reply;
-
-    const assembled = await assembleArenaBattle(opts, attacker.id, body.attackerHeroIds ?? [], body.defenderPlayerId);
-    if (!assembled.ok) return reply.code(assembled.code).send({ error: assembled.error });
-    const setup = assembled.setup;
-
-    // A seed é DERIVADA do nonce (ver ticket.ts): o cliente que pediu um ticket jogou com
-    // exatamente esta seed, e quem pula o ticket não tem como escolhê-la.
-    const seed = deriveSeed(opts.ticketSecret, body.nonce);
-    const result = simulate({
-      rulesVersion: RULES_VERSION,
-      seed,
-      initialState: setup,
-      commands: body.commands ?? [],
-    });
-
-    // §9.1 — "ELO, temporadas de 14 dias." §10 — "marcas de arena" ganhas em toda
-    // batalha concluída (não em 'ongoing' — comandos insuficientes pra terminar o
-    // engajamento não devem mexer em rating nem em moeda de ninguém).
-    let elo: { attacker: number; defender: number } | undefined;
-    let arenaMarks: { attacker: number; defender: number } | undefined;
-    if (result.outcome !== 'ongoing') {
-      const defenderPlayer = await opts.repository.getPlayerById(assembled.defenderPlayerId);
-      if (defenderPlayer) {
-        const winnerIsAttacker = result.outcome === 'victory';
-
-        const update = computeEloUpdate(
-          winnerIsAttacker ? attacker.elo : defenderPlayer.elo,
-          winnerIsAttacker ? defenderPlayer.elo : attacker.elo,
-        );
-        const attackerElo = winnerIsAttacker ? update.winnerElo : update.loserElo;
-        const defenderElo = winnerIsAttacker ? update.loserElo : update.winnerElo;
-        await opts.repository.updateElo(attacker.id, attackerElo);
-        await opts.repository.updateElo(defenderPlayer.id, defenderElo);
-        elo = { attacker: attackerElo, defender: defenderElo };
-
-        const attackerGain = winnerIsAttacker ? ARENA_MARKS_WIN : ARENA_MARKS_LOSS;
-        const defenderGain = winnerIsAttacker ? ARENA_MARKS_LOSS : ARENA_MARKS_WIN;
-        const attackerMarks = attacker.arenaMarks + attackerGain;
-        const defenderMarks = defenderPlayer.arenaMarks + defenderGain;
-        await opts.repository.updateArenaMarks(attacker.id, attackerMarks);
-        await opts.repository.updateArenaMarks(defenderPlayer.id, defenderMarks);
-        arenaMarks = { attacker: attackerMarks, defender: defenderMarks };
-      }
-    }
-
-    // §9.4/roadmap M7 sub-sessão 9 — persiste o replay pra revisão/auditoria posterior.
-    // A gravação em si (`ReplayRepository.save`, PK = nonce) também é a defesa real
-    // contra reenvio; a checagem de `getByNonce` acima é só uma resposta de erro mais
-    // rápida antes de gastar trabalho simulando de novo.
-    await opts.replayRepository.save({
-      nonce: body.nonce,
-      rulesVersion: RULES_VERSION,
-      seed,
-      initialState: setup,
-      commands: body.commands ?? [],
-      result,
-      attackerPlayerId: attacker.id,
-      defenderPlayerId: assembled.defenderPlayerId,
-      createdAt: new Date().toISOString(),
-    });
-
-    return { seed, result, elo, arenaMarks };
-  });
+  // M36 2/N (D47) — `POST /battles/ticket` e `POST /battles` FORAM APOSENTADOS.
+  //
+  // As duas eram o modelo `ticket → joga tudo → run`: o ticket mandava o `BattleSetup` COMPLETO
+  // do defensor para o atacante, que jogava a batalha inteira no cliente, e `POST /battles`
+  // reexecutava os comandos só para conferir. Com o inimigo desconhecido isso deixou de ser
+  // possível — o setup completo é exatamente o que não pode sair do servidor.
+  //
+  // O que as substitui: `POST /arena/matches` abre a partida viva e `POST /matches/:nonce/commands`
+  // joga, em `battle/matchRoutes.ts`. `assembleArenaBattle` acima continua sendo a MESMA montagem;
+  // só quem a chama mudou.
 
   fastify.get('/battles/:nonce', async (request, reply) => {
     if (!request.player) return reply.code(401).send({ error: 'missing player token' });

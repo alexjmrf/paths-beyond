@@ -9,7 +9,7 @@
         "classId": "class-espadachim",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-aren-postura-firme": 1,
@@ -49,7 +49,8 @@
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-lamina-do-juramento"
     },
     {
       "hero": {
@@ -58,7 +59,7 @@
         "classId": "class-arqueiro",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-sylla-pes-leves": 1,
@@ -97,7 +98,8 @@
         "y": 1
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-arco-da-alvorada"
     },
     {
       "hero": {
@@ -106,7 +108,7 @@
         "classId": "class-guerreiro",
         "level": 10,
         "exp": 0,
-        "awakening": 0,
+        "awakening": 3,
         "imprint": 0,
         "talents": {
           "talent-rurik-estandarte": 2,
@@ -144,7 +146,8 @@
         "y": 0
       },
       "height": 0,
-      "aiArchetype": "aggressive"
+      "aiArchetype": "aggressive",
+      "artifactId": "artifact-machado-do-tirano"
     }
   ]
 }

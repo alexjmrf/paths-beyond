@@ -3,7 +3,9 @@ import {
   buildInitialStateLogged,
   nextUint32,
   seedRng,
+  type ArtifactInstance,
   type BattleUnit,
+  type EquippedArtifact,
   type Hero,
   type HeroPlacement,
   type Id,
@@ -58,20 +60,46 @@ function resolveEquippedItems(hero: Hero, content: ContentCatalog, compId: Id): 
   return equipped;
 }
 
-function toPlacements(
+// M38 5/N — o TIER em que o artefato entra na medição. A decisão do usuário é awakening 3,
+// imprint 0: o mínimo em que todo artefato fica no rank corrente Hero (D53 item 7).
+export interface ArtifactTier {
+  readonly awakening: ArtifactInstance['awakening'];
+  readonly imprint: ArtifactInstance['imprint'];
+}
+
+// O artefato que a unidade DECLARA na comp (`artifactId`, da classe dela), numa instância
+// sintética no tier da medição. Sem `artifactId`, a medição COM artefato falha alto: uma
+// unidade sem artefato no meio de um time com artefato mediria um time misturado em silêncio.
+function artefatoDaUnidade(unit: Composition['units'][number], content: ContentCatalog, compId: Id, tier: ArtifactTier): EquippedArtifact {
+  if (!unit.artifactId) throw new Error(`a unidade ${unit.hero.id} (composição ${compId}) não declara artefato`);
+  const def = content.artifacts[unit.artifactId];
+  if (!def) throw new Error(`artefato desconhecido: ${unit.artifactId} (composição ${compId})`);
+  return {
+    def,
+    instance: { id: `${unit.hero.id}-artefato`, artifactId: def.id, awakening: tier.awakening, imprint: tier.imprint },
+  };
+}
+
+export function toPlacements(
   comp: Composition,
   content: ContentCatalog,
   side: 'player' | 'enemy',
   positionOffsetX: number,
+  artefatos?: ArtifactTier,
+  // M38 5/N — no ESPELHO (a comp contra ela mesma, no delta do artefato), os dois lados teriam
+  // os mesmos ids de unidade e de herói, e o motor os trataria como a mesma peça. O sufixo
+  // separa o lado espelhado; fora do espelho ele é vazio e nada muda.
+  unitIdSuffix = '',
 ): HeroPlacement[] {
   return comp.units.map((unit): HeroPlacement => {
     const classDef = content.classes[unit.hero.classId];
     if (!classDef) throw new Error(`classe desconhecida: ${unit.hero.classId} (composição ${comp.id})`);
     return {
-      unitId: unit.hero.id,
-      hero: unit.hero,
+      unitId: `${unit.hero.id}${unitIdSuffix}`,
+      hero: unitIdSuffix ? { ...unit.hero, id: `${unit.hero.id}${unitIdSuffix}` } : unit.hero,
       classDef,
       equippedItems: resolveEquippedItems(unit.hero, content, comp.id),
+      ...(artefatos ? { artifact: artefatoDaUnidade(unit, content, comp.id, artefatos) } : {}),
       side,
       pos: { x: unit.pos.x + positionOffsetX, y: unit.pos.y },
       height: unit.height,
@@ -94,9 +122,23 @@ function applyDefenderBonus(units: readonly BattleUnit[]): readonly BattleUnit[]
 // devolvido é o mesmo — `simulate` com `commands: []` é literalmente `buildInitialState` mais a
 // montagem do `BattleResult`, e os campos usados aqui (`outcome`, unidades finais) saem
 // igualmente do estado. Travado por teste em `packages/core`.
-function runOneBattle(attacker: Composition, defender: Composition, content: ContentCatalog, seed: number): BattleOutcomeRecord {
-  const attackerPlacements = toPlacements(attacker, content, 'player', 0);
-  const defenderPlacements = toPlacements(defender, content, 'enemy', DEFENDER_POSITION_OFFSET_X);
+function runOneBattle(
+  attacker: Composition,
+  defender: Composition,
+  content: ContentCatalog,
+  seed: number,
+  artefatos: { readonly atacante?: ArtifactTier; readonly defensor?: ArtifactTier } = {},
+): BattleOutcomeRecord {
+  const espelho = attacker.id === defender.id ? '-espelho' : '';
+  const attackerPlacements = toPlacements(attacker, content, 'player', 0, artefatos.atacante);
+  const defenderPlacements = toPlacements(
+    defender,
+    content,
+    'enemy',
+    DEFENDER_POSITION_OFFSET_X,
+    artefatos.defensor,
+    espelho,
+  );
   // Coliseu (§9.2) só conhece uma arena — ver `firstArenaMap` em `@paths-beyond/content`
   // pra saber por que "o primeiro mapa carregado" ainda é seguro nesta sub-sessão.
   const map = firstArenaMap(content);
@@ -148,6 +190,9 @@ function runOneBattle(attacker: Composition, defender: Composition, content: Con
 export interface RunTournamentOptions {
   readonly runsPerPairing: number;
   readonly masterSeed: number;
+  // M38 5/N — presente, TODA unidade dos dois lados leva o artefato declarado neste tier.
+  // Ausente, o torneio é o de sempre.
+  readonly artefatos?: ArtifactTier;
 }
 
 // PRNG só pra gerar seeds distintas de batalha — não é RNG de regra (isso continua
@@ -172,10 +217,69 @@ export function runTournament(content: ContentCatalog, options: RunTournamentOpt
       for (let i = 0; i < options.runsPerPairing; i++) {
         const picked = nextBattleSeed(rngState);
         rngState = picked.state;
-        records.push(runOneBattle(attacker, defender, content, picked.seed));
+        records.push(
+          runOneBattle(attacker, defender, content, picked.seed, { atacante: options.artefatos, defensor: options.artefatos }),
+        );
       }
     }
   }
 
   return records;
+}
+
+// M38 5/N — O DELTA DO ARTEFATO: cada comp com artefato contra ELA MESMA sem. É o número que
+// responde "sidegrade ou upgrade?" (roadmap do M38): no espelho, tudo é igual menos o artefato,
+// então 50% seria sidegrade puro e o quanto passa de 50% é o poder que o artefato compra.
+//
+// Os dois lados do mapa separados, porque o defensor tem +1 AP e o terreno (§9.5): medir só
+// um confundiria a vantagem do artefato com a do lado.
+export interface ArtifactDeltaSide {
+  readonly vitoriasComArtefato: number;
+  readonly vitoriasSemArtefato: number;
+  readonly total: number;
+}
+
+export interface ArtifactDeltaRow {
+  readonly compId: Id;
+  // A comp COM artefato atacando a mesma comp SEM.
+  readonly comoAtacante: ArtifactDeltaSide;
+  // A comp COM artefato defendendo contra a mesma comp SEM.
+  readonly comoDefensor: ArtifactDeltaSide;
+}
+
+export interface RunArtifactDeltaOptions {
+  readonly runsPerPairing: number;
+  readonly masterSeed: number;
+  readonly artefatos: ArtifactTier;
+}
+
+export function runArtifactDelta(content: ContentCatalog, options: RunArtifactDeltaOptions): readonly ArtifactDeltaRow[] {
+  let rngState = seedRng(options.masterSeed);
+  const rows: ArtifactDeltaRow[] = [];
+
+  for (const comp of content.comps) {
+    const lado = (comArtefatoAtacando: boolean): ArtifactDeltaSide => {
+      let com = 0;
+      let sem = 0;
+      for (let i = 0; i < options.runsPerPairing; i++) {
+        const picked = nextBattleSeed(rngState);
+        rngState = picked.state;
+        const record = runOneBattle(
+          comp,
+          comp,
+          content,
+          picked.seed,
+          comArtefatoAtacando ? { atacante: options.artefatos } : { defensor: options.artefatos },
+        );
+        // A comp é a mesma dos dois lados: quem venceu se lê pelo LADO, não pelo id.
+        if (record.outcome === 'victory') comArtefatoAtacando ? com++ : sem++;
+        else if (record.outcome === 'defeat') comArtefatoAtacando ? sem++ : com++;
+      }
+      return { vitoriasComArtefato: com, vitoriasSemArtefato: sem, total: options.runsPerPairing };
+    };
+
+    rows.push({ compId: comp.id, comoAtacante: lado(true), comoDefensor: lado(false) });
+  }
+
+  return rows;
 }

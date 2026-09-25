@@ -3,6 +3,7 @@
   "name": "Cavaleiro de Teste",
   "classId": "class-cavaleiro",
   "acquisition": "story",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-personagem-cavaleiro",
   "startingHero": {
     "level": 10,

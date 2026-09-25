@@ -1,0 +1,73 @@
+{
+  "id": "artifact-lanca-muralha",
+  "signatureOf": "ally-lanceiro",
+  "name": "Lança-Muralha",
+  "classId": "class-lanceiro",
+  "rank": "hero",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "hp",
+    "byAwakening": [
+      40,
+      50,
+      60,
+      70,
+      85,
+      100,
+      120
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "reaction",
+    "skillId": "skill-muralha-de-lancas",
+    "multiplierByImprint": [
+      500,
+      540,
+      580,
+      620,
+      660,
+      700
+    ]
+  }
+}

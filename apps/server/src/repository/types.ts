@@ -1,4 +1,6 @@
+import type { BannerKind, ChoiceState, PityState, TokenState } from '@paths-beyond/gacha';
 import type {
+  ArtifactInstance,
   BattleCommand,
   BattleResult,
   BattleSetup,
@@ -325,9 +327,38 @@ export interface CharacterOwnershipRepository {
   // Só o que foi ADQUIRIDO. Quem chama une com o núcleo do catálogo (`ownedCharacterIds`).
   listAcquired(playerId: string): Promise<readonly string[]>;
   grant(playerId: string, characterId: string): Promise<void>;
-  // Contador de pity por (jogador, banner). Ausente = nunca rolou neste banner.
-  getPity(playerId: string, bannerId: string): Promise<number | null>;
-  setPity(playerId: string, bannerId: string, rollsSinceNew: number): Promise<void>;
+  // D50 (M37, 2/N) — os contadores de pity por (jogador, banner), UM POR RANK. Ausente =
+  // nunca rolou neste banner, e quem chama usa o `INITIAL_PITY` de `packages/gacha`.
+  //
+  // O tipo é o `PityState` do motor de propósito: se um rank de base novo aparecer em
+  // `packages/core`, o repositório para de compilar em vez de guardar um contador a menos
+  // em silêncio.
+  //
+  // M38 3/N (D54) — **o pity é guardado ENTRE banners**: a chave deixou de ser o banner e
+  // passou a ser o TIPO dele (`pityScopeOf` de `packages/gacha`).
+  getPity(playerId: string, scope: BannerKind): Promise<PityState | null>;
+  setPity(playerId: string, scope: BannerKind, pity: PityState): Promise<void>;
+
+  // M38 3/N — o token de 1,5·P, por (jogador, banner rotativo de personagem). Ausente = nunca
+  // rolou naquele banner (`INITIAL_TOKEN`). `listPendingTokens` existe porque o pendente é
+  // pago quando o destaque entra na conta por QUALQUER caminho — inclusive depois de o banner
+  // sair de rotação.
+  getToken(playerId: string, bannerId: string): Promise<TokenState | null>;
+  setToken(playerId: string, bannerId: string, state: TokenState): Promise<void>;
+  listPendingTokens(playerId: string): Promise<readonly { readonly bannerId: string; readonly state: TokenState }[]>;
+
+  // D54 — a escolha a cada 180 rolagens do genérico. Ausente = `INITIAL_CHOICE`.
+  getChoice(playerId: string, bannerId: string): Promise<ChoiceState | null>;
+  setChoice(playerId: string, bannerId: string, state: ChoiceState): Promise<void>;
+
+  // D53 — a posse de ARTEFATO: uma instância por (jogador, definição). Conceder uma segunda
+  // cópia da mesma definição não cria nada (a rota paga fragmento antes de chegar aqui; o
+  // `ON CONFLICT` é a rede de uma corrida).
+  listArtifacts(playerId: string): Promise<readonly ArtifactInstance[]>;
+  grantArtifact(playerId: string, instance: ArtifactInstance): Promise<void>;
+  // M38 4/N — awakening e imprint do artefato. Só toca a instância SE ela for daquele
+  // jogador: o id vem da URL, e o dono vem da sessão.
+  updateArtifact(playerId: string, instance: ArtifactInstance): Promise<void>;
 }
 
 export interface EconomyRepository {
@@ -458,5 +489,77 @@ export interface TelemetryRepository {
   listAllAttempts(): Promise<readonly MissionAttempt[]>;
   listAccounts(): Promise<readonly TelemetryAccount[]>;
   // §9.4 (M20) — exclusão de conta; também o que "recusar" chama para apagar o coletado.
+  deletePlayerData(playerId: string): Promise<void>;
+}
+
+// M36 2/N (D47) — A BATALHA VIVA. `ticket → joga tudo → run` morre aqui.
+//
+// **Por que uma tabela.** O modelo antigo mandava o `BattleSetup` inteiro para o cliente e
+// confiava nele para jogar a batalha sozinho; a submissão reexecutava os comandos só para
+// conferir. Isso deixou de ser possível quando o inimigo virou desconhecido: o setup COMPLETO
+// não pode sair do servidor, então o estado da batalha precisa morar aqui — e sobreviver a uma
+// queda de conexão, a uma troca de aba e a um deploy.
+//
+// **O estado não é guardado; ele é DERIVADO.** A linha guarda `setup + seed + commands`, e
+// `estadoDaPartida` reconstrói o `BattleState` com `buildInitialState` + `advanceWithoutAi`. É
+// literalmente §3.3 de `01-fundacoes-tecnicas.md` ("o estado da batalha é derivado exclusivamente
+// de initialState + seed + commands"), e é o que faz o replay de uma batalha viva reproduzir
+// exatamente o que ela produziu: são o mesmo cálculo sobre a mesma linha.
+//
+// A chave continua sendo o `nonce`, como no ticket e no replay: um id por tentativa de batalha,
+// que já dobrava como defesa anti-reenvio desde M7.
+export type MatchKind = 'campaign' | 'dungeon' | 'arena';
+export const MATCH_KINDS: readonly MatchKind[] = ['campaign', 'dungeon', 'arena'];
+
+export type MatchOutcome = 'ongoing' | 'victory' | 'defeat';
+
+export interface StoredMatch {
+  readonly nonce: string;
+  /** Quem joga — o dono dos comandos. Na arena, o ATACANTE. */
+  readonly playerId: string;
+  readonly kind: MatchKind;
+  /** `chapterId`, `dungeonId` ou o id do defensor, conforme o `kind`. */
+  readonly refId: string;
+  readonly rulesVersion: string;
+  readonly seed: number;
+  /**
+   * COMPLETO, com stats, skills e scripts dos dois lados. **Isto nunca sai do servidor** —
+   * `battle/visao.ts` é a única porta, e ela redige. Guardado como jsonb, como
+   * `replays.initial_state` desde M7.
+   */
+  readonly setup: BattleSetup;
+  /** Os comandos do jogador, na ordem em que ele os mandou. A IA não entra: ela é derivada. */
+  readonly commands: readonly BattleCommand[];
+  readonly outcome: MatchOutcome;
+  readonly createdAt: string; // ISO 8601
+  /** Nulo enquanto `outcome === 'ongoing'`. */
+  readonly finishedAt: string | null;
+  /**
+   * `true` quando a partida fechou porque o jogador DESISTIU, e não porque a batalha acabou.
+   * Fica separado do `outcome` porque a telemetria do M34 lê as duas coisas de formas
+   * diferentes: desistir continua sendo abandono ("onde o jogador para"), e contá-lo como
+   * derrota apagaria justamente o sinal que o M34 existe para medir.
+   */
+  readonly forfeited: boolean;
+}
+
+export interface MatchRepository {
+  create(match: StoredMatch): Promise<StoredMatch>;
+  get(nonce: string): Promise<StoredMatch | null>;
+  /**
+   * Regrava comandos e desfecho da partida. Devolve `null` se o nonce não existe — nunca
+   * inventa linha, como `TelemetryRepository.recordFinished`.
+   */
+  update(
+    nonce: string,
+    patch: Pick<StoredMatch, 'commands' | 'outcome' | 'finishedAt' | 'forfeited'>,
+  ): Promise<StoredMatch | null>;
+  /**
+   * A partida em andamento do jogador, se houver. É a reconexão do M22 sobrevivendo à batalha
+   * viva: quem cai no meio de um duelo volta para ele em vez de perdê-lo ou repeti-lo. No
+   * máximo uma por jogador — garantido por índice único parcial na migration 0017.
+   */
+  getOngoingByPlayer(playerId: string): Promise<StoredMatch | null>;
+  // §9.4 (M20) — exclusão de conta.
   deletePlayerData(playerId: string): Promise<void>;
 }

@@ -1,4 +1,5 @@
-import type { EnergyState, EntryLimitState, ItemInstance } from '@paths-beyond/core';
+import type { BannerKind, ChoiceState, PityState, TokenState } from '@paths-beyond/gacha';
+import type { ArtifactInstance, EnergyState, EntryLimitState, ItemInstance } from '@paths-beyond/core';
 import {
   DEFAULT_ARENA_MARKS,
   DEFAULT_ELO,
@@ -23,6 +24,8 @@ import {
   type SeasonRepository,
   type StoredHero,
   type StoredReplay,
+  type MatchRepository,
+  type StoredMatch,
   type DungeonRunRecord,
   type EconomyActionRecord,
   type EconomyRepository,
@@ -322,8 +325,12 @@ export function createMemoryCharacterOwnershipRepository(
   const acquired = new Map<string, Set<string>>(
     Object.entries(seed).map(([playerId, ids]) => [playerId, new Set(ids)]),
   );
-  const pity = new Map<string, number>();
+  const pity = new Map<string, PityState>();
   const pityKey = (playerId: string, bannerId: string): string => `${playerId}::${bannerId}`;
+  // M38 3/N — token, escolha e artefatos, com a mesma chave `jogador::id`.
+  const tokens = new Map<string, TokenState>();
+  const choices = new Map<string, ChoiceState>();
+  const artifacts = new Map<string, ArtifactInstance[]>();
 
   return {
     async listAcquired(playerId) {
@@ -334,16 +341,54 @@ export function createMemoryCharacterOwnershipRepository(
       owned.add(characterId);
       acquired.set(playerId, owned);
     },
-    async getPity(playerId, bannerId) {
-      return pity.get(pityKey(playerId, bannerId)) ?? null;
+    async getPity(playerId, scope: BannerKind) {
+      return pity.get(pityKey(playerId, scope)) ?? null;
     },
-    async setPity(playerId, bannerId, rollsSinceNew) {
-      pity.set(pityKey(playerId, bannerId), rollsSinceNew);
+    async setPity(playerId, scope: BannerKind, estado) {
+      pity.set(pityKey(playerId, scope), estado);
+    },
+    async getToken(playerId, bannerId) {
+      return tokens.get(pityKey(playerId, bannerId)) ?? null;
+    },
+    async setToken(playerId, bannerId, estado) {
+      tokens.set(pityKey(playerId, bannerId), estado);
+    },
+    async listPendingTokens(playerId) {
+      // Ordenado por banner, como o `ORDER BY` do Postgres: a paridade compara listas.
+      return [...tokens.entries()]
+        .filter(([chave, estado]) => chave.startsWith(`${playerId}::`) && estado.status === 'pending')
+        .map(([chave, state]) => ({ bannerId: chave.slice(playerId.length + 2), state }))
+        .sort((a, b) => a.bannerId.localeCompare(b.bannerId));
+    },
+    async getChoice(playerId, bannerId) {
+      return choices.get(pityKey(playerId, bannerId)) ?? null;
+    },
+    async setChoice(playerId, bannerId, estado) {
+      choices.set(pityKey(playerId, bannerId), estado);
+    },
+    async listArtifacts(playerId) {
+      return [...(artifacts.get(playerId) ?? [])].sort((a, b) => a.artifactId.localeCompare(b.artifactId));
+    },
+    async grantArtifact(playerId, instance) {
+      const lista = artifacts.get(playerId) ?? [];
+      if (lista.some((a) => a.artifactId === instance.artifactId)) return;
+      artifacts.set(playerId, [...lista, instance]);
+    },
+    async updateArtifact(playerId, instance) {
+      const lista = artifacts.get(playerId);
+      if (!lista || !lista.some((a) => a.id === instance.id)) return;
+      artifacts.set(
+        playerId,
+        lista.map((a) => (a.id === instance.id ? { ...a, awakening: instance.awakening, imprint: instance.imprint } : a)),
+      );
     },
     async deletePlayerData(playerId) {
       acquired.delete(playerId);
-      for (const chave of [...pity.keys()]) {
-        if (chave.startsWith(`${playerId}::`)) pity.delete(chave);
+      artifacts.delete(playerId);
+      for (const mapa of [pity, tokens, choices] as Map<string, unknown>[]) {
+        for (const chave of [...mapa.keys()]) {
+          if (chave.startsWith(`${playerId}::`)) mapa.delete(chave);
+        }
       }
     },
   };
@@ -450,6 +495,49 @@ export function createMemoryTelemetryRepository(): TelemetryRepository {
     async deletePlayerData(playerId) {
       contas.delete(playerId);
       for (const [nonce, t] of [...tentativas.entries()]) if (t.playerId === playerId) tentativas.delete(nonce);
+    },
+  };
+}
+
+// M36 2/N (D47) — a metade em memória da BATALHA VIVA. Mesma convenção do resto do arquivo: é o
+// que a suíte usa, e o Postgres é o espelho — `repositoryParity.test.ts` compara os dois.
+export function createMemoryMatchRepository(): MatchRepository {
+  const porNonce = new Map<string, StoredMatch>();
+
+  return {
+    async create(match) {
+      // A mesma trava do índice único parcial da migration 0017: no máximo uma partida em
+      // andamento por jogador. Está aqui também, e não só no SQL, porque a paridade entre os
+      // dois backends é observável — um servidor em memória que aceitasse duas partidas
+      // esconderia em teste o erro que o Postgres daria em produção.
+      for (const existente of porNonce.values()) {
+        if (existente.playerId === match.playerId && existente.outcome === 'ongoing') {
+          throw new Error('já há uma partida em andamento para este jogador');
+        }
+      }
+      porNonce.set(match.nonce, match);
+      return match;
+    },
+    async get(nonce) {
+      return porNonce.get(nonce) ?? null;
+    },
+    async update(nonce, patch) {
+      const atual = porNonce.get(nonce);
+      if (!atual) return null;
+      const atualizada: StoredMatch = { ...atual, ...patch };
+      porNonce.set(nonce, atualizada);
+      return atualizada;
+    },
+    async getOngoingByPlayer(playerId) {
+      for (const match of porNonce.values()) {
+        if (match.playerId === playerId && match.outcome === 'ongoing') return match;
+      }
+      return null;
+    },
+    async deletePlayerData(playerId) {
+      for (const [nonce, match] of [...porNonce.entries()]) {
+        if (match.playerId === playerId) porNonce.delete(nonce);
+      }
     },
   };
 }

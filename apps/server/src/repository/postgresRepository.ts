@@ -1,4 +1,14 @@
-import type { BattleCommand, BattleResult, BattleSetup, EnergyState, EntryLimitState, Hero, ItemInstance } from '@paths-beyond/core';
+import type {
+  ArtifactInstance,
+  BattleCommand,
+  BattleResult,
+  BattleSetup,
+  EnergyState,
+  EntryLimitState,
+  Hero,
+  ItemInstance,
+} from '@paths-beyond/core';
+import type { TokenStatus } from '@paths-beyond/gacha';
 import type { Pool } from 'pg';
 import type { RateLimiter, RateLimiterOptions } from '../battle/rateLimit.js';
 import {
@@ -23,6 +33,10 @@ import {
   type SeasonRepository,
   type StoredHero,
   type StoredReplay,
+  type MatchKind,
+  type MatchOutcome,
+  type MatchRepository,
+  type StoredMatch,
   type DungeonRunRecord,
   type EconomyActionRecord,
   type CharacterOwnershipRepository,
@@ -630,23 +644,101 @@ export function createPostgresCharacterOwnershipRepository(pool: Pool): Characte
         [playerId, characterId],
       );
     },
-    async getPity(playerId, bannerId) {
-      const result = await pool.query<{ rolls_since_new: number }>(
-        'SELECT rolls_since_new FROM banner_pity WHERE player_id = $1 AND banner_id = $2',
-        [playerId, bannerId],
+    async getPity(playerId, scope) {
+      // D50 (M37) — dois andares, duas colunas. Linha ausente devolve `null`, e quem chama
+      // usa o `INITIAL_PITY` do motor: inventar zeros aqui espalharia o valor inicial por
+      // dois lugares.
+      const result = await pool.query<{ rolls_since_adventurer: number; rolls_since_hero: number }>(
+        'SELECT rolls_since_adventurer, rolls_since_hero FROM banner_pity WHERE player_id = $1 AND pity_scope = $2',
+        [playerId, scope],
       );
       const row = result.rows[0];
-      return row ? row.rolls_since_new : null;
+      return row ? { adventurer: row.rolls_since_adventurer, hero: row.rolls_since_hero } : null;
     },
     async deletePlayerData(playerId) {
       await pool.query('DELETE FROM player_characters WHERE player_id = $1', [playerId]);
       await pool.query('DELETE FROM banner_pity WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM banner_tokens WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM generic_choices WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM player_artifacts WHERE player_id = $1', [playerId]);
     },
-    async setPity(playerId, bannerId, rollsSinceNew) {
+    async setPity(playerId, scope, estado) {
+      // M38 3/N (D54) — a chave é o TIPO do banner (`pity_scope`, migration 0019).
       await pool.query(
-        `INSERT INTO banner_pity (player_id, banner_id, rolls_since_new) VALUES ($1, $2, $3)
-         ON CONFLICT (player_id, banner_id) DO UPDATE SET rolls_since_new = EXCLUDED.rolls_since_new`,
-        [playerId, bannerId, rollsSinceNew],
+        `INSERT INTO banner_pity (player_id, pity_scope, rolls_since_adventurer, rolls_since_hero)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (player_id, pity_scope) DO UPDATE SET
+           rolls_since_adventurer = EXCLUDED.rolls_since_adventurer,
+           rolls_since_hero = EXCLUDED.rolls_since_hero`,
+        [playerId, scope, estado.adventurer, estado.hero],
+      );
+    },
+    async getToken(playerId, bannerId) {
+      const result = await pool.query<{ rolls: number; status: TokenStatus }>(
+        'SELECT rolls, status FROM banner_tokens WHERE player_id = $1 AND banner_id = $2',
+        [playerId, bannerId],
+      );
+      const row = result.rows[0];
+      return row ? { rolls: row.rolls, status: row.status } : null;
+    },
+    async setToken(playerId, bannerId, estado) {
+      await pool.query(
+        `INSERT INTO banner_tokens (player_id, banner_id, rolls, status) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (player_id, banner_id) DO UPDATE SET rolls = EXCLUDED.rolls, status = EXCLUDED.status`,
+        [playerId, bannerId, estado.rolls, estado.status],
+      );
+    },
+    async listPendingTokens(playerId) {
+      const result = await pool.query<{ banner_id: string; rolls: number; status: TokenStatus }>(
+        `SELECT banner_id, rolls, status FROM banner_tokens WHERE player_id = $1 AND status = 'pending' ORDER BY banner_id`,
+        [playerId],
+      );
+      return result.rows.map((row) => ({ bannerId: row.banner_id, state: { rolls: row.rolls, status: row.status } }));
+    },
+    async getChoice(playerId, bannerId) {
+      const result = await pool.query<{ rolls: number; pending: number }>(
+        'SELECT rolls, pending FROM generic_choices WHERE player_id = $1 AND banner_id = $2',
+        [playerId, bannerId],
+      );
+      const row = result.rows[0];
+      return row ? { rolls: row.rolls, pending: row.pending } : null;
+    },
+    async setChoice(playerId, bannerId, estado) {
+      await pool.query(
+        `INSERT INTO generic_choices (player_id, banner_id, rolls, pending) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (player_id, banner_id) DO UPDATE SET rolls = EXCLUDED.rolls, pending = EXCLUDED.pending`,
+        [playerId, bannerId, estado.rolls, estado.pending],
+      );
+    },
+    async listArtifacts(playerId) {
+      const result = await pool.query<{ id: string; artifact_id: string; awakening: number; imprint: number }>(
+        'SELECT id, artifact_id, awakening, imprint FROM player_artifacts WHERE player_id = $1 ORDER BY artifact_id',
+        [playerId],
+      );
+      return result.rows.map(
+        (row): ArtifactInstance => ({
+          id: row.id,
+          artifactId: row.artifact_id,
+          awakening: row.awakening as ArtifactInstance['awakening'],
+          imprint: row.imprint as ArtifactInstance['imprint'],
+        }),
+      );
+    },
+    async updateArtifact(playerId, instance) {
+      await pool.query('UPDATE player_artifacts SET awakening = $3, imprint = $4 WHERE id = $1 AND player_id = $2', [
+        instance.id,
+        playerId,
+        instance.awakening,
+        instance.imprint,
+      ]);
+    },
+    async grantArtifact(playerId, instance) {
+      // Uma instância por (jogador, definição): a segunda é duplicata, e a rota já pagou
+      // fragmento antes de chegar aqui. O `ON CONFLICT` é a rede de uma corrida.
+      await pool.query(
+        `INSERT INTO player_artifacts (id, player_id, artifact_id, awakening, imprint) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (player_id, artifact_id) DO NOTHING`,
+        [instance.id, playerId, instance.artifactId, instance.awakening, instance.imprint],
       );
     },
   };
@@ -895,6 +987,101 @@ export function createPostgresTelemetryRepository(pool: Pool): TelemetryReposito
     async deletePlayerData(playerId) {
       await pool.query('DELETE FROM mission_attempts WHERE player_id = $1', [playerId]);
       await pool.query('DELETE FROM telemetry_accounts WHERE player_id = $1', [playerId]);
+    },
+  };
+}
+
+// M36 2/N (D47) — a BATALHA VIVA em Postgres, espelho de `createMemoryMatchRepository`.
+interface MatchRow {
+  readonly nonce: string;
+  readonly player_id: string;
+  readonly kind: MatchKind;
+  readonly ref_id: string;
+  readonly rules_version: string;
+  // `seed` é `bigint` na migration 0017, e `pg` devolve bigint como STRING para não perder
+  // precisão. A seed é uint32 e cabe num number folgado, então a conversão é segura — mas ela
+  // tem de ser explícita, senão a seed voltaria do banco como texto e `rngFor` receberia uma
+  // coisa que não é número. É o tipo de divergência que só aparece com Postgres ligado, que é
+  // exatamente o que `repositoryParity.test.ts` existe para pegar.
+  readonly seed: string | number;
+  readonly setup: BattleSetup;
+  readonly commands: readonly BattleCommand[];
+  readonly outcome: MatchOutcome;
+  readonly created_at: string;
+  readonly finished_at: string | null;
+  readonly forfeited: boolean;
+}
+
+function rowToStoredMatch(row: MatchRow): StoredMatch {
+  return {
+    nonce: row.nonce,
+    playerId: row.player_id,
+    kind: row.kind,
+    refId: row.ref_id,
+    rulesVersion: row.rules_version,
+    seed: Number(row.seed),
+    setup: row.setup,
+    commands: row.commands,
+    outcome: row.outcome,
+    createdAt: new Date(row.created_at).toISOString(),
+    finishedAt: row.finished_at ? new Date(row.finished_at).toISOString() : null,
+    forfeited: row.forfeited,
+  };
+}
+
+const MATCH_COLUMNS =
+  'nonce, player_id, kind, ref_id, rules_version, seed, setup, commands, outcome, created_at, finished_at, forfeited';
+
+export function createPostgresMatchRepository(pool: Pool): MatchRepository {
+  return {
+    async create(match) {
+      // Sem `ON CONFLICT`: o índice único parcial de 0017 ("no máximo uma em andamento por
+      // jogador") é a trava real contra abrir uma segunda partida para escapar do custo da
+      // primeira, e engolir a violação aqui a desarmaria.
+      await pool.query(
+        `INSERT INTO matches (${MATCH_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          match.nonce,
+          match.playerId,
+          match.kind,
+          match.refId,
+          match.rulesVersion,
+          match.seed,
+          JSON.stringify(match.setup),
+          JSON.stringify(match.commands),
+          match.outcome,
+          match.createdAt,
+          match.finishedAt,
+          match.forfeited,
+        ],
+      );
+      return match;
+    },
+    async get(nonce) {
+      const result = await pool.query<MatchRow>(`SELECT ${MATCH_COLUMNS} FROM matches WHERE nonce = $1`, [nonce]);
+      const row = result.rows[0];
+      return row ? rowToStoredMatch(row) : null;
+    },
+    async update(nonce, patch) {
+      const result = await pool.query<MatchRow>(
+        `UPDATE matches SET commands = $2, outcome = $3, finished_at = $4, forfeited = $5
+         WHERE nonce = $1
+         RETURNING ${MATCH_COLUMNS}`,
+        [nonce, JSON.stringify(patch.commands), patch.outcome, patch.finishedAt, patch.forfeited],
+      );
+      const row = result.rows[0];
+      return row ? rowToStoredMatch(row) : null;
+    },
+    async getOngoingByPlayer(playerId) {
+      const result = await pool.query<MatchRow>(
+        `SELECT ${MATCH_COLUMNS} FROM matches WHERE player_id = $1 AND outcome = 'ongoing'`,
+        [playerId],
+      );
+      const row = result.rows[0];
+      return row ? rowToStoredMatch(row) : null;
+    },
+    async deletePlayerData(playerId) {
+      await pool.query('DELETE FROM matches WHERE player_id = $1', [playerId]);
     },
   };
 }

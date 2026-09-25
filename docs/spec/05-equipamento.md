@@ -3,7 +3,16 @@
 
 ### 7.1 Slots e mainstats
 
-6 slots: `weapon`, `helmet`, `armor`, `necklace`, `ring`, `boots`.
+7 slots: os 6 de item — `weapon`, `helmet`, `armor`, `necklace`, `ring`, `boots` — e o **artefato** (M38, D53).
+
+O artefato **não é item**: não tem set, enhance, substat rolado nem reforge, e por isso não entra em `GEAR_SLOTS` nem em `hero.equipment` (vive em `hero.artifact`, o id de uma instância da conta). Ele é:
+- **travado por CLASSE** — o schema recusa artefato sem classe, e equipar em outra classe é recusado;
+- `atk` fixo + um stat variável por artefato, numa curva por awakening que nunca desce;
+- uma **passiva exclusiva** de vocabulário fechado: `stat`, `startingPool` ou `reaction`;
+- de rank de base `adventurer` ou `hero`, com `legend` pelo awakening PRÓPRIO do artefato (0–6, núcleo de artefato + ouro); o rank corrente é `rankCorrente(base, awakening)`, nunca gravado;
+- **imprint** (0–5) pago com fragmento do próprio artefato, que só muda número — status e a magnitude da passiva, nunca efeito novo.
+
+Uma instância equipa um herói por vez: equipar em outro MOVE o artefato (D56). Ele sai dos banners de artefato (§10, D54).
 
 | Slot | Mainstat |
 |---|---|

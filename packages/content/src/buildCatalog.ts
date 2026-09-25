@@ -1,4 +1,5 @@
 import type {
+  ArtifactDef,
   ClassDef,
   ColumnTalentTree,
   EnemyDef,
@@ -32,6 +33,7 @@ import encounterSchema from '@paths-beyond/data/schemas/encounters.schema.js';
 import dungeonSchema from '@paths-beyond/data/schemas/dungeons.schema.js';
 import dungeonEncounterSchema from '@paths-beyond/data/schemas/dungeon-encounters.schema.js';
 import materialSchema from '@paths-beyond/data/schemas/materials.schema.js';
+import artifactSchema from '@paths-beyond/data/schemas/artifacts.schema.js';
 import bannerSchema from '@paths-beyond/data/schemas/banners.schema.js';
 import achievementSchema from '@paths-beyond/data/schemas/achievements.schema.js';
 import eventSchema from '@paths-beyond/data/schemas/events.schema.js';
@@ -50,6 +52,9 @@ import type {
   AchievementContent,
   ArenaMap,
   BannerContent,
+  BannerEntryContent,
+  RotatingArtifactBannerContent,
+  RotatingCharacterBannerContent,
   EventContent,
   Chapter,
   CharacterContent,
@@ -106,6 +111,9 @@ export interface ParsedContentFiles {
   readonly dungeons?: readonly unknown[];
   readonly dungeonEncounters?: readonly unknown[];
   readonly materials?: readonly unknown[];
+  // M38 2/N — obrigatório pelo mesmo motivo de `banners`: esquecer de passar tem de ser erro
+  // de tipo, não um jogo em que o banner de artefato não tem o que entregar.
+  readonly artifacts: readonly unknown[];
   // Obrigatório, sem `?`, pelo mesmo motivo de `characters` e `enemies`: esquecer de
   // passar tem de ser erro de tipo, não um catálogo sem banner descoberto em produção.
   readonly banners: readonly unknown[];
@@ -121,7 +129,7 @@ export interface ParsedContentFiles {
 // Zeros explícitos em vez de `undefined` evitam que cada consumidor tenha de checar.
 const EMPTY_ECONOMY_RULES: EconomyRules = { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] };
 const EMPTY_PREMIUM_RULES: PremiumRules = {
-  summon: { premiumCost: 0, pityThreshold: 1 },
+  summon: { premiumCost: 0, pityThresholds: { adventurer: 1, hero: 1 } },
   energyPurchase: { premiumCost: 0, energy: 0 },
   premiumRewards: { missionFirstClear: 0, chapterFirstClear: 0, dungeonFirstClear: 0 },
 };
@@ -238,9 +246,114 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     (input.dungeonEncounters ?? []).map((raw) => dungeonEncounterSchema.parse(raw) as unknown as DungeonEncounter),
   );
   const materials = indexById((input.materials ?? []).map((raw) => materialSchema.parse(raw) as MaterialDef));
+
+  // M38 2/N (D53/D54) — os artefatos. O schema valida cada um sozinho; o que cruza tipos é
+  // conferido aqui e falha ALTO na carga: dono no elenco, classe e rank de base IGUAIS aos do
+  // dono (a classe é a trava, e o artefato de um Hero é Hero), um artefato por dono (o banner
+  // rotativo garante "o artefato do Hero em destaque", e dois tornariam isso ambíguo), e a
+  // skill de uma passiva `reaction` existindo e sendo reação — sem isso a passiva sumiria em
+  // silêncio, porque skill ausente é ignorada pelo perfil de combate.
+  const donosDeArtefato = new Set<Id>();
+  const artifacts = indexById(
+    input.artifacts.map((raw) => {
+      const artifact = artifactSchema.parse(raw) as ArtifactDef;
+      const dono = characters[artifact.signatureOf];
+      if (!dono) throw new Error(`Artefato '${artifact.id}' é assinatura de '${artifact.signatureOf}', que não existe no elenco.`);
+      if (artifact.classId !== dono.classId) {
+        throw new Error(`Artefato '${artifact.id}' é da classe '${artifact.classId}', mas o dono '${dono.id}' é '${dono.classId}'.`);
+      }
+      if (artifact.rank !== dono.rank) {
+        throw new Error(`Artefato '${artifact.id}' tem rank '${artifact.rank}', mas o dono '${dono.id}' é '${dono.rank}'.`);
+      }
+      if (donosDeArtefato.has(dono.id)) throw new Error(`'${dono.id}' tem dois artefatos: um por dono (mesmo dono repetido em '${artifact.id}').`);
+      donosDeArtefato.add(dono.id);
+      if (artifact.passive.t === 'reaction') {
+        const skill = skills[artifact.passive.skillId];
+        if (!skill) throw new Error(`Artefato '${artifact.id}': a skill '${artifact.passive.skillId}' da passiva não existe.`);
+        if (skill.kind !== 'reaction') {
+          throw new Error(`Artefato '${artifact.id}': a skill '${skill.id}' da passiva não é reação (kind: ${skill.kind}).`);
+        }
+      }
+      return artifact;
+    }),
+  );
+  // M38 5/N — o artefato declarado numa unidade de comp: tem de existir e ser da classe dela.
+  // Conferido aqui, depois de os artefatos carregarem, e falhando ALTO: um artefato de outra
+  // classe faria `resolveHeroStatSheet` falhar no meio do torneio, e um inexistente sumiria.
+  for (const comp of comps) {
+    for (const unit of comp.units) {
+      if (unit.artifactId === undefined) continue;
+      const artifact = artifacts[unit.artifactId];
+      if (!artifact) throw new Error(`Comp '${comp.id}': o artefato '${unit.artifactId}' não existe.`);
+      if (artifact.classId !== unit.hero.classId) {
+        throw new Error(
+          `Comp '${comp.id}': '${artifact.id}' é da classe '${artifact.classId}', e a unidade '${unit.hero.id}' é '${unit.hero.classId}'.`,
+        );
+      }
+    }
+  }
+
   // §10 (M18, 2/N) — os banners. Obrigatórios como o elenco: sem eles um `bannerId` não
   // resolve, e "catálogo sem banner" não é um jogo sem aquisição.
-  const banners = indexById(input.banners.map((raw) => bannerSchema.parse(raw) as unknown as BannerContent));
+  //
+  // D49/D50 (M37, 2/N) — **é AQUI que o rank de base entra na entrada do pool.** Ele não é
+  // autorado no JSON do banner (o schema o recusa): é DERIVADO do personagem, que é quem o
+  // declara, ao lado da classe. Uma fonte só para a mesma verdade, pela lição que o M18 2/N
+  // aprendeu com o fragmento de imprint.
+  //
+  // Personagem do pool que não existe no elenco é erro de conteúdo e falha ALTO, aqui: sem
+  // ele não há rank, e sem rank a rolagem não sabe de qual garantia aquela entrada paga.
+  // Antes do M37 este erro só aparecia num teste de conformidade de `packages/content`.
+  // M38 3/N (D54/D55) — o rank de uma entrada de ARTEFATO vem do catálogo de artefatos, pelo
+  // mesmo argumento; e o fragmento declarado tem de ser o do próprio artefato, conferido aqui
+  // porque o artefato não declara o seu (o material é quem aponta para ele, `forArtifactId`).
+  //
+  // O `token` do rotativo de personagem também é DERIVADO: o JSON só declara o limiar, e o
+  // artefato é a assinatura do destaque (`signatureOf`), com o fragmento dele.
+  const fragmentoDoArtefato = (artifactId: Id): Id | undefined =>
+    Object.values(materials).find((m) => m.kind === 'artifactFragment' && m.forArtifactId === artifactId)?.id;
+
+  type EntradaCrua = { readonly characterId?: Id; readonly artifactId?: Id; readonly weight: number; readonly fragmentMaterialId: Id };
+  const comRank = (bannerId: Id, entry: EntradaCrua): BannerEntryContent => {
+    if (entry.artifactId !== undefined) {
+      const artifact = artifacts[entry.artifactId];
+      if (!artifact) throw new Error(`Banner '${bannerId}' oferece o artefato '${entry.artifactId}', que não existe.`);
+      if (fragmentoDoArtefato(artifact.id) !== entry.fragmentMaterialId) {
+        throw new Error(`Banner '${bannerId}': o fragmento de '${artifact.id}' não é '${entry.fragmentMaterialId}'.`);
+      }
+      return { artifactId: artifact.id, weight: entry.weight, fragmentMaterialId: entry.fragmentMaterialId, rank: artifact.rank };
+    }
+    const character = characters[entry.characterId!];
+    if (!character) {
+      throw new Error(`Banner '${bannerId}' oferece '${entry.characterId}', que não existe no elenco: sem personagem não há rank.`);
+    }
+    return { characterId: character.id, weight: entry.weight, fragmentMaterialId: entry.fragmentMaterialId, rank: character.rank };
+  };
+
+  const banners = indexById(
+    input.banners.map((raw): BannerContent => {
+      const banner = bannerSchema.parse(raw);
+      const pool = banner.pool.map((entry: EntradaCrua) => comRank(banner.id, entry));
+
+      if (banner.kind === 'rotatingCharacter') {
+        const { tokenThreshold, ...resto } = banner;
+        const assinatura = Object.values(artifacts).find((a) => a.signatureOf === banner.featuredCharacterId);
+        const fragmento = assinatura ? fragmentoDoArtefato(assinatura.id) : undefined;
+        if (!assinatura || !fragmento) {
+          throw new Error(`Banner '${banner.id}': o destaque '${banner.featuredCharacterId}' não tem artefato assinatura com fragmento para o token.`);
+        }
+        return {
+          ...resto,
+          pool: pool as RotatingCharacterBannerContent['pool'],
+          token: { threshold: tokenThreshold, artifactId: assinatura.id, fragmentMaterialId: fragmento },
+        };
+      }
+      if (banner.kind === 'rotatingArtifact') {
+        return { ...banner, pool: pool as RotatingArtifactBannerContent['pool'] };
+      }
+      return { ...banner, pool };
+    }),
+  );
 
   // §10 (M18, 4/N) — as fontes autoradas da moeda premium.
   const achievements = indexById(
@@ -283,6 +396,7 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     dungeons,
     dungeonEncounters,
     materials,
+    artifacts,
     banners,
     achievements,
     events,

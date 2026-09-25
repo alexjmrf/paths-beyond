@@ -1,6 +1,7 @@
-import { loadCatalogFromDisk, playFromSetup } from '@paths-beyond/content';
+import { loadCatalogFromDisk } from '@paths-beyond/content';
 import { RULES_VERSION } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
+import { jogarPartidaViva, type EstadoVisivelDeTeste } from './partidaViva.js';
 import { buildApp } from '../src/app.js';
 import { createInMemoryRateLimiter } from '../src/battle/rateLimit.js';
 import { createDevIdentityValidator } from '../src/identity/devIdentity.js';
@@ -12,6 +13,7 @@ import {
   createMemoryHeroRepository,
   createMemoryIdempotencyRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -61,6 +63,7 @@ function servidorVazio() {
     arenaDefenseRepository: createMemoryArenaDefenseRepository(),
     partyPresetRepository: createMemoryPartyPresetRepository(),
     replayRepository: createMemoryReplayRepository(),
+    matchRepository: createMemoryMatchRepository(),
     seasonRepository: createMemorySeasonRepository(),
     economyRepository: createMemoryEconomyRepository(),
     ownershipRepository: createMemoryCharacterOwnershipRepository(),
@@ -112,6 +115,45 @@ function timeParaMissao(heroes: readonly Heroi[], missaoId: string): readonly st
     });
 }
 
+// M36 2/N — a demo inteira jogada pela BATALHA VIVA, e pelo piloto CEGO.
+//
+// O que este arquivo prova é o critério de aceite 3 do M27: uma conta que nunca pagou fecha os
+// três capítulos. A partir desta milestone ele prova junto uma coisa maior — que ela os fecha
+// **sem nunca ver a ficha de um inimigo**. `playFromSetup` (que lia `moveRange` e `duelRange` do
+// outro lado para calcular ameaça) não serve mais, e não por conveniência de teste: é a
+// informação que D47 tirou do jogador. Se a demo só fosse vencível com ela, a decisão teria
+// quebrado o jogo — e é exatamente isto que passaria despercebido sem este arquivo.
+async function jogarMissao(eu: ReturnType<typeof jogador>, missaoId: string, time: readonly string[]) {
+  const abertura = await eu.post(`/campaign/${missaoId}/matches`, { heroIds: time, rulesVersion: RULES_VERSION });
+  expect(abertura.status, `${missaoId}: ${JSON.stringify(abertura.body)}`).toBe(201);
+
+  const enviar = async (rota: string, corpo: unknown) => {
+    const r = await eu.post(rota, corpo as Record<string, unknown>);
+    return { status: r.status, body: r.body as Record<string, unknown> };
+  };
+  const jogada = await jogarPartidaViva(
+    enviar,
+    abertura.body.nonce as string,
+    abertura.body.visivel as EstadoVisivelDeTeste,
+  );
+
+  // A partida pode ficar `ongoing` se o piloto esgotar o teto de comandos sem decidir a
+  // batalha; desistir fecha a linha para a tentativa seguinte poder abrir.
+  if (jogada.outcome === 'ongoing') {
+    await eu.post(`/matches/${abertura.body.nonce}/forfeit`, {});
+  }
+
+  const liquidacao = (jogada.ultima?.liquidacao ?? abertura.body.liquidacao ?? {}) as Record<string, unknown>;
+  return {
+    status: 200,
+    body: {
+      outcome: jogada.outcome === 'ongoing' ? 'defeat' : jogada.outcome,
+      premiumAwarded: (liquidacao.premiumAwarded as number) ?? 0,
+      premium: liquidacao.premium as number | undefined,
+    } as any,
+  };
+}
+
 describe('M27 — a demo inteira, por uma conta que nunca pagou', () => {
   it('as trinta missões, os três capítulos, sem uma linha escrita no banco à mão', async () => {
     const app = servidorVazio();
@@ -140,16 +182,7 @@ describe('M27 — a demo inteira, por uma conta que nunca pagou', () => {
 
       while (tentativas < TENTATIVAS_MAX) {
         tentativas += 1;
-        const ticket = await eu.post(`/campaign/${missao.id}/ticket`, { heroIds: time });
-        expect(ticket.status, `${missao.id}: ${JSON.stringify(ticket.body)}`).toBe(200);
-
-        const jogada = playFromSetup(ticket.body.setup, ticket.body.seed, missao.id);
-        resultado = await eu.post(`/campaign/${missao.id}/run`, {
-          nonce: ticket.body.nonce,
-          heroIds: time,
-          commands: jogada.commandLog,
-          rulesVersion: RULES_VERSION,
-        });
+        resultado = await jogarMissao(eu, missao.id, time);
         expect(resultado.status, `${missao.id}: ${JSON.stringify(resultado.body)}`).toBe(200);
         if (resultado.body.outcome === 'victory') break;
 
@@ -193,7 +226,13 @@ describe('M27 — a demo inteira, por uma conta que nunca pagou', () => {
     // "A energia e o summon aceleram e nunca destravam" — a metade da energia se mede assim:
     // trinta missões e as derrotas do caminho, e o medidor no mesmo lugar.
     expect((await eu.get('/me/economy')).body.energy, 'a campanha cobrou energia').toEqual(energiaInicial);
-  });
+  },
+    // M36 4/N — a batalha viva trocou UMA requisição por batalha por uma por COMANDO, e este
+    // arquivo joga trinta missões com repetição. Isolado ele roda em ~3 s; sob a contenção da
+    // suíte inteira ele passava dos 5 s do default do Vitest e falhava por AGENDAMENTO, não pelo
+    // que mede. O limite generoso abaixo é sobre isso — mesma leitura de `fuzz.test.ts`.
+    60_000,
+  );
 
   it('e as três conquistas de campanha ficam reivindicáveis — a segunda fonte gratuita', async () => {
     // A demo completa é o que torna "A Fortaleza Caiu" (3 capítulos) alcançável. Sem esta
@@ -207,14 +246,7 @@ describe('M27 — a demo inteira, por uma conta que nunca pagou', () => {
     for (const missao of catalog.encounters) {
       const time = timeParaMissao(heroes, missao.id);
       for (let i = 0; i < TENTATIVAS_MAX; i++) {
-        const ticket = await eu.post(`/campaign/${missao.id}/ticket`, { heroIds: time });
-        const jogada = playFromSetup(ticket.body.setup, ticket.body.seed, missao.id);
-        const r = await eu.post(`/campaign/${missao.id}/run`, {
-          nonce: ticket.body.nonce,
-          heroIds: time,
-          commands: jogada.commandLog,
-          rulesVersion: RULES_VERSION,
-        });
+        const r = await jogarMissao(eu, missao.id, time);
         if (r.body.outcome === 'victory') break;
       }
     }
@@ -225,5 +257,11 @@ describe('M27 — a demo inteira, por uma conta que nunca pagou', () => {
       expect(premio, `${id} não está na lista`).toBeDefined();
       expect(premio!.claimable, `${id} não ficou reivindicável com a demo inteira limpa`).toBe(true);
     }
-  });
+  },
+    // M36 4/N — a batalha viva trocou UMA requisição por batalha por uma por COMANDO, e este
+    // arquivo joga trinta missões com repetição. Isolado ele roda em ~3 s; sob a contenção da
+    // suíte inteira ele passava dos 5 s do default do Vitest e falhava por AGENDAMENTO, não pelo
+    // que mede. O limite generoso abaixo é sobre isso — mesma leitura de `fuzz.test.ts`.
+    60_000,
+  );
 });

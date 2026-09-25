@@ -3,6 +3,7 @@
   "name": "Rurik",
   "classId": "class-guerreiro",
   "acquisition": "summon",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-ally-guerreiro",
   "startingHero": {
     "level": 10,

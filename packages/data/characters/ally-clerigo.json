@@ -3,6 +3,7 @@
   "name": "Miron",
   "classId": "class-clerigo",
   "acquisition": "story",
+  "rank": "hero",
   "fragmentMaterialId": "material-fragmento-ally-clerigo",
   "startingHero": {
     "level": 10,

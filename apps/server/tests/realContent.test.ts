@@ -9,6 +9,7 @@ import {
   createMemoryPartyPresetRepository,
   createMemoryHeroRepository,
   createMemoryPlayerRepository,
+  createMemoryMatchRepository,
   createMemoryReplayRepository,
   createMemoryRewardsRepository,
   createMemorySeasonRepository,
@@ -28,7 +29,7 @@ const TICKET_SECRET = 'segredo-de-teste';
 // mão como `battles.test.ts`/`fuzz.test.ts`. Fica AO LADO do fuzz (D5) — o fuzz continua
 // testando o MOTOR com conteúdo sintético; este teste prova que o CATÁLOGO real carrega e
 // resolve de ponta a ponta através do endpoint HTTP.
-describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)', () => {
+describe('a batalha viva com o conteúdo real de packages/data (M9, sub-sessão 2)', () => {
   it('roda uma batalha ponta a ponta com classes/skills/mapa reais e devolve um resultado', async () => {
     const catalog = loadCatalogFromDisk();
     const mapId = Object.keys(catalog.maps)[0];
@@ -77,6 +78,7 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
       arenaDefenseRepository: createMemoryArenaDefenseRepository(),
       partyPresetRepository: createMemoryPartyPresetRepository(),
       replayRepository: createMemoryReplayRepository(),
+      matchRepository: createMemoryMatchRepository(),
       seasonRepository: createMemorySeasonRepository(),
       catalog,
       shopCatalog: {},
@@ -96,26 +98,36 @@ describe('POST /battles — conteúdo real de packages/data (M9, sub-sessão 2)'
     });
     expect(saveDefense.statusCode).toBe(200);
 
-    const createBattle = await app.inject({
+    // M36 2/N — `POST /battles` saiu; abrir a partida viva é o que exercita a mesma corrente
+    // (catálogo real → montagem → `buildInitialState` → resposta HTTP). E ela exercita MAIS que
+    // antes: a resposta precisa atravessar a redação, então um catálogo que carregasse torto
+    // apareceria aqui de dois jeitos em vez de um.
+    const abertura = await app.inject({
       method: 'POST',
-      url: '/battles',
-      headers: { 'x-platform-ticket': 'dev:token-real-atacante'},
+      url: '/arena/matches',
+      headers: { 'x-platform-ticket': 'dev:token-real-atacante' },
       payload: {
         attackerHeroIds: [attackerHero.id],
         defenderPlayerId: 'player-real-defensor',
-        commands: [],
         rulesVersion: RULES_VERSION,
-        nonce: 'nonce-conteudo-real-1',
       },
     });
 
-    expect(createBattle.statusCode).toBe(200);
-    const body = createBattle.json();
-    expect(['victory', 'defeat', 'ongoing']).toContain(body.result.outcome);
-    expect(body.result.finalUnits).toHaveLength(2);
-    for (const unit of body.result.finalUnits) {
-      expect(unit.stats.spd).toBeGreaterThan(0);
-      expect(unit.stats.hp).toBeGreaterThan(0);
-    }
+    expect(abertura.statusCode, abertura.body).toBe(201);
+    const body = abertura.json();
+    expect(['victory', 'defeat', 'ongoing']).toContain(body.outcome);
+    expect(body.visivel.units).toHaveLength(2);
+
+    // O MEU herói resolveu stats de verdade a partir do catálogo real — é o que o teste sempre
+    // mediu. O do defensor não traz stats nenhum, e é o que esta milestone acrescentou: o mesmo
+    // catálogo real, do outro lado, fica no servidor.
+    const meu = body.visivel.units.find((u: { unitId: string }) => u.unitId === attackerHero.id);
+    const dele = body.visivel.units.find((u: { unitId: string }) => u.unitId === defenderHero.id);
+    expect(meu.stats.spd).toBeGreaterThan(0);
+    expect(meu.stats.hp).toBeGreaterThan(0);
+    expect(dele.stats).toBeUndefined();
+    // Do defensor sobra o que D47 deixou de pé — e o `hpMax` de D48, que é o que a barra lê.
+    expect(dele.hp).toBeGreaterThan(0);
+    expect(dele.hpMax).toBeGreaterThan(0);
   });
 });

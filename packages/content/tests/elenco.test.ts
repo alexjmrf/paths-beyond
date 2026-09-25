@@ -36,6 +36,7 @@ interface CharacterFile {
   readonly id: string;
   readonly name: string;
   readonly classId: string;
+  readonly rank: 'adventurer' | 'hero';
 }
 
 const elenco = readAll<CharacterFile>('characters');
@@ -45,7 +46,10 @@ const catalog = loadCatalogFromDisk();
 const arvorePorPersonagem = new Map(arvores.map((t) => [t.characterId, t] as const));
 
 // D7 — o elenco cresce de 6 para 9: as classes jogáveis passam a ter todas um consumidor.
-const TAMANHO_DO_ELENCO = 9;
+// D49 (M37 3/N) — e de 9 para 15: seis `Adventurer` entram para a razão de 1,5 por `Hero`
+// que o usuário fechou. Cada um é o PAR DE CLASSE de um `Hero`, o que quebra de propósito a
+// bijeção classe↔personagem — ver o teste do consumidor de classe abaixo.
+const TAMANHO_DO_ELENCO = 15;
 
 // §10 — "Awakening (0–6): ... libera nós avançados de talento a partir de 5."
 const AWAKENING_AVANCADO = 5;
@@ -128,14 +132,51 @@ describe('M17 §8.1 — o elenco é fechado e cobre as classes jogáveis', () =>
   // D7 — o elenco cresceu justamente porque grifeiro, guerreiro e lanceiro ficariam sem
   // ninguém para jogá-las: classe autorada sem consumidor é o antipadrão que M10, M11 e
   // M15 passaram o projeto corrigindo.
-  it('toda classe NÃO-promovida do catálogo tem exatamente um personagem', () => {
+  //
+  // **D49 (M37 3/N) afrouxou isto de UM para AO MENOS UM, e a mudança é deliberada.** A
+  // asserção antiga era uma bijeção (`classesDoElenco` igual a `classesJogaveis` como
+  // listas ordenadas), e ela nasceu de uma época em que havia exatamente um personagem por
+  // classe. O que D7 queria dizer é o RECÍPROCO — nenhuma classe sem consumidor —, e é ele
+  // que continua valendo ao pé da letra.
+  //
+  // O que mudou: cada `Adventurer` novo é o par de classe de um `Hero`, e é assim que
+  // "menos decisões, não menos poder" (§2) fica verificável — os dois compartilham curva,
+  // skills e ficha inicial, e diferem só na profundidade da árvore. Exigir bijeção aqui
+  // obrigaria seis classes novas, com seis curvas de stat novas, e o rank passaria a
+  // carregar poder pela porta dos fundos.
+  it('toda classe NÃO-promovida tem AO MENOS um personagem — nenhuma fica sem consumidor', () => {
     const classesJogaveis = Object.values(catalog.classes)
       .filter((c) => c.promotesFrom === undefined)
       .map((c) => c.id)
       .sort();
-    const classesDoElenco = elenco.map((c) => c.classId).sort();
+    const classesDoElenco = new Set(elenco.map((c) => c.classId));
 
-    expect(classesDoElenco).toEqual(classesJogaveis);
+    for (const classe of classesJogaveis) {
+      expect(classesDoElenco.has(classe), `classe sem personagem: ${classe}`).toBe(true);
+    }
+    // E o outro lado: nenhum personagem aponta para uma classe promovida ou inexistente.
+    for (const classe of classesDoElenco) {
+      expect(classesJogaveis, `classe não-jogável no elenco: ${classe}`).toContain(classe);
+    }
+  });
+
+  // D49 — o par de classe é o desenho, e não um acidente: todo `Adventurer` de uma classe
+  // compartilhada tem um `Hero` daquela mesma classe do outro lado. Sem esta asserção, um
+  // segundo `Adventurer` numa classe sem `Hero` passaria despercebido, e aí a classe teria
+  // dois personagens que não são par de ninguém.
+  it('toda classe com mais de um personagem tem exatamente um `Hero` entre eles', () => {
+    const porClasse = new Map<string, { id: string; rank: string }[]>();
+    for (const personagem of elenco) {
+      const lista = porClasse.get(personagem.classId) ?? [];
+      lista.push({ id: personagem.id, rank: personagem.rank });
+      porClasse.set(personagem.classId, lista);
+    }
+
+    for (const [classe, personagens] of porClasse) {
+      if (personagens.length === 1) continue;
+      const heroes = personagens.filter((p) => p.rank === 'hero');
+      expect(heroes.length, `${classe}: ${personagens.map((p) => `${p.id}(${p.rank})`).join(', ')}`).toBe(1);
+    }
   });
 
   it('a classe de todo personagem existe no catálogo', () => {

@@ -31,6 +31,10 @@ export interface Hero {
   readonly imprint: 0 | 1 | 2 | 3 | 4 | 5;
   readonly talents: TalentAllocation;
   readonly equipment: Readonly<Record<GearSlot, Id | null>>;
+  // M38 (D53) — o 7º slot: a INSTÂNCIA de artefato equipada, fora de `equipment` porque o
+  // artefato não é `ItemInstance` (ver artifacts/types.ts). Opcional: ausente e `null` são o
+  // mesmo "slot vazio", e todo herói gravado antes do M38 continua válido.
+  readonly artifact?: Id | null;
   readonly weaponType: WeaponType;
   readonly duelSkills: readonly Id[];
   readonly mapSkills: readonly Id[];

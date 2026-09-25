@@ -1,7 +1,17 @@
 {
   "id": "banner-teste",
+  "kind": "generic",
   "name": "Invocação de Teste",
-  "pityThreshold": 3,
+  "choiceEvery": 180,
+  "pityThresholds": {
+    "adventurer": 3,
+    "hero": 9
+  },
+  "softPity": {
+    "baseRate": 6,
+    "softStart": 7,
+    "step": 60
+  },
   "pool": [
     {
       "characterId": "personagem-soldado",

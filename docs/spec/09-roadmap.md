@@ -669,6 +669,13 @@ divisão do elenco, pity novo) vieram do usuário.
 ---
 
 ### M38 — Armas assinatura e o banner de armas
+
+> **Reescrito pela implementação (D53–D56):** a arma assinatura virou o **artefato** — slot
+> próprio, fora da arma e dos 6 slots de item (§7.1), travado por classe, com passiva exclusiva,
+> tier e awakening próprios. O banner de armas virou três banners: o rotativo de personagem
+> (com o token de 1,5·P = 135, que entrega o artefato do destaque), o rotativo de artefato
+> (pity 60) e o genérico misto (escolha a cada 180), com soft pity escondido da tela. O texto
+> abaixo é o original, mantido como registro da pergunta que o milestone respondeu.
 **O equipamento vira alvo de gacha.** Uma arma/artefato assinatura por personagem, **travada por
 CLASSE** — equipável por qualquer personagem da classe de quem ela pertence —, com banner próprio; e
 quando um personagem entra em rotação, a arma dele entra junto. **A máquina de item já existe
@@ -697,16 +704,16 @@ um **mainstat ligado às habilidades daquele personagem** (2 a 3 possibilidades)
 abre depois de o personagem ser upado até certo nível. **O farm dropa material GENÉRICO e a escolha
 de para quem craftar acontece no craft** (decisão do usuário, e é a certa): um farm por classe
 recriaria o "hoje tenho de farmar o domínio errado" de Genshin e do Epic Seven. **Duas consequências
-de forma que dimensionam a fatia:** a Soul é um **7º slot**, e `GEAR_SLOTS` é lista única usada por
-UI e validação de save enquanto §7.1 diz "6 slots" normativamente e §4.1 fixa a ordem de agregação —
-é mudança de regra; e como o mainstat é sorteado entre 2–3 opções, o jogador **vai recraftar**, então
+de forma que dimensionam a fatia:** a Soul é um **8º slot** (o M38 adiantou o 7º, o artefato —
+D53), e `GEAR_SLOTS` é lista única usada por UI e validação de save enquanto §7.1 lista os slots
+normativamente e §4.1 fixa a ordem de agregação — é mudança de regra; e como o mainstat é sorteado entre 2–3 opções, o jogador **vai recraftar**, então
 o sumidouro tem de ser afinado como repetível e não como gasto único. **Distinção a preservar:**
-arma é travada por CLASSE e Soul por PERSONAGEM — dois modelos de exclusividade de propósito, com
+o artefato é travado por CLASSE e a Soul por PERSONAGEM — dois modelos de exclusividade de propósito, com
 nomes distintos no dado para ninguém fundi-los depois. (`ItemInstance.lockedBy?: HeroId` existe no
 tipo e no schema **sem consumidor** desde o M4 e é o "trancar no herói" do E7 — não serve para
 nenhuma das duas travas.)
 **Aceite:** a Soul entra como slot próprio com a ordem de agregação de §4.1 declarada e testada, e
-§7.1 deixa de dizer "6 slots"; o slot recusa abrir abaixo do nível declarado, e o nível é conteúdo e
+§7.1 passa a listar 8 slots; o slot recusa abrir abaixo do nível declarado, e o nível é conteúdo e
 não constante em código; o mainstat sorteia entre as opções declaradas DAQUELE personagem e o schema
 recusa uma Soul cujo mainstat não pertença a ele; craftar escolhe o personagem no ato, a partir de
 material genérico, com idempotência por nonce como toda ação de economia desde o M14 4/N;

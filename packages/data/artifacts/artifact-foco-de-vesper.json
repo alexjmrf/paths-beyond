@@ -1,0 +1,73 @@
+{
+  "id": "artifact-foco-de-vesper",
+  "signatureOf": "ally-arcanista",
+  "name": "Foco de Vesper",
+  "classId": "class-arcanista",
+  "rank": "adventurer",
+  "atkByAwakening": [
+    8,
+    10,
+    12,
+    14,
+    17,
+    20,
+    24
+  ],
+  "variableStat": {
+    "stat": "eff",
+    "byAwakening": [
+      40,
+      50,
+      60,
+      70,
+      85,
+      100,
+      120
+    ]
+  },
+  "imprintFlat": [
+    [],
+    [
+      {
+        "stat": "hp",
+        "flat": 10
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 20
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 30
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 40
+      }
+    ],
+    [
+      {
+        "stat": "hp",
+        "flat": 60
+      }
+    ]
+  ],
+  "passive": {
+    "t": "stat",
+    "stat": "atk",
+    "pctByImprint": [
+      50,
+      58,
+      66,
+      74,
+      82,
+      90
+    ]
+  }
+}

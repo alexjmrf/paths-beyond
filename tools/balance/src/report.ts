@@ -1,5 +1,5 @@
 import type { Id } from '@paths-beyond/core';
-import type { BattleOutcomeRecord } from './runTournament.js';
+import type { ArtifactDeltaRow, ArtifactDeltaSide, ArtifactTier, BattleOutcomeRecord } from './runTournament.js';
 
 export interface PairingCell {
   readonly attackerWins: number;
@@ -250,4 +250,28 @@ export function formatReport(report: BalanceReport, compNames: Readonly<Record<I
   }
 
   return lines.join('\n');
+}
+
+// M38 5/N — o relatório do DELTA do artefato: cada comp com artefato contra ela mesma sem,
+// separado por lado. 50% é sidegrade puro; o que passa disso é o poder que o artefato compra.
+export function formatArtifactDelta(
+  rows: readonly ArtifactDeltaRow[],
+  compNames: Readonly<Record<Id, string>>,
+  tier: ArtifactTier,
+): string {
+  const pct = (lado: ArtifactDeltaSide) => (lado.total === 0 ? 0 : (lado.vitoriasComArtefato / lado.total) * 100);
+  const linhas = [...rows]
+    .map((row) => ({ row, media: (pct(row.comoAtacante) + pct(row.comoDefensor)) / 2 }))
+    .sort((a, b) => b.media - a.media)
+    .map(
+      ({ row, media }) =>
+        `  ${compNames[row.compId] ?? row.compId}: ${media.toFixed(1)}% com artefato ` +
+        `(atacando: ${pct(row.comoAtacante).toFixed(1)}%, defendendo: ${pct(row.comoDefensor).toFixed(1)}%; ` +
+        `${row.comoAtacante.total + row.comoDefensor.total} partidas)`,
+    );
+  return [
+    `=== Delta do artefato: cada comp COM artefato (awakening ${tier.awakening}, imprint ${tier.imprint}) contra ela mesma SEM ===`,
+    '  50% = o artefato não muda o resultado (sidegrade); acima disso, é o poder que ele compra.',
+    ...linhas,
+  ].join('\n');
 }

@@ -55,6 +55,8 @@ describe('M18 §10 — a ficha inicial aponta só para conteúdo que existe', ()
   it('todo personagem do pool de todo banner tem ficha inicial', () => {
     for (const banner of Object.values(catalog.banners)) {
       for (const entry of banner.pool) {
+        // M38 3/N — entrada de artefato não vira herói; a ficha é só do personagem.
+        if (entry.characterId === undefined) continue;
         expect(catalog.characters[entry.characterId]?.startingHero, `${entry.characterId} sem ficha`).toBeDefined();
       }
     }

@@ -11,6 +11,7 @@ import type { Id } from '../types.js';
 import type { BattleSetup, BattleUnit, MapAiArchetype, PermadeathMode, Side, WinCondition } from './types.js';
 import type { ValorSkillDef } from './valor.js';
 import type { EffectDef } from '../duel/types.js';
+import type { EquippedArtifact } from '../artifacts/types.js';
 
 export interface BuildBattleUnitInput {
   readonly unitId: Id;
@@ -61,6 +62,8 @@ export interface HeroPlacement {
   readonly hero: Hero;
   readonly classDef: ClassDef;
   readonly equippedItems: readonly ItemInstance[];
+  // M38 (D53) — o artefato do herói, já buscado por quem monta. Ausente = slot vazio.
+  readonly artifact?: EquippedArtifact;
   readonly side: Side;
   readonly pos: Coord;
   readonly height: 0 | 1 | 2 | 3;
@@ -174,6 +177,7 @@ export function buildBattleSetupFromHeroes(input: BuildBattleSetupFromHeroesInpu
           weaponDuelRanges: input.weaponDuelRanges,
           baselineReactionSkillIds: input.baselineReactionSkillIds,
           talentTree: arvoreDe(placement.hero),
+          ...(placement.artifact ? { artifact: placement.artifact } : {}),
         });
 
     const unit = buildBattleUnit({
