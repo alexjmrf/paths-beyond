@@ -13,7 +13,8 @@ export const PAINEIS_DA_BATALHA = [
   { painel: 'iniciativa', papel: 'previsao' },
   { painel: 'recursos', papel: 'previsao' },
   { painel: 'objetivo', papel: 'previsao' },
-  { painel: 'modo', papel: 'administracao' },
+  // M35 9/N — o painel do MODO saiu: a administração (abandonar, voltar, rever o replay) mora no
+  // menu de pausa, aberto pelo Esc. Dentro da missão, só o campo de batalha (pedido do usuário).
 ] as const;
 
 export type PainelDaBatalha = (typeof PAINEIS_DA_BATALHA)[number]['painel'];

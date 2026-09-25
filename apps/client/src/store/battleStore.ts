@@ -620,6 +620,9 @@ interface BattleStore {
   // camada de idioma, bloqueia a aba inteira e não é testável sem navegador. Nenhum dos dois
   // vai para o save: são estado de tela.
   readonly opcoesAbertas: boolean;
+  // M35 9/N — o menu de pausa da batalha, aberto pelo Esc (ou pelo botão ☰). É estado da store
+  // pelo mesmo motivo de `opcoesAbertas`: a decisão se testa aqui, não no componente.
+  readonly pausaAberta: boolean;
   // M35 1/N (D41) — a tela do hub. Só ela está na tela; a batalha não tem menu. M35 5/N — o
   // hub é um LOBBY com botões (julgamento do usuário na tela): `'lobby'` é onde quem entra cai,
   // e as cinco telas de `ABAS_DO_HUB` são para onde os botões levam.
@@ -698,7 +701,7 @@ interface BattleStore {
   toggleChapterOpen: (chapterId: string) => void;
   toggleCampaignHero: (heroId: string) => void;
   enterChapter: (chapterId: string) => Promise<void>;
-  exitCampaign: () => void;
+  exitCampaign: () => Promise<void>;
   saveHeroTactics: (heroId: string, script: TacticsScript) => Promise<void>;
   saveHeroTalents: (heroId: string, allocation: TalentAllocation) => Promise<void>;
   openTacticsEditor: (unitId: string) => void;
@@ -728,6 +731,14 @@ interface BattleStore {
   toggleColorblindMode: () => void;
   setUiScale: (scale: number) => void;
   abrirOpcoes: () => void;
+  alternarPausa: () => void;
+  fecharPausa: () => void;
+  /** Opções a partir da pausa: fecha a pausa e abre o menu de opções. */
+  opcoesDaPausa: () => void;
+  /** Sai da missão pela pausa: desiste se ela corre (D48) e volta à tela de onde veio. */
+  sairDaMissao: () => Promise<void>;
+  /** Só na campanha: desiste e abre a MESMA missão com os mesmos heróis. */
+  recomecarMissao: () => Promise<void>;
   escolherAba: (aba: AbaDoHub) => void;
   voltarAoLobby: () => void;
   concluirTransicao: () => void;
@@ -767,7 +778,7 @@ interface BattleStore {
   togglePveHero: (heroId: string) => void;
   enterDungeon: (dungeonId: string) => Promise<void>;
   sweepDungeon: (dungeonId: string) => Promise<void>;
-  exitDungeon: () => void;
+  exitDungeon: () => Promise<void>;
   enhanceInventoryItem: (itemId: string) => Promise<void>;
   equipInventoryItem: (heroId: string, itemId: string) => Promise<void>;
   awakenHero: (heroId: string) => Promise<void>;
@@ -971,6 +982,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   colorblindMode: restoredSave?.colorblindMode ?? false,
   uiScale: restoredSave?.uiScale ?? DEFAULT_UI_SCALE,
   opcoesAbertas: false,
+  pausaAberta: false,
   abaDoHub: 'lobby',
   transicao: null,
   presets: { slots: 8, lista: [], busy: false, error: null },
@@ -1357,12 +1369,13 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       lastCommandReason: null,
       aiTurnReport: null,
       comandoEmVoo: false,
+      pausaAberta: false,
     });
   },
 
   exitCampaign: () => {
     const missaoJogada = get().partida?.refId ?? null;
-    void get().desistirDaPartida();
+    const desistencia = get().desistirDaPartida();
     set((s) => ({
       campaign: {
         ...s.campaign,
@@ -1377,6 +1390,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           : s.campaign.selectedMissionId,
       },
     }));
+    return desistencia;
   },
 
   // §6.3 (M18, 7/N) — o script tático passa a ser do SERVIDOR. Antes ele era editado no
@@ -2407,11 +2421,12 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
 
   exitDungeon: () => {
-    void get().desistirDaPartida();
+    const desistencia = get().desistirDaPartida();
     set((s) => ({
       mode: 'campaign',
       pve: { ...s.pve, activeDungeonId: null, status: null, error: null },
     }));
+    return desistencia;
   },
 
   enhanceInventoryItem: async (itemId) => {
@@ -2562,6 +2577,30 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // Reabrir não pode encontrar a pergunta ainda de pé, esperando um clique que o jogador
   // não sabe que está dando.
   abrirOpcoes: () => set({ opcoesAbertas: true }),
+  alternarPausa: () => set((s) => ({ pausaAberta: !s.pausaAberta })),
+  fecharPausa: () => set({ pausaAberta: false }),
+  opcoesDaPausa: () => set({ pausaAberta: false, opcoesAbertas: true }),
+  sairDaMissao: async () => {
+    set({ pausaAberta: false });
+    const { mode } = get();
+    if (mode === 'campaign') await get().exitCampaign();
+    else if (mode === 'dungeon') await get().exitDungeon();
+    else {
+      await get().desistirDaPartida();
+      get().exitPvp();
+    }
+  },
+  recomecarMissao: async () => {
+    const { mode, partida, campaign } = get();
+    if (mode !== 'campaign' || !partida) return;
+    const missaoId = partida.refId;
+    set({ pausaAberta: false });
+    // Os mesmos heróis que entraram: a seleção da campanha é o que `enterChapter` manda.
+    const herois = campaign.selectedHeroIds;
+    await get().desistirDaPartida();
+    set((s) => ({ campaign: { ...s.campaign, selectedHeroIds: herois } }));
+    await get().enterChapter(missaoId);
+  },
   // M35 5/N — escolher abre a transição; a tela só troca em `concluirTransicao`. A introdução
   // de "primeiro summon" (que morava no botão Atualizar, morto na 1/N) dispara ao CHEGAR: é
   // quando moeda premium, banner e pity aparecem pela primeira vez — não por cima do véu.

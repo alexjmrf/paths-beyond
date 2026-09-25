@@ -278,3 +278,37 @@ button.ui-botao-perigo:hover:not(:disabled) {
 .app-layout button.lobby-botao.acao-principal:hover {
   border-color: #fff1c7;
 }
+
+/* --- M35 9/N — a batalha é só a batalha, e a saída mora na pausa ------------------------- */
+
+.main-batalha {
+  position: relative;
+}
+
+/* O ☰ fica no canto do campo de batalha: à mão, mas sem disputar lugar com os painéis. */
+.app-layout button.abrir-pausa {
+  position: fixed;
+  top: 0.55rem;
+  right: 6.5rem;
+  z-index: 30;
+  font-family: var(--fonte-titulo);
+  letter-spacing: 0.05em;
+}
+
+.pausa-menu {
+  min-width: 22rem;
+  text-align: center;
+}
+
+.pausa-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.pausa-acoes button {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+}

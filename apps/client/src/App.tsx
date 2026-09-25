@@ -24,6 +24,7 @@ import { UpdateBanner } from './components/UpdateBanner.js';
 import { VersionGate } from './components/VersionGate.js';
 import { useEffect } from 'react';
 import { PAINEIS_DA_BATALHA } from './logic/ordemDaBatalha.js';
+import { PausaMenu } from './components/PausaMenu.js';
 import { telaDoJogo } from './logic/tela.js';
 import { nomeDeConteudo } from './i18n/conteudo.js';
 import { missaoPorId, useBattleStore } from './store/battleStore.js';
@@ -37,7 +38,9 @@ export function App() {
   // M32 — o NOME da missão em curso, e não o id do ticket: o cabeçalho dizia
   // `encounter-campanha-ponte-1` enquanto o painel ao lado dizia "Jogando A Trilha".
   const missaoEmCurso = useBattleStore((s) => {
-    const id = s.campaign.ticket?.chapterId;
+    // M35 9/N — da PARTIDA viva, não do `ticket`, que morreu no M36: com ele o topo da batalha
+    // dizia "Escolha um capítulo" no meio da missão.
+    const id = s.partida?.kind === 'campaign' ? s.partida.refId : null;
     return id ? nomeDeConteudo(s.t, 'missao', id, missaoPorId(s.campaign.chapters, id)?.name ?? id) : null;
   });
   const mode = useBattleStore((s) => s.mode);
@@ -119,7 +122,10 @@ export function App() {
           )}
         </main>
       ) : (
-        <main>
+        <main className="main-batalha">
+          {/* M35 9/N — dentro da missão, SÓ o campo de batalha (pedido do usuário). Sair,
+              recomeçar e as opções moram no menu de pausa, aberto pelo Esc ou pelo ☰. */}
+          <PausaMenu />
           <MapCanvas />
           <DuelScene />
           <div className="side-panels">
@@ -132,14 +138,8 @@ export function App() {
                 <InitiativePanel key={painel} />
               ) : painel === 'recursos' ? (
                 <ResourcePanel key={painel} />
-              ) : painel === 'objetivo' ? (
-                <ObjectivePanel key={painel} />
-              ) : mode === 'campaign' ? (
-                <CampaignPanel key={painel} />
-              ) : mode === 'dungeon' ? (
-                <DungeonPanel key={painel} />
               ) : (
-                <PvpPanel key={painel} />
+                <ObjectivePanel key={painel} />
               ),
             )}
           </div>
