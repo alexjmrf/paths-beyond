@@ -1,4 +1,4 @@
-import { CampaignTransitionOverlay } from './components/CampaignTransitionOverlay.js';
+import { ConclusaoDaMissao } from './components/ConclusaoDaMissao.js';
 import { DungeonPanel } from './components/DungeonPanel.js';
 import { EntradaPanel } from './components/EntradaPanel.js';
 import { InitiativePanel } from './components/InitiativePanel.js';
@@ -149,7 +149,8 @@ export function App() {
       <InventoryPanel />
       <TalentTreePanel />
       <ReplayPanel />
-      <CampaignTransitionOverlay />
+      {/* M35 9/N — a tela de conclusão (resultado, loot, próxima missão ou menu) nos três modos. */}
+      <ConclusaoDaMissao />
     </div>
   );
 }

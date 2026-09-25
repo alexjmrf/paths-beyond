@@ -739,6 +739,10 @@ interface BattleStore {
   sairDaMissao: () => Promise<void>;
   /** Só na campanha: desiste e abre a MESMA missão com os mesmos heróis. */
   recomecarMissao: () => Promise<void>;
+  /** M35 9/N — da tela de conclusão: sai da batalha e abre a Campanha com a missão escolhida. */
+  continuarParaProxima: (missaoId: string) => Promise<void>;
+  /** M35 9/N — da tela de conclusão: sai da batalha e volta ao lobby. */
+  voltarAoMenu: () => Promise<void>;
   escolherAba: (aba: AbaDoHub) => void;
   voltarAoLobby: () => void;
   concluirTransicao: () => void;
@@ -2589,6 +2593,17 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       await get().desistirDaPartida();
       get().exitPvp();
     }
+  },
+  continuarParaProxima: async (missaoId) => {
+    await get().sairDaMissao();
+    // Direto na Campanha, com a próxima escolhida: a próxima pode ter outro número de vagas,
+    // então quem vai se escolhe lá, com a prévia na frente.
+    set({ abaDoHub: 'campanha' });
+    get().selectChapter(missaoId);
+  },
+  voltarAoMenu: async () => {
+    await get().sairDaMissao();
+    get().voltarAoLobby();
   },
   recomecarMissao: async () => {
     const { mode, partida, campaign } = get();

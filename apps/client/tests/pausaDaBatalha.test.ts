@@ -120,3 +120,48 @@ describe('o menu de pausa, na store', () => {
     expect(chamadas.filter((c) => c.method === 'POST')).toEqual([]);
   });
 });
+
+// M35 9/N — as duas saídas da tela de conclusão.
+describe('as saídas da tela de conclusão', () => {
+  beforeEach(() => {
+    useBattleStore.setState((s) => ({
+      partida: { ...PARTIDA, outcome: 'victory' } as never,
+      abaDoHub: 'campanha',
+      campaign: {
+        ...s.campaign,
+        chapters: [
+          {
+            id: 'cap-1',
+            order: 1,
+            name: 'A Estrada',
+            cleared: false,
+            missions: [
+              { id: 'encounter-campanha-1', order: 1, name: 'A Trilha', slots: 1, cleared: true },
+              { id: 'encounter-campanha-2', order: 2, name: 'O Bloqueio', slots: 1, cleared: false },
+            ],
+          },
+        ] as never,
+      },
+    }));
+  });
+
+  it('continuar para a próxima deixa a batalha e abre a Campanha com a missão seguinte escolhida', async () => {
+    await useBattleStore.getState().continuarParaProxima('encounter-campanha-2');
+    const s = useBattleStore.getState();
+    expect(s.partida).toBeNull();
+    expect(s.abaDoHub).toBe('campanha');
+    expect(s.campaign.selectedMissionId).toBe('encounter-campanha-2');
+  });
+
+  it('batalha terminada não desiste de nada ao sair: não há POST de desistência', async () => {
+    await useBattleStore.getState().continuarParaProxima('encounter-campanha-2');
+    expect(chamadas.some((c) => c.url.includes('/forfeit'))).toBe(false);
+  });
+
+  it('voltar ao menu deixa a batalha e leva ao lobby', async () => {
+    await useBattleStore.getState().voltarAoMenu();
+    const s = useBattleStore.getState();
+    expect(s.partida).toBeNull();
+    expect(s.transicao?.para ?? s.abaDoHub).toBe('lobby');
+  });
+});
