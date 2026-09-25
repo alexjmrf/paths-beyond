@@ -68,7 +68,10 @@ export function App() {
           cabeçalho fica com o que diz ONDE o jogador está, e um botão para o menu. */}
       <header>
         <h1>{t('app.titulo')}</h1>
-        {tela === 'entrada' ? null : (
+        {/* M35 6/N — o subtítulo só diz algo DENTRO da batalha (a missão, o modo). No hub, o
+            cabeçalho de cada tela já diz onde o jogador está, e "Escolha um capítulo" no lobby e
+            na Invocação era ruído. */}
+        {tela !== 'batalha' ? null : (
           <span className="campaign-progress">
             {/* M18 7/N — o capítulo em curso vem do TICKET, e não de um índice local: quem
                 sabe em que ponto da campanha o jogador está é o servidor. */}

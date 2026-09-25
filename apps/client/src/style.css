@@ -4,8 +4,8 @@
 
 body {
   margin: 0;
-  background: #0b1220;
-  color: #e5e7eb;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
   font-family: system-ui, sans-serif;
 }
 
@@ -17,7 +17,7 @@ body {
 
 header {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #1f2937;
+  border-bottom: 1px solid var(--cor-painel-2);
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
@@ -29,7 +29,7 @@ header h1 {
 }
 
 header .campaign-progress {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.85rem;
 }
 
@@ -37,7 +37,7 @@ header .campaign-progress {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.8rem;
   margin-left: auto;
   cursor: pointer;
@@ -49,7 +49,7 @@ header .campaign-progress {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -58,14 +58,14 @@ header .campaign-progress {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.8rem;
 }
 
 .ui-scale-select select {
-  background: #111827;
-  color: #e5e7eb;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
   padding: 0.15rem 0.3rem;
   font-size: 0.8rem;
@@ -80,10 +80,10 @@ header {
 .clear-progress {
   margin-left: 0.75rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid #4b5563;
+  border: 1px solid var(--cor-borda-forte);
   border-radius: 4px;
   background: transparent;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -95,12 +95,12 @@ header {
 
 .duel-preview-revealing {
   margin-top: 0.75rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-style: italic;
 }
 
 .duel-preview-actions button:disabled {
-  background: #374151;
+  background: var(--cor-borda);
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -121,7 +121,7 @@ main {
    `max-width` é o que garante que ele nunca roube a coluna dos painéis; quem mantém a unidade
    selecionada dentro da janela é `logic/enquadramento.ts`. */
 .map-canvas {
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   line-height: 0;
   overflow: auto;
   max-width: 100%;
@@ -139,8 +139,8 @@ main {
 
 .initiative-panel,
 .unit-action-bar {
-  background: #111827;
-  border: 1px solid #1f2937;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-painel-2);
   border-radius: 8px;
   padding: 0.75rem;
 }
@@ -202,7 +202,7 @@ main {
 }
 
 .unit-action-bar button:disabled {
-  background: #374151;
+  background: var(--cor-borda);
   cursor: not-allowed;
 }
 
@@ -222,8 +222,8 @@ main {
 }
 
 .duel-preview-panel {
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 10px;
   padding: 1.25rem;
   max-width: 560px;
@@ -236,7 +236,7 @@ main {
 }
 
 .duel-preview-panel .troca {
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   padding-top: 0.5rem;
   margin-top: 0.5rem;
 }
@@ -260,7 +260,7 @@ main {
 
 .duel-preview-summary {
   margin-top: 0.75rem;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   padding-top: 0.5rem;
   font-size: 0.9rem;
 }
@@ -284,13 +284,13 @@ main {
 }
 
 .duel-preview-actions button:last-child {
-  background: #374151;
+  background: var(--cor-borda);
   color: white;
 }
 
 .resource-panel {
-  background: #111827;
-  border: 1px solid #1f2937;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-painel-2);
   border-radius: 8px;
   padding: 0.75rem;
 }
@@ -308,14 +308,14 @@ main {
 
 .resource-panel th {
   text-align: left;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-weight: normal;
   padding-bottom: 0.25rem;
 }
 
 .resource-panel td {
   padding: 0.25rem 0.25rem 0.25rem 0;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
 }
 
 .resource-panel tr {
@@ -350,8 +350,8 @@ main {
 
 .resource-panel .tag.no-rest,
 .resource-panel .tag.acted {
-  background: #374151;
-  color: #d1d5db;
+  background: var(--cor-borda);
+  color: var(--cor-texto);
 }
 
 .resource-panel .tag.vulnerable {
@@ -370,8 +370,8 @@ main {
 }
 
 .campaign-overlay-panel {
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 10px;
   padding: 1.5rem 2rem;
   text-align: center;
@@ -405,8 +405,8 @@ main {
 
 .tactics-editor-panel,
 .inventory-panel {
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 10px;
   padding: 1.25rem;
   max-width: 640px;
@@ -430,7 +430,7 @@ main {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   border-radius: 6px;
   padding: 0.5rem;
   margin-bottom: 0.5rem;
@@ -438,16 +438,16 @@ main {
 }
 
 .tactics-line .drag-handle {
-  color: #6b7280;
+  color: var(--cor-texto-suave);
   cursor: grab;
 }
 
 .tactics-line select,
 .tactics-line input[type='text'],
 .tactics-line input[type='number'] {
-  background: #1f2937;
-  color: #e5e7eb;
-  border: 1px solid #374151;
+  background: var(--cor-painel-2);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
 }
@@ -486,15 +486,15 @@ main {
 
 .condition-editor select,
 .condition-editor input {
-  background: #1f2937;
-  color: #e5e7eb;
-  border: 1px solid #374151;
+  background: var(--cor-painel-2);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
   padding: 0.15rem 0.35rem;
 }
 
 .tactics-test {
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   margin-top: 0.75rem;
   padding-top: 0.75rem;
 }
@@ -503,7 +503,7 @@ main {
   display: inline-flex;
   flex-direction: column;
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   margin-right: 0.75rem;
 }
 
@@ -531,7 +531,7 @@ main {
 
 .tactics-editor-actions button:last-child,
 .inventory-actions button:last-child {
-  background: #374151;
+  background: var(--cor-borda);
 }
 
 .inventory-equipped {
@@ -550,7 +550,7 @@ main {
 
 .equipped-slot .slot-name {
   min-width: 70px;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   text-transform: capitalize;
 }
 
@@ -573,13 +573,13 @@ main {
   display: flex;
   flex-direction: column;
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .inventory-filters select {
-  background: #1f2937;
-  color: #e5e7eb;
-  border: 1px solid #374151;
+  background: var(--cor-painel-2);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
 }
@@ -590,13 +590,13 @@ main {
   margin: 0 0 0.75rem;
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   border-radius: 6px;
 }
 
 .inventory-list li {
   padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid #1f2937;
+  border-bottom: 1px solid var(--cor-painel-2);
   cursor: pointer;
   font-size: 0.85rem;
   display: flex;
@@ -613,7 +613,7 @@ main {
 }
 
 .inventory-comparison {
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   padding-top: 0.75rem;
 }
 
@@ -642,7 +642,7 @@ main {
 }
 
 .inventory-comparison button:disabled {
-  background: #374151;
+  background: var(--cor-borda);
   cursor: not-allowed;
 }
 
@@ -657,8 +657,8 @@ main {
 }
 
 .talent-tree-panel {
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 10px;
   padding: 1.25rem;
   max-width: 720px;
@@ -687,12 +687,12 @@ main {
 }
 
 .talent-tabs button:disabled {
-  background: #374151;
+  background: var(--cor-borda);
   cursor: default;
 }
 
 .talent-points {
-  color: #e5e7eb;
+  color: var(--cor-texto);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -701,20 +701,20 @@ main {
    mesmos 9 pontos. Mostrar as duas leituras lado a lado é o que impede o jogador de ler
    uma árvore rasa como uma árvore fraca. */
 .talent-depth {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.85rem;
   margin-right: auto;
 }
 
 .talent-subtitle {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.8rem;
   font-weight: 400;
 }
 
 .talent-graph {
-  background: #0b1220;
-  border: 1px solid #1f2937;
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-painel-2);
   border-radius: 6px;
 }
 
@@ -723,8 +723,8 @@ main {
 }
 
 .talent-node rect {
-  fill: #1f2937;
-  stroke: #374151;
+  fill: var(--cor-painel-2);
+  stroke: var(--cor-borda);
   stroke-width: 1.5;
 }
 
@@ -750,12 +750,12 @@ main {
    Apagado e não escondido — o jogador precisa ver a coluna que ele não escolheu para saber
    o que está trocando. */
 .talent-node.locked rect {
-  fill: #111827;
-  stroke: #1f2937;
+  fill: var(--cor-painel);
+  stroke: var(--cor-painel-2);
 }
 
 .talent-node.locked text {
-  fill: #4b5563;
+  fill: var(--cor-borda-forte);
 }
 
 /* A trilha do caminho alocado, linha a linha. É o que faz a build se ler como uma descida
@@ -766,7 +766,7 @@ main {
 }
 
 .talent-column-titles text {
-  fill: #6b7280;
+  fill: var(--cor-texto-suave);
   font-size: 10px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -778,17 +778,17 @@ main {
 }
 
 .talent-node text {
-  fill: #e5e7eb;
+  fill: var(--cor-texto);
   font-size: 10px;
   pointer-events: none;
 }
 
 .talent-node text.rank {
-  fill: #9ca3af;
+  fill: var(--cor-texto-suave);
 }
 
 .talent-node-details {
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   border-radius: 6px;
   padding: 0.6rem;
   margin-top: 0.75rem;
@@ -801,7 +801,7 @@ main {
 }
 
 .talent-node-details .requires {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   margin: 0.15rem 0;
 }
 
@@ -829,19 +829,19 @@ main {
 }
 
 .talent-node-actions button:disabled {
-  background: #374151;
-  color: #6b7280;
+  background: var(--cor-borda);
+  color: var(--cor-texto-suave);
   cursor: default;
 }
 
 .talent-hint {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.85rem;
   margin-top: 0.75rem;
 }
 
 .talent-preview {
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   margin-top: 0.75rem;
   padding-top: 0.75rem;
 }
@@ -862,7 +862,7 @@ main {
 }
 
 .talent-build-code {
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   margin-top: 0.75rem;
   padding-top: 0.75rem;
 }
@@ -871,14 +871,14 @@ main {
   display: flex;
   flex-direction: column;
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   margin-bottom: 0.35rem;
 }
 
 .talent-build-code textarea {
-  background: #1f2937;
-  color: #e5e7eb;
-  border: 1px solid #374151;
+  background: var(--cor-painel-2);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
   font-family: monospace;
   font-size: 0.75rem;
@@ -906,14 +906,14 @@ main {
   border-radius: 6px;
   border: none;
   cursor: pointer;
-  background: #374151;
+  background: var(--cor-borda);
   color: white;
 }
 
 /* M12, sub-sessão 4/N — objetivo do mapa, Valor e mira. */
 .objective-panel {
-  background: #111827;
-  border: 1px solid #1f2937;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-painel-2);
   border-left: 3px solid #facc15;
   border-radius: 8px;
   padding: 0.75rem;
@@ -934,7 +934,7 @@ main {
 .objective-detail {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .round-counter {
@@ -944,7 +944,7 @@ main {
 
 .valor-section {
   margin-top: 0.75rem;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   padding-top: 0.5rem;
 }
 
@@ -974,7 +974,7 @@ main {
 }
 
 .valor-skills .cost {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 /* Mesma cor do overlay de mira no mapa, pra o botão ativo e os tiles legais se lerem
@@ -992,7 +992,7 @@ button.targeting {
 .hint {
   margin: 0;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--cor-texto-suave);
 }
 
 /* M13, sub-sessão 1/N — tela de replay (§11). z-index acima do overlay de fim de mapa
@@ -1008,8 +1008,8 @@ button.targeting {
 }
 
 .replay-panel {
-  background: #0f172a;
-  border: 1px solid #1f2937;
+  background: var(--cor-fundo-2);
+  border: 1px solid var(--cor-painel-2);
   border-radius: 10px;
   padding: 1rem 1.25rem;
   min-width: 520px;
@@ -1025,7 +1025,7 @@ button.targeting {
 .replay-meta {
   margin: 0 0 0.75rem;
   font-size: 0.72rem;
-  color: #6b7280;
+  color: var(--cor-texto-suave);
 }
 
 .replay-step {
@@ -1042,7 +1042,7 @@ button.targeting {
 .replay-next {
   margin: 0.15rem 0 0.5rem;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--cor-texto-suave);
 }
 
 .replay-units {
@@ -1054,13 +1054,13 @@ button.targeting {
 
 .replay-units th {
   text-align: left;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-weight: normal;
 }
 
 .replay-units td {
   padding: 0.2rem 0.4rem 0.2rem 0;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
 }
 
 .replay-units tr.player td:first-child {
@@ -1072,7 +1072,7 @@ button.targeting {
 }
 
 .replay-units tr.dead td {
-  color: #4b5563;
+  color: var(--cor-borda-forte);
   text-decoration: line-through;
 }
 
@@ -1098,8 +1098,8 @@ button.targeting {
 
 /* M13, sub-sessão 2/N — tela de PvP. */
 .pvp-panel {
-  background: #111827;
-  border: 1px solid #1f2937;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-painel-2);
   border-left: 3px solid #a855f7;
   border-radius: 8px;
   padding: 0.75rem;
@@ -1164,13 +1164,13 @@ button.targeting {
 
 .pvp-result {
   margin-top: 0.5rem;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   padding-top: 0.35rem;
 }
 
 /* §10 (M14, 5/N) — painel de masmorras e conta. Mesma linguagem visual do painel de PvP. */
 .dungeon-panel {
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   border-radius: 6px;
   padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
@@ -1184,12 +1184,12 @@ button.targeting {
 .dungeon-panel h3 {
   margin: 0.75rem 0 0.35rem;
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .pve-economy {
   margin: 0.35rem 0;
-  color: #d1d5db;
+  color: var(--cor-texto);
 }
 
 .pve-roster,
@@ -1211,7 +1211,7 @@ button.targeting {
   align-items: center;
   gap: 0.4rem;
   padding: 0.25rem 0;
-  border-bottom: 1px solid #111827;
+  border-bottom: 1px solid var(--cor-painel);
 }
 
 .pve-dungeons li.locked {
@@ -1223,7 +1223,7 @@ button.targeting {
 }
 
 .pve-locked {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.75rem;
 }
 
@@ -1237,9 +1237,9 @@ button.targeting {
 .dungeon-panel button {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
-  border: 1px solid #374151;
-  background: #111827;
-  color: #e5e7eb;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-painel);
+  color: var(--cor-texto);
   font-size: 0.75rem;
   cursor: pointer;
 }
@@ -1250,14 +1250,14 @@ button.targeting {
 }
 
 .pve-status {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   margin: 0.4rem 0 0;
 }
 
 .pve-result {
   margin-top: 0.5rem;
   padding-top: 0.4rem;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
 }
 
 /* §9.1 (M15, sub-sessão 3/N) — a tela de montar a defesa de arena. Reusa a caixa e a
@@ -1268,7 +1268,7 @@ button.targeting {
 .defense-panel {
   margin-top: 0.75rem;
   padding-top: 0.6rem;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
   /* O tile acompanha a escala de UI de M13 4/N pelo mesmo motivo do mapa: a grade tem de
      crescer junto, senão ela vira o único ponto ilegível da tela em 175%. */
   --defense-tile: 0.85rem;
@@ -1320,7 +1320,7 @@ button.targeting {
 }
 
 .defense-roster li.placed .defense-hero {
-  color: #f8fafc;
+  color: var(--cor-texto-forte);
 }
 
 .defense-roster button.arming {
@@ -1329,7 +1329,7 @@ button.targeting {
 
 .defense-pos {
   font-variant-numeric: tabular-nums;
-  color: #94a3b8;
+  color: var(--cor-texto-suave);
 }
 
 .defense-archetype-legend {
@@ -1337,7 +1337,7 @@ button.targeting {
   margin: 0;
   padding: 0;
   font-size: 0.68rem;
-  color: #94a3b8;
+  color: var(--cor-texto-suave);
   max-width: 26rem;
 }
 
@@ -1374,7 +1374,7 @@ button.targeting {
 /* §10 (M18, 6/N) — a tela de aquisição. Mesma caixa e mesma linguagem do painel de
    masmorras: é mais uma superfície de conta, não um lugar novo do jogo. */
 .summon-panel {
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   border-radius: 6px;
   padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
@@ -1388,15 +1388,15 @@ button.targeting {
 .summon-panel h3 {
   margin: 0.75rem 0 0.35rem;
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .summon-panel button {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
-  border: 1px solid #374151;
-  background: #111827;
-  color: #e5e7eb;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-painel);
+  color: var(--cor-texto);
   font-size: 0.75rem;
   cursor: pointer;
 }
@@ -1410,7 +1410,7 @@ button.targeting {
 .summon-pity,
 .summon-pool {
   margin: 0.25rem 0;
-  color: #d1d5db;
+  color: var(--cor-texto);
 }
 
 /* O pity é a informação que a tela existe para mostrar (D18): destacado, não escondido
@@ -1435,15 +1435,15 @@ button.targeting {
 .summon-banner {
   margin-top: 0.5rem;
   padding-top: 0.4rem;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--cor-painel-2);
 }
 
 .summon-result {
   margin: 0.5rem 0 0;
   padding: 0.35rem 0.5rem;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
-  background: #111827;
+  background: var(--cor-painel);
 }
 
 .summon-roster,
@@ -1463,7 +1463,7 @@ button.targeting {
   align-items: center;
   gap: 0.4rem;
   padding: 0.25rem 0;
-  border-bottom: 1px solid #111827;
+  border-bottom: 1px solid var(--cor-painel);
 }
 
 .summon-roster li.locked,
@@ -1488,23 +1488,23 @@ button.targeting {
   align-items: center;
   gap: 0.75rem;
   padding: 0.4rem 0.9rem;
-  background: #1f2937;
-  border-bottom: 1px solid #374151;
-  color: #e5e7eb;
+  background: var(--cor-painel-2);
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
   font-size: 0.85rem;
 }
 
 .update-banner button {
   padding: 0.2rem 0.7rem;
-  border: 1px solid #4b5563;
+  border: 1px solid var(--cor-borda-forte);
   border-radius: 4px;
-  background: #374151;
-  color: #f9fafb;
+  background: var(--cor-borda);
+  color: var(--cor-texto-forte);
   cursor: pointer;
 }
 
 .update-banner button:hover {
-  background: #4b5563;
+  background: var(--cor-borda-forte);
 }
 
 /* M22 1/N — a tela de atualização obrigatória. Cobre o jogo inteiro de propósito: depois de
@@ -1523,10 +1523,10 @@ button.targeting {
 .version-gate-card {
   max-width: 32rem;
   padding: 1.5rem 1.75rem;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   border-radius: 8px;
-  background: #111827;
-  color: #e5e7eb;
+  background: var(--cor-painel);
+  color: var(--cor-texto);
   line-height: 1.5;
 }
 
@@ -1536,17 +1536,17 @@ button.targeting {
 }
 
 .version-gate-detalhe {
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
   font-size: 0.85rem;
 }
 
 .version-gate-card button {
   margin-top: 0.5rem;
   padding: 0.4rem 1rem;
-  border: 1px solid #4b5563;
+  border: 1px solid var(--cor-borda-forte);
   border-radius: 4px;
-  background: #374151;
-  color: #f9fafb;
+  background: var(--cor-borda);
+  color: var(--cor-texto-forte);
   cursor: pointer;
 }
 
@@ -1560,11 +1560,11 @@ button.targeting {
   z-index: 900;
   max-width: 22rem;
   padding: 0.9rem 1rem;
-  border: 1px solid #4b5563;
+  border: 1px solid var(--cor-borda-forte);
   border-left: 3px solid #60a5fa;
   border-radius: 6px;
-  background: #111827;
-  color: #e5e7eb;
+  background: var(--cor-painel);
+  color: var(--cor-texto);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   line-height: 1.45;
 }
@@ -1582,10 +1582,10 @@ button.targeting {
 
 .introducao button {
   padding: 0.25rem 0.9rem;
-  border: 1px solid #4b5563;
+  border: 1px solid var(--cor-borda-forte);
   border-radius: 4px;
-  background: #374151;
-  color: #f9fafb;
+  background: var(--cor-borda);
+  color: var(--cor-texto-forte);
   cursor: pointer;
 }
 
@@ -1626,9 +1626,9 @@ button.targeting {
 .duel-scene-quadro {
   position: relative;
   width: min(960px, 94vw);
-  border: 1px solid #1f2937;
+  border: 1px solid var(--cor-painel-2);
   border-radius: 10px;
-  background: #0b1220;
+  background: var(--cor-fundo);
   padding: 0.75rem;
 }
 
@@ -1637,7 +1637,7 @@ button.targeting {
   justify-content: space-between;
   font-weight: bold;
   padding: 0 0.5rem 0.5rem;
-  color: #e5e7eb;
+  color: var(--cor-texto);
 }
 
 /* O canvas é desenhado num espaço lógico de 960×420 e encolhe com a janela. É o mesmo
@@ -1674,7 +1674,7 @@ button.targeting {
   background: none;
   border: none;
   padding: 0.15rem 0;
-  color: #e5e7eb;
+  color: var(--cor-texto);
   font: inherit;
   cursor: pointer;
 }
@@ -1692,7 +1692,7 @@ button.targeting {
   background: none;
   border: none;
   padding: 0.1rem 0;
-  color: #d1d5db;
+  color: var(--cor-texto);
   font: inherit;
   cursor: pointer;
 }
@@ -1722,9 +1722,9 @@ button.targeting {
 }
 
 .app-layout button.acao-principal:disabled {
-  background: #374151;
-  border-color: #4b5563;
-  color: #9ca3af;
+  background: var(--cor-borda);
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-texto-suave);
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -1739,16 +1739,16 @@ button.targeting {
 .abrir-opcoes {
   margin-left: auto;
   padding: 0.3rem 0.7rem;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
-  background: #111827;
-  color: #d1d5db;
+  background: var(--cor-painel);
+  color: var(--cor-texto);
   font-size: 0.85rem;
   cursor: pointer;
 }
 
 .abrir-opcoes:hover {
-  border-color: #6b7280;
+  border-color: var(--cor-texto-suave);
 }
 
 /* A entrada: sem sessão, a única coisa na tela. Centrada, com um botão. */
@@ -1764,8 +1764,8 @@ button.targeting {
   gap: 0.9rem;
   max-width: 28rem;
   padding: 2rem 2.5rem;
-  background: #111827;
-  border: 1px solid #1f2937;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-painel-2);
   border-radius: 10px;
   text-align: center;
 }
@@ -1777,7 +1777,7 @@ button.targeting {
 
 .entrada-chamada {
   margin: 0;
-  color: #d1d5db;
+  color: var(--cor-texto);
 }
 
 .tela-de-entrada .acao-principal {
@@ -1812,17 +1812,17 @@ button.targeting {
   gap: 0.35rem;
   min-height: 6.5rem;
   padding: 1rem 1.2rem;
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 8px;
-  color: #e5e7eb;
+  color: var(--cor-texto);
   text-align: left;
   cursor: pointer;
 }
 
 .app-layout button.lobby-botao:hover {
-  border-color: #6b7280;
-  background: #1f2937;
+  border-color: var(--cor-texto-suave);
+  background: var(--cor-painel-2);
 }
 
 /* A campanha é a ação principal: mesma tinta de `.acao-principal`, redeclarada porque a regra
@@ -1847,7 +1847,7 @@ button.targeting {
 
 .lobby-resumo {
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .app-layout button.lobby-botao.acao-principal .lobby-resumo {
@@ -1859,16 +1859,16 @@ button.targeting {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid var(--cor-borda);
   padding-bottom: 0.4rem;
 }
 
 .cabecalho-da-tela .voltar {
   background: transparent;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
   padding: 0.3rem 0.7rem;
-  color: #d1d5db;
+  color: var(--cor-texto);
   cursor: pointer;
 }
 
@@ -1890,7 +1890,7 @@ button.targeting {
 .transicao-nome {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #f9fafb;
+  color: var(--cor-texto-forte);
   letter-spacing: 0.04em;
 }
 
@@ -1914,9 +1914,9 @@ button.targeting {
 .previa-da-missao {
   margin: 0.75rem 0 1rem;
   padding: 0.75rem;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   border-radius: 6px;
-  background: #0f172a;
+  background: var(--cor-fundo-2);
 }
 
 .previa-da-missao h3 {
@@ -1932,7 +1932,7 @@ button.targeting {
 
 .previa-do-mapa canvas {
   display: block;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   max-width: 100%;
 }
 
@@ -1950,7 +1950,7 @@ button.targeting {
 .previa-ficha h4 {
   margin: 0.75rem 0 0.25rem;
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .previa-inimigos {
@@ -1960,7 +1960,7 @@ button.targeting {
 }
 
 .personagens-panel .pve-roster li.em-foco {
-  background: #1f2937;
+  background: var(--cor-painel-2);
   border-radius: 4px;
 }
 
@@ -1980,8 +1980,8 @@ button.targeting {
   max-height: calc(100vh - 2rem);
   overflow: auto;
   padding: 1rem 1.25rem 1.25rem;
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
@@ -2006,14 +2006,14 @@ button.targeting {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #9ca3af;
+  color: var(--cor-texto-suave);
 }
 
 .opcoes-linha {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #d1d5db;
+  color: var(--cor-texto);
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -2059,9 +2059,9 @@ button.targeting {
 .apagar-botoes button {
   padding: 0.3rem 0.7rem;
   border-radius: 4px;
-  border: 1px solid #4b5563;
-  background: #1f2937;
-  color: #e5e7eb;
+  border: 1px solid var(--cor-borda-forte);
+  background: var(--cor-painel-2);
+  color: var(--cor-texto);
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -2076,9 +2076,9 @@ button.targeting {
 .presets-de-party {
   margin: 0.5rem 0 0.75rem;
   padding: 0.6rem 0.75rem;
-  border: 1px solid #374151;
+  border: 1px solid var(--cor-borda);
   border-radius: 6px;
-  background: #0f172a;
+  background: var(--cor-fundo-2);
 }
 
 .presets-de-party h4 {
@@ -2105,10 +2105,10 @@ button.targeting {
 .presets-lista .preset input {
   width: 9rem;
   padding: 0.2rem 0.4rem;
-  background: #111827;
-  border: 1px solid #374151;
+  background: var(--cor-painel);
+  border: 1px solid var(--cor-borda);
   border-radius: 4px;
-  color: #e5e7eb;
+  color: var(--cor-texto);
   font: inherit;
   font-size: 0.85rem;
 }

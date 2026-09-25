@@ -23,6 +23,8 @@ const TELAS_COM_ACAO_PRINCIPAL: Readonly<Record<string, string>> = {
   'EntradaPanel.tsx': 'entrar',
   // M35 5/N — no lobby a próxima ação de quem chega é a campanha.
   'LobbyPanel.tsx': 'entrar na campanha',
+  // M35 6/N — não é tela: é a variante primária do `Botao`. Quem a usa continua sendo a tela.
+  'ui.tsx': 'a variante primária do Botao (componente base, não tela)',
   'CampaignPanel.tsx': 'a próxima missão, ou entrar na missão escolhida',
   // M36 4/N (D47) — `DuelPreviewPanel.tsx` SAIU: o preview de duelo foi removido, e com ele o
   // botão de confirmar. Engajar virou um comando só.

@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/cinzel": "^5.3.0",
     "@paths-beyond/content": "workspace:*",
     "@paths-beyond/core": "workspace:*",
     "@paths-beyond/data": "workspace:*",

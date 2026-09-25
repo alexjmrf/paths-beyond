@@ -17,7 +17,7 @@ import type { Catalogo, Idioma } from './idioma.js';
 
 const en: Catalogo = {
   // Cabeçalho e preferências de apresentação (§11 — acessibilidade).
-  'app.titulo': 'Project Vanguard — campaign',
+  'app.titulo': 'Project Vanguard',
   'app.modo.pvp': 'Arena — PvP',
   'app.modo.masmorra': 'Dungeon',
   'app.modo.escolhaCapitulo': 'Choose a chapter',
@@ -735,7 +735,7 @@ const en: Catalogo = {
 };
 
 const pt: Catalogo = {
-  'app.titulo': 'Project Vanguard — campanha',
+  'app.titulo': 'Project Vanguard',
   'app.modo.pvp': 'Arena — PvP',
   'app.modo.masmorra': 'Masmorra',
   'app.modo.escolhaCapitulo': 'Escolha um capítulo',

@@ -172,3 +172,48 @@ mostra a ficha dele (HP, AP/PP, alcance) e nada que seja ação.
 - Se a aba Personagens absorve o editor de talentos e de táticas INTEIROS ou só abre os de hoje
   — decidir na 1/N medindo o tamanho deles; não é decisão de design, é de corte.
 - Telemetria (M34) continua depois do playtest: nada aqui instala medição.
+
+---
+
+## 7. A passagem de estilo (6/N em diante) — aberta em 2026-09-25
+
+**Por que agora.** O M35 fechou a ESTRUTURA e deixou o estilo "para depois do playtest". Com o
+jogo visto de novo no navegador depois do M38, o usuário pediu que ela viesse já: *"o quão ruim
+está o design da HUD... a opção de seleção de missões é horrível e quando você está dentro da
+missão é super não prático sair e escolher outra"*. O que a tela mostrou, medido:
+
+- **Dentro da missão, o hub inteiro vem junto.** O "painel do modo" que D44 pôs por último na
+  coluna da batalha é o `CampaignPanel` INTEIRO — lista de capítulos, prévia, oito slots de
+  preset, "quem vai" e "Entrar na missão" — embaixo do tabuleiro. Ele foi posto ali porque era
+  onde morava a saída, e trouxe o hub com ele. Não há pausa, nem abandonar, nem trocar de missão.
+- **A seleção de missão é uma lista de texto em sanfona**, e clicar numa missão despeja a
+  prévia, os oito presets sempre abertos e uma lista de checkboxes na mesma página.
+- **Botões nativos do navegador** em quase todas as telas, sem hierarquia visual.
+
+**As decisões do usuário (2026-09-25):**
+
+1. **Direção visual: tático clássico** — a linha de Fire Emblem / Unicorn Overlord: painéis
+   escuros com moldura, dourado como destaque, uma serifa nos títulos, retratos nos cartões.
+2. **Escopo primeiro: o fluxo da campanha e a batalha** — Campanha → Preparação → Batalha (com
+   pausa) → Resultado, mais o sistema visual aplicado ao lobby. Personagens, Invocação,
+   Masmorras e Arena ganham só o sistema visual; o redesenho delas vem depois.
+3. **É continuação do M35**, sem número novo. O M39 (a Soul) vem depois desta passagem.
+
+**As sub-sessões:**
+
+- **6/N — o sistema visual.** Tokens de cor e tipografia (Cinzel, OFL, empacotada, nos títulos),
+  estilo base que acaba com o botão nativo, componentes `Botao`/`Painel`/`Cartao`/`Modal`, e o
+  lobby redesenhado com eles.
+- **7/N — a Campanha.** Capítulos em abas e missões em CARTÕES (número, nome, vagas, recompensa
+  de primeira vitória, estado limpa/disponível/próxima). Clicar leva à Preparação.
+- **8/N — a Preparação, tela própria.** Prévia grande, objetivo e inimigos; "quem vai" como
+  retratos clicáveis; presets num seletor compacto com "Salvar como…"; Iniciar missão e ←
+  Campanha.
+- **9/N — a Batalha e o Resultado.** A batalha é SÓ batalha (o `CampaignPanel` sai dela), com
+  faixa no topo (missão, objetivo, round, Valor), **menu de pausa** (Continuar, Recomeçar,
+  Abandonar → Preparação, Trocar de missão → Campanha) e tela de resultado (Próxima missão,
+  Repetir, Voltar à campanha). Masmorras e Arena ganham a mesma pausa.
+
+**O que NÃO fazer nesta passagem:** regra no cliente (regra 3); mexer no core ou no servidor;
+redesenhar o duelo (a cena de M26); o redesenho de Personagens/Invocação/Masmorras/Arena além do
+sistema visual; inventar texto de história (M30).

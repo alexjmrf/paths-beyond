@@ -1,5 +1,6 @@
 import { ABAS_DO_HUB, type AbaDoHub } from '../logic/tela.js';
 import { useBattleStore } from '../store/battleStore.js';
+import { ICONES_DO_LOBBY } from './ui.js';
 
 // M35 5/N (D41, revisada) — o LOBBY: a tela principal com um botão por tela.
 //
@@ -8,8 +9,8 @@ import { useBattleStore } from '../store/battleStore.js';
 // lá dentro (o capítulo em curso, a energia, a moeda premium), lida da store que o sign-in já
 // carregou: é o que faz o lobby dizer alguma coisa em vez de ser cinco palavras.
 //
-// A ação principal de quem chega é a CAMPANHA (D40): é o único botão com peso maior. Estilo
-// (cor, arte de botão, animação) é passagem futura por decisão do usuário; aqui é estrutura.
+// A ação principal de quem chega é a CAMPANHA (D40): é o único botão com peso maior. M35 6/N —
+// a pele do tático clássico (`theme.css`) e um ícone por botão.
 export function LobbyPanel() {
   const escolherAba = useBattleStore((s) => s.escolherAba);
   const t = useBattleStore((s) => s.t);
@@ -44,6 +45,9 @@ export function LobbyPanel() {
           className={aba === 'campanha' ? 'lobby-botao acao-principal' : 'lobby-botao'}
           onClick={() => escolherAba(aba)}
         >
+          <span className="lobby-icone" aria-hidden="true">
+            {ICONES_DO_LOBBY[aba]}
+          </span>
           <span className="lobby-nome">{t(`menu.${aba}`)}</span>
           <span className="lobby-resumo">{resumo[aba]}</span>
         </button>
