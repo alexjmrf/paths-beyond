@@ -384,3 +384,251 @@ button.ui-botao-perigo:hover:not(:disabled) {
   color: var(--cor-texto-suave);
   font-size: 0.85rem;
 }
+
+/* --- M35 7/N — a Campanha em abas e cartões ------------------------------------------- */
+
+.campanha-abas {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0.8rem;
+  border-bottom: 1px solid var(--cor-borda-forte);
+}
+
+.app-layout button.campanha-aba {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 12rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: none;
+  border-radius: var(--raio) var(--raio) 0 0;
+  background: var(--cor-fundo-2);
+  color: var(--cor-texto-suave);
+}
+
+.app-layout button.campanha-aba.ativa {
+  background: linear-gradient(var(--cor-painel-2), var(--cor-painel));
+  border-color: var(--cor-ouro);
+  color: var(--cor-texto-forte);
+  box-shadow: inset 0 2px 0 var(--cor-ouro);
+}
+
+.campanha-aba-numero {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cor-ouro);
+}
+
+.campanha-aba-nome {
+  font-family: var(--fonte-titulo);
+  font-size: 1.05rem;
+}
+
+.campanha-aba-progresso {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.campanha-regra {
+  margin: 0 0 0.9rem;
+}
+
+.campanha-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: 0.8rem;
+}
+
+.campanha-grid > li > button {
+  width: 100%;
+  min-height: 8.5rem;
+  position: relative;
+}
+
+.campanha-cartao-numero {
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--cor-ouro);
+}
+
+.campanha-cartao-nome {
+  font-family: var(--fonte-titulo);
+  font-size: 1rem;
+  color: var(--cor-texto-forte);
+}
+
+.campanha-cartao-linha {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.campanha-cartao-estado {
+  margin-top: auto;
+  font-size: 0.78rem;
+  color: var(--cor-ouro-claro);
+}
+
+.campanha-cartao.estado-limpa {
+  opacity: 0.75;
+}
+
+.campanha-cartao.estado-limpa .campanha-cartao-estado {
+  color: #86c98a;
+}
+
+/* A próxima missão é a ação principal da tela (D40): o cartão ganha a tinta dourada. */
+.app-layout button.campanha-cartao.acao-principal {
+  font-family: inherit;
+  letter-spacing: normal;
+  text-shadow: none;
+}
+
+.app-layout button.campanha-cartao.acao-principal .campanha-cartao-numero,
+.app-layout button.campanha-cartao.acao-principal .campanha-cartao-nome,
+.app-layout button.campanha-cartao.acao-principal .campanha-cartao-linha,
+.app-layout button.campanha-cartao.acao-principal .campanha-cartao-estado {
+  color: #1b1408;
+}
+
+/* --- M35 8/N — a Preparação ------------------------------------------------------------ */
+
+.preparacao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.preparacao-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.preparacao-titulo {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.preparacao-selo {
+  font-size: 0.8rem;
+  color: #86c98a;
+  border: 1px solid #3f6b42;
+  border-radius: var(--raio);
+  padding: 0.1rem 0.5rem;
+}
+
+.preparacao-corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(14rem, 2fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.preparacao-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.retratos {
+  list-style: none;
+  margin: 0.4rem 0 0.9rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.app-layout button.retrato {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  width: 7.5rem;
+  padding: 0.5rem 0.4rem 0.6rem;
+  background: linear-gradient(var(--cor-painel-2), var(--cor-painel));
+  border: 1px solid var(--cor-borda);
+}
+
+.app-layout button.retrato.escolhido {
+  border-color: var(--cor-ouro);
+  box-shadow: 0 0 0 1px var(--cor-ouro), 0 0 14px rgb(212 166 74 / 0.35);
+}
+
+.retrato-imagem {
+  width: 4.5rem;
+  height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgb(212 166 74 / 0.12), transparent 70%);
+}
+
+.retrato-imagem img {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+}
+
+.retrato-nome {
+  font-family: var(--fonte-titulo);
+  color: var(--cor-texto-forte);
+}
+
+.retrato-classe {
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+}
+
+.retrato-vaga {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cor-ouro);
+  color: #1b1408;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.preparacao-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.app-layout button.preparacao-iniciar {
+  padding: 0.7rem 2.2rem;
+  font-size: 1.1rem;
+}
+
+.presets-compactos {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.presets-salvar {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}

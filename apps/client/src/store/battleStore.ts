@@ -699,6 +699,10 @@ interface BattleStore {
   refreshCampaign: () => Promise<void>;
   selectChapter: (chapterId: string) => void;
   toggleChapterOpen: (chapterId: string) => void;
+  /** M35 7/N — a aba de capítulo: UM capítulo em foco por vez (o grid de cartões dele). */
+  escolherCapitulo: (chapterId: string) => void;
+  /** M35 8/N — "← Missões": sai da Preparação e volta ao grid de cartões. */
+  voltarParaMissoes: () => void;
   toggleCampaignHero: (heroId: string) => void;
   enterChapter: (chapterId: string) => Promise<void>;
   exitCampaign: () => Promise<void>;
@@ -1197,6 +1201,14 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   // M27 3/N — abrir e fechar um capítulo. Sem exclusividade: o jogador que quer comparar a
   // rampa de dois capítulos abre os dois, e forçá-lo a um de cada vez seria uma regra que
   // nada pede.
+  escolherCapitulo: (chapterId) => {
+    const { campaign } = get();
+    if (!campaign.chapters.some((chapter) => chapter.id === chapterId)) return;
+    // `openChapterIds` guarda a aba em foco (a primeira da lista): a sanfona do M27 abria
+    // várias, a aba abre uma.
+    set({ campaign: { ...campaign, openChapterIds: [chapterId] } });
+  },
+  voltarParaMissoes: () => set((s) => ({ campaign: { ...s.campaign, selectedMissionId: null, error: null } })),
   toggleChapterOpen: (chapterId) => {
     const { campaign } = get();
     if (!campaign.chapters.some((chapter) => chapter.id === chapterId)) return;
