@@ -1,6 +1,7 @@
 {
   "id": "enemy-cerco-guerreiro",
   "name": "Sitiante de Machado",
+  "level": 18,
   "stats": {
     "hp": 580,
     "atk": 105,

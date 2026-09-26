@@ -1,6 +1,7 @@
 {
   "id": "enemy-treino-alvo-espadachim",
   "name": "Alvo de Treino de Espada",
+  "level": 11,
   "stats": {
     "hp": 560,
     "atk": 102,

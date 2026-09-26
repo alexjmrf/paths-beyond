@@ -23,6 +23,10 @@ import type { Id } from '../types.js';
 export interface EnemyDef {
   readonly id: Id;
   readonly name: string;
+  // M39 1/N — o nível do inimigo: é o que ele vale de exp (`expDaInstancia`). Obrigatório no
+  // schema (todo inimigo do conteúdo o declara) e opcional aqui, para os inimigos montados à mão
+  // nos testes continuarem válidos — sem nível, o inimigo não vale exp.
+  readonly level?: number;
   // A folha COMPLETA, já resolvida. É o campo que substitui `statCurve[level-1]` mais
   // multiplicador de despertar, mais imprint, mais equipamento, mais talento.
   readonly stats: StatSheet;

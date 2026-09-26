@@ -30,6 +30,7 @@ function inimigo(overrides: Record<string, unknown> = {}) {
   return {
     id: 'enemy-patrulheiro',
     name: 'Patrulheiro',
+    level: 12,
     stats: STATS,
     unitType: 'infantry',
     weaponType: 'spear',
@@ -55,8 +56,11 @@ describe('schema de inimigo autorado', () => {
     expect(() => enemySchema.parse(inimigo({ stats: { hp: 980, atk: 150 } }))).toThrow();
   });
 
-  it('recusa `classId`, `level`, `awakening`, `imprint`, `talents` e `equipment` — a forma antiga falha alto', () => {
-    for (const campo of ['classId', 'level', 'awakening', 'imprint', 'talents', 'equipment']) {
+  // M39 1/N — `level` saiu desta lista: o inimigo passou a declarar o nível que ele VALE de exp
+  // (a soma dos inimigos é o exp da instância). Não é o nível de herói da forma antiga, que
+  // resolvia status pela curva da classe — os status do inimigo continuam autorados.
+  it('recusa `classId`, `awakening`, `imprint`, `talents` e `equipment` — a forma antiga falha alto', () => {
+    for (const campo of ['classId', 'awakening', 'imprint', 'talents', 'equipment']) {
       expect(() => enemySchema.parse(inimigo({ [campo]: 1 })), campo).toThrow();
     }
   });

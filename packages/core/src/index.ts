@@ -263,6 +263,9 @@ export {
   rankCorrente,
 } from './economy/rank.js';
 export type { BaseRank, CharacterRank } from './economy/rank.js';
+// M39 1/N — a subida de nível.
+export { MAX_LEVEL, aplicarExp, expDaInstancia } from './economy/nivel.js';
+export type { CurvaDeExp, ResultadoDoExp } from './economy/nivel.js';
 export type { AwakenInput } from './economy/awakening.js';
 export { MAX_IMPRINT, applyImprint } from './economy/imprint.js';
 export type { ApplyImprintInput } from './economy/imprint.js';

@@ -1,6 +1,7 @@
 {
   "id": "enemy-chefe",
   "name": "Comandante da Fortaleza",
+  "level": 21,
   "stats": {
     "hp": 1015,
     "atk": 156,

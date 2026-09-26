@@ -1,3 +1,4 @@
+import { darExpDaVitoria } from './experiencia.js';
 import { artefatoEquipado } from '../summon/artefatos.js';
 import {
   buildBattleSetupFromHeroes,
@@ -391,12 +392,22 @@ export const economyRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fa
     // viva, em `battle/matchRoutes.ts`.
     const premiumAwarded = 0;
 
+    // M39 1/N — a varredura também é instância PvE: o exp dos inimigos vai aos heróis que foram.
+    const { exp, subidas } = await darExpDaVitoria(opts.catalog, opts.heroRepository, {
+      playerId: player.id,
+      kind: 'dungeon',
+      refId: dungeon.id,
+      heroIds: assembled.setup.units.filter((u) => u.side === 'player').map((u) => u.heroId),
+    });
+
     return {
       outcome,
       roundsPlayed,
       rewards,
       energy: spent.energy,
       premiumAwarded,
+      exp,
+      subidas,
       wallet: { gold: wallet.gold, stones: wallet.stones, arenaMarks: wallet.arenaMarks },
     };
   });

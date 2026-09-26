@@ -632,3 +632,35 @@ button.ui-botao-perigo:hover:not(:disabled) {
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* --- M39 1/N — o nível e os tomos ------------------------------------------------------ */
+
+.nivel-linha {
+  margin: 0.2rem 0 0.4rem;
+}
+
+.barra-de-exp {
+  height: 0.5rem;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: 999px;
+  background: var(--cor-fundo-2);
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+}
+
+.barra-de-exp-cheia {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cor-ouro-escuro), var(--cor-ouro-claro));
+}
+
+input.tomo-quantidade {
+  width: 4rem;
+}
+
+.conclusao-subidas {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  color: var(--cor-ouro-claro);
+  font-family: var(--fonte-titulo);
+}

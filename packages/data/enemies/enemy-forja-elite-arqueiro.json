@@ -1,6 +1,7 @@
 {
   "id": "enemy-forja-elite-arqueiro",
   "name": "Besteiro da Forja",
+  "level": 19,
   "stats": {
     "hp": 700,
     "atk": 93,

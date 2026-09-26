@@ -1,6 +1,7 @@
 {
   "id": "enemy-cerco-grifeiro",
   "name": "Sitiante Alado",
+  "level": 19,
   "stats": {
     "hp": 580,
     "atk": 105,

@@ -1,6 +1,7 @@
 {
   "id": "enemy-cerco-lanceiro",
   "name": "Sitiante de Lança",
+  "level": 18,
   "stats": {
     "hp": 580,
     "atk": 105,

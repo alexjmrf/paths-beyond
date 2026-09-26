@@ -173,3 +173,21 @@ describe('o artefato na aba Personagens', () => {
     expect(useBattleStore.getState().pve.error).toContain('400');
   });
 });
+
+// M39 1/N — usar Tomos de Experiência num herói.
+describe('os tomos de experiência', () => {
+  it('usar tomos manda o tomo e a quantidade, e relê heróis e economia', async () => {
+    responder(`/api/heroes/${RURIK.hero.id}/exp-tomes`, { hero: { ...RURIK.hero, level: 12 }, niveisGanhos: 2, materials: {} });
+    await useBattleStore.getState().usarTomos(RURIK.hero.id, 'material-tomo-medio', 2);
+    const post = chamadas.find((c) => c.url === `/api/heroes/${RURIK.hero.id}/exp-tomes`);
+    expect(post?.body).toMatchObject({ materialId: 'material-tomo-medio', quantidade: 2 });
+    expect(typeof (post?.body as { nonce: string }).nonce).toBe('string');
+    expect(chamadas.some((c) => c.url === '/api/me/heroes')).toBe(true);
+    expect(chamadas.some((c) => c.url === '/api/me/economy')).toBe(true);
+  });
+
+  it('quantidade zero não vira requisição', async () => {
+    await useBattleStore.getState().usarTomos(RURIK.hero.id, 'material-tomo-medio', 0);
+    expect(chamadas.filter((c) => c.url.includes('/exp-tomes'))).toHaveLength(0);
+  });
+});

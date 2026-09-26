@@ -1,6 +1,7 @@
 {
   "id": "enemy-veio-elite-couracado",
   "name": "Capataz do Veio Couraçado",
+  "level": 16,
   "stats": {
     "hp": 780,
     "atk": 99,

@@ -104,3 +104,24 @@ describe('a conclusão da partida', () => {
     ]);
   });
 });
+
+// M39 1/N — o exp da vitória (a soma dos inimigos) e quem subiu de nível entram no espólio.
+describe('o exp e as subidas de nível na conclusão', () => {
+  it('o exp aparece no espólio, e cada herói que subiu ganha a linha dele', () => {
+    const c = conclusaoDaPartida({
+      modo: 'campaign',
+      outcome: 'victory',
+      rounds: 3,
+      liquidacao: { premiumAwarded: 0, exp: 240, subidas: [{ heroId: 'p1-hero-jogador', level: 11, niveisGanhos: 1 }] },
+      refId: 'm1',
+      capitulos,
+    })!;
+    expect(c.loot).toEqual([{ tipo: 'exp', valor: 240 }]);
+    expect(c.subidas).toEqual([{ heroId: 'p1-hero-jogador', level: 11 }]);
+  });
+
+  it('sem subida, a lista vem vazia', () => {
+    const c = conclusaoDaPartida({ modo: 'campaign', outcome: 'victory', rounds: 3, liquidacao: { exp: 100 }, refId: 'm1', capitulos })!;
+    expect(c.subidas).toEqual([]);
+  });
+});

@@ -1,6 +1,7 @@
 {
   "id": "enemy-invasor-lanceiro",
   "name": "Invasor de Lança",
+  "level": 14,
   "stats": {
     "hp": 580,
     "atk": 105,

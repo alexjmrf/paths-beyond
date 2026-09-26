@@ -357,6 +357,9 @@ export interface LiquidacaoDaPartida {
   readonly wallet?: { readonly gold: number; readonly stones: number; readonly arenaMarks: number };
   readonly elo?: { readonly attacker: number; readonly defender: number };
   readonly arenaMarks?: { readonly attacker: number; readonly defender: number };
+  // M39 1/N — o exp da vitória numa instância PvE (a soma dos inimigos) e quem subiu de nível.
+  readonly exp?: number;
+  readonly subidas?: readonly { readonly heroId: string; readonly level: number; readonly niveisGanhos: number }[];
 }
 
 /** A partida, como ela chega ao abrir e ao reconectar. */
@@ -707,6 +710,14 @@ export const api = {
       ticket,
       `/heroes/${heroId}/awaken`,
       { method: 'POST', body: JSON.stringify({ nonce: nonce() }) },
+    ),
+
+  // M39 1/N — usar Tomos de Experiência num herói.
+  usarTomos: (ticket: string, heroId: string, materialId: string, quantidade: number) =>
+    request<{ readonly hero: Hero; readonly niveisGanhos: number; readonly materials: Readonly<Record<string, number>> }>(
+      ticket,
+      `/heroes/${heroId}/exp-tomes`,
+      { method: 'POST', body: JSON.stringify({ nonce: nonce(), materialId, quantidade }) },
     ),
 
   imprintHero: (ticket: string, heroId: string) =>

@@ -266,7 +266,8 @@ export interface DungeonRunRecord {
 //
 // Uma constante em tempo de execução é o que permite a `tests/migrations.test.ts` comparar
 // os dois lados. O tipo continua estreito porque sai dela.
-export const ECONOMY_ACTION_KINDS = ['enhance', 'awaken', 'imprint', 'equip', 'summon', 'energy'] as const;
+// M39 1/N — `exp`: usar Tomos de Experiência num herói (migration 0020).
+export const ECONOMY_ACTION_KINDS = ['enhance', 'awaken', 'imprint', 'equip', 'summon', 'energy', 'exp'] as const;
 
 export interface EconomyActionRecord {
   readonly nonce: string;

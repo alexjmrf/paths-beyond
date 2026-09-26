@@ -1,6 +1,7 @@
 {
   "id": "enemy-forja-elite-guarda-espadachim",
   "name": "Guardião da Forja de Espada",
+  "level": 19,
   "stats": {
     "hp": 720,
     "atk": 126,

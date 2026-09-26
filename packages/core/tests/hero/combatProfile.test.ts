@@ -495,10 +495,11 @@ describe('resolveHeroCombatProfile — Hero→ClassDef→talentos até o perfil 
 // M38 5/N (D57) — a ordem das reações é regra: a mesma batalha dá outro resultado quando uma
 // reação concedida passa a disparar na frente da baseline.
 describe('RULES_VERSION — a ordem das reações (D57)', () => {
-  it('sobe para 0.23.0, e o cliente de 0.22.0 é recusado', async () => {
+  // A versão exata é afirmada pela fatia mais recente (M39 1/N, `tests/economy/nivel.test.ts`).
+  it('subiu da 0.22.0: o cliente dela é recusado', async () => {
     const { RULES_VERSION } = await import('../../src/rulesVersion.js');
     const { checkRulesVersion } = await import('../../src/rulesVersionCompat.js');
-    expect(RULES_VERSION).toBe('0.23.0');
+    expect(RULES_VERSION).not.toBe('0.22.0');
     expect(checkRulesVersion('0.22.0')).not.toBeNull();
   });
 });

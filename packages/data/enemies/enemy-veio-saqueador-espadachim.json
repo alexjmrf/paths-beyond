@@ -1,6 +1,7 @@
 {
   "id": "enemy-veio-saqueador-espadachim",
   "name": "Saqueador do Veio de Espada",
+  "level": 12,
   "stats": {
     "hp": 620,
     "atk": 111,

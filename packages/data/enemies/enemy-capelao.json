@@ -1,6 +1,7 @@
 {
   "id": "enemy-capelao",
   "name": "Capelão",
+  "level": 20,
   "stats": {
     "hp": 600,
     "atk": 78,

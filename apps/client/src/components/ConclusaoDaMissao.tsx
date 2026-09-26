@@ -1,6 +1,7 @@
 import { catalog } from '../data/catalog.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
 import { conclusaoDaPartida, type LinhaDeLoot } from '../logic/conclusao.js';
+import { rotuloDeHeroi } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 import type { Tradutor } from '../i18n/idioma.js';
 import { Botao, Modal, Painel } from './ui.js';
@@ -42,6 +43,11 @@ export function ConclusaoDaMissao() {
   const voltarAoMenu = useBattleStore((s) => s.voltarAoMenu);
   const recomecarMissao = useBattleStore((s) => s.recomecarMissao);
   const openReplayViewer = useBattleStore((s) => s.openReplayViewer);
+  const roster = useBattleStore((s) => s.pvp.roster);
+  const nomeDoHeroi = (heroId: string) => {
+    const entry = roster.find((e) => e.hero.id === heroId);
+    return entry ? rotuloDeHeroi(t, entry.hero, catalog).nome : heroId;
+  };
 
   if (!partida || boardAnimating || duelScene) return null;
   const conclusao = conclusaoDaPartida({
@@ -68,6 +74,15 @@ export function ConclusaoDaMissao() {
         <h2 className="conclusao-titulo">{conclusao.venceu ? t('conclusao.vitoria') : t('conclusao.derrota')}</h2>
         {nomeDaMissao ? <p className="conclusao-missao">{nomeDaMissao}</p> : null}
         <p className="hint">{t('conclusao.rounds', { rounds: conclusao.rounds })}</p>
+
+        {/* M39 1/N — quem subiu de nível com o exp desta vitória. */}
+        {conclusao.subidas.length > 0 ? (
+          <ul className="conclusao-subidas">
+            {conclusao.subidas.map((s) => (
+              <li key={s.heroId}>{t('conclusao.subiu', { nome: nomeDoHeroi(s.heroId), nivel: s.level })}</li>
+            ))}
+          </ul>
+        ) : null}
 
         <h3 className="conclusao-loot-titulo">{t('conclusao.loot.titulo')}</h3>
         {conclusao.loot.length > 0 ? (

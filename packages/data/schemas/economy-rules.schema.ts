@@ -39,6 +39,14 @@ const economyRulesSchema = z.object({
     .array(z.object({ gold: z.number().int().min(0), materials: materialCostSchema }))
     .length(6),
   artifactImprint: z.array(z.object({ fragments: z.number().int().positive() })).length(5),
+  // M39 1/N — A SUBIDA DE NÍVEL. `expParaProximo[L - 1]` é o exp do nível L para o L+1, do 1 ao
+  // 60 (o tamanho da `statCurve`); `porNivelDeInimigo` é quanto cada nível de inimigo vale.
+  experiencia: z
+    .object({
+      expParaProximo: z.array(z.number().int().positive()).length(59),
+      porNivelDeInimigo: z.number().int().positive(),
+    })
+    .strict(),
   // §10 (M18) — os dois sumidouros da QUARTA moeda, a premium (D17). Ela não se ganha
   // farmando e não paga evolução de personagem: awakening, imprint e enhance continuam em
   // ouro, pedras e material, pela mesma razão que a loja de arena nunca vende poder bruto.

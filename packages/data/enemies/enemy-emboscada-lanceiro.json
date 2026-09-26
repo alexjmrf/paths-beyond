@@ -1,6 +1,7 @@
 {
   "id": "enemy-emboscada-lanceiro",
   "name": "Emboscador de Lança",
+  "level": 18,
   "stats": {
     "hp": 580,
     "atk": 105,

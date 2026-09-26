@@ -1,8 +1,10 @@
 import {
   ENHANCE_MILESTONES,
+  aplicarExp,
   applyImprint,
   attemptEnhance,
   awaken,
+  intMul,
 } from '@paths-beyond/core';
 import type { FastifyPluginAsync } from 'fastify';
 import { deriveSeed } from '../battle/ticket.js';
@@ -17,7 +19,7 @@ import type { EconomyRoutesOptions } from './routes.js';
 // rede não pode cobrar duas vezes. O cliente não sabe se a primeira requisição chegou; o
 // servidor sabe.
 
-type ActionKind = 'enhance' | 'awaken' | 'imprint' | 'equip';
+type ActionKind = 'enhance' | 'awaken' | 'imprint' | 'equip' | 'exp';
 
 export const progressionRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fastify, opts) => {
   async function claimAction(
@@ -116,6 +118,41 @@ export const progressionRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async
     await opts.economyRepository.setMaterials(player.id, result.materials);
 
     return { hero: result.hero, materials: result.materials };
+  });
+
+  // M39 1/N — os TOMOS DE EXPERIÊNCIA: o jeito mais eficiente de subir de nível, sem custo de
+  // ouro (decisões do usuário). O exp de cada tomo é do catálogo (`material.exp`), nunca do
+  // corpo; a subida é `aplicarExp` do core, a mesma da vitória. Recusa (tomo insuficiente,
+  // material que não é tomo, quantidade inválida) volta 400 ANTES de gastar o nonce.
+  fastify.post('/heroes/:heroId/exp-tomes', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const player = request.player;
+    const heroId = (request.params as { heroId: string }).heroId;
+    const body = request.body as { nonce?: string; materialId?: string; quantidade?: number };
+
+    const stored = await opts.heroRepository.getHeroById(heroId);
+    if (!stored || stored.ownerPlayerId !== player.id) return reply.code(403).send({ error: 'esse herói não é seu' });
+
+    const tomo = body.materialId ? opts.catalog.materials[body.materialId] : undefined;
+    if (!tomo || tomo.kind !== 'expTome' || !tomo.exp) return reply.code(400).send({ error: 'isso não é um tomo de experiência' });
+    const quantidade = body.quantidade ?? 0;
+    if (!Number.isInteger(quantidade) || quantidade < 1) return reply.code(400).send({ error: 'quantidade inválida' });
+    const regras = opts.catalog.economyRules.experiencia;
+    if (!regras) return reply.code(500).send({ error: 'curva de exp ausente do catálogo' });
+
+    const materials = await opts.economyRepository.getMaterials(player.id);
+    const tem = materials[tomo.id] ?? 0;
+    if (tem < quantidade) return reply.code(400).send({ error: `tomos insuficientes: ${tem} de ${quantidade}` });
+
+    const claim = await claimAction(body.nonce, player.id, 'exp');
+    if (!claim.ok) return reply.code(claim.status).send({ error: claim.error });
+
+    const resultado = aplicarExp(stored.hero, intMul(tomo.exp, quantidade), regras);
+    await opts.heroRepository.updateHero({ ...stored, hero: resultado.hero });
+    const restantes = { ...materials, [tomo.id]: tem - quantidade };
+    await opts.economyRepository.setMaterials(player.id, restantes);
+
+    return { hero: resultado.hero, niveisGanhos: resultado.niveisGanhos, materials: restantes };
   });
 
   // §7.3 — enhance. A chance de sucesso vem do dado (`enhance-rates`) e o custo é pedras +

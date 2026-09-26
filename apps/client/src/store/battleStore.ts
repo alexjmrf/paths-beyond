@@ -791,6 +791,8 @@ interface BattleStore {
   equipInventoryItem: (heroId: string, itemId: string) => Promise<void>;
   awakenHero: (heroId: string) => Promise<void>;
   imprintHero: (heroId: string) => Promise<void>;
+  /** M39 1/N — usa `quantidade` Tomos de Experiência (`materialId`) no herói. */
+  usarTomos: (heroId: string, materialId: string, quantidade: number) => Promise<void>;
   lerInvocacao: () => Promise<void>;
   // M32 — o que o hub mostra, lido no sign-in: campanha, invocação e masmorras.
   carregarHub: () => Promise<void>;
@@ -2486,6 +2488,24 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     try {
       const result = await api.awakenHero(pvp.token, heroId);
       set((s) => ({ pve: { ...s.pve, busy: false, status: get().t('estado.awakening', { nivel: result.hero.awakening }) } }));
+      const roster = await api.roster(pvp.token);
+      set((s) => ({ pvp: { ...s.pvp, roster } }));
+      await get().refreshPve();
+    } catch (error) {
+      set((s) => ({ pve: { ...s.pve, busy: false, error: describeApiError(error) } }));
+    }
+  },
+
+  usarTomos: async (heroId, materialId, quantidade) => {
+    const { pvp } = get();
+    // Quantidade inválida não vira requisição: a recusa é do servidor, mas o nonce não se queima.
+    if (!pvp.token || !Number.isInteger(quantidade) || quantidade < 1) return;
+    set((s) => ({ pve: { ...s.pve, busy: true, error: null } }));
+    try {
+      const result = await api.usarTomos(pvp.token, heroId, materialId, quantidade);
+      set((s) => ({
+        pve: { ...s.pve, busy: false, status: get().t('estado.tomosUsados', { nivel: result.hero.level }) },
+      }));
       const roster = await api.roster(pvp.token);
       set((s) => ({ pvp: { ...s.pvp, roster } }));
       await get().refreshPve();

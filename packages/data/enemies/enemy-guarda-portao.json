@@ -1,6 +1,7 @@
 {
   "id": "enemy-guarda-portao",
   "name": "Guarda do Portão",
+  "level": 18,
   "stats": {
     "hp": 600,
     "atk": 81,

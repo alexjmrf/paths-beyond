@@ -1,6 +1,7 @@
 {
   "id": "enemy-patrulheiro-arqueiro",
   "name": "Patrulheiro Arqueiro",
+  "level": 12,
   "stats": {
     "hp": 560,
     "atk": 72,

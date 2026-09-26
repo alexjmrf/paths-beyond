@@ -1,6 +1,7 @@
 {
   "id": "enemy-invasor-arqueiro",
   "name": "Invasor Arqueiro",
+  "level": 14,
   "stats": {
     "hp": 580,
     "atk": 75,

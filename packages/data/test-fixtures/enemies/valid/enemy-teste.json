@@ -1,6 +1,7 @@
 {
   "id": "enemy-teste",
   "name": "Inimigo de Teste",
+  "level": 10,
   "stats": {
     "hp": 500,
     "atk": 100,

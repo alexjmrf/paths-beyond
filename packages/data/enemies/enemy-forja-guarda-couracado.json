@@ -1,6 +1,7 @@
 {
   "id": "enemy-forja-guarda-couracado",
   "name": "Guarda da Forja Couraçado",
+  "level": 13,
   "stats": {
     "hp": 600,
     "atk": 81,

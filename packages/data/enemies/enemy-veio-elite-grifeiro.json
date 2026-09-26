@@ -1,6 +1,7 @@
 {
   "id": "enemy-veio-elite-grifeiro",
   "name": "Capataz do Veio Alado",
+  "level": 19,
   "stats": {
     "hp": 760,
     "atk": 132,

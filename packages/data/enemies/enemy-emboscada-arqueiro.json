@@ -1,6 +1,7 @@
 {
   "id": "enemy-emboscada-arqueiro",
   "name": "Emboscador Arqueiro",
+  "level": 18,
   "stats": {
     "hp": 580,
     "atk": 75,

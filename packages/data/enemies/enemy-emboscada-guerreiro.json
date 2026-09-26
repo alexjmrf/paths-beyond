@@ -1,6 +1,7 @@
 {
   "id": "enemy-emboscada-guerreiro",
   "name": "Emboscador de Machado",
+  "level": 18,
   "stats": {
     "hp": 580,
     "atk": 105,

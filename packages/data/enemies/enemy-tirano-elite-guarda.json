@@ -1,6 +1,7 @@
 {
   "id": "enemy-tirano-elite-guarda",
   "name": "Guarda Pretoriano",
+  "level": 19,
   "stats": {
     "hp": 840,
     "atk": 105,

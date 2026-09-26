@@ -1,6 +1,7 @@
 {
   "id": "enemy-sentinela-alada",
   "name": "Sentinela Alada",
+  "level": 19,
   "stats": {
     "hp": 600,
     "atk": 108,

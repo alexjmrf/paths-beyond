@@ -1,6 +1,7 @@
 {
   "id": "enemy-forja-elite-arcanista",
   "name": "Fundidor Arcano",
+  "level": 19,
   "stats": {
     "hp": 700,
     "atk": 93,

@@ -347,7 +347,10 @@ describe('a masmorra é uma batalha VIVA (M36 2/N)', () => {
 
     expect(resultado.status).toBe(200);
     expect(resultado.body.outcome).toBe('victory');
-    expect(resultado.body.rewards.exp).toBeGreaterThan(0);
+    // M39 1/N — o exp cru saiu da masmorra: a vitória dá o exp dos INIMIGOS aos heróis, e a
+    // Campo de Treino dropa Tomos Pequenos.
+    expect(resultado.body.exp).toBeGreaterThan(0);
+    expect(resultado.body.rewards.materials['material-tomo-pequeno']).toBeGreaterThanOrEqual(3);
 
     const depois = await economia(h);
     expect(depois.wallet.gold).toBe(resultado.body.rewards.gold);
@@ -442,7 +445,8 @@ describe('varredura (decisão do usuário: limpar à mão antes)', () => {
     });
     expect(varredura.status).toBe(200);
     expect(varredura.body.outcome).toBe('victory');
-    expect(varredura.body.rewards.exp).toBeGreaterThan(0);
+    expect(varredura.body.exp).toBeGreaterThan(0);
+    expect(varredura.body.rewards.materials['material-tomo-pequeno']).toBeGreaterThanOrEqual(3);
   });
 
   it('varrer com time fraco demais PERDE — não é loot garantido', async () => {

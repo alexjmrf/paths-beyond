@@ -274,4 +274,11 @@
 // concorrem ao `onAttacked` (`ReactionLine.granted`, marcada pelo perfil). Reação de 0 PP
 // NÃO reserva (o Fôlego de Combate reservaria toda troca). E entre as concedidas, o artefato
 // vem antes do talento.
-export const RULES_VERSION = '0.23.0';
+//
+// M39, sub-sessão 1/N: **A SUBIDA DE NÍVEL.** Até aqui o herói ficava no nível 10: o exp era
+// sorteado e descartado. Agora a vitória numa instância PvE dá a cada herói o exp dos inimigos
+// dela (a soma, pelo nível de cada um — `expDaInstancia`), os Tomos de Experiência sobem o
+// herói, e `aplicarExp` percorre a curva de `economy.json` até o 60. O stat sheet sobe com o
+// nível pela `statCurve` que já existia. **Não observável em `pnpm balance`**: a matriz mede
+// todas as comps no nível 10.
+export const RULES_VERSION = '0.24.0';

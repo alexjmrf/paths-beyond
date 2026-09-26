@@ -28,6 +28,10 @@ const enemySchema = z
   .object({
     id: idSchema,
     name: z.string().min(1),
+    // M39 1/N — o NÍVEL do inimigo. O exp de uma instância PvE é a soma dos inimigos dela, cada
+    // um valendo `experiencia.porNivelDeInimigo` × o nível (decisão do usuário: o ganho varia
+    // com a quantidade e o nível dos inimigos). Não mexe nos status: eles continuam autorados.
+    level: z.number().int().min(1).max(60),
     // A folha COMPLETA. Diferente da `statCurve` da classe, que é parcial porque a
     // agregação (§4.1) preenche o resto: aqui não há agregação nenhuma depois, então um
     // campo ausente viraria zero em silêncio, e `def: 0` é diferença grande de dificuldade.

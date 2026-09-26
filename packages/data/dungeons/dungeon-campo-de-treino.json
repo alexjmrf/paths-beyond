@@ -5,12 +5,19 @@
   "difficulty": "normal",
   "encounterId": "encounter-campo-de-treino",
   "energyCost": 10,
-  "exp": {
-    "min": 400,
-    "max": 600
-  },
   "gold": {
     "min": 5,
     "max": 10
-  }
+  },
+  "materialDropCount": 1,
+  "materialDrops": [
+    {
+      "weight": 1,
+      "materialId": "material-tomo-pequeno",
+      "amount": {
+        "min": 3,
+        "max": 5
+      }
+    }
+  ]
 }

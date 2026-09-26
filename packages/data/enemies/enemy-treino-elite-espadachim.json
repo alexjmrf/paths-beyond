@@ -1,6 +1,7 @@
 {
   "id": "enemy-treino-elite-espadachim",
   "name": "Veterano de Treino de Espada",
+  "level": 19,
   "stats": {
     "hp": 760,
     "atk": 132,

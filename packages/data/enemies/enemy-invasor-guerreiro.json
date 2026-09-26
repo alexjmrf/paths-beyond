@@ -1,6 +1,7 @@
 {
   "id": "enemy-invasor-guerreiro",
   "name": "Invasor de Machado",
+  "level": 14,
   "stats": {
     "hp": 580,
     "atk": 105,

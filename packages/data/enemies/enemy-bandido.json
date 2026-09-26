@@ -1,6 +1,7 @@
 {
   "id": "enemy-bandido",
   "name": "Bandido",
+  "level": 10,
   "stats": {
     "hp": 560,
     "atk": 102,

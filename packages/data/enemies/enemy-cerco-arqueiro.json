@@ -1,6 +1,7 @@
 {
   "id": "enemy-cerco-arqueiro",
   "name": "Sitiante Arqueiro",
+  "level": 18,
   "stats": {
     "hp": 580,
     "atk": 75,

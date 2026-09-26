@@ -1,6 +1,7 @@
 {
   "id": "enemy-tirano-guarda",
   "name": "Guarda do Covil",
+  "level": 13,
   "stats": {
     "hp": 660,
     "atk": 87,

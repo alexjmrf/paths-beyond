@@ -181,7 +181,10 @@ describe('masmorras (§10)', () => {
     // progressão (§10: "Chefe (materiais de promoção)").
     expect(porFoco.get('gear')!.gearDropCount).toBeGreaterThan(0);
     expect(porFoco.get('boss')!.materialDropCount).toBeGreaterThan(0);
-    expect(porFoco.get('exp')!.exp!.min).toBeGreaterThan(porFoco.get('gold')!.exp?.min ?? 0);
+    // M39 1/N — a de foco `exp` entrega TOMOS de experiência (o exp cru saiu das masmorras).
+    expect(
+      porFoco.get('exp')!.materialDrops?.every((d) => d.materialId.startsWith('material-tomo-')),
+    ).toBe(true);
     expect(porFoco.get('gold')!.gold!.min).toBeGreaterThan(porFoco.get('exp')!.gold?.min ?? 0);
   });
 });

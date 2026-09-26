@@ -1,6 +1,7 @@
 {
   "id": "enemy-veio-elite-espadachim",
   "name": "Capataz do Veio de Espada",
+  "level": 16,
   "stats": {
     "hp": 780,
     "atk": 135,

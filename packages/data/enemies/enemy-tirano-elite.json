@@ -1,6 +1,7 @@
 {
   "id": "enemy-tirano-elite",
   "name": "O Tirano Desperto",
+  "level": 19,
   "stats": {
     "hp": 1325,
     "atk": 193,

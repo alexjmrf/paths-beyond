@@ -87,7 +87,8 @@ export interface DungeonRunRewards {
 // `forCharacterId` é o que impede fragmento de um personagem virar imprint de outro.
 // M38 (D53): `artifactFragment` é a duplicata de ARTEFATO, com `forArtifactId` pelo mesmo
 // motivo de `forCharacterId` — sem dono, viraria imprint de qualquer artefato.
-export type MaterialKind = 'awakening' | 'heroFragment' | 'artifactFragment' | 'generic';
+// M39 1/N — `expTome`: o Tomo de Experiência, o jeito mais eficiente de subir de nível.
+export type MaterialKind = 'awakening' | 'heroFragment' | 'artifactFragment' | 'generic' | 'expTome';
 
 export interface MaterialDef {
   readonly id: Id;
@@ -95,6 +96,8 @@ export interface MaterialDef {
   readonly kind: MaterialKind;
   readonly forCharacterId?: Id;
   readonly forArtifactId?: Id;
+  // M39 1/N — o exp que UM tomo dá (só no `expTome`).
+  readonly exp?: number;
 }
 
 // §10 — "Energia de conta limita o farm diário." Decisão do usuário: regeneração contínua
@@ -143,6 +146,12 @@ export interface EconomyRules {
   // `awakenArtifact` recusa alto uma tabela vazia.
   readonly artifactAwakening?: readonly AwakeningStep[];
   readonly artifactImprint?: readonly ImprintStep[];
+  // M39 1/N — a subida de nível: a curva e quanto cada nível de inimigo vale. Opcional pelo
+  // mesmo motivo das tabelas do artefato; o catálogo real sempre a preenche.
+  readonly experiencia?: {
+    readonly expParaProximo: readonly number[];
+    readonly porNivelDeInimigo: number;
+  };
 }
 
 // M14 2/N — calendário e trava de tempo.

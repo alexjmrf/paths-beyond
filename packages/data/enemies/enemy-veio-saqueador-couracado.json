@@ -1,6 +1,7 @@
 {
   "id": "enemy-veio-saqueador-couracado",
   "name": "Saqueador do Veio Couraçado",
+  "level": 13,
   "stats": {
     "hp": 620,
     "atk": 83,

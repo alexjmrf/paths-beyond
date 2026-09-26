@@ -1,3 +1,4 @@
+import { darExpDaVitoria, type SubidaDeNivel } from '../economy/experiencia.js';
 import {
   RULES_VERSION,
   buildInitialStateLogged,
@@ -182,6 +183,9 @@ interface Liquidacao {
   readonly wallet?: { readonly gold: number; readonly stones: number; readonly arenaMarks: number };
   readonly elo?: { readonly attacker: number; readonly defender: number };
   readonly arenaMarks?: { readonly attacker: number; readonly defender: number };
+  // M39 1/N — o exp da vitória em instância PvE (a soma dos inimigos, pelo nível) e quem subiu.
+  readonly exp?: number;
+  readonly subidas?: readonly SubidaDeNivel[];
 }
 
 export const matchRoutes: FastifyPluginAsync<MatchRoutesOptions> = async (fastify, opts) => {
@@ -516,7 +520,14 @@ async function liquidar(
     }
     const atualizado =
       premiumAwarded > 0 ? await opts.repository.updatePremium(player.id, player.premium + premiumAwarded) : player;
-    return { premiumAwarded, premium: atualizado.premium };
+    // M39 1/N — a vitória dá o exp dos inimigos da missão a cada herói que foi.
+    const { exp, subidas } = await darExpDaVitoria(opts.catalog, opts.heroRepository, {
+      playerId: match.playerId,
+      kind: match.kind,
+      refId: match.refId,
+      heroIds: match.setup.units.filter((u) => u.side === 'player').map((u) => u.heroId),
+    });
+    return { premiumAwarded, premium: atualizado.premium, exp, subidas };
   }
 
   if (match.kind === 'dungeon') {
@@ -550,11 +561,20 @@ async function liquidar(
       await opts.repository.updatePremium(player.id, player.premium + premiumAwarded);
     }
 
+    // M39 1/N — e o exp dos inimigos da masmorra, pelo mesmo caminho da campanha.
+    const { exp, subidas } = await darExpDaVitoria(opts.catalog, opts.heroRepository, {
+      playerId: match.playerId,
+      kind: match.kind,
+      refId: match.refId,
+      heroIds: match.setup.units.filter((u) => u.side === 'player').map((u) => u.heroId),
+    });
     return {
       rewards,
       energy,
       premiumAwarded,
       wallet: { gold: wallet.gold, stones: wallet.stones, arenaMarks: wallet.arenaMarks },
+      exp,
+      subidas,
     };
   }
 

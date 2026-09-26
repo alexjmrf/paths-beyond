@@ -1,6 +1,7 @@
 {
   "id": "enemy-treino-elite-arqueiro",
   "name": "Veterano de Treino Arqueiro",
+  "level": 15,
   "stats": {
     "hp": 760,
     "atk": 102,

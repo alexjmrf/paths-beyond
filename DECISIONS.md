@@ -9127,3 +9127,43 @@ registrado como observação de desenho:** Juramento (600) e Muralha (500) SUBST
 `contra-atacar` (800) de quem os equipa, com multiplicador menor; a Fúria (`onDebuffed`) e o Arco
 (+1 AP) quase não fazem efeito. A matriz passa assim, mas a passiva desses quatro não entrega o
 que o nome promete.
+
+## M39 — A Soul (e, antes dela, a subida de nível)
+
+### D58 — a subida de nível: exp de toda instância PvE, pelos inimigos; tomos como o meio mais eficiente (2026-09-26)
+
+**O bloqueio encontrado antes da Soul.** O critério do M39 diz que o slot da Soul "só abre depois
+de o personagem ser upado até certo nível", e **o jogo não tinha subida de nível**: todo herói
+nascia no 10 e ficava nele; o `exp` era sorteado no drop da masmorra e descartado. Decisão do
+usuário: a subida de nível entra como a **1/N do M39**, e a Soul abre no **nível 20**.
+
+**As decisões do usuário:**
+1. **O exp vem de QUALQUER instância PvE** — campanha, masmorra, evento — e varia com a
+   quantidade e o nível dos inimigos.
+2. **Os Tomos de Experiência são o jeito mais eficiente de subir**, e **usar tomo não custa
+   ouro**.
+3. A tabela de mainstats da Soul, os valores e o craft propostos foram aceitos para começar.
+
+**O que a implementação decidiu dentro disso (proposto e aceito):**
+- **Cada inimigo declara `level`** (dado novo nos 41). O nível de cada um saiu de ONDE ele
+  aparece: campanha `10 + 4·(capítulo−1) + ⌊(missão−1)/3⌋` (capítulo 1: 10–13, 2: 14–17, 3:
+  18–21), masmorra normal 13, elite 19; o menor, se aparece em mais de um lugar. Vai de 10 (o
+  Bandido e os alvos de treino) a 21 (o chefe do capítulo 3). O `level` do inimigo não mexe nos
+  status, que continuam autorados.
+- **O exp de uma instância é a soma dos inimigos dela, 20 por nível** (`porNivelDeInimigo`),
+  pago na VITÓRIA a cada herói do jogador que estava nela — na partida viva (campanha e
+  masmorra) e na varredura.
+- **A curva:** do nível L para o L+1 custa `1000 + 100·(L−10)`, até o 60 (o tamanho da
+  `statCurve`). Do 10 ao 20 são 14.500 de exp.
+- **Tomos:** Pequeno 500, Médio 2.000, Grande 8.000 (`kind: 'expTome'`, com o `exp` no dado). A
+  Campo de Treino troca o exp cru por tomos: a normal dá 3–5 Pequenos (~2.000 de exp por 10 de
+  energia); a elite, 3 sorteios entre Médio (peso 5) e Grande (peso 1). **Nenhuma masmorra
+  declara exp cru** — é teste.
+- **Servidor:** `economy/experiencia.ts` (`darExpDaVitoria`), `exp` e `subidas` na liquidação e
+  na varredura, `POST /heroes/:heroId/exp-tomes` com nonce, e o kind `exp` em
+  `economy_actions` (migration `0020`, com o teste de deriva SQL×TS).
+- **Cliente:** a conclusão mostra o exp no espólio e "X chegou ao nível N"; a aba Personagens
+  mostra o nível, a barra de exp e o uso de tomos no herói em foco.
+
+`RULES_VERSION` 0.23.0 → **0.24.0**. O `pnpm balance` não muda: a matriz mede todas as comps no
+nível 10.

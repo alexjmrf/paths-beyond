@@ -1,6 +1,7 @@
 {
   "id": "enemy-forja-guarda-espadachim",
   "name": "Guarda da Forja de Espada",
+  "level": 13,
   "stats": {
     "hp": 600,
     "atk": 108,

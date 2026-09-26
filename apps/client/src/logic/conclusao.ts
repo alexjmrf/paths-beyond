@@ -15,8 +15,15 @@ export type LinhaDeLoot =
 
 export type AcaoDaConclusao = 'proxima' | 'repetir' | 'menu' | 'rever';
 
+export interface SubidaNaConclusao {
+  readonly heroId: string;
+  readonly level: number;
+}
+
 export interface Conclusao {
   readonly venceu: boolean;
+  // M39 1/N — quem subiu de nível com o exp desta vitória.
+  readonly subidas: readonly SubidaNaConclusao[];
   readonly rounds: number;
   readonly loot: readonly LinhaDeLoot[];
   readonly acoes: readonly AcaoDaConclusao[];
@@ -55,6 +62,8 @@ function lootDe(modo: ModoDaPartida, liquidacao: LiquidacaoDaPartida | null): Li
     for (const [id, valor] of Object.entries(r.materials)) if (valor > 0) loot.push({ tipo: 'material', id, valor });
     for (const item of r.items) loot.push({ tipo: 'item', id: item.id, valor: 1 });
   }
+  // M39 1/N — o exp da vitória numa instância PvE: a soma dos inimigos, dada a cada herói.
+  if (liquidacao.exp && liquidacao.exp > 0) loot.push({ tipo: 'exp', valor: liquidacao.exp });
   if (modo === 'pvp') {
     if (liquidacao.elo) loot.push({ tipo: 'elo', valor: liquidacao.elo.attacker });
     if (liquidacao.arenaMarks) loot.push({ tipo: 'marcas', valor: liquidacao.arenaMarks.attacker });
@@ -73,5 +82,6 @@ export function conclusaoDaPartida(entrada: EntradaDaConclusao): Conclusao | nul
   if (entrada.modo === 'campaign' && !venceu) acoes.push('repetir');
   acoes.push('menu', 'rever');
 
-  return { venceu, rounds: entrada.rounds, loot: lootDe(entrada.modo, entrada.liquidacao), acoes, proximaMissaoId };
+  const subidas = (entrada.liquidacao?.subidas ?? []).map((s) => ({ heroId: s.heroId, level: s.level }));
+  return { venceu, rounds: entrada.rounds, loot: lootDe(entrada.modo, entrada.liquidacao), acoes, proximaMissaoId, subidas };
 }

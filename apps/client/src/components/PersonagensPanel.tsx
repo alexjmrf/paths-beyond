@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { ArtifactInstanceView } from '../data/api.js';
 import { catalog } from '../data/catalog.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
+import { NivelEtomos } from './NivelEtomos.js';
 import { rotuloDeHeroi } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
@@ -111,6 +112,10 @@ export function PersonagensPanel() {
       {/* M38 4/N (D53/D56) — o slot de artefato do herói em foco. Só aparecem os artefatos da
           CLASSE dele (a trava é do servidor; a tela só não oferece o que seria recusado).
           Equipar um que está em outro herói MOVE o artefato, e a tela diz com quem ele está. */}
+      {/* M39 1/N — o nível do herói em foco e os tomos de experiência. */}
+      <h3>{t('personagens.nivelTitulo')}</h3>
+      {heroDoFoco ? <NivelEtomos heroId={heroDoFoco.hero.id} /> : null}
+
       <h3>{t('personagens.artefato')}</h3>
       {heroDoFoco ? (
         <SlotDeArtefato

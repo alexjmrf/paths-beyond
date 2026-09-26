@@ -1,6 +1,7 @@
 {
   "id": "enemy-tirano",
   "name": "O Tirano",
+  "level": 13,
   "stats": {
     "hp": 1075,
     "atk": 153,

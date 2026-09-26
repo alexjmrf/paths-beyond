@@ -1,6 +1,7 @@
 {
   "id": "enemy-treino-elite-clerigo",
   "name": "Veterano de Treino Clérigo",
+  "level": 19,
   "stats": {
     "hp": 740,
     "atk": 99,

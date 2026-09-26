@@ -1,6 +1,7 @@
 {
   "id": "enemy-forja-arqueiro",
   "name": "Vigia da Forja",
+  "level": 13,
   "stats": {
     "hp": 580,
     "atk": 75,

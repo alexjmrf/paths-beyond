@@ -23,7 +23,10 @@ const materialSchema = z
   .object({
     id: idSchema,
     name: z.string().min(1),
-    kind: z.enum(['awakening', 'heroFragment', 'artifactFragment', 'generic']),
+    // M39 1/N — `expTome`: o Tomo de Experiência, o jeito mais eficiente de subir de nível.
+    kind: z.enum(['awakening', 'heroFragment', 'artifactFragment', 'generic', 'expTome']),
+    // O exp que UM tomo dá. Obrigatório no `expTome` e proibido nos outros.
+    exp: z.number().int().positive().optional(),
     forCharacterId: idSchema.optional(),
     forArtifactId: idSchema.optional(),
   })
@@ -33,6 +36,9 @@ const materialSchema = z
   })
   .refine((m) => (m.kind === 'artifactFragment' ? m.forArtifactId !== undefined : m.forArtifactId === undefined), {
     message: 'forArtifactId é obrigatório em artifactFragment e proibido nos demais kinds.',
+  })
+  .refine((m) => (m.kind === 'expTome' ? m.exp !== undefined : m.exp === undefined), {
+    message: 'exp é obrigatório em expTome e proibido nos demais kinds.',
   });
 
 export default materialSchema;
