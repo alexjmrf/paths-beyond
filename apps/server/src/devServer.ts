@@ -82,12 +82,18 @@ const heroes: StoredHero[] = [
   stored('dev-player-2', devHero('ally-lanceiro')),
 ];
 
-const app = buildApp({
-    economyRepository: createMemoryEconomyRepository(),
-    idempotencyRepository: createMemoryIdempotencyRepository(),
-    ownershipRepository: createMemoryCharacterOwnershipRepository(),
-    rewardsRepository: createMemoryRewardsRepository(),
-  repository: createMemoryPlayerRepository([
+// Todo material do catálogo semeado, pelo mesmo motivo do ouro abaixo: verificar na tela o
+// craft da Soul, o despertar, o vínculo, o artefato e os tomos não deveria exigir farmar cada
+// masmorra antes. Lido do catálogo, e não listado aqui, para material novo já vir junto.
+const DEV_MATERIAL_AMOUNT = 500;
+const DEV_MATERIALS = Object.fromEntries(Object.keys(catalog.materials).map((id) => [id, DEV_MATERIAL_AMOUNT]));
+const economyRepository = createMemoryEconomyRepository();
+await economyRepository.setMaterials('dev-player-1', DEV_MATERIALS);
+
+// A conta do NAVEGADOR não é a `dev-atacante`: sem `paths-beyond/dev-identity` no localStorage,
+// o cliente sorteia uma identidade `dev-xxxxxxxx` e a conta nasce no primeiro sign-in. Então toda
+// conta criada neste servidor de dev nasce com os materiais e o ouro de verificação também.
+const basePlayerRepository = createMemoryPlayerRepository([
     // Ouro e pedras semeados: o ciclo de aceite começa em farmar, mas verificar enhance
     // sem nada na carteira exigiria farmar ouro antes de cada tentativa.
     {
@@ -106,7 +112,22 @@ const app = buildApp({
       energy: { stored: catalog.economyRules.energy.max, asOfMs: Date.now() },
     },
     { id: 'dev-player-2', platformProvider: 'dev' as const, platformId: DEFENDER_ID, displayName: 'Defensor (dev)', elo: 1200, arenaMarks: 0, ...DEFAULT_PVE_ACCOUNT },
-  ]),
+]);
+const playerRepository: typeof basePlayerRepository = {
+  ...basePlayerRepository,
+  async createPlayer(input) {
+    const player = await basePlayerRepository.createPlayer(input);
+    await economyRepository.setMaterials(player.id, DEV_MATERIALS);
+    return basePlayerRepository.updateWallet(player.id, { gold: 50_000, stones: 200 });
+  },
+};
+
+const app = buildApp({
+    economyRepository,
+    idempotencyRepository: createMemoryIdempotencyRepository(),
+    ownershipRepository: createMemoryCharacterOwnershipRepository(),
+    rewardsRepository: createMemoryRewardsRepository(),
+  repository: playerRepository,
   heroRepository: createMemoryHeroRepository(heroes),
   // O defensor já entra com defesa montada: sem ela, `/matchmaking/opponent` não devolve
   // ninguém e não há partida a jogar.
