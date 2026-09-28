@@ -10,6 +10,7 @@ import { rewardsRoutes } from './rewards/routes.js';
 import { preparationRoutes } from './economy/preparationRoutes.js';
 import { progressionRoutes } from './economy/progressionRoutes.js';
 import { artifactRoutes } from './economy/artifactRoutes.js';
+import { soulRoutes } from './economy/soulRoutes.js';
 import { economyRoutes } from './economy/routes.js';
 import { matchmakingRoutes } from './matchmaking/routes.js';
 import type {
@@ -228,6 +229,17 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
     // M38 4/N (D53/D56) — o artefato jogável: equipar, desequipar, despertar e imprint.
     // Mesmas opções de `progressionRoutes`, e pelo mesmo motivo de estar ao lado dele.
     await protectedRoutes.register(artifactRoutes, {
+      repository: deps.repository,
+      heroRepository: deps.heroRepository,
+      economyRepository: deps.economyRepository,
+      ownershipRepository: deps.ownershipRepository,
+      catalog: deps.catalog,
+      ticketSecret: deps.ticketSecret,
+      now: deps.now ?? (() => Date.now()),
+    });
+
+    // M39 4/N (D59/D61) — a Soul jogável: craftar, recraftar, equipar e desequipar.
+    await protectedRoutes.register(soulRoutes, {
       repository: deps.repository,
       heroRepository: deps.heroRepository,
       economyRepository: deps.economyRepository,

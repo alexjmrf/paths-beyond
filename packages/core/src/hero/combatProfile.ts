@@ -12,6 +12,7 @@ import type { Id } from '../types.js';
 import { resolveHeroStatSheet } from './resolve.js';
 import { resolveArtifact } from '../artifacts/index.js';
 import type { EquippedArtifact } from '../artifacts/types.js';
+import type { SoulInstance } from '../soul/types.js';
 import type { ClassDef, Hero } from './types.js';
 
 // §15 (decisões em aberto) — "alcance de assistência: começar em 2 tiles para melee e
@@ -63,6 +64,8 @@ export interface ResolveHeroCombatProfileInput {
   readonly baselineReactionSkillIds: readonly Id[];
   // M38 (D53) — o artefato equipado. Ausente = slot vazio. Ver `resolveHeroStatSheet`.
   readonly artifact?: EquippedArtifact;
+  // M39 2/N — a Soul equipada. Ausente = slot vazio. Só stat: ver `resolveHeroStatSheet`.
+  readonly soul?: SoulInstance;
 }
 
 function isMeleeWeapon(weaponType: WeaponType): boolean {
@@ -97,7 +100,8 @@ export function resolveHeroCombatProfile(input: ResolveHeroCombatProfileInput): 
   const { hero, classDef, equippedItems, itemSets, skillsCatalog, weaponDuelRanges, baselineReactionSkillIds, talentTree } = input;
 
   const artifactInput = input.artifact ? { artifact: input.artifact } : {};
-  const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets, talentTree, ...artifactInput });
+  const soulInput = input.soul ? { soul: input.soul } : {};
+  const stats = resolveHeroStatSheet({ hero, classDef, equippedItems, itemSets, talentTree, ...artifactInput, ...soulInput });
   const resolvedTalents = resolveTalentEffects(talentTree, hero.talents);
   // A trava de classe já foi conferida por `resolveHeroStatSheet` logo acima.
   const artifact = input.artifact ? resolveArtifact(input.artifact) : undefined;

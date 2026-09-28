@@ -26,7 +26,7 @@
 ```
 1. base do herói no nível N (curva no JSON da classe) × multiplicador de awakening
 2. + flat de classe/promoção + imprint
-3. + flat de equipamento (mainstats e substats flat) + status do artefato (`atk` fixo + o stat variável + imprint)
+3. + flat de equipamento (mainstats e substats flat) + status do artefato (`atk` fixo + o stat variável + imprint) + Soul (mainstat e os dois substats)
 4. × (1 + soma das % de equipamento + % da passiva `stat` do artefato)
 5. + flat de talentos
 6. × (1 + soma das % de talentos)
@@ -36,7 +36,9 @@
 
 **O artefato (M38, D53) é equipamento para a agregação:** não ganha passo próprio. Seus status entram no passo 3 e o % da passiva `stat` no passo 4. As outras duas passivas não são stat: `startingPool` é AP/PP de entrada na batalha (a mesma semântica do set Reserva, não é regeneração — regra 7) e `reaction` concede uma skill de reação do catálogo. Artefato de outra classe falha alto na resolução.
 
-Passos 1–7 produzem o **stat sheet estático**; cacheie e invalide só quando equipamento/artefato/talento/nível/awakening mudarem. Passo 8 é o único recalculado dentro do duelo.
+**A Soul (M39, D59) também é equipamento para a agregação:** não ganha passo próprio. O mainstat e os dois substats são todos flat e entram no passo 3; a Soul não tem % nem passiva. Soul de outro personagem falha alto na resolução (`assertSoulFitsHero`).
+
+Passos 1–7 produzem o **stat sheet estático**; cacheie e invalide só quando equipamento/artefato/Soul/talento/nível/awakening mudarem. Passo 8 é o único recalculado dentro do duelo.
 
 ### 4.2 Entidades
 

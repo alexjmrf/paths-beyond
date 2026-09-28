@@ -281,4 +281,18 @@
 // herói, e `aplicarExp` percorre a curva de `economy.json` até o 60. O stat sheet sobe com o
 // nível pela `statCurve` que já existia. **Não observável em `pnpm balance`**: a matriz mede
 // todas as comps no nível 10.
-export const RULES_VERSION = '0.24.0';
+//
+// M39, sub-sessão 2/N: **A SOUL, o 8º slot.** Travada por PERSONAGEM (`soulOf`), com o mainstat
+// sorteado entre as 2–3 opções daquele personagem e dois substats de tabela própria; mainstat e
+// substats entram no passo 3 de §4.1, como equipamento. O slot abre no nível do dado; o craft
+// escolhe o personagem no ato, a partir de material genérico; o recraft re-sorteia tudo. O stat
+// sheet de um herói com Soul muda — é regra. **Não observável em `pnpm balance` nem no
+// GOLDEN_HASH nesta fatia:** o campo é opcional e nenhum conteúdo nem comp declara Soul ainda
+// (a medição com e sem é a 6/N).
+//
+// M39, sub-sessão 6/N (D63): **as curvas de `atk`/`def` das classes acima do nível 10.** Nenhuma
+// linha do core mudou; mudou o dado que o passo 1 de §4.1 lê. Sobe mesmo assim porque muda o
+// resultado de toda batalha com herói acima do 10 — possível desde a 1/N —, e o replay é
+// REEXECUTADO: sem o bump, uma partida gravada antes daria outro desfecho em silêncio. Os níveis
+// 1–10 não mudaram, e `pnpm balance` no nível 10 é idêntico.
+export const RULES_VERSION = '0.26.0';

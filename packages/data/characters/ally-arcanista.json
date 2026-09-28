@@ -28,5 +28,33 @@
         "conditions": []
       }
     ]
+  },
+  "soul": {
+    "mainstatOptions": [
+      {
+        "stat": "atk",
+        "weight": 1,
+        "valueRange": {
+          "min": 20,
+          "max": 45
+        }
+      },
+      {
+        "stat": "eff",
+        "weight": 1,
+        "valueRange": {
+          "min": 50,
+          "max": 100
+        }
+      },
+      {
+        "stat": "pen",
+        "weight": 1,
+        "valueRange": {
+          "min": 45,
+          "max": 80
+        }
+      }
+    ]
   }
 }

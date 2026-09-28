@@ -103,10 +103,12 @@ describe('expDaInstancia', () => {
 // M39 1/N — a subida de nível é regra: o mesmo herói, depois de uma vitória, tem outro stat
 // sheet. RULES_VERSION sobe.
 describe('RULES_VERSION — a subida de nível', () => {
-  it('sobe para 0.24.0, e o cliente de 0.23.0 é recusado', async () => {
+  // A versão exata é afirmada pela fatia mais recente (M39 2/N: `tests/soul/soul.test.ts`);
+  // aqui fica o que a 1/N garantiu: o cliente de antes da subida de nível não volta.
+  it('subiu do M38: o cliente de 0.23.0 é recusado', async () => {
     const { RULES_VERSION } = await import('../../src/rulesVersion.js');
     const { checkRulesVersion } = await import('../../src/rulesVersionCompat.js');
-    expect(RULES_VERSION).toBe('0.24.0');
+    expect(RULES_VERSION).not.toBe('0.23.0');
     expect(checkRulesVersion('0.23.0')).not.toBeNull();
   });
 });

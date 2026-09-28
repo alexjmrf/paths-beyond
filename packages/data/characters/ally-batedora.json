@@ -28,5 +28,33 @@
         "conditions": []
       }
     ]
+  },
+  "soul": {
+    "mainstatOptions": [
+      {
+        "stat": "chc",
+        "weight": 1,
+        "valueRange": {
+          "min": 45,
+          "max": 90
+        }
+      },
+      {
+        "stat": "chd",
+        "weight": 1,
+        "valueRange": {
+          "min": 70,
+          "max": 140
+        }
+      },
+      {
+        "stat": "atk",
+        "weight": 1,
+        "valueRange": {
+          "min": 20,
+          "max": 45
+        }
+      }
+    ]
   }
 }

@@ -28,5 +28,33 @@
         "conditions": []
       }
     ]
+  },
+  "soul": {
+    "mainstatOptions": [
+      {
+        "stat": "hp",
+        "weight": 1,
+        "valueRange": {
+          "min": 80,
+          "max": 160
+        }
+      },
+      {
+        "stat": "def",
+        "weight": 1,
+        "valueRange": {
+          "min": 15,
+          "max": 35
+        }
+      },
+      {
+        "stat": "eff",
+        "weight": 1,
+        "valueRange": {
+          "min": 50,
+          "max": 100
+        }
+      }
+    ]
   }
 }

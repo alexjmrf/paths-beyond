@@ -327,6 +327,28 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         expect((await backend.ownership.listArtifacts(PLAYER)).find((a) => a.id === instancia.id)?.awakening).toBe(3);
       });
 
+      it('M39 4/N — a Soul: várias do mesmo personagem, atualizar só a do dono, lista na ordem de criação', async () => {
+        const base = {
+          soulOf: 'hero-jogador',
+          mainstat: { stat: 'atk', value: 30 },
+          substats: [
+            { stat: 'hp', value: 60 },
+            { stat: 'spd', value: 6 },
+          ],
+          crafts: 1,
+        } as const;
+        const primeira = { ...base, id: `soul-${PLAYER}-1` };
+        const segunda = { ...base, id: `soul-${PLAYER}-2`, mainstat: { stat: 'chd', value: 100 } } as const;
+        await backend.ownership.grantSoul(PLAYER, primeira);
+        await backend.ownership.grantSoul(PLAYER, segunda);
+        expect(await backend.ownership.listSouls(PLAYER)).toEqual([primeira, segunda]);
+
+        const recraftada = { ...primeira, mainstat: { stat: 'eff', value: 70 }, crafts: 2 } as const;
+        await backend.ownership.updateSoul(PLAYER, recraftada);
+        await backend.ownership.updateSoul(`${PLAYER}-outro`, { ...primeira, crafts: 9 });
+        expect(await backend.ownership.listSouls(PLAYER)).toEqual([recraftada, segunda]);
+      });
+
       it('M38 — apagar a conta apaga pity, token, escolha e artefatos', async () => {
         const outro = `${PLAYER}-apagado`;
         await backend.players.createPlayer({
@@ -339,8 +361,19 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         await backend.ownership.setToken(outro, 'banner-x', { rolls: 1, status: 'counting' });
         await backend.ownership.setChoice(outro, 'banner-generico', { rolls: 1, pending: 0 });
         await backend.ownership.grantArtifact(outro, { id: `a-${outro}`, artifactId: 'artifact-pena-de-grifo', awakening: 0, imprint: 0 });
+        await backend.ownership.grantSoul(outro, {
+          id: `s-${outro}`,
+          soulOf: 'hero-jogador',
+          mainstat: { stat: 'atk', value: 30 },
+          substats: [
+            { stat: 'hp', value: 60 },
+            { stat: 'spd', value: 6 },
+          ],
+          crafts: 1,
+        });
 
         await backend.ownership.deletePlayerData(outro);
+        expect(await backend.ownership.listSouls(outro)).toEqual([]);
 
         expect(await backend.ownership.getPity(outro, 'generic')).toBeNull();
         expect(await backend.ownership.getToken(outro, 'banner-x')).toBeNull();

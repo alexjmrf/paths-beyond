@@ -54,6 +54,8 @@ const heroSchema = z.object({
   // artefato não é item de gear (sem set, enhance nem substat). Opcional: todo herói gravado
   // antes do M38 continua válido, e ausente = `null` = slot vazio.
   artifact: idSchema.nullable().optional(),
+  // M39 (D59) — o 8º slot: a instância de Soul equipada, fora de `equipment` pelo mesmo motivo.
+  soul: idSchema.nullable().optional(),
   weaponType: weaponTypeSchema,
   duelSkills: z.array(idSchema).max(5),
   mapSkills: z.array(idSchema).max(2),

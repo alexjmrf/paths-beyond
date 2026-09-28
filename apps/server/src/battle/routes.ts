@@ -1,4 +1,4 @@
-import { artefatoEquipado } from '../summon/artefatos.js';
+import { artefatoEquipado, soulEquipada } from '../summon/artefatos.js';
 import {
   buildBattleSetupFromHeroes,
   type Coord,
@@ -120,12 +120,14 @@ export async function assembleArenaBattle(
     // unidade por linha.
     // M38 4/N — o artefato equipado vai junto, dos DOIS lados (o do defensor é da conta dele).
     const artifact = await artefatoEquipado(opts.ownershipRepository, opts.catalog, stored);
+    const soul = await soulEquipada(opts.ownershipRepository, opts.catalog, stored);
     placements.push({
       unitId: stored.hero.id,
       hero: stored.hero,
       classDef,
       equippedItems: stored.equippedItems,
       ...(artifact ? { artifact } : {}),
+      ...(soul ? { soul } : {}),
       side: 'player',
       pos: { x: 0, y: index },
       height: 0,
@@ -138,12 +140,14 @@ export async function assembleArenaBattle(
     const classDef = opts.catalog.classes[stored.hero.classId];
     if (!classDef) return { ok: false, code: 500, error: `classe desconhecida: ${stored.hero.classId}` };
     const artifact = await artefatoEquipado(opts.ownershipRepository, opts.catalog, stored);
+    const soul = await soulEquipada(opts.ownershipRepository, opts.catalog, stored);
     placements.push({
       unitId: stored.hero.id,
       hero: stored.hero,
       classDef,
       equippedItems: stored.equippedItems,
       ...(artifact ? { artifact } : {}),
+      ...(soul ? { soul } : {}),
       side: 'enemy',
       pos: defenseUnit.pos,
       height: defenseUnit.height,

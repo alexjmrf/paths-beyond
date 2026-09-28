@@ -1,5 +1,5 @@
 import { darExpDaVitoria } from './experiencia.js';
-import { artefatoEquipado } from '../summon/artefatos.js';
+import { artefatoEquipado, soulEquipada } from '../summon/artefatos.js';
 import {
   buildBattleSetupFromHeroes,
   consumeEntry,
@@ -119,6 +119,8 @@ export async function assembleDungeonBattle(
 
   // M38 4/N — o artefato equipado de cada herói, buscado antes (a busca é assíncrona).
   const artefatos = await Promise.all(stored.map((hero) => artefatoEquipado(opts.ownershipRepository, opts.catalog, hero)));
+  // M39 4/N — a Soul equipada de cada herói, pelo mesmo caminho.
+  const souls = await Promise.all(stored.map((hero) => soulEquipada(opts.ownershipRepository, opts.catalog, hero)));
   const placements: Placement[] = [];
 
   stored.forEach((hero, index) => {
@@ -126,12 +128,14 @@ export async function assembleDungeonBattle(
     const classDef = opts.catalog.classes[hero.hero.classId];
     if (!classDef) throw new Error(`classe desconhecida: ${hero.hero.classId}`);
     const artifact = artefatos[index];
+    const soul = souls[index];
     placements.push({
       unitId: `player-${hero.hero.id}`,
       hero: hero.hero,
       classDef,
       equippedItems: hero.equippedItems,
       ...(artifact ? { artifact } : {}),
+      ...(soul ? { soul } : {}),
       side: 'player',
       pos: slot.pos,
       height: slot.height,

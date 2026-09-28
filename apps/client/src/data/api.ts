@@ -12,6 +12,7 @@ import type {
   Hero,
   ItemInstance,
   MapAiArchetype,
+  SoulInstance,
   TacticsScript,
   TalentAllocation,
   UnitType,
@@ -827,6 +828,34 @@ export const api = {
 
   imprintArtifact: (ticket: string, instanceId: string) =>
     request<{ readonly artifact: ArtifactInstanceView }>(ticket, `/artifacts/${instanceId}/imprint`, {
+      method: 'POST',
+      body: JSON.stringify({ nonce: nonce() }),
+    }),
+
+  // M39 5/N (D61) — a Soul. Craft e recraft devolvem carteira e materiais, mas a tela relê a
+  // economia inteira depois, como no artefato.
+  souls: (ticket: string) => request<{ readonly souls: readonly SoulInstance[] }>(ticket, '/me/souls'),
+
+  craftSoul: (ticket: string, characterId: string) =>
+    request<{ readonly soul: SoulInstance }>(ticket, '/souls/craft', {
+      method: 'POST',
+      body: JSON.stringify({ nonce: nonce(), characterId }),
+    }),
+
+  recraftSoul: (ticket: string, soulId: string) =>
+    request<{ readonly soul: SoulInstance }>(ticket, `/souls/${soulId}/recraft`, {
+      method: 'POST',
+      body: JSON.stringify({ nonce: nonce() }),
+    }),
+
+  equipSoul: (ticket: string, soulId: string, heroId: string) =>
+    request<{ readonly hero: Hero }>(ticket, `/souls/${soulId}/equip`, {
+      method: 'POST',
+      body: JSON.stringify({ nonce: nonce(), heroId }),
+    }),
+
+  unequipSoul: (ticket: string, heroId: string) =>
+    request<{ readonly hero: Hero }>(ticket, `/heroes/${heroId}/soul/unequip`, {
       method: 'POST',
       body: JSON.stringify({ nonce: nonce() }),
     }),

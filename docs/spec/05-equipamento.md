@@ -3,7 +3,7 @@
 
 ### 7.1 Slots e mainstats
 
-7 slots: os 6 de item — `weapon`, `helmet`, `armor`, `necklace`, `ring`, `boots` — e o **artefato** (M38, D53).
+8 slots: os 6 de item — `weapon`, `helmet`, `armor`, `necklace`, `ring`, `boots` —, o **artefato** (M38, D53) e a **Soul** (M39, D59).
 
 O artefato **não é item**: não tem set, enhance, substat rolado nem reforge, e por isso não entra em `GEAR_SLOTS` nem em `hero.equipment` (vive em `hero.artifact`, o id de uma instância da conta). Ele é:
 - **travado por CLASSE** — o schema recusa artefato sem classe, e equipar em outra classe é recusado;
@@ -13,6 +13,13 @@ O artefato **não é item**: não tem set, enhance, substat rolado nem reforge, 
 - **imprint** (0–5) pago com fragmento do próprio artefato, que só muda número — status e a magnitude da passiva, nunca efeito novo.
 
 Uma instância equipa um herói por vez: equipar em outro MOVE o artefato (D56). Ele sai dos banners de artefato (§10, D54).
+
+A **Soul** também **não é item**: sem set, enhance nem reforge, fora de `GEAR_SLOTS` e de `hero.equipment` (vive em `hero.soul`, o id de uma instância da conta). Ela é:
+- **travada por PERSONAGEM** (`soulOf`), e não por classe como o artefato. Os dois modelos de exclusividade são distintos de propósito;
+- um **mainstat** sorteado entre as 2 a 3 opções declaradas DAQUELE personagem (`characters/*.json`, `soul.mainstatOptions`, ligadas ao kit), mais **dois substats** de uma tabela própria da Soul (`economy.json`, bloco `soul`). Tudo é flat (§4.1, passo 3). O schema e `validateSoul` recusam mainstat fora das opções do personagem;
+- craftada a partir de material **genérico** (Essência de Alma), com o personagem escolhido no ato do craft. O **recraft** re-sorteia tudo na mesma instância, com custo próprio: é o sumidouro repetível;
+- equipável só a partir de `unlockLevel` (dado, hoje 20). O nível trava o slot, não a posse: a conta pode ter várias Souls do mesmo personagem.
+- `focus` e `vigor` ficam fora das opções de mainstat por enquanto (D60).
 
 | Slot | Mainstat |
 |---|---|

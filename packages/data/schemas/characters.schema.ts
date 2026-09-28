@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { gearSlotSchema, idSchema, tacticsLineSchema, weaponTypeSchema } from './shared.js';
+import { gearSlotSchema, idSchema, statKeySchema, tacticsLineSchema, valueRangeSchema, weaponTypeSchema } from './shared.js';
 
 // M17 (§8.1) — o ELENCO. É a lista fechada de personagens jogáveis, e ela existe porque
 // a árvore deixou de ser da classe: resolver a alocação de talentos de alguém exige a
@@ -56,6 +56,28 @@ const startingHeroSchema = z
   })
   .strict();
 
+const soulMainstatOptionSchema = z
+  .object({
+    stat: statKeySchema,
+    weight: z.number().int().positive(),
+    valueRange: valueRangeSchema,
+  })
+  .strict();
+
+// "2 a 3 possibilidades" (roadmap M39), distintas — o mesmo limite de `SOUL_MAINSTAT_OPTIONS_*`
+// no core, que falha alto se receber outra coisa.
+const soulSchema = z
+  .object({
+    mainstatOptions: z
+      .array(soulMainstatOptionSchema)
+      .min(2)
+      .max(3)
+      .refine((opcoes) => new Set(opcoes.map((o) => o.stat)).size === opcoes.length, {
+        message: 'as opções de mainstat da Soul não podem repetir stat.',
+      }),
+  })
+  .strict();
+
 const characterSchema = z
   .object({
     id: idSchema,
@@ -89,6 +111,11 @@ const characterSchema = z
     // Obrigatória, e sem padrão: um personagem sem ficha é posse sem herói para levar ao
     // mapa — o jogador pagaria a moeda premium por uma linha no banco.
     startingHero: startingHeroSchema,
+    // M39 3/N (D60) — a SOUL deste personagem: as 2 a 3 opções de mainstat, ligadas ao kit dele.
+    // Mora aqui porque a trava é por PERSONAGEM: o dono é o próprio arquivo, e não há campo
+    // `soulOf` para divergir dele (o `soulOf` da instância é derivado na carga). Obrigatória:
+    // personagem sem Soul teria o 8º slot aberto e nada para craftar.
+    soul: soulSchema,
   })
   .strict();
 

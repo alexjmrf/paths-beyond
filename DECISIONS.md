@@ -9167,3 +9167,212 @@ usuário: a subida de nível entra como a **1/N do M39**, e a Soul abre no **ní
 
 `RULES_VERSION` 0.23.0 → **0.24.0**. O `pnpm balance` não muda: a matriz mede todas as comps no
 nível 10.
+
+### D59 — a forma da Soul (M39 2/N, 2026-09-26)
+
+A proposta "aceita para começar" citada em D58 não ficou registrada em arquivo, então a forma foi
+perguntada de novo. **Decisões do usuário:**
+1. **Tipo próprio**, fora de `GEAR_SLOTS`: `SoulInstance` em `hero.soul`, como o artefato em
+   `hero.artifact` — sem set, enhance nem reforge. `GEAR_SLOTS` continua com os 6 de item; o 8º
+   slot é `hero.soul`.
+2. **O recraft re-sorteia TUDO** (mainstat e os dois substats) na mesma instância, com custo
+   próprio (`recraftCost`).
+3. **Várias Souls do mesmo personagem na conta**; o herói equipa uma.
+4. **Os dois substats saem de uma tabela PRÓPRIA da Soul** (`SoulRules.substats`), não da
+   `substat-weights.json` dos itens. "Roláveis" = sorteados no craft e no recraft; não há enhance.
+
+**O que a implementação decidiu dentro disso:**
+- A trava por personagem se chama **`soulOf`** (o artefato usa `classId` para a trava e
+  `signatureOf` para a associação). `validateSoul` recusa mainstat fora das opções DAQUELE
+  personagem, Soul de outro personagem, valor fora da faixa, e substats a mais, repetidos, iguais ao
+  mainstat ou fora da tabela.
+- **O nível trava o SLOT, não a posse:** `craftSoul` não olha nível; `equipSoul` recusa abaixo de
+  `SoulRules.unlockLevel` (dado — D58 diz 20).
+- O RNG é `rngFor(seed, crafts, id, 'soul-…')`, e `crafts` (1 no craft, +1 por recraft) mora na
+  instância: o recraft com a mesma seed não repete o sorteio anterior.
+- A Soul é equipamento para §4.1: mainstat e substats entram **flat no passo 3**.
+- 2 a 3 opções de mainstat e 2 substats são forma, logo constantes do core
+  (`SOUL_MAINSTAT_OPTIONS_MIN/MAX`, `SOUL_SUBSTAT_COUNT`); todo número está em `SoulRules`, que
+  vem de dado na 3/N.
+
+`RULES_VERSION` 0.24.0 → **0.25.0**.
+
+### D60 — os números da Soul (M39 3/N, 2026-09-26)
+
+Proposta do agente, **aprovada pelo usuário** sem mudança:
+
+1. **Opções de mainstat por personagem**, ligadas ao kit, com peso igual: sangramento, queimadura e
+   desarme puxam `eff`; cura puxa `heal`; crítico puxa `chc`/`chd`; tanque puxa `def`/`hp`/`efr`.
+   Aren atk·chd·eff; Sena def·hp·eff; Rurik atk·pen·eff; Halla atk·chc·pen; Nyra def·eff·hp;
+   Pell hp·def·eff; Kaia atk·chc·chd; Wren heal·hp·efr; Bardan def·hp·efr; Torv hp·def·efr;
+   Sylla atk·chc·chd; Ilvi chc·chd·atk; Vesper atk·eff·pen; Miron heal·atk·efr; Dorn heal·hp·efr.
+2. **Faixas do mainstat** (as mesmas para qualquer personagem, na escala de um colar ou anel topo):
+   atk 20–45, hp 80–160, def 15–35, chc 45–90, chd 70–140, eff 50–100, efr 50–100, pen 45–80,
+   heal 45–90.
+3. **`focus` e `vigor` ficam FORA por agora.** Nenhum item os dá; abaixo do limiar (100/150) seriam
+   decoração, e no limiar seriam +1 AP/PP garantido, a maior mudança de poder possível — pede
+   medição própria.
+4. **Substats:** os mesmos 10 stats e pesos da tabela dos itens, com a faixa em DOBRO (a Soul tem
+   2 substats e nenhum enhance; um item topo tem 4, roladas várias vezes).
+5. **Custos:** craft 40 Essências de Alma + 5.000 de ouro; recraft 20 + 2.500 (a metade — o
+   sumidouro repetível). O slot abre no nível 20 (D58).
+6. **A Essência de Alma** (`kind: 'generic'`) dropa na **Forja Abandonada**, que não dropava
+   material nenhum: normal 3–5 por run, elite 7–11. Na elite, um craft sai por ~4–5 runs.
+
+**Forma no dado:** as opções moram em `characters/*.json` (`soul.mainstatOptions`, obrigatório,
+2–3 distintas). Não há `soulOf` no dado: o dono é o próprio arquivo, e o `CharacterSoulDef` do core
+é derivado na carga (`catalog.characterSouls`). As regras estão no bloco `soul` de `economy.json`.
+`buildCatalog` falha alto se o custo usar material inexistente ou não genérico, ou se alguma opção
+de mainstat não deixar dois substats elegíveis.
+
+O `RULES_VERSION` não muda nesta fatia: nenhuma regra mudou, só entrou dado que nenhuma batalha lê
+ainda (nenhuma comp nem herói equipa Soul).
+
+### D61 — a Soul no servidor (M39 4/N, 2026-09-26)
+
+Tudo segue o precedente do artefato (M38 4/N); as duas escolhas padrão da fatia vão registradas:
+
+- **Rotas, todas com nonce:** `GET /me/souls`, `POST /souls/craft` (`characterId`),
+  `POST /souls/:id/recraft`, `POST /souls/:id/equip` (`heroId`), `POST /heroes/:heroId/soul/unequip`.
+  Craft e recraft são o kind novo `soul` de `economy_actions`; equipar e desequipar reusam `equip`.
+  Recusa por falta de recurso ou pela trava do core vem ANTES de gastar o nonce.
+- **O sorteio sai do nonce** por HMAC (`deriveSeed(segredo, nonce + ':soul')`), como no summon; o id
+  da instância é `soul-<jogador>-<nonce>`.
+- **Escolha padrão 1 — craftar exige POSSUIR o personagem** (a mesma checagem de posse de §9.4 que as
+  batalhas fazem; personagem de história conta como possuído). Personagem fora do elenco é 404.
+- **Escolha padrão 2 — descartar Soul NÃO existe nesta fatia.** Nem a spec nem D59 pedem; com várias
+  por personagem, o inventário só cresce. Fica em aberto.
+- **Persistência:** `player_souls` (migration `0021`), sem UNIQUE por (jogador, personagem) —
+  várias por personagem (D59) —, ordenada por `seq`. Paridade memória × Postgres e limpeza na
+  exclusão de conta.
+- **Batalha:** `soulEquipada` ao lado de `artefatoEquipado`, nas quatro montagens (campanha,
+  masmorra, arena atacante e defensor). Soul ausente da conta, ou que `validateSoul` recusa contra o
+  catálogo, **falha alto**.
+
+### D62 — a Soul no cliente (M39 5/N, 2026-09-28)
+
+Segue o molde do artefato no cliente (M38 4/N). Uma escolha fora da spec, **aprovada pelo usuário
+junto com o plano**:
+
+- **O recraft pede dois cliques na MESMA Soul.** Ele re-sorteia tudo e apaga a Soul atual (D59). O
+  primeiro clique arma, e o botão vira "Confirmar? Re-sorteia tudo"; o segundo manda. Clicar em outra
+  Soul rearma nela, e o armado desarma sozinho em 4 s. Não abre diálogo modal. A regra do clique é
+  `cliqueNoRecraft` em `logic/soul.ts`.
+
+O que a implementação decidiu dentro disso:
+- O bloco Soul fica na aba Personagens, entre Artefato e Equipamento, e só aparece para herói com
+  `characterId`. Abaixo de `unlockLevel` (lido de `economy.json`, via `soulSlotOpen` do core), mostra
+  só "abre no nível N (agora: M)".
+- A lista mostra só as Souls DAQUELE personagem. Craftar a partir da aba usa o personagem do herói em
+  foco (o servidor aceita qualquer personagem possuído; a tela não oferece outro).
+- O custo de craft e de recraft aparece como "tem/precisa", e o botão desliga quando não basta. É só
+  exibição: o servidor recusa de novo.
+- As Souls são lidas ao abrir a aba Personagens (`lerSouls`) e relidas depois de cada ação, junto
+  com os heróis e a economia.
+- O poder do herói passa a incluir a Soul, pelo mesmo `resolveHeroStatSheet` da batalha. O cálculo
+  saiu do painel para `logic/poder.ts`.
+- Os stats aparecem pela chave em caixa alta (`ATK +30`), como nos itens. O cliente não tem rótulo
+  traduzido de stat.
+
+`RULES_VERSION` não muda: nenhuma regra mudou.
+
+### D63 — a medição da Soul e do nível (M39 6/N, 2026-09-28)
+
+**Decisões do usuário:**
+1. **A Soul da medição é a MEDIANA determinística:** a primeira opção de mainstat do personagem e
+   os dois substats de maior peso da tabela da Soul (fora o stat do mainstat), tudo no ponto médio
+   da faixa (`soulMediana` em `tools/balance`).
+2. **O PvP deveria ser verificado com os personagens no nível máximo.** A pergunta do usuário
+   revelou que toda a medição desde o M8 foi feita no nível 10, e que o teto é 60 (a `statCurve`),
+   sem teto por rank nem normalização de nível na arena. Então o nível entra na ferramenta como
+   `--nivel N`, sobrescrito só na medição, sem tocar no JSON das comps.
+
+**Ferramenta:** `--nivel N`, `--souls` e `--delta-soul` (`runSoulDelta`). A trava de nível da Soul
+não entra na medição, que monta a batalha direto pelo core.
+
+**Resultado, 10.000 partidas por par, todas COM artefato (a base do PvP real, D57):**
+
+| Medição | Faixa global | Fora de 40–60% | `spd` > mediana |
+|---|---|---|---|
+| nível 10, sem Soul | 42,9%–59,0% | nenhuma (idêntica ao M38) | 32,8% |
+| nível 10, com Soul | 33,6%–64,2% | Arqueiro 64,2, Guerreiro 63,3; Lanceiro 37,0, Druida 33,6 | 35,7% |
+| nível 20, com Soul | 37,4%–63,3% | Arqueiro 63,3, Guerreiro 61,1; Lanceiro 39,0, Druida 37,4 | 35,4% |
+| nível 60, sem Soul | 37,2%–67,8% | Arcanista 67,8; Escudeira 38,4, Sentinela 37,2 | 33,4% |
+| nível 60, com Soul | 35,9%–64,8% | Arcanista 64,8, Arqueiro 64,7; Sentinela 35,9 | 34,8% |
+
+**Delta da Soul** (a comp com Soul contra ela mesma sem): **92,8%–98,5% no nível 20** e
+**75,9%–91,5% no nível 60**. A Soul é upgrade, como o artefato (73,5%–90,7%, D57), e pesa
+relativamente menos quanto maior o nível.
+
+**Leitura:**
+- **O critério do M8 NÃO fica de pé com a Soul**, em nenhum nível medido. O critério de `spd` passa
+  em todas.
+- **O nível 60 reprova sozinho, sem Soul.** É um problema anterior à Soul e maior que ela: as
+  curvas de classe crescem de forma diferente, e o Arcanista passa do teto.
+- **Viés possível da medição:** a mediana usa a PRIMEIRA opção de mainstat de cada personagem, e a
+  ordem das opções no dado não foi escolhida para isso. Quem tem opção ofensiva primeiro (Sylla atk,
+  Rurik atk) sobe; quem tem defensiva primeiro (Nyra def) desce.
+- **Discrepância achada na ferramenta:** `report.ts` marca ALERTA acima de **65%**, mas o critério
+  do M8 é **60%**. Arqueiro em 64,2% e Guerreiro em 63,3% reprovam sem alerta impresso. Não foi
+  corrigido nesta fatia.
+
+**Nenhum número foi tocado (regra 10).** A decisão (mexer na Soul, mexer nas curvas, mudar o
+critério ou o nível em que ele é medido) é do usuário.
+
+#### Fechamento (mesmo dia) — decisões do usuário: "pode ajustar" a Soul, "pode balancear" o nível 60, e a medição pela média das opções
+
+**1. A medição passa por TODAS as opções de mainstat**, com peso igual: a partida i usa a opção
+`i mod n` (`soulMediana(…, opcaoIndex)`). **Resultado: a Soul NÃO precisou de ajuste.** No nível
+10 com Soul, a faixa foi de 33,6–64,2% (só a primeira opção) para **41,3–59,2%** (a média). A
+reprovação vinha do viés da ordem das opções no dado. Uma tentativa de ajuste (a opção `atk` do
+Rurik trocada por `hp`) quase não mexeu no Guerreiro e derrubou a Escudeira para 39,7%, e foi
+desfeita.
+
+**2. As curvas de classe acima do nível 10.** Diagnóstico: todas as classes ganhavam `atk` +3
+por nível. Quem começa em 60 (Arcanista, Clérigo, Druida, Arqueiro) multiplicava o `atk` por 3,5
+até o 60, contra 2,67 do hp; e o Couraçado, +2 por nível, ficava para trás. Variantes medidas
+(2.000 partidas por par, nível 60, sem Soul / com Soul):
+
+| Variante | Sem Soul | Com Soul |
+|---|---|---|
+| original | 37,2–67,8% | 35,9–64,8% |
+| A: `atk` e `def` proporcionais | 40,9–59,8% | 42,0–60,5% |
+| B: só `atk` proporcional | 39,8–57,4% | 42,4–58,6% |
+| B + Arqueiro com `atk` original | 36,1–66,5% | 36,5–61,7% |
+| B + Arqueiro com `atk` 175 | 40,7–59,2% | 40,7–57,0% |
+| **B + Arqueiro 175 + Couraçado com `def` proporcional** | **41,3–58,8%** | **41,2–56,5%** |
+
+**A curva adotada**, só nos níveis 11–60 (1–10 intactos, então a matriz do nível 10 é idêntica):
+- **`atk`:** `trunc(atk10 × (30 + (L − 10)) / 30)`, a mesma regra que o hp já seguia. Classes com
+  `atk` 90 no nível 10 não mudam (a regra dá +3 exatos). Arcanista, Clérigo e Druida: 210 → 160 no
+  60; Couraçado: 163 → 168; Mestre Espadachim: 315 → 306.
+- **Exceção, o Arqueiro:** `trunc(60 + 2,3·(L − 10))`, 175 no 60. A regra dava 160, e as comps de
+  arqueiro caíam para 39,8%. Com o `atk` original (210), as comps com a Sylla passavam de 65%.
+- **`def`:** a original em toda classe, **exceto o Couraçado**, que passa à regra proporcional
+  (89 → 104 no 60). A Sentinela ficava rente ao piso em toda variante.
+- `hp` e `spd`: intocados.
+
+**Confirmação com 10.000 partidas por par, todas com artefato:**
+
+| Nível | Soul | Faixa | `spd` > mediana |
+|---|---|---|---|
+| 10 | não | 42,9–59,0% (idêntica ao M38) | 32,8% |
+| 10 | sim | 41,3–59,2% | 35,7% |
+| 20 | não | 44,2–57,1% | 32,9% |
+| 20 | sim | 44,1–58,6% | 32,9% |
+| 60 | não | 41,1–58,6% | 33,2% |
+| 60 | sim | 40,8–56,2% | 33,2% |
+
+**Os dois critérios do M8 de pé em todas.** As pontas mais apertadas: Sentinela 40,8% (60, com
+Soul) e Guerreiro 59,2% (10, com Soul).
+
+**Efeito no PvE:** Clérigo e Arcanista batem menos em nível alto. As elites continuam vencíveis
+com o time 20 níveis acima: Campo de Treino 13/20 seeds no +20 (17/20 antes) e 20/20 no +25. O
+teste de masmorra que usava 4 seeds fixas caiu por azar (as 4 estavam entre as 7 derrotas) e
+passou a sortear 20.
+
+**`RULES_VERSION` 0.25.0 → 0.26.0.** Nenhuma linha do core mudou, mas o resultado de toda batalha
+com herói acima do 10 muda, e o replay é reexecutado.
+
+**Em aberto, fora desta fatia:** o alerta de `report.ts` em 65% segue o §9.5 da spec de PvP,
+enquanto o M8 do roadmap diz 60%. As duas partes da spec divergem.

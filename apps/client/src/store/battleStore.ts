@@ -28,6 +28,7 @@ import {
   type MapAiArchetype,
   type ReachableTile,
   type Hero,
+  type SoulInstance,
   type TacticsScript,
   type TalentAllocation,
   type ColumnTalentTree,
@@ -399,6 +400,8 @@ export interface PvpSession {
   // M38 4/N — os artefatos da conta (instâncias). Moram ao lado do roster de heróis porque
   // são lidos juntos: a aba Personagens mostra quem leva qual.
   readonly artifacts: readonly ArtifactInstanceView[];
+  // M39 5/N — as Souls da conta, pelo mesmo motivo (várias por personagem, D59).
+  readonly souls: readonly SoulInstance[];
 }
 
 // O rascunho: mapa escolhido e as unidades posicionadas. Mora no store e não no componente
@@ -435,6 +438,7 @@ const EMPTY_PVP: PvpSession = {
   savedDefense: null,
   defenseDraft: { mapId: '', units: [], placingHeroId: null },
   artifacts: [],
+  souls: [],
 };
 
 // §10 (M14, sub-sessão 5/N) — a sessão de farm. Mora ao lado da de PvP e pelo mesmo
@@ -805,6 +809,12 @@ interface BattleStore {
   desequiparArtefato: (heroId: string) => Promise<void>;
   despertarArtefato: (instanceId: string) => Promise<void>;
   imprintArtefato: (instanceId: string) => Promise<void>;
+  // M39 5/N (D61) — a Soul: ler, craftar (escolhe o personagem no ato), recraftar, equipar.
+  lerSouls: () => Promise<void>;
+  craftarSoul: (characterId: string) => Promise<void>;
+  recraftarSoul: (soulId: string) => Promise<void>;
+  equiparSoul: (soulId: string, heroId: string) => Promise<void>;
+  desequiparSoul: (heroId: string) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
   purchaseEnergy: () => Promise<void>;
   openReplayViewer: () => Promise<void>;
@@ -952,6 +962,31 @@ async function acaoDeArtefato(
     await chamada();
     const [roster, artefatos] = await Promise.all([api.roster(pvp.token), api.artifacts(pvp.token)]);
     set((s) => ({ pvp: { ...s.pvp, roster, artifacts: artefatos.artifacts }, pve: { ...s.pve, busy: false, status } }));
+    await get().refreshPve();
+  } catch (error) {
+    set((s) => ({ pve: { ...s.pve, busy: false, error: describeApiError(error) } }));
+  }
+}
+
+// M39 5/N — o molde das quatro ações de Soul, o mesmo do artefato: chamar a rota e reler
+// heróis, Souls e a economia (craft e recraft gastam Essência e ouro). A recusa do servidor —
+// nível abaixo do slot, falta de recurso — vai para a tela.
+async function acaoDeSoul(
+  get: () => BattleStore,
+  set: (parcial: (s: BattleStore) => Partial<BattleStore>) => void,
+  chamada: () => Promise<unknown>,
+  status: string,
+): Promise<void> {
+  const { pvp } = get();
+  if (!pvp.token) {
+    set((s) => ({ pve: { ...s.pve, error: get().t('estado.conecteAntes') } }));
+    return;
+  }
+  set((s) => ({ pve: { ...s.pve, busy: true, error: null } }));
+  try {
+    await chamada();
+    const [roster, souls] = await Promise.all([api.roster(pvp.token), api.souls(pvp.token)]);
+    set((s) => ({ pvp: { ...s.pvp, roster, souls: souls.souls }, pve: { ...s.pve, busy: false, status } }));
     await get().refreshPve();
   } catch (error) {
     set((s) => ({ pve: { ...s.pve, busy: false, error: describeApiError(error) } }));
@@ -1778,6 +1813,29 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
   imprintArtefato: async (instanceId) => {
     await acaoDeArtefato(get, set, () => api.imprintArtifact(get().pvp.token, instanceId), get().t('estado.artefatoImprint'));
+  },
+
+  lerSouls: async () => {
+    const { pvp } = get();
+    if (!pvp.token) return;
+    try {
+      const { souls } = await api.souls(pvp.token);
+      set((s) => ({ pvp: { ...s.pvp, souls } }));
+    } catch (error) {
+      set((s) => ({ pve: { ...s.pve, error: describeApiError(error) } }));
+    }
+  },
+  craftarSoul: async (characterId) => {
+    await acaoDeSoul(get, set, () => api.craftSoul(get().pvp.token, characterId), get().t('estado.soulCraftada'));
+  },
+  recraftarSoul: async (soulId) => {
+    await acaoDeSoul(get, set, () => api.recraftSoul(get().pvp.token, soulId), get().t('estado.soulRecraftada'));
+  },
+  equiparSoul: async (soulId, heroId) => {
+    await acaoDeSoul(get, set, () => api.equipSoul(get().pvp.token, soulId, heroId), get().t('estado.soulEquipada'));
+  },
+  desequiparSoul: async (heroId) => {
+    await acaoDeSoul(get, set, () => api.unequipSoul(get().pvp.token, heroId), get().t('estado.soulDesequipada'));
   },
 
   claimReward: async (rewardId) => {
@@ -2658,6 +2716,8 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     if (!transicao) return;
     set({ abaDoHub: transicao.para, transicao: null });
     if (transicao.para === 'invocacao') get().dispararIntroducao('primeiro-summon');
+    // M39 5/N — as Souls só aparecem na aba Personagens; lidas ao abri-la.
+    if (transicao.para === 'personagens') void get().lerSouls();
   },
   fecharOpcoes: () => set({ opcoesAbertas: false, apagarProgressoPendente: false }),
   pedirApagarProgresso: () => set({ apagarProgressoPendente: true }),

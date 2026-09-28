@@ -1,5 +1,6 @@
 import type {
   ArtifactInstance,
+  SoulInstance,
   BattleCommand,
   BattleResult,
   BattleSetup,
@@ -661,6 +662,7 @@ export function createPostgresCharacterOwnershipRepository(pool: Pool): Characte
       await pool.query('DELETE FROM banner_tokens WHERE player_id = $1', [playerId]);
       await pool.query('DELETE FROM generic_choices WHERE player_id = $1', [playerId]);
       await pool.query('DELETE FROM player_artifacts WHERE player_id = $1', [playerId]);
+      await pool.query('DELETE FROM player_souls WHERE player_id = $1', [playerId]);
     },
     async setPity(playerId, scope, estado) {
       // M38 3/N (D54) — a chave é o TIPO do banner (`pity_scope`, migration 0019).
@@ -739,6 +741,41 @@ export function createPostgresCharacterOwnershipRepository(pool: Pool): Characte
         `INSERT INTO player_artifacts (id, player_id, artifact_id, awakening, imprint) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (player_id, artifact_id) DO NOTHING`,
         [instance.id, playerId, instance.artifactId, instance.awakening, instance.imprint],
+      );
+    },
+    async listSouls(playerId) {
+      const result = await pool.query<{
+        id: string;
+        soul_of: string;
+        mainstat_stat: string;
+        mainstat_value: number;
+        substats: SoulInstance['substats'];
+        crafts: number;
+      }>('SELECT id, soul_of, mainstat_stat, mainstat_value, substats, crafts FROM player_souls WHERE player_id = $1 ORDER BY seq', [
+        playerId,
+      ]);
+      return result.rows.map(
+        (row): SoulInstance => ({
+          id: row.id,
+          soulOf: row.soul_of,
+          mainstat: { stat: row.mainstat_stat as SoulInstance['mainstat']['stat'], value: row.mainstat_value },
+          substats: row.substats,
+          crafts: row.crafts,
+        }),
+      );
+    },
+    async grantSoul(playerId, soul) {
+      await pool.query(
+        `INSERT INTO player_souls (id, player_id, soul_of, mainstat_stat, mainstat_value, substats, crafts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [soul.id, playerId, soul.soulOf, soul.mainstat.stat, soul.mainstat.value, JSON.stringify(soul.substats), soul.crafts],
+      );
+    },
+    async updateSoul(playerId, soul) {
+      await pool.query(
+        `UPDATE player_souls SET mainstat_stat = $3, mainstat_value = $4, substats = $5, crafts = $6
+         WHERE id = $1 AND player_id = $2`,
+        [soul.id, playerId, soul.mainstat.stat, soul.mainstat.value, JSON.stringify(soul.substats), soul.crafts],
       );
     },
   };

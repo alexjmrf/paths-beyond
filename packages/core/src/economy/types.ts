@@ -1,6 +1,7 @@
 import type { GearSlot, ItemInstance, Rarity, ValueRange } from '../items/types.js';
 import type { Hero } from '../hero/types.js';
 import type { Id } from '../types.js';
+import type { SoulRules } from '../soul/types.js';
 
 // §10 — Progressão e economia (PvE). A seção são cinco linhas de prosa e nenhum número;
 // tudo que é balanceamento mora em `packages/data` (regra 4) e chega aqui por parâmetro.
@@ -152,6 +153,9 @@ export interface EconomyRules {
     readonly expParaProximo: readonly number[];
     readonly porNivelDeInimigo: number;
   };
+  // M39 3/N — as regras da Soul (nível de abertura, substats, custos). Opcional pelo mesmo
+  // motivo das tabelas acima; o catálogo real sempre as preenche.
+  readonly soul?: SoulRules;
 }
 
 // M14 2/N — calendário e trava de tempo.

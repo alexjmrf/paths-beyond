@@ -1,5 +1,6 @@
 import type {
   ArtifactDef,
+  CharacterSoulDef,
   ClassDef,
   ColumnTalentTree,
   EnemyDef,
@@ -21,6 +22,7 @@ import type {
   WeaponType,
   WinCondition,
 } from '@paths-beyond/core';
+import { SOUL_SUBSTAT_COUNT } from '@paths-beyond/core';
 import classSchema from '@paths-beyond/data/schemas/classes.schema.js';
 import characterSchema from '@paths-beyond/data/schemas/characters.schema.js';
 import characterTalentTreeSchema from '@paths-beyond/data/schemas/character-talent-trees.schema.js';
@@ -367,6 +369,36 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
   const economyRulesRaw = (input.economyRules ?? []).map((raw) => economyRulesSchema.parse(raw));
   const economyRules = (economyRulesRaw[0] as unknown as EconomyRules | undefined) ?? EMPTY_ECONOMY_RULES;
   const premiumRules = (economyRulesRaw[0] as unknown as PremiumRules | undefined) ?? EMPTY_PREMIUM_RULES;
+
+  // M39 3/N (D60) — a Soul. As opções moram no arquivo do personagem e o `soulOf` é derivado
+  // dele, então não há dono para divergir. O que cruza tipos falha ALTO aqui: o material dos
+  // custos existe e é GENÉRICO (a escolha do personagem é no craft, não no farm), e toda opção
+  // de mainstat deixa dois substats elegíveis na tabela — senão `generateSoul` falharia no meio
+  // de um craft já pago.
+  const characterSouls: Record<Id, CharacterSoulDef> = {};
+  for (const character of Object.values(characters)) {
+    characterSouls[character.id] = { soulOf: character.id, mainstatOptions: character.soul.mainstatOptions };
+  }
+  const soulRules = economyRules.soul;
+  if (soulRules) {
+    for (const [nome, custo] of [['craft', soulRules.craftCost], ['recraft', soulRules.recraftCost]] as const) {
+      for (const materialId of Object.keys(custo.materials)) {
+        const material = materials[materialId];
+        if (!material) throw new Error(`Soul: o custo de ${nome} usa '${materialId}', que não existe.`);
+        if (material.kind !== 'generic') {
+          throw new Error(`Soul: o custo de ${nome} usa '${materialId}' (kind: ${material.kind}); a Soul se crafta de material genérico.`);
+        }
+      }
+    }
+    for (const def of Object.values(characterSouls)) {
+      for (const opcao of def.mainstatOptions) {
+        const elegiveis = new Set(soulRules.substats.map((s) => s.stat).filter((stat) => stat !== opcao.stat));
+        if (elegiveis.size < SOUL_SUBSTAT_COUNT) {
+          throw new Error(`Soul de '${def.soulOf}': com mainstat ${opcao.stat}, a tabela de substats não deixa ${SOUL_SUBSTAT_COUNT} elegíveis.`);
+        }
+      }
+    }
+  }
   const substatWeights = (
     input.substatWeights === undefined ? [] : substatWeightsSchema.parse(input.substatWeights)
   ) as SubstatWeightEntry[];
@@ -397,6 +429,7 @@ export function buildCatalog(input: ParsedContentFiles): ContentCatalog {
     dungeonEncounters,
     materials,
     artifacts,
+    characterSouls,
     banners,
     achievements,
     events,

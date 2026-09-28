@@ -12,6 +12,7 @@ import type { BattleSetup, BattleUnit, MapAiArchetype, PermadeathMode, Side, Win
 import type { ValorSkillDef } from './valor.js';
 import type { EffectDef } from '../duel/types.js';
 import type { EquippedArtifact } from '../artifacts/types.js';
+import type { SoulInstance } from '../soul/types.js';
 
 export interface BuildBattleUnitInput {
   readonly unitId: Id;
@@ -64,6 +65,8 @@ export interface HeroPlacement {
   readonly equippedItems: readonly ItemInstance[];
   // M38 (D53) — o artefato do herói, já buscado por quem monta. Ausente = slot vazio.
   readonly artifact?: EquippedArtifact;
+  // M39 2/N — a Soul do herói, já buscada por quem monta. Ausente = slot vazio.
+  readonly soul?: SoulInstance;
   readonly side: Side;
   readonly pos: Coord;
   readonly height: 0 | 1 | 2 | 3;
@@ -178,6 +181,7 @@ export function buildBattleSetupFromHeroes(input: BuildBattleSetupFromHeroesInpu
           baselineReactionSkillIds: input.baselineReactionSkillIds,
           talentTree: arvoreDe(placement.hero),
           ...(placement.artifact ? { artifact: placement.artifact } : {}),
+          ...(placement.soul ? { soul: placement.soul } : {}),
         });
 
     const unit = buildBattleUnit({

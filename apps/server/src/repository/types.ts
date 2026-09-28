@@ -1,6 +1,7 @@
 import type { BannerKind, ChoiceState, PityState, TokenState } from '@paths-beyond/gacha';
 import type {
   ArtifactInstance,
+  SoulInstance,
   BattleCommand,
   BattleResult,
   BattleSetup,
@@ -267,7 +268,7 @@ export interface DungeonRunRecord {
 // Uma constante em tempo de execução é o que permite a `tests/migrations.test.ts` comparar
 // os dois lados. O tipo continua estreito porque sai dela.
 // M39 1/N — `exp`: usar Tomos de Experiência num herói (migration 0020).
-export const ECONOMY_ACTION_KINDS = ['enhance', 'awaken', 'imprint', 'equip', 'summon', 'energy', 'exp'] as const;
+export const ECONOMY_ACTION_KINDS = ['enhance', 'awaken', 'imprint', 'equip', 'summon', 'energy', 'exp', 'soul'] as const;
 
 export interface EconomyActionRecord {
   readonly nonce: string;
@@ -360,6 +361,12 @@ export interface CharacterOwnershipRepository {
   // M38 4/N — awakening e imprint do artefato. Só toca a instância SE ela for daquele
   // jogador: o id vem da URL, e o dono vem da sessão.
   updateArtifact(playerId: string, instance: ArtifactInstance): Promise<void>;
+
+  // M39 4/N (D59) — a posse de SOUL: várias por personagem, na ordem de criação. `updateSoul` é o
+  // recraft, e só toca a instância SE ela for daquele jogador (o id vem da URL, o dono da sessão).
+  listSouls(playerId: string): Promise<readonly SoulInstance[]>;
+  grantSoul(playerId: string, soul: SoulInstance): Promise<void>;
+  updateSoul(playerId: string, soul: SoulInstance): Promise<void>;
 }
 
 export interface EconomyRepository {

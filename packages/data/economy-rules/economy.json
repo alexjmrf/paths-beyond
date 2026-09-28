@@ -215,5 +215,102 @@
       5900
     ],
     "porNivelDeInimigo": 20
+  },
+  "soul": {
+    "unlockLevel": 20,
+    "substats": [
+      {
+        "stat": "atk",
+        "weight": 18,
+        "valueRange": {
+          "min": 8,
+          "max": 24
+        }
+      },
+      {
+        "stat": "hp",
+        "weight": 18,
+        "valueRange": {
+          "min": 40,
+          "max": 120
+        }
+      },
+      {
+        "stat": "def",
+        "weight": 16,
+        "valueRange": {
+          "min": 8,
+          "max": 20
+        }
+      },
+      {
+        "stat": "spd",
+        "weight": 8,
+        "valueRange": {
+          "min": 4,
+          "max": 10
+        }
+      },
+      {
+        "stat": "chc",
+        "weight": 10,
+        "valueRange": {
+          "min": 40,
+          "max": 100
+        }
+      },
+      {
+        "stat": "chd",
+        "weight": 10,
+        "valueRange": {
+          "min": 60,
+          "max": 160
+        }
+      },
+      {
+        "stat": "eff",
+        "weight": 6,
+        "valueRange": {
+          "min": 40,
+          "max": 120
+        }
+      },
+      {
+        "stat": "efr",
+        "weight": 6,
+        "valueRange": {
+          "min": 40,
+          "max": 120
+        }
+      },
+      {
+        "stat": "pen",
+        "weight": 4,
+        "valueRange": {
+          "min": 40,
+          "max": 100
+        }
+      },
+      {
+        "stat": "heal",
+        "weight": 4,
+        "valueRange": {
+          "min": 40,
+          "max": 100
+        }
+      }
+    ],
+    "craftCost": {
+      "gold": 5000,
+      "materials": {
+        "material-essencia-de-alma": 40
+      }
+    },
+    "recraftCost": {
+      "gold": 2500,
+      "materials": {
+        "material-essencia-de-alma": 20
+      }
+    }
   }
 }

@@ -29,5 +29,33 @@
         "conditions": []
       }
     ]
+  },
+  "soul": {
+    "mainstatOptions": [
+      {
+        "stat": "heal",
+        "weight": 1,
+        "valueRange": {
+          "min": 45,
+          "max": 90
+        }
+      },
+      {
+        "stat": "atk",
+        "weight": 1,
+        "valueRange": {
+          "min": 20,
+          "max": 45
+        }
+      },
+      {
+        "stat": "efr",
+        "weight": 1,
+        "valueRange": {
+          "min": 50,
+          "max": 100
+        }
+      }
+    ]
   }
 }

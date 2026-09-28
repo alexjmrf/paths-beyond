@@ -39,5 +39,16 @@
       "rarity": "epic",
       "ilvl": 85
     }
+  ],
+  "materialDropCount": 1,
+  "materialDrops": [
+    {
+      "weight": 1,
+      "materialId": "material-essencia-de-alma",
+      "amount": {
+        "min": 3,
+        "max": 5
+      }
+    }
   ]
 }

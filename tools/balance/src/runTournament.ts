@@ -11,6 +11,7 @@ import {
   type Id,
   type ItemInstance,
   type RngState,
+  type SoulInstance,
 } from '@paths-beyond/core';
 import { firstArenaMap, type Composition, type ContentCatalog } from '@paths-beyond/content';
 
@@ -80,6 +81,51 @@ function artefatoDaUnidade(unit: Composition['units'][number], content: ContentC
   };
 }
 
+// M39 6/N — A SOUL DA MEDIÇÃO (decisão do usuário, 2026-09-28): a MEDIANA determinística, sem
+// sorte de craft. Uma opção de mainstat do personagem e os dois substats de maior peso da tabela
+// da Soul (fora o stat do mainstat; empate fica com a ordem da tabela), todos no ponto médio da
+// faixa. É o equivalente do tier fixo do artefato. Personagem sem Soul no catálogo falha alto:
+// uma unidade sem Soul num time com Soul mediria um time misturado em silêncio.
+//
+// D63, fechamento (decisão do usuário): a medição passa por TODAS as opções com peso igual — a
+// partida i usa a opção `i mod n` — em vez de só a primeira, cuja ordem no dado não foi escolhida
+// para medir e enviesava a matriz.
+const SUBSTATS_DA_SOUL = 2;
+const meio = (faixa: { readonly min: number; readonly max: number }) => Math.trunc((faixa.min + faixa.max) / 2);
+
+export function soulMediana(characterId: Id, content: ContentCatalog, unitId: Id, opcaoIndex = 0): SoulInstance {
+  const def = content.characterSouls[characterId];
+  if (!def) throw new Error(`personagem sem Soul no catálogo: ${characterId}`);
+  const regras = content.economyRules.soul;
+  if (!regras) throw new Error('o catálogo não declara as regras da Soul (economy.json, bloco `soul`)');
+  const opcao = def.mainstatOptions[opcaoIndex % def.mainstatOptions.length];
+  if (!opcao) throw new Error(`a Soul de ${characterId} não declara opção de mainstat`);
+  const substats = regras.substats
+    .map((entrada, ordem) => ({ entrada, ordem }))
+    .filter(({ entrada }) => entrada.stat !== opcao.stat)
+    .sort((a, b) => b.entrada.weight - a.entrada.weight || a.ordem - b.ordem)
+    .slice(0, SUBSTATS_DA_SOUL)
+    .map(({ entrada }) => ({ stat: entrada.stat, value: meio(entrada.valueRange) }));
+  return {
+    id: `${unitId}-soul`,
+    soulOf: characterId,
+    mainstat: { stat: opcao.stat, value: meio(opcao.valueRange) },
+    substats,
+    crafts: 1,
+  };
+}
+
+// M39 6/N — o que muda na medição além do artefato. `souls`: toda unidade leva a Soul mediana
+// do seu personagem. `nivel`: o nível de TODA unidade na medição, sobrescrito aqui e não no JSON
+// das comps (a base do nível 10 continua reproduzível). A trava de nível da Soul não entra: a
+// medição monta a batalha direto pelo core, sem `equipSoul`.
+export interface ExtrasDaMedicao {
+  readonly souls?: boolean;
+  readonly nivel?: number;
+  // Qual opção de mainstat a Soul mediana usa (módulo o número de opções do personagem).
+  readonly opcaoDaSoul?: number;
+}
+
 export function toPlacements(
   comp: Composition,
   content: ContentCatalog,
@@ -90,16 +136,28 @@ export function toPlacements(
   // os mesmos ids de unidade e de herói, e o motor os trataria como a mesma peça. O sufixo
   // separa o lado espelhado; fora do espelho ele é vazio e nada muda.
   unitIdSuffix = '',
+  extras: ExtrasDaMedicao = {},
 ): HeroPlacement[] {
   return comp.units.map((unit): HeroPlacement => {
     const classDef = content.classes[unit.hero.classId];
     if (!classDef) throw new Error(`classe desconhecida: ${unit.hero.classId} (composição ${comp.id})`);
+    const unitId = `${unit.hero.id}${unitIdSuffix}`;
+    const hero = {
+      ...unit.hero,
+      ...(unitIdSuffix ? { id: unitId } : {}),
+      ...(extras.nivel !== undefined ? { level: extras.nivel } : {}),
+    };
+    const characterId = unit.hero.characterId;
+    if (extras.souls && !characterId) {
+      throw new Error(`a unidade ${unit.hero.id} (composição ${comp.id}) não é personagem e não tem Soul`);
+    }
     return {
-      unitId: `${unit.hero.id}${unitIdSuffix}`,
-      hero: unitIdSuffix ? { ...unit.hero, id: `${unit.hero.id}${unitIdSuffix}` } : unit.hero,
+      unitId,
+      hero,
       classDef,
       equippedItems: resolveEquippedItems(unit.hero, content, comp.id),
       ...(artefatos ? { artifact: artefatoDaUnidade(unit, content, comp.id, artefatos) } : {}),
+      ...(extras.souls && characterId ? { soul: soulMediana(characterId, content, unitId, extras.opcaoDaSoul ?? 0) } : {}),
       side,
       pos: { x: unit.pos.x + positionOffsetX, y: unit.pos.y },
       height: unit.height,
@@ -107,6 +165,8 @@ export function toPlacements(
     };
   });
 }
+
+const extrasDoNivel = (nivel: number | undefined) => (nivel !== undefined ? { nivel } : {});
 
 function applyDefenderBonus(units: readonly BattleUnit[]): readonly BattleUnit[] {
   return units.map((unit) => (unit.side === 'enemy' ? { ...unit, ap: unit.ap + DEFENDER_AP_BONUS } : unit));
@@ -128,9 +188,15 @@ function runOneBattle(
   content: ContentCatalog,
   seed: number,
   artefatos: { readonly atacante?: ArtifactTier; readonly defensor?: ArtifactTier } = {},
+  // M39 6/N — a Soul por LADO (o delta a põe de um lado só) e o nível, que vale para os dois.
+  extras: { readonly soulsAtacante?: boolean; readonly soulsDefensor?: boolean; readonly nivel?: number; readonly opcaoDaSoul?: number } = {},
 ): BattleOutcomeRecord {
   const espelho = attacker.id === defender.id ? '-espelho' : '';
-  const attackerPlacements = toPlacements(attacker, content, 'player', 0, artefatos.atacante);
+  const comum = { ...extrasDoNivel(extras.nivel), opcaoDaSoul: extras.opcaoDaSoul ?? 0 };
+  const attackerPlacements = toPlacements(attacker, content, 'player', 0, artefatos.atacante, '', {
+    ...comum,
+    souls: extras.soulsAtacante ?? false,
+  });
   const defenderPlacements = toPlacements(
     defender,
     content,
@@ -138,6 +204,7 @@ function runOneBattle(
     DEFENDER_POSITION_OFFSET_X,
     artefatos.defensor,
     espelho,
+    { ...comum, souls: extras.soulsDefensor ?? false },
   );
   // Coliseu (§9.2) só conhece uma arena — ver `firstArenaMap` em `@paths-beyond/content`
   // pra saber por que "o primeiro mapa carregado" ainda é seguro nesta sub-sessão.
@@ -193,6 +260,9 @@ export interface RunTournamentOptions {
   // M38 5/N — presente, TODA unidade dos dois lados leva o artefato declarado neste tier.
   // Ausente, o torneio é o de sempre.
   readonly artefatos?: ArtifactTier;
+  // M39 6/N — presentes, TODA unidade dos dois lados leva a Soul mediana / fica neste nível.
+  readonly souls?: boolean;
+  readonly nivel?: number;
 }
 
 // PRNG só pra gerar seeds distintas de batalha — não é RNG de regra (isso continua
@@ -218,7 +288,14 @@ export function runTournament(content: ContentCatalog, options: RunTournamentOpt
         const picked = nextBattleSeed(rngState);
         rngState = picked.state;
         records.push(
-          runOneBattle(attacker, defender, content, picked.seed, { atacante: options.artefatos, defensor: options.artefatos }),
+          runOneBattle(
+            attacker,
+            defender,
+            content,
+            picked.seed,
+            { atacante: options.artefatos, defensor: options.artefatos },
+            { soulsAtacante: options.souls ?? false, soulsDefensor: options.souls ?? false, ...extrasDoNivel(options.nivel), opcaoDaSoul: i },
+          ),
         );
       }
     }
@@ -276,6 +353,60 @@ export function runArtifactDelta(content: ContentCatalog, options: RunArtifactDe
         else if (record.outcome === 'defeat') comArtefatoAtacando ? sem++ : com++;
       }
       return { vitoriasComArtefato: com, vitoriasSemArtefato: sem, total: options.runsPerPairing };
+    };
+
+    rows.push({ compId: comp.id, comoAtacante: lado(true), comoDefensor: lado(false) });
+  }
+
+  return rows;
+}
+
+// M39 6/N — O DELTA DA SOUL: cada comp com Soul contra ELA MESMA sem, no molde do delta do
+// artefato. Os dois lados levam o mesmo artefato (quando pedido) e ficam no mesmo nível; a única
+// diferença é a Soul. 50% seria Soul sem efeito; o quanto passa disso é o poder que ela compra.
+export interface SoulDeltaSide {
+  readonly vitoriasComSoul: number;
+  readonly vitoriasSemSoul: number;
+  readonly total: number;
+}
+
+export interface SoulDeltaRow {
+  readonly compId: Id;
+  readonly comoAtacante: SoulDeltaSide;
+  readonly comoDefensor: SoulDeltaSide;
+}
+
+export interface RunSoulDeltaOptions {
+  readonly runsPerPairing: number;
+  readonly masterSeed: number;
+  readonly artefatos?: ArtifactTier;
+  readonly nivel?: number;
+}
+
+export function runSoulDelta(content: ContentCatalog, options: RunSoulDeltaOptions): readonly SoulDeltaRow[] {
+  let rngState = seedRng(options.masterSeed);
+  const rows: SoulDeltaRow[] = [];
+
+  for (const comp of content.comps) {
+    const lado = (comSoulAtacando: boolean): SoulDeltaSide => {
+      let com = 0;
+      let sem = 0;
+      for (let i = 0; i < options.runsPerPairing; i++) {
+        const picked = nextBattleSeed(rngState);
+        rngState = picked.state;
+        const record = runOneBattle(
+          comp,
+          comp,
+          content,
+          picked.seed,
+          { atacante: options.artefatos, defensor: options.artefatos },
+          { soulsAtacante: comSoulAtacando, soulsDefensor: !comSoulAtacando, ...extrasDoNivel(options.nivel), opcaoDaSoul: i },
+        );
+        // A comp é a mesma dos dois lados: quem venceu se lê pelo LADO, não pelo id.
+        if (record.outcome === 'victory') comSoulAtacando ? com++ : sem++;
+        else if (record.outcome === 'defeat') comSoulAtacando ? sem++ : com++;
+      }
+      return { vitoriasComSoul: com, vitoriasSemSoul: sem, total: options.runsPerPairing };
     };
 
     rows.push({ compId: comp.id, comoAtacante: lado(true), comoDefensor: lado(false) });

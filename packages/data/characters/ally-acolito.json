@@ -29,5 +29,33 @@
         "conditions": []
       }
     ]
+  },
+  "soul": {
+    "mainstatOptions": [
+      {
+        "stat": "heal",
+        "weight": 1,
+        "valueRange": {
+          "min": 45,
+          "max": 90
+        }
+      },
+      {
+        "stat": "hp",
+        "weight": 1,
+        "valueRange": {
+          "min": 80,
+          "max": 160
+        }
+      },
+      {
+        "stat": "efr",
+        "weight": 1,
+        "valueRange": {
+          "min": 50,
+          "max": 100
+        }
+      }
+    ]
   }
 }

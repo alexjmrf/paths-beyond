@@ -100,8 +100,14 @@ describe('as masmorras são confrontos jogáveis', () => {
 
       // Com um time 20 níveis acima, ela cai. Sem esta metade, "difícil" seria
       // indistinguível de "inacabável" — e conteúdo impossível passaria no teste acima.
+      //
+      // M39 6/N (D63) — 20 seeds em vez das 4 de SEEDS: "não é impossível" é uma afirmação sobre
+      // existir vitória, e 4 seeds fixas a tornavam refém de sorte. Com as curvas novas, a elite do
+      // Campo de Treino é vencida em 13 de 20 seeds no +20 e em todas no +25 — as 4 de SEEDS
+      // estavam, por acaso, entre as 7 que perdem.
       const forte = setupFor(encounter, 20);
-      const vitorias = SEEDS.filter((seed) => resolveAutoBattle({ setup: forte, seed }).outcome === 'victory');
+      const seedsDoForte = Array.from({ length: 20 }, (_, i) => i + 1);
+      const vitorias = seedsDoForte.filter((seed) => resolveAutoBattle({ setup: forte, seed }).outcome === 'victory');
       expect(vitorias.length, `${dungeonId} não foi vencida nem com time 20 níveis acima`).toBeGreaterThan(0);
     },
   );

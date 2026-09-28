@@ -3,15 +3,15 @@ import { parseArgs, runCli } from '../src/cli.js';
 
 describe('parseArgs', () => {
   it('usa defaults quando nenhum argumento é passado', () => {
-    expect(parseArgs([])).toEqual({ runs: 10_000, seed: 1, artefatos: false, delta: false });
+    expect(parseArgs([])).toEqual({ runs: 10_000, seed: 1, artefatos: false, delta: false, souls: false, deltaSoul: false, nivel: undefined });
   });
 
   it('lê --runs e --seed', () => {
-    expect(parseArgs(['--runs', '500', '--seed', '99'])).toEqual({ runs: 500, seed: 99, artefatos: false, delta: false });
+    expect(parseArgs(['--runs', '500', '--seed', '99'])).toEqual({ runs: 500, seed: 99, artefatos: false, delta: false, souls: false, deltaSoul: false, nivel: undefined });
   });
 
   it('ignora argumentos desconhecidos', () => {
-    expect(parseArgs(['--foo', 'bar', '--runs', '10'])).toEqual({ runs: 10, seed: 1, artefatos: false, delta: false });
+    expect(parseArgs(['--foo', 'bar', '--runs', '10'])).toEqual({ runs: 10, seed: 1, artefatos: false, delta: false, souls: false, deltaSoul: false, nivel: undefined });
   });
 });
 

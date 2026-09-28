@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { idSchema } from './shared.js';
+import { idSchema, statKeySchema, valueRangeSchema } from './shared.js';
 
 // §10 (M14) — a tabela única de números da economia PvE: energia, custo de awakening e
 // custo de imprint. Tipo de conteúdo com um arquivo só, mesmo padrão de
@@ -45,6 +45,21 @@ const economyRulesSchema = z.object({
     .object({
       expParaProximo: z.array(z.number().int().positive()).length(59),
       porNivelDeInimigo: z.number().int().positive(),
+    })
+    .strict(),
+  // M39 3/N (D60) — A SOUL: o nível em que o slot abre (D58: 20), a tabela PRÓPRIA dos dois
+  // substats (não a dos itens — decisão do usuário) e os custos. O material do custo tem de ser
+  // genérico e existir; isso é cruzado em `buildCatalog`. O recraft re-sorteia tudo e é o
+  // sumidouro repetível, com custo próprio.
+  soul: z
+    .object({
+      unlockLevel: z.number().int().min(1).max(60),
+      substats: z
+        .array(z.object({ stat: statKeySchema, weight: z.number().int().positive(), valueRange: valueRangeSchema }).strict())
+        .min(2)
+        .refine((s) => new Set(s.map((e) => e.stat)).size === s.length, { message: 'substat da Soul repetido.' }),
+      craftCost: z.object({ gold: z.number().int().min(0), materials: materialCostSchema }).strict(),
+      recraftCost: z.object({ gold: z.number().int().min(0), materials: materialCostSchema }).strict(),
     })
     .strict(),
   // §10 (M18) — os dois sumidouros da QUARTA moeda, a premium (D17). Ela não se ganha

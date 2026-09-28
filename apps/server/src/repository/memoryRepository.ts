@@ -1,5 +1,5 @@
 import type { BannerKind, ChoiceState, PityState, TokenState } from '@paths-beyond/gacha';
-import type { ArtifactInstance, EnergyState, EntryLimitState, ItemInstance } from '@paths-beyond/core';
+import type { ArtifactInstance, EnergyState, EntryLimitState, ItemInstance, SoulInstance } from '@paths-beyond/core';
 import {
   DEFAULT_ARENA_MARKS,
   DEFAULT_ELO,
@@ -331,6 +331,8 @@ export function createMemoryCharacterOwnershipRepository(
   const tokens = new Map<string, TokenState>();
   const choices = new Map<string, ChoiceState>();
   const artifacts = new Map<string, ArtifactInstance[]>();
+  // M39 4/N — as Souls, na ordem de criação (como o `ORDER BY seq` do Postgres).
+  const souls = new Map<string, SoulInstance[]>();
 
   return {
     async listAcquired(playerId) {
@@ -382,9 +384,21 @@ export function createMemoryCharacterOwnershipRepository(
         lista.map((a) => (a.id === instance.id ? { ...a, awakening: instance.awakening, imprint: instance.imprint } : a)),
       );
     },
+    async listSouls(playerId) {
+      return [...(souls.get(playerId) ?? [])];
+    },
+    async grantSoul(playerId, soul) {
+      souls.set(playerId, [...(souls.get(playerId) ?? []), soul]);
+    },
+    async updateSoul(playerId, soul) {
+      const lista = souls.get(playerId);
+      if (!lista || !lista.some((s) => s.id === soul.id)) return;
+      souls.set(playerId, lista.map((s) => (s.id === soul.id ? soul : s)));
+    },
     async deletePlayerData(playerId) {
       acquired.delete(playerId);
       artifacts.delete(playerId);
+      souls.delete(playerId);
       for (const mapa of [pity, tokens, choices] as Map<string, unknown>[]) {
         for (const chave of [...mapa.keys()]) {
           if (chave.startsWith(`${playerId}::`)) mapa.delete(chave);

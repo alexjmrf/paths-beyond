@@ -35,6 +35,9 @@ export interface Hero {
   // artefato não é `ItemInstance` (ver artifacts/types.ts). Opcional: ausente e `null` são o
   // mesmo "slot vazio", e todo herói gravado antes do M38 continua válido.
   readonly artifact?: Id | null;
+  // M39 2/N — o 8º slot: a INSTÂNCIA de Soul equipada, fora de `equipment` pelo mesmo motivo
+  // do artefato (não é `ItemInstance`). Opcional: ausente e `null` são o mesmo slot vazio.
+  readonly soul?: Id | null;
   readonly weaponType: WeaponType;
   readonly duelSkills: readonly Id[];
   readonly mapSkills: readonly Id[];

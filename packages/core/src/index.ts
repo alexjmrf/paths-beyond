@@ -316,3 +316,19 @@ export type {
   EquipArtifactResult,
 } from './artifacts/index.js';
 export type { ArtifactDef, ArtifactInstance, ArtifactPassive, EquippedArtifact, ResolvedArtifact } from './artifacts/types.js';
+// M39 2/N — a Soul: o 8º slot, travado por PERSONAGEM, craftada de material genérico.
+export {
+  SOUL_MAINSTAT_OPTIONS_MAX,
+  SOUL_MAINSTAT_OPTIONS_MIN,
+  SOUL_SUBSTAT_COUNT,
+  assertSoulFitsHero,
+  craftSoul,
+  equipSoul,
+  generateSoul,
+  recraftSoul,
+  resolveSoul,
+  soulSlotOpen,
+  validateSoul,
+} from './soul/index.js';
+export type { CraftSoulInput, EquipSoulResult, GenerateSoulInput, RecraftSoulInput, SoulCraftResult } from './soul/index.js';
+export type { CharacterSoulDef, SoulCost, SoulInstance, SoulMainstatOption, SoulRules, SoulSubstatEntry } from './soul/types.js';

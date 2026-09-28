@@ -1,9 +1,11 @@
-import { artifactRank, resolveHeroStatSheet, type EquippedArtifact } from '@paths-beyond/core';
+import { artifactRank } from '@paths-beyond/core';
 import { useState } from 'react';
 import type { ArtifactInstanceView } from '../data/api.js';
 import { catalog } from '../data/catalog.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
 import { NivelEtomos } from './NivelEtomos.js';
+import { SlotDeSoul } from './SlotDeSoul.js';
+import { poderDoHeroi } from '../logic/poder.js';
 import { rotuloDeHeroi } from '../logic/rotulos.js';
 import { useBattleStore } from '../store/battleStore.js';
 
@@ -14,40 +16,8 @@ import { useBattleStore } from '../store/battleStore.js';
 // o inventário num painel só (§10, M14 5/N). Nada mudou de regra: despertar, vínculo, aprimorar
 // e equipar continuam sendo chamadas de rota, e o servidor é quem decide (regra 3).
 
-// O "poder" mostrado ao lado do herói: o stat sheet resolvido pelo core a partir do que o
-// SERVIDOR devolveu (herói + itens equipados). É o número que precisa subir no fim do ciclo
-// farm → drop → enhance → equipar — e é o mesmo cálculo que a batalha usa, não uma métrica de
-// vitrine. §8.1 (M17, 2/N): a árvore é do personagem, e o poder inclui o talento pelo mesmo
-// motivo.
-// M38 4/N — o artefato equipado, montado a partir do que o servidor devolveu (a instância) e
-// do catálogo (a definição). Ausente ou inconsistente = sem artefato na conta da tela.
-function artefatoDoHeroi(
-  heroArtifact: string | null | undefined,
-  artefatos: readonly ArtifactInstanceView[],
-): EquippedArtifact | undefined {
-  const instance = artefatos.find((a) => a.id === heroArtifact);
-  const def = instance ? catalog.artifacts[instance.artifactId] : undefined;
-  return instance && def ? { def, instance } : undefined;
-}
-
-function powerOf(
-  entry: ReturnType<typeof useBattleStore.getState>['pvp']['roster'][number],
-  artefatos: readonly ArtifactInstanceView[],
-): number | null {
-  const classDef = catalog.classes[entry.hero.classId];
-  if (!classDef) return null;
-  // M38 4/N — o artefato entra no poder pelo mesmo cálculo que a batalha usa (passos 3/4).
-  const artifact = artefatoDoHeroi(entry.hero.artifact, artefatos);
-  const sheet = resolveHeroStatSheet({
-    hero: entry.hero,
-    classDef,
-    equippedItems: entry.equippedItems,
-    itemSets: catalog.itemSets,
-    talentTree: entry.hero.characterId ? (catalog.characterTalentTrees[entry.hero.characterId]?.nodes ?? []) : [],
-    ...(artifact && artifact.def.classId === classDef.id ? { artifact } : {}),
-  });
-  return Object.values(sheet).reduce((total, value) => total + value, 0);
-}
+// O "poder" ao lado do herói é `poderDoHeroi` (logic/poder.ts): o mesmo cálculo da batalha,
+// com talento, artefato e Soul.
 
 export function PersonagensPanel() {
   const pve = useBattleStore((s) => s.pve);
@@ -74,7 +44,7 @@ export function PersonagensPanel() {
       <h3>{t('personagens.elenco')}</h3>
       <ul className="pve-roster">
         {pvp.roster.map((entry) => {
-          const power = powerOf(entry, pvp.artifacts);
+          const power = poderDoHeroi(entry, pvp.artifacts, pvp.souls);
           const rotulo = rotuloDeHeroi(t, entry.hero, catalog);
           return (
             <li key={entry.hero.id} className={heroDoFoco?.hero.id === entry.hero.id ? 'em-foco' : ''}>
@@ -128,6 +98,14 @@ export function PersonagensPanel() {
           aoDespertar={(instanceId) => void despertarArtefato(instanceId)}
           aoVincular={(instanceId) => void imprintArtefato(instanceId)}
         />
+      ) : null}
+
+      {/* M39 5/N — o 8º slot. Herói sem personagem não tem Soul, e o bloco some. */}
+      {heroDoFoco?.hero.characterId ? (
+        <>
+          <h3>{t('personagens.soul')}</h3>
+          <SlotDeSoul hero={heroDoFoco.hero} />
+        </>
       ) : null}
 
       <h3>{t('personagens.equipamento')}</h3>

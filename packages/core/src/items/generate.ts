@@ -38,7 +38,7 @@ export interface GenerateItemInput {
   readonly mainstatWeights: readonly MainstatWeightEntry[];
 }
 
-function pickWeighted<T extends { readonly weight: number }>(entries: readonly T[], rngValue: number): T {
+export function pickWeighted<T extends { readonly weight: number }>(entries: readonly T[], rngValue: number): T {
   const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
   const roll = rngValue % totalWeight;
   let cursor = 0;
@@ -49,7 +49,7 @@ function pickWeighted<T extends { readonly weight: number }>(entries: readonly T
   return entries[entries.length - 1] as T;
 }
 
-function rollInRange(rngValue: number, range: ValueRange): number {
+export function rollInRange(rngValue: number, range: ValueRange): number {
   const span = range.max - range.min + 1;
   return range.min + (rngValue % span);
 }

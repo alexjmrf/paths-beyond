@@ -1,6 +1,7 @@
 import type { BannerEntry, GenericBanner, RotatingArtifactBanner, RotatingCharacterBanner } from '@paths-beyond/gacha';
 import type {
   ArtifactDef,
+  CharacterSoulDef,
   BaseRank,
   ClassDef,
   ColumnTalentTree,
@@ -165,6 +166,9 @@ export interface CharacterContent {
   // nova ou saindo do banner. É um subconjunto de `Hero` de propósito: o que ela não
   // carrega é progresso (exp, awakening, imprint, talentos), que é estado de conta.
   readonly startingHero: StartingHeroContent;
+  // M39 3/N (D60) — as opções de mainstat da Soul DESTE personagem. O dono é o próprio arquivo;
+  // o `CharacterSoulDef` do core (com `soulOf`) é derivado na carga, em `characterSouls`.
+  readonly soul: { readonly mainstatOptions: CharacterSoulDef['mainstatOptions'] };
 }
 
 export interface StartingHeroContent {
@@ -319,6 +323,9 @@ export interface ContentCatalog {
   // M38 2/N (D53/D54) — os artefatos, um por personagem, indexados por id. Chegam aqui já
   // conferidos contra o elenco e as skills (`buildCatalog`).
   readonly artifacts: Readonly<Record<Id, ArtifactDef>>;
+  // M39 3/N (D60) — a Soul de cada personagem, no formato do core, indexada pelo `characterId`
+  // (que é também o `soulOf`). As regras (nível, substats, custos) estão em `economyRules.soul`.
+  readonly characterSouls: Readonly<Record<Id, CharacterSoulDef>>;
   // §10 (M18, 2/N) — os banners de invocação. Obrigatórios pela mesma razão que o elenco:
   // catálogo sem banner não é "este jogo não tem aquisição", é uma rota de summon que não
   // resolve.

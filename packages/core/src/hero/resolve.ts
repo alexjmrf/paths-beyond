@@ -8,6 +8,8 @@ import type { Id } from '../types.js';
 import type { ClassDef, Hero } from './types.js';
 import { assertArtifactFitsClass, resolveArtifact } from '../artifacts/index.js';
 import type { EquippedArtifact } from '../artifacts/types.js';
+import { assertSoulFitsHero, resolveSoul } from '../soul/index.js';
+import type { SoulInstance } from '../soul/types.js';
 
 export interface ResolveHeroStatSheetInput {
   readonly hero: Hero;
@@ -24,6 +26,9 @@ export interface ResolveHeroStatSheetInput {
   // `equippedItems`). Ausente = slot vazio. Os status entram no passo 3 e o % da passiva no
   // passo 4: o artefato é equipamento, e §4.1 não ganha passo novo.
   readonly artifact?: EquippedArtifact;
+  // M39 2/N — a Soul equipada, já buscada por quem chama. Ausente = slot vazio. Mainstat e
+  // substats entram no passo 3, como todo equipamento: §4.1 não ganha passo novo.
+  readonly soul?: SoulInstance;
 }
 
 function itemStatMods(item: ItemInstance): readonly StatModifier[] {
@@ -52,7 +57,13 @@ export function resolveHeroStatSheet(input: ResolveHeroStatSheetInput): StatShee
   if (input.artifact) assertArtifactFitsClass(input.artifact, classDef.id);
   const artifact = input.artifact ? resolveArtifact(input.artifact) : undefined;
 
-  const equipmentFlat = [...equippedItems.flatMap(itemStatMods), ...(artifact?.equipmentFlat ?? [])];
+  if (input.soul) assertSoulFitsHero(input.soul, hero);
+
+  const equipmentFlat = [
+    ...equippedItems.flatMap(itemStatMods),
+    ...(artifact?.equipmentFlat ?? []),
+    ...(input.soul ? resolveSoul(input.soul) : []),
+  ];
   const equipmentPct: readonly StatModifier[] = artifact?.equipmentPct ?? [];
 
   const resolvedTalents = resolveTalentEffects(talentTree, hero.talents);

@@ -279,3 +279,31 @@ describe('o gacha do M38 no SQL', () => {
     expect(sql).toMatch(/UNIQUE \(player_id, artifact_id\)/);
   });
 });
+
+// M39 4/N (D61) — a Soul no SQL: várias por personagem (sem UNIQUE por dono+personagem, ao
+// contrário do artefato) e o kind `soul` para craft e recraft.
+describe('a Soul do M39 no SQL', () => {
+  const sql = sqlDasMigrations();
+
+  it('`player_souls` tem as colunas que o repositório lê', () => {
+    expect([...colunasDaTabela(sql, 'player_souls')].sort()).toEqual([
+      'crafted_at',
+      'crafts',
+      'id',
+      'mainstat_stat',
+      'mainstat_value',
+      'player_id',
+      'seq',
+      'soul_of',
+      'substats',
+    ]);
+  });
+
+  it('a conta pode ter VÁRIAS Souls do mesmo personagem (D59): nada de UNIQUE por dono e personagem', () => {
+    expect(sql).not.toMatch(/UNIQUE \(player_id, soul_of\)/);
+  });
+
+  it('craft e recraft são uma ação de economia de kind `soul`', () => {
+    expect(ECONOMY_ACTION_KINDS).toContain('soul');
+  });
+});

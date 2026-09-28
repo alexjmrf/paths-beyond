@@ -1,5 +1,12 @@
 import type { Id } from '@paths-beyond/core';
-import type { ArtifactDeltaRow, ArtifactDeltaSide, ArtifactTier, BattleOutcomeRecord } from './runTournament.js';
+import type {
+  ArtifactDeltaRow,
+  ArtifactDeltaSide,
+  ArtifactTier,
+  BattleOutcomeRecord,
+  SoulDeltaRow,
+  SoulDeltaSide,
+} from './runTournament.js';
 
 export interface PairingCell {
   readonly attackerWins: number;
@@ -254,6 +261,29 @@ export function formatReport(report: BalanceReport, compNames: Readonly<Record<I
 
 // M38 5/N — o relatório do DELTA do artefato: cada comp com artefato contra ela mesma sem,
 // separado por lado. 50% é sidegrade puro; o que passa disso é o poder que o artefato compra.
+// M39 6/N — o delta da Soul, no mesmo formato do delta do artefato.
+export function formatSoulDelta(
+  rows: readonly SoulDeltaRow[],
+  compNames: Readonly<Record<Id, string>>,
+  contexto: string,
+): string {
+  const pct = (lado: SoulDeltaSide) => (lado.total === 0 ? 0 : (lado.vitoriasComSoul / lado.total) * 100);
+  const linhas = [...rows]
+    .map((row) => ({ row, media: (pct(row.comoAtacante) + pct(row.comoDefensor)) / 2 }))
+    .sort((a, b) => b.media - a.media)
+    .map(
+      ({ row, media }) =>
+        `  ${compNames[row.compId] ?? row.compId}: ${media.toFixed(1)}% com Soul ` +
+        `(atacando: ${pct(row.comoAtacante).toFixed(1)}%, defendendo: ${pct(row.comoDefensor).toFixed(1)}%; ` +
+        `${row.comoAtacante.total + row.comoDefensor.total} partidas)`,
+    );
+  return [
+    `=== Delta da Soul: cada comp COM a Soul mediana contra ela mesma SEM (${contexto}) ===`,
+    '  50% = a Soul não muda o resultado; acima disso, é o poder que ela compra.',
+    ...linhas,
+  ].join('\n');
+}
+
 export function formatArtifactDelta(
   rows: readonly ArtifactDeltaRow[],
   compNames: Readonly<Record<Id, string>>,

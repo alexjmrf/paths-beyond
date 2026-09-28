@@ -47,6 +47,7 @@ const emptyCatalog: ContentCatalog = {
   dungeonEncounters: {},
   materials: {},
   artifacts: {},
+  characterSouls: {},
   economyRules: { energy: { max: 0, refillIntervalMs: 1 }, awakening: [], imprint: [], enhance: [] },
   substatWeights: [],
   mainstatWeights: [],

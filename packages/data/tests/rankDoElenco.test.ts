@@ -64,6 +64,12 @@ function comRank(rank: string): Personagem {
       mapSkills: [],
       tacticsScript: [],
     },
+    soul: {
+      mainstatOptions: [
+        { stat: 'atk', weight: 1, valueRange: { min: 20, max: 45 } },
+        { stat: 'hp', weight: 1, valueRange: { min: 80, max: 160 } },
+      ],
+    },
   } as unknown as Personagem;
 }
 
