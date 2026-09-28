@@ -721,6 +721,155 @@ material genérico, com idempotência por nonce como toda ação de economia des
 
 ---
 
+> **M40–M45 foram PROPOSTAS pelo agente em 2026-09-28**, depois de uma auditoria que percorreu o
+> jogo **na tela** — entrada, lobby, campanha, preparação, batalha, duelo, personagens e invocação,
+> capturados de um cliente real contra o servidor de dev — e com a direção dada pelo usuário, nas
+> palavras dele: *"eu gostaria veementemente que o que fosse desenvolvido fossem aspectos para que o
+> jogo começasse a se parecer mais com um jogo de verdade: HUD desde menus até o combate, sprites e
+> esse tipo de coisa."* Ratificar antes de abrir, como M19–M39.
+>
+> **O diagnóstico, em uma frase:** as unidades já parecem de um jogo e **todo o resto parece de um
+> painel web**. Os 56 sprites da PixelLab (M26) são a única arte do jogo; o terreno é código (grama
+> lisa com triângulos, parede cinza com zigue-zague), a HUD de combate é uma coluna de cartões de
+> texto que muda de largura a cada clique, a cena de duelo são dois sprites num retângulo preto, a
+> ficha de personagem é uma lista de *radio buttons* e a invocação é uma página de texto corrido com
+> 22 nomes separados por vírgula. **Nenhuma destas milestones muda regra**: `packages/core`
+> intocado, regra 3 absoluta, D47 vale (nada de preview nem zona de ameaça), D46 vale (tudo nasce
+> tocável — mobile é alvo), e D22/D27/D28 valem (a unidade é uma imagem animada por código; o golpe
+> é efeito por tipo de arma). A ordem é por onde o jogador passa o tempo: o sistema visual primeiro
+> porque todas as outras o reusam, depois o tabuleiro e a HUD de combate — que é onde o jogo é
+> jogado —, depois o duelo, os menus e o acabamento.
+
+### M40 — O sistema visual: direção de arte, kit de UI e ícones
+**A fundação que as outras cinco reusam.** Hoje cada tela resolve sozinha como é um painel, um
+botão, um número de HP: há botões azuis de formulário ao lado de botões dourados, fonte do sistema
+ao lado de uma serifa de título, e **nenhum ícone de jogo** — AP, PP, HP, ataque, defesa e as sete
+armas são texto. A milestone fecha a direção de arte **coerente com os sprites que já existem**
+(pixel art, a mesma paleta de fundo), e produz o kit: molduras de painel em 9-slice, botões com
+estados (normal, hover, pressionado, desabilitado, *foco* para teclado/controle), barras (HP, AP, PP,
+EXP), a fonte de interface e a de números, e o **conjunto de ícones** — recursos, atributos, as sete
+armas, as classes, os slots de equipamento, as raridades. **A fonte é a PixelLab** (D25), agora para
+UI e fonte (`create_ui_asset`, `create_font`), passando pelo `tools/art` do M26 com procedência
+declarada em dado, no molde de `unit-art` — e `semAssetsRaster.test.ts` passa a travar o contrato
+novo como já trava o das unidades. Nada de tela muda de layout aqui: o kit entra e **substitui** o
+que existe, componente por componente, sem redesenhar a hierarquia ainda.
+**Aceite:** existe um guia visual curto em `docs/` (paleta, tipografia, tamanhos, espaçamento,
+estados) e o cliente o consome como tokens, não como cores soltas; todo botão, painel e barra do
+cliente vem do kit — uma asserção falha se um componente declarar cor ou fonte fora dele; os ícones
+de recurso, atributo, arma, classe, slot e raridade existem com procedência em dado e cada um tem
+teste de que está referenciado; todo alvo de toque tem pelo menos 44 px (D46); a garantia de
+daltonismo do M13 4/N é reverificada no kit novo; **julgado pelo usuário na tela**, como o critério 2
+do M16.
+
+---
+
+### M41 — O tabuleiro: tileset, unidades no chão e o mapa que parece um mapa
+**Onde o jogador passa a maior parte do tempo, e hoje é o que mais denuncia o protótipo.** O
+terreno é desenhado por código (`terrainMarks.ts`, `tilePatterns.ts`, `structureMarks.ts`) desde o
+M16, que o declarou provisório ao pôr a costura trocável. A milestone troca a *implementação* pela
+arte: um **tileset top-down** (`create_topdown_tileset`) para cada terreno de `packages/data/
+terrains/` com **transições** entre eles — floresta que termina em borda, não num quadrado —, os
+objetos de mapa (muralha, portão, forte, acampamento) como peças (`create_map_object`) e decoração
+que não altera regra. **A arte é chaveada por id de terreno em dado**, como a da unidade: terreno
+novo sem arte é visível, não silencioso. As unidades saem do **disco colorido** e passam a ficar
+*no chão*: sombra, um aro de time discreto, a barra de HP e os pontos de AP/PP embaixo da peça (§11
+exige AP/PP legíveis no tile sem hover). Os overlays de movimento e de alvo ganham forma e
+animação próprias, e o de ameaça **não existe** (D47). O enquadramento para de encostar na borda: o
+mapa é centrado e a câmera acompanha a unidade ativa.
+**Aceite:** nenhum tile do tabuleiro é desenhado por primitiva de código — a costura do M16 passa a
+ter a implementação por arte como a padrão, e a de código fica só como *fallback* testado; os três
+terrenos e os quatro objetos têm arte com procedência e transições entre pares vizinhos; as
+unidades não têm mais disco de fundo, e a identificação de lado continua funcionando **sem cor**
+(modo daltônico); AP/PP e HP legíveis na peça sem hover, conferido em 100% e na menor escala de UI;
+o `PreviaDoMapa` da preparação usa a mesma arte; o determinismo e a suíte não mudam; **julgado pelo
+usuário na tela**.
+
+---
+
+### M42 — A HUD de combate
+**A coluna de cartões de texto sai; entra uma HUD de jogo.** Na captura de 2026-09-28 a lateral é
+uma pilha de painéis de formulário — "Selecione uma unidade", uma tabela de iniciativa, uma tabela
+de "Recursos do exército", o objetivo e quatro botões de Valor —, que **muda de largura a cada
+seleção** e em que o cartão de introdução cobre os botões de Valor. A forma de jogo, que todo tactics
+do gênero converge: a **iniciativa como fila de retratos** no topo (§11 exige a ordem completa do
+round sempre visível); o **cartão da unidade selecionada** embaixo, com retrato, barras e as skills
+como ícones; as **ações perto da peça** (mover, engajar, esperar, descansar) em vez de uma fileira de
+botões azuis; o **Valor como medidor** com as skills de mapa; o **objetivo como faixa** e o
+**anúncio de turno** ("Round 2 — sua vez"). O cartão do inimigo mostra **só o visível** de D47:
+posição, HP, AP, PP e lugar na iniciativa. "Editar táticas", "Inventário" e "Talentos" saem de dentro
+da batalha — são preparação, e o M35 já tirou de dentro da missão tudo o que não é batalha.
+**Precondição, e é dívida que esta milestone não pode empurrar:** `battleStore.ts` cresceu de 1.710
+linhas (auditoria de 2026-09-03) para **2.807**, e ele é o lugar apontado desde então como onde a
+regra 3 pode erodir em silêncio. O estado de HUD nasce **fora** dele, e a milestone parte o store
+por domínio antes de pendurar a HUD nova nele.
+**Aceite:** a batalha inteira é jogável sem a lateral antiga, que deixa de existir; nenhum elemento da
+HUD muda de tamanho ou posição ao selecionar ou desselecionar uma unidade (asserção sobre o layout);
+nada da HUD cobre um controle interativo; a fila de iniciativa, os AP/PP e o objetivo estão sempre
+visíveis; nenhuma resposta do servidor passa a carregar dado oculto por causa da HUD (o teste de
+forma do M36 continua verde); tudo operável por toque; `battleStore.ts` está partido e nenhum
+pedaço dele passa de um limite declarado; **julgado pelo usuário na tela**.
+
+---
+
+### M43 — A cena de duelo
+**Hoje: dois sprites num retângulo preto, um número flutuando e um chevron.** É o momento de
+maior tensão do jogo — é onde a aposta de D47 se resolve — e é o mais pobre visualmente. A
+milestone dá ao duelo um **palco**: o fundo é o terreno onde a luta acontece (a arte do M41
+reenquadrada), cada lado tem **placa de nome e barras de HP/AP/PP** que descem em tempo com o golpe,
+e o **nome da skill aparece quando ela dispara** — que é, por D47, o único jeito de o jogador aprender
+o que enfrentou, e hoje não aparece. Acerto, crítico, erro, defesa, contra-ataque, assistência e cura
+ganham leitura própria (os efeitos por arma de D28 já existem; faltam o *resultado* e o *ritmo*):
+pausa no impacto, tremor proporcional, número que diz se foi crítico, e a entrada da assistência como
+um terceiro corpo que chega. **A animação continua por código (D22/D27/D28).** A PixelLab tem hoje um
+animador de esqueleto mais novo do que o que D27 mediu; se o usuário quiser reabrir a pergunta dos
+quadros gerados, é uma bateria de medição no molde de D27 — **não** uma premissa desta milestone.
+**Aceite:** o duelo tem fundo do terreno do tile, placas e barras dos dois lados, e o nome de cada
+skill no instante em que dispara, vindo do log do servidor (nada é inferido no cliente — regra 3 e
+D47); crítico, erro, defesa, contra-ataque, assistência e cura são distinguíveis **sem cor**; "Pular"
+e o modo de resultado instantâneo continuam funcionando; a duração de um duelo típico fica dentro de
+um teto declarado, para o jogo não ficar lento por causa do espetáculo; **julgado pelo usuário na
+tela**.
+
+---
+
+### M44 — Os menus que parecem de jogo: hub, ficha de personagem, invocação
+**Três telas que hoje são páginas.** O **lobby** é uma grade de cinco cartões num fundo vazio; vira
+um *hub* — arte de fundo, um personagem do elenco em destaque, a próxima ação em evidência e as
+moedas sempre à vista no topo. A **ficha de personagem** é uma lista de *radio buttons* com "Despertar"
+e "Vínculo" em cada linha e as seções empilhadas embaixo; vira o padrão do gênero: o elenco em
+**grade de retratos** (`create_portrait_character`), e ao escolher um, a ficha com o corpo inteiro,
+os atributos com os ícones do M40, e o **equipamento como boneco** — os slots em volta, artefato e
+Soul nos lugares deles, cada item com ícone e raridade. A **invocação** é texto corrido — "No banner:
+Bardan, Nyra, Égide de Bardan…" com 22 nomes — e um botão desabilitado; vira a apresentação que o
+gênero inteiro usa: o **banner como arte** com o destaque dele, botões de 1× e 10×, a garantia como
+barra, e a **revelação** da invocação com o raro anunciado antes de aparecer. Prêmios viram caixa de
+correio com "resgatar tudo". **O que não muda:** as regras de gacha (D49–D55), as taxas exibidas e a
+honestidade delas — a tela nova mostra a mesma taxa e a mesma garantia, só que legíveis.
+**Aceite:** as três telas não têm mais lista de texto onde o gênero usa imagem (elenco, equipamento,
+pool do banner); a taxa e a garantia exibidas vêm do mesmo lugar que hoje e um teste confere que a
+tela não arredonda nem omite; a revelação da invocação pode ser pulada e nunca atrasa o registro no
+servidor (a posse é gravada antes da animação, como hoje); os ícones de item, artefato e Soul vêm do
+kit do M40; operável por toque; **julgado pelo usuário na tela**.
+
+---
+
+### M45 — O acabamento: a primeira impressão e o ritmo entre telas
+**O que separa "funciona" de "parece pronto".** A **tela de título** hoje é um cartão "Project
+Vanguard / Entrar" num fundo escuro; ela ganha logotipo e arte-chave — e o nome: *Project Vanguard*
+é o nome-código do `CLAUDE.md` e *Paths Beyond* o do instalador, e o jogo precisa de **um** nome na
+tela antes de um estranho abri-lo. **Transições** entre telas (hoje cada troca é um corte seco), a
+**vitória e a derrota** como momentos e não como painel, **som de interface** (clique, confirmação,
+erro) sobre o motor de áudio sintetizado do M24, e a pergunta da **música**: o M24 sintetiza tudo, e
+música de verdade é conteúdo que se compra, se encomenda ou se gera — é decisão do usuário, não da
+milestone. O cursor, o foco de teclado e os estados de carregamento fecham a lista.
+**Aceite:** o jogo tem um nome só em toda superfície (título, janela, instalador, lojas); toda troca de
+tela tem transição e nenhuma passa de um teto declarado; vitória e derrota têm tela própria com a
+recompensa legível; todo botão tem som e todo erro tem som distinto; nenhum carregamento deixa tela
+em branco; a decisão sobre música está registrada; **julgado pelo usuário na tela, jogando do título
+ao fim do capítulo 1 sem que nada pareça de protótipo** — que é o critério que resume as seis.
+
+---
+
 ## 15. Decisões em aberto (registrar em `DECISIONS.md` ao resolver)
 
 - **`MAX_TROCAS = 3`** é um chute inicial. Com 2, o duelo vira "quem bate primeiro"; com 4+, o preview fica ilegível e `spd` volta a dominar. Teste 3 antes de mexer.
