@@ -9375,4 +9375,37 @@ passou a sortear 20.
 com herói acima do 10 muda, e o replay é reexecutado.
 
 **Em aberto, fora desta fatia:** o alerta de `report.ts` em 65% segue o §9.5 da spec de PvP,
-enquanto o M8 do roadmap diz 60%. As duas partes da spec divergem.
+enquanto o M8 do roadmap diz 60%. As duas partes da spec divergem. *(Resolvido em D64: a
+divergência não estava na spec atual.)*
+
+### D64 — as pendências do M39: o teto de 60% e descartar Soul (2026-09-28)
+
+O usuário pediu que as pendências fossem resolvidas, exceto o julgamento nas telas.
+
+**1. O teto de winrate é 60%.** Verificado antes de mexer: a spec de PvP atual (`07-pvp.md`) não
+cita 65% em lugar nenhum. O 65% sobrevivia em três lugares fora da spec normativa: o
+`report.ts` (`WINRATE_ALERT_THRESHOLD_PCT = 65`, com um comentário citando o §9.5 antigo), a
+instrução do agente `balance` e a `SPEC-completa.md`, que é a v2 inteira antiga e não está na
+tabela de arquivos da spec do `CLAUDE.md`. O M8 do roadmap diz 40–60% desde a revisão de
+2026-08-28, e a nota dele afirma que a ferramenta "já media os dois". O piso sim, o teto não.
+**Correção:** a constante vai a 60 (o teto é inclusivo: 60% exatos não alertam), o texto do
+relatório diz "ACIMA DE 60%", e o agente `balance` passa a citar a faixa de 40–60%. A
+`SPEC-completa.md` e os comentários históricos com 65% ficam como estão, porque registram o que
+foi medido na época. Testes em `tools/balance/tests/report.test.ts`.
+
+**2. Descartar Soul.** Nem a spec nem D59/D61 cobrem, então as escolhas foram as de menor
+invenção, seguindo os padrões que já existem:
+- `POST /souls/:id/discard` com nonce, kind `soul` em `economy_actions` (sem migration nova);
+- **sem reembolso**: a spec não prevê nenhum, e o sumidouro da Soul é o recraft;
+- **Soul equipada é recusada com 409** ("desequipe antes"). Apagá-la deixaria o herói apontando
+  para uma Soul inexistente, e a montagem de batalha falha alto nesse caso (4/N). A recusa vem
+  antes do nonce, como nas outras rotas;
+- `deleteSoul(playerId, soulId)` no repositório, que só apaga a Soul daquele jogador, com
+  paridade memória × Postgres;
+- no cliente, o botão "Descartar" só nas Souls não equipadas, com os mesmos dois cliques do
+  recraft. `cliqueNoRecraft` virou `cliqueEmDoisTempos(armada, ação, soulId)`: a chave armada
+  inclui a ação, então um recraft armado nunca confirma um descarte.
+
+Testes: `server/tests/souls.test.ts` (+3), `repositoryParity.test.ts`,
+`client/tests/soulNoCliente.test.ts` (+2) e `client/tests/slotDeSoul.test.ts`. `RULES_VERSION`
+não muda: nenhuma regra mudou.

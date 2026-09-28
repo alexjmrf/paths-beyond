@@ -778,6 +778,9 @@ export function createPostgresCharacterOwnershipRepository(pool: Pool): Characte
         [soul.id, playerId, soul.mainstat.stat, soul.mainstat.value, JSON.stringify(soul.substats), soul.crafts],
       );
     },
+    async deleteSoul(playerId, soulId) {
+      await pool.query('DELETE FROM player_souls WHERE id = $1 AND player_id = $2', [soulId, playerId]);
+    },
   };
 }
 

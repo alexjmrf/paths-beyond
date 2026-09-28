@@ -815,6 +815,8 @@ interface BattleStore {
   recraftarSoul: (soulId: string) => Promise<void>;
   equiparSoul: (soulId: string, heroId: string) => Promise<void>;
   desequiparSoul: (heroId: string) => Promise<void>;
+  // D64 — descartar (sem reembolso; o servidor recusa a equipada).
+  descartarSoul: (soulId: string) => Promise<void>;
   claimReward: (rewardId: string) => Promise<void>;
   purchaseEnergy: () => Promise<void>;
   openReplayViewer: () => Promise<void>;
@@ -1836,6 +1838,9 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
   },
   desequiparSoul: async (heroId) => {
     await acaoDeSoul(get, set, () => api.unequipSoul(get().pvp.token, heroId), get().t('estado.soulDesequipada'));
+  },
+  descartarSoul: async (soulId) => {
+    await acaoDeSoul(get, set, () => api.discardSoul(get().pvp.token, soulId), get().t('estado.soulDescartada'));
   },
 
   claimReward: async (rewardId) => {

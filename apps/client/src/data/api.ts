@@ -854,6 +854,12 @@ export const api = {
       body: JSON.stringify({ nonce: nonce(), heroId }),
     }),
 
+  discardSoul: (ticket: string, soulId: string) =>
+    request<{ readonly discarded: string }>(ticket, `/souls/${soulId}/discard`, {
+      method: 'POST',
+      body: JSON.stringify({ nonce: nonce() }),
+    }),
+
   unequipSoul: (ticket: string, heroId: string) =>
     request<{ readonly hero: Hero }>(ticket, `/heroes/${heroId}/soul/unequip`, {
       method: 'POST',

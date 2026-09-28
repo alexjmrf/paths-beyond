@@ -2,15 +2,16 @@ import type { Hero, SoulCost, SoulInstance } from '@paths-beyond/core';
 import { useEffect, useState } from 'react';
 import { catalog } from '../data/catalog.js';
 import { nomeDeConteudo } from '../i18n/conteudo.js';
-import { cliqueNoRecraft, custoDaSoul, estadoDoSlotDeSoul, soulDoHeroi, soulsDoPersonagem } from '../logic/soul.js';
+import { cliqueEmDoisTempos, custoDaSoul, estadoDoSlotDeSoul, soulDoHeroi, soulsDoPersonagem } from '../logic/soul.js';
 import { useBattleStore } from '../store/battleStore.js';
 
 // M39 5/N (D59/D61) — o 8º slot, a Soul do herói em foco. Trancada abaixo do nível do catálogo;
 // aberta, mostra a equipada, as outras Souls DAQUELE personagem e o craft com o custo ao lado.
 // Quem trava, cobra e sorteia é o servidor (regra 3); a tela só não oferece o que seria recusado.
 //
-// O recraft re-sorteia tudo e apaga a Soul atual (D59), então pede dois cliques na mesma Soul
-// (decisão do usuário ao aprovar a 5/N). O armado desarma sozinho depois de alguns segundos.
+// O recraft re-sorteia tudo e apaga a Soul atual (D59), e o descartar a apaga de vez (D64), então
+// os dois pedem dois cliques na mesma Soul (decisão do usuário ao aprovar a 5/N). O armado
+// desarma sozinho depois de alguns segundos.
 const DESARMAR_EM_MS = 4000;
 
 const resumoDaSoul = (soul: SoulInstance) =>
@@ -27,6 +28,7 @@ export function SlotDeSoul({ hero }: { readonly hero: Hero }) {
   const recraftarSoul = useBattleStore((s) => s.recraftarSoul);
   const equiparSoul = useBattleStore((s) => s.equiparSoul);
   const desequiparSoul = useBattleStore((s) => s.desequiparSoul);
+  const descartarSoul = useBattleStore((s) => s.descartarSoul);
   const [armada, setArmada] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,12 +72,27 @@ export function SlotDeSoul({ hero }: { readonly hero: Hero }) {
       disabled={busy || !recraft.basta}
       title={recraft.texto}
       onClick={() => {
-        const clique = cliqueNoRecraft(armada, soul.id);
+        const clique = cliqueEmDoisTempos(armada, 'recraft', soul.id);
         setArmada(clique.armada);
         if (clique.enviar) void recraftarSoul(soul.id);
       }}
     >
-      {armada === soul.id ? t('personagens.confirmarRecraft') : t('personagens.recraftarSoul')}
+      {armada === `recraft:${soul.id}` ? t('personagens.confirmarRecraft') : t('personagens.recraftarSoul')}
+    </button>
+  );
+
+  // D64 — só nas Souls que não estão equipadas (o servidor recusa a equipada).
+  const botaoDeDescartar = (soul: SoulInstance) => (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        const clique = cliqueEmDoisTempos(armada, 'descartar', soul.id);
+        setArmada(clique.armada);
+        if (clique.enviar) void descartarSoul(soul.id);
+      }}
+    >
+      {armada === `descartar:${soul.id}` ? t('personagens.confirmarDescarte') : t('personagens.descartarSoul')}
     </button>
   );
 
@@ -106,6 +123,7 @@ export function SlotDeSoul({ hero }: { readonly hero: Hero }) {
                   {t('personagens.equiparSoul')}
                 </button>
                 {botaoDeRecraft(soul)}
+                {botaoDeDescartar(soul)}
               </span>
             </li>
           ))}

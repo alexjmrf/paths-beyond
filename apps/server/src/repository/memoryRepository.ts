@@ -395,6 +395,10 @@ export function createMemoryCharacterOwnershipRepository(
       if (!lista || !lista.some((s) => s.id === soul.id)) return;
       souls.set(playerId, lista.map((s) => (s.id === soul.id ? soul : s)));
     },
+    async deleteSoul(playerId, soulId) {
+      const lista = souls.get(playerId);
+      if (lista) souls.set(playerId, lista.filter((s) => s.id !== soulId));
+    },
     async deletePlayerData(playerId) {
       acquired.delete(playerId);
       artifacts.delete(playerId);

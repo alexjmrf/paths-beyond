@@ -39,7 +39,8 @@ export interface BalanceReport {
   // §04-duelo.md §6.7 — "se mais de 60% das builds vencedoras tiverem spd acima da
   // mediana, o sistema falhou."
   readonly spdAlertTriggered: boolean;
-  // §9.5 — "nenhuma composição acima de 65% de winrate global."
+  // M8 (roadmap, revisão de 2026-08-28) — a faixa é 40–60%; acima de 60% a comp é opressora.
+  // O texto original ("nenhuma composição acima de 65%") foi substituído por essa faixa.
   readonly overpoweredComps: readonly Id[];
   // §9.5 (revisado) — o critério original só tinha teto. Uma composição em 31% é tão
   // inviável quanto uma em 70% é opressora: ninguém a leva para a arena, e o roster
@@ -61,7 +62,9 @@ export interface HardCounter {
   readonly total: number;
 }
 
-const WINRATE_ALERT_THRESHOLD_PCT = 65;
+// O teto do M8. Até o M39 esta constante ainda era 65 (o teto ORIGINAL), e uma comp em 62%
+// reprovava no critério sem alerta impresso (D64).
+const WINRATE_ALERT_THRESHOLD_PCT = 60;
 const WINRATE_FLOOR_THRESHOLD_PCT = 40;
 // Um confronto é "counter absoluto" quando praticamente nenhuma partida escapa do
 // resultado esperado. Não usamos 0/100 exatos de propósito: 99,5% já é um confronto que
@@ -196,7 +199,7 @@ export function formatReport(report: BalanceReport, compNames: Readonly<Record<I
   for (const g of [...report.globalWinrates].sort((a, b) => b.winratePct - a.winratePct)) {
     const flag =
       g.winratePct > WINRATE_ALERT_THRESHOLD_PCT
-        ? '  <-- ACIMA DE 65%, ALERTA'
+        ? '  <-- ACIMA DE 60%, ALERTA'
         : g.winratePct < WINRATE_FLOOR_THRESHOLD_PCT
           ? '  <-- ABAIXO DE 40%, ALERTA'
           : '';
@@ -226,7 +229,7 @@ export function formatReport(report: BalanceReport, compNames: Readonly<Record<I
 
   if (report.overpoweredComps.length > 0) {
     lines.push('');
-    lines.push('=== Composições acima de 65% de winrate global (§9.5) ===');
+    lines.push('=== Composições acima de 60% de winrate global (M8) ===');
     for (const compId of report.overpoweredComps) {
       lines.push(`  ${compNames[compId] ?? compId}`);
     }

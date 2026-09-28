@@ -42,20 +42,25 @@ describe('buildReport — matriz de winrate', () => {
     expect(b).toMatchObject({ wins: 1, total: 2, winratePct: 50 });
   });
 
-  it('sinaliza overpoweredComps quando winrate global > 65%', () => {
-    const records: BattleOutcomeRecord[] = Array.from({ length: 10 }, (_, i) =>
-      record({ outcome: i < 7 ? 'victory' : 'defeat', winningCompId: i < 7 ? 'comp-a' : 'comp-b' }),
+  // O teto é o do M8 no roadmap, 60% (a revisão de 2026-08-28). Até o M39 a ferramenta ainda
+  // alertava em 65%, o teto ORIGINAL, e uma comp em 62% reprovava no critério sem alerta impresso.
+  const comWinrateDaA = (vitoriasEmCem: number): BattleOutcomeRecord[] =>
+    Array.from({ length: 100 }, (_, i) =>
+      record({ outcome: i < vitoriasEmCem ? 'victory' : 'defeat', winningCompId: i < vitoriasEmCem ? 'comp-a' : 'comp-b' }),
     );
-    const report = buildReport(records);
-    expect(report.overpoweredComps).toContain('comp-a');
+
+  it('sinaliza overpoweredComps quando winrate global > 60% (o teto do M8)', () => {
+    expect(buildReport(comWinrateDaA(62)).overpoweredComps).toContain('comp-a');
   });
 
-  it('não sinaliza overpoweredComps quando winrate global está dentro de 52-65%', () => {
-    const records: BattleOutcomeRecord[] = Array.from({ length: 10 }, (_, i) =>
-      record({ outcome: i < 6 ? 'victory' : 'defeat', winningCompId: i < 6 ? 'comp-a' : 'comp-b' }),
-    );
-    const report = buildReport(records);
-    expect(report.overpoweredComps).not.toContain('comp-a');
+  it('não sinaliza overpoweredComps em 60% exatos — o teto é inclusivo', () => {
+    expect(buildReport(comWinrateDaA(60)).overpoweredComps).not.toContain('comp-a');
+  });
+
+  it('o texto do alerta diz 60%', () => {
+    const text = formatReport(buildReport(comWinrateDaA(62)), { 'comp-a': 'Comp A', 'comp-b': 'Comp B' });
+    expect(text).toContain('ACIMA DE 60%');
+    expect(text).not.toContain('65%');
   });
 });
 

@@ -255,6 +255,54 @@ describe('POST /souls/:id/equip — o slot abre no nível do dado, e só para o 
   });
 });
 
+// D64 — descartar. Sem reembolso (a spec não prevê nenhum) e só Soul que NÃO está equipada: apagar
+// a que um herói leva deixaria o herói apontando para uma Soul que não existe, e a montagem de
+// batalha falha alto nesse caso (4/N).
+describe('POST /souls/:id/discard — tira a Soul da conta', () => {
+  it('apaga a Soul, não devolve nada, e as outras ficam', async () => {
+    const h = await harness();
+    const a = (await h.post('/souls/craft', { nonce: 'd-a', characterId: RURIK })).body.soul as SoulInstance;
+    const b = (await h.post('/souls/craft', { nonce: 'd-b', characterId: RURIK })).body.soul as SoulInstance;
+    const antes = await h.economyRepository.getMaterials('player-1');
+    const ouroAntes = (await h.playerRepository.getPlayerById('player-1'))!.gold;
+
+    const r = await h.post(`/souls/${a.id}/discard`, { nonce: 'd-1' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.discarded).toBe(a.id);
+    expect(await h.ownershipRepository.listSouls('player-1')).toEqual([b]);
+    expect(await h.economyRepository.getMaterials('player-1')).toEqual(antes);
+    expect((await h.playerRepository.getPlayerById('player-1'))!.gold).toBe(ouroAntes);
+  });
+
+  it('Soul EQUIPADA é recusada, e nada muda', async () => {
+    const h = await harness();
+    await h.ownershipRepository.grantSoul('player-1', SOUL_DO_RURIK);
+    await h.subirNivel('player-1', RURIK, 20);
+    await h.post(`/souls/${SOUL_DO_RURIK.id}/equip`, { nonce: 'd-eq', heroId: heroiDe('player-1', RURIK) });
+
+    const r = await h.post(`/souls/${SOUL_DO_RURIK.id}/discard`, { nonce: 'd-2' });
+    expect(r.status).toBe(409);
+    expect(await h.ownershipRepository.listSouls('player-1')).toEqual([SOUL_DO_RURIK]);
+
+    // Recusada antes do nonce: desequipar e descartar com a MESMA chave funciona.
+    await h.post(`/heroes/${heroiDe('player-1', RURIK)}/soul/unequip`, { nonce: 'd-un' });
+    expect((await h.post(`/souls/${SOUL_DO_RURIK.id}/discard`, { nonce: 'd-2' })).status).toBe(200);
+  });
+
+  it('Soul de outro jogador é 404; sem nonce é 400; reenvio é 409', async () => {
+    const h = await harness();
+    await h.ownershipRepository.grantSoul('player-1', SOUL_DO_RURIK);
+    expect((await h.post(`/souls/${SOUL_DO_RURIK.id}/discard`, { nonce: 'd-x' }, OUTRO_TOKEN)).status).toBe(404);
+    expect((await h.post(`/souls/${SOUL_DO_RURIK.id}/discard`, {})).status).toBe(400);
+    expect(await h.ownershipRepository.listSouls('player-1')).toEqual([SOUL_DO_RURIK]);
+
+    await h.ownershipRepository.grantSoul('player-1', { ...SOUL_DO_RURIK, id: 'soul-2' });
+    expect((await h.post(`/souls/${SOUL_DO_RURIK.id}/discard`, { nonce: 'd-y' })).status).toBe(200);
+    expect((await h.post('/souls/soul-2/discard', { nonce: 'd-y' })).status).toBe(409);
+    expect(await h.ownershipRepository.listSouls('player-1')).toHaveLength(1);
+  });
+});
+
 describe('a Soul chega à batalha', () => {
   async function comSoulEquipada(h: Awaited<ReturnType<typeof harness>>) {
     await h.ownershipRepository.grantSoul('player-1', SOUL_DO_RURIK);

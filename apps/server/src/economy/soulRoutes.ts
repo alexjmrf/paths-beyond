@@ -10,7 +10,7 @@ import type { EconomyRoutesOptions } from './routes.js';
 // nível e de personagem é `equipSoul` — todos do core (2/N) — e os números vêm de
 // `economy.json` (3/N). O que mora aqui é autorização, idempotência (nonce) e persistência.
 //
-// Craft e recraft usam o kind `soul`; equipar e desequipar reusam `equip`, como o artefato.
+// Craft, recraft e descartar (D64) usam o kind `soul`; equipar e desequipar reusam `equip`, como o artefato.
 // A seed de cada sorteio sai do nonce por HMAC, como todo sorteio do servidor: sem o segredo, o
 // cliente não escolhe o que sai.
 
@@ -159,5 +159,28 @@ export const soulRoutes: FastifyPluginAsync<EconomyRoutesOptions> = async (fasti
 
     const updated = await opts.heroRepository.updateHero({ ...stored, hero: { ...stored.hero, soul: null } });
     return { hero: updated.hero };
+  });
+
+  // D64 — descartar. Sem reembolso (a spec não prevê nenhum). Soul EQUIPADA é recusada: apagá-la
+  // deixaria o herói apontando para uma Soul que não existe, e a montagem de batalha falha alto
+  // nesse caso. A recusa vem antes do nonce, como nas outras rotas.
+  fastify.post('/souls/:soulId/discard', async (request, reply) => {
+    if (!request.player) return reply.code(401).send({ error: 'missing player token' });
+    const player = request.player;
+    const soulId = (request.params as { soulId: string }).soulId;
+    const body = request.body as { nonce?: string };
+    if (!body.nonce) return reply.code(400).send({ error: 'nonce é obrigatório' });
+
+    const soul = await soulDoJogador(player.id, soulId);
+    if (!soul) return reply.code(404).send({ error: 'Soul não está na sua conta' });
+
+    const comQuem = (await opts.heroRepository.listHeroesByOwner(player.id)).find((s) => s.hero.soul === soul.id);
+    if (comQuem) return reply.code(409).send({ error: `a Soul está equipada em ${comQuem.hero.id}; desequipe antes` });
+
+    const claim = await claimAction(body.nonce, player.id, 'soul');
+    if (!claim.ok) return reply.code(claim.status).send({ error: claim.error });
+
+    await opts.ownershipRepository.deleteSoul(player.id, soul.id);
+    return { discarded: soul.id };
   });
 };

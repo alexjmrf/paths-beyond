@@ -2,7 +2,7 @@ import type { Hero, SoulInstance } from '@paths-beyond/core';
 import { describe, expect, it } from 'vitest';
 import { catalog } from '../src/data/catalog.js';
 import { poderDoHeroi } from '../src/logic/poder.js';
-import { cliqueNoRecraft, custoDaSoul, estadoDoSlotDeSoul, soulDoHeroi, soulsDoPersonagem } from '../src/logic/soul.js';
+import { cliqueEmDoisTempos, custoDaSoul, estadoDoSlotDeSoul, soulDoHeroi, soulsDoPersonagem } from '../src/logic/soul.js';
 
 // M39 5/N — o que a tela mostra da Soul. Nada aqui decide (regra 3): a trava de nível é
 // `soulSlotOpen` do core com o número do catálogo, e o poder é o `resolveHeroStatSheet` da batalha.
@@ -57,16 +57,22 @@ describe('o slot da Soul', () => {
   });
 });
 
-// O recraft re-sorteia TUDO e apaga a Soul atual (D59): o primeiro clique só arma, o segundo
-// na MESMA Soul manda (decisão do usuário ao aprovar o plano da 5/N).
-describe('o recraft em dois cliques', () => {
-  it('o primeiro clique arma, o segundo na mesma Soul confirma', () => {
-    expect(cliqueNoRecraft(null, 'soul-a')).toEqual({ enviar: false, armada: 'soul-a' });
-    expect(cliqueNoRecraft('soul-a', 'soul-a')).toEqual({ enviar: true, armada: null });
+// O recraft re-sorteia TUDO e apaga a Soul atual (D59), e o descartar a apaga de vez (D64): o
+// primeiro clique só arma, o segundo na MESMA ação da MESMA Soul manda (decisão do usuário ao
+// aprovar o plano da 5/N).
+describe('recraft e descartar em dois cliques', () => {
+  it('o primeiro clique arma, o segundo na mesma ação e Soul confirma', () => {
+    expect(cliqueEmDoisTempos(null, 'recraft', 'soul-a')).toEqual({ enviar: false, armada: 'recraft:soul-a' });
+    expect(cliqueEmDoisTempos('recraft:soul-a', 'recraft', 'soul-a')).toEqual({ enviar: true, armada: null });
   });
 
   it('clicar em outra Soul rearma nela em vez de mandar', () => {
-    expect(cliqueNoRecraft('soul-a', 'soul-b')).toEqual({ enviar: false, armada: 'soul-b' });
+    expect(cliqueEmDoisTempos('recraft:soul-a', 'recraft', 'soul-b')).toEqual({ enviar: false, armada: 'recraft:soul-b' });
+  });
+
+  it('o recraft armado NÃO confirma um descartar na mesma Soul, e vice-versa', () => {
+    expect(cliqueEmDoisTempos('recraft:soul-a', 'descartar', 'soul-a')).toEqual({ enviar: false, armada: 'descartar:soul-a' });
+    expect(cliqueEmDoisTempos('descartar:soul-a', 'recraft', 'soul-a')).toEqual({ enviar: false, armada: 'recraft:soul-a' });
   });
 });
 

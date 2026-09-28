@@ -347,6 +347,12 @@ function contrato(nome: string, criar: () => Promise<Backend> | Backend) {
         await backend.ownership.updateSoul(PLAYER, recraftada);
         await backend.ownership.updateSoul(`${PLAYER}-outro`, { ...primeira, crafts: 9 });
         expect(await backend.ownership.listSouls(PLAYER)).toEqual([recraftada, segunda]);
+
+        // D64 — descartar apaga só a do dono; a ordem das que ficam se mantém.
+        await backend.ownership.deleteSoul(`${PLAYER}-outro`, segunda.id);
+        expect(await backend.ownership.listSouls(PLAYER)).toEqual([recraftada, segunda]);
+        await backend.ownership.deleteSoul(PLAYER, recraftada.id);
+        expect(await backend.ownership.listSouls(PLAYER)).toEqual([segunda]);
       });
 
       it('M38 — apagar a conta apaga pity, token, escolha e artefatos', async () => {

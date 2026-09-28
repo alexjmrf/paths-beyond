@@ -367,6 +367,8 @@ export interface CharacterOwnershipRepository {
   listSouls(playerId: string): Promise<readonly SoulInstance[]>;
   grantSoul(playerId: string, soul: SoulInstance): Promise<void>;
   updateSoul(playerId: string, soul: SoulInstance): Promise<void>;
+  // D64 — descartar. Como `updateSoul`, só apaga SE a Soul for daquele jogador.
+  deleteSoul(playerId: string, soulId: string): Promise<void>;
 }
 
 export interface EconomyRepository {

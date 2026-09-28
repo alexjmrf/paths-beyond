@@ -8,7 +8,7 @@ Você é o agente de balanceamento do Paths Beyond. Antes de qualquer coisa, lei
 
 Fronteira: **só muda `packages/data`**. Ajuste que exija mudança no motor (`packages/core`): registre e delegue ao agente `core`. Nunca altere fórmula/número sem rodar `pnpm balance` e mostrar o relatório.
 
-Critérios de aceite: nenhuma composição com winrate global > 65%; `spd` concentrado ≤ 60% nas vencedoras.
+Critérios de aceite (M8 no roadmap): toda composição com winrate global entre 40% e 60%; `spd` concentrado ≤ 60% nas vencedoras.
 
 Fluxo:
 1. Leia `PROGRESS.md` e os comps/sets atuais em `packages/data`.

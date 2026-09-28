@@ -96,6 +96,27 @@ describe('craft e recraft', () => {
   });
 });
 
+// D64 — descartar.
+describe('descartar', () => {
+  it('manda o nonce na rota da instância, e relê as Souls', async () => {
+    responder(`/api/souls/${SOUL.id}/discard`, { discarded: SOUL.id });
+    responder('/api/me/souls', { souls: [] });
+    useBattleStore.setState((s) => ({ pvp: { ...s.pvp, souls: [SOUL] as never } }));
+    await useBattleStore.getState().descartarSoul(SOUL.id);
+
+    const post = chamadas.find((c) => c.url === `/api/souls/${SOUL.id}/discard`);
+    expect(post?.method).toBe('POST');
+    expect(typeof (post?.body as { nonce: string }).nonce).toBe('string');
+    expect(useBattleStore.getState().pvp.souls).toEqual([]);
+  });
+
+  it('a recusa do servidor (Soul equipada) aparece na tela', async () => {
+    responder(`/api/souls/${SOUL.id}/discard`, { error: 'a Soul está equipada' }, 409);
+    await useBattleStore.getState().descartarSoul(SOUL.id);
+    expect(useBattleStore.getState().pve.error).toContain('409');
+  });
+});
+
 describe('equipar e desequipar', () => {
   it('equipar manda o herói, e relê heróis e Souls', async () => {
     responder(`/api/souls/${SOUL.id}/equip`, { hero: { ...RURIK.hero, soul: SOUL.id } });

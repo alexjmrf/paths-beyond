@@ -43,10 +43,18 @@ export function custoDaSoul(
   };
 }
 
+export type AcaoEmDoisTempos = 'recraft' | 'descartar';
+
 /**
- * O recraft re-sorteia TUDO e apaga a Soul atual (D59), então pede dois cliques na mesma Soul:
- * o primeiro arma, o segundo manda. Clicar em outra Soul rearma nela.
+ * O recraft re-sorteia TUDO e apaga a Soul atual (D59), e o descartar a apaga de vez (D64), então
+ * os dois pedem dois cliques: o primeiro arma, o segundo na MESMA ação da MESMA Soul manda.
+ * Qualquer outro clique rearma nele — um recraft armado nunca confirma um descartar.
  */
-export function cliqueNoRecraft(armada: string | null, soulId: string): { readonly enviar: boolean; readonly armada: string | null } {
-  return armada === soulId ? { enviar: true, armada: null } : { enviar: false, armada: soulId };
+export function cliqueEmDoisTempos(
+  armada: string | null,
+  acao: AcaoEmDoisTempos,
+  soulId: string,
+): { readonly enviar: boolean; readonly armada: string | null } {
+  const chave = `${acao}:${soulId}`;
+  return armada === chave ? { enviar: true, armada: null } : { enviar: false, armada: chave };
 }
